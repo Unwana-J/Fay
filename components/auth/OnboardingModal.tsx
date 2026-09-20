@@ -375,7 +375,8 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                   onClick={handleComplete}
                   className="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-lg"
                 >
-                  <Sparkles size={16} /> Enter Fey
+                  <span>Enter Fey</span>
+                  <ArrowRight size={15} />
                 </button>
               </div>
             </motion.div>
