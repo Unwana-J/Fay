@@ -4,20 +4,30 @@ import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
-  Users, Globe, Lock, Copy, Check, Clock, Mic, StopCircle,
-  ChevronRight, Star, ThumbsUp, ArrowLeft, Play, Share2
+  Globe, Lock, Copy, Check, Mic, StopCircle,
+  ChevronRight, Star, ArrowLeft, Play, Pause, Volume2, RotateCcw
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 import { useCommunityStore } from "@/store/useCommunityStore";
 import { useAppStore } from "@/store/useAppStore";
 import {
+  type ResearchRoom,
   type RoomParticipant,
-  type RoomSubmission,
   type CommunityUser,
   encodeRoomPayload,
   decodeRoomPayload
 } from "@/lib/mockCommunity";
 import UserAvatar from "@/components/ui/UserAvatar";
 import UserProfileModal from "@/components/community/UserProfileModal";
+
+function blobToBase64(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => resolve(reader.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(blob);
+  });
+}
 
 const CATEGORY_COLORS: Record<string, string> = {
   "Artificial Intelligence": "#7A1C2E",
@@ -123,18 +133,41 @@ export default function RoomPage() {
   const [hoverStar, setHoverStar] = useState<Record<string, number>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Audio recording & playback state
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioBase64, setAudioBase64] = useState<string | null>(null);
+  const [playingSubId, setPlayingSubId] = useState<string | null>(null);
+
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const chunksRef = useRef<Blob[]>([]);
+  const streamRef = useRef<MediaStream | null>(null);
+  const selfAudioRef = useRef<HTMLAudioElement | null>(null);
+  const subAudioRef = useRef<HTMLAudioElement | null>(null);
+
   // Sync room from URL param if opened via shared link
   useEffect(() => {
     const rParam = searchParams.get("r");
     if (rParam) {
       const decoded = decodeRoomPayload(rParam);
       if (decoded && decoded.id) {
-        importRoom(decoded as any);
+        importRoom(decoded as unknown as ResearchRoom);
       }
     }
   }, [searchParams]);
 
   const room = rooms.find((r) => r.id === roomId || r.inviteCode === roomId);
+
+  // Clean up audio stream & playback on unmount
+  useEffect(() => {
+    return () => {
+      if (streamRef.current) {
+        streamRef.current.getTracks().forEach((t) => t.stop());
+      }
+      if (timerRef.current) clearInterval(timerRef.current);
+      if (selfAudioRef.current) selfAudioRef.current.pause();
+      if (subAudioRef.current) subAudioRef.current.pause();
+    };
+  }, []);
 
   // Auto-join room when ready
   useEffect(() => {
@@ -188,15 +221,83 @@ export default function RoomPage() {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const startRecording = () => {
+  const startRecording = async () => {
+    setAudioUrl(null);
+    setAudioBase64(null);
     setRecording(true);
     setRecordingSec(0);
-    timerRef.current = setInterval(() => setRecordingSec((s) => s + 1), 1000);
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      streamRef.current = stream;
+      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
+      const mr = new MediaRecorder(stream, { mimeType });
+      mediaRecorderRef.current = mr;
+      chunksRef.current = [];
+
+      mr.ondataavailable = (e) => {
+        if (e.data.size > 0) chunksRef.current.push(e.data);
+      };
+
+      mr.onstop = async () => {
+        const blob = new Blob(chunksRef.current, { type: mimeType });
+        const url = URL.createObjectURL(blob);
+        setAudioUrl(url);
+        try {
+          const b64 = await blobToBase64(blob);
+          setAudioBase64(b64);
+        } catch (err) {
+          console.error("Failed to convert recording to base64", err);
+        }
+        if (streamRef.current) {
+          streamRef.current.getTracks().forEach((t) => t.stop());
+          streamRef.current = null;
+        }
+      };
+
+      mr.start(200);
+
+      timerRef.current = setInterval(() => {
+        setRecordingSec((s) => {
+          if (s + 1 >= (room?.speakingDurationSec || 60)) {
+            stopRecording();
+            return s + 1;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    } catch (err) {
+      console.warn("Microphone access not available or denied; using fallback timer", err);
+      timerRef.current = setInterval(() => {
+        setRecordingSec((s) => {
+          if (s + 1 >= (room?.speakingDurationSec || 60)) {
+            stopRecording();
+            return s + 1;
+          }
+          return s + 1;
+        });
+      }, 1000);
+    }
   };
 
   const stopRecording = () => {
     setRecording(false);
-    if (timerRef.current) clearInterval(timerRef.current);
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    if (mediaRecorderRef.current && mediaRecorderRef.current.state !== "inactive") {
+      mediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleResetRecording = () => {
+    setAudioUrl(null);
+    setAudioBase64(null);
+    setRecordingSec(0);
+    if (selfAudioRef.current) {
+      selfAudioRef.current.pause();
+    }
   };
 
   const handleSubmit = () => {
@@ -210,9 +311,28 @@ export default function RoomPage() {
         bio: profile.bio,
         xp: profile.xp,
         level: Math.floor(profile.xp / 500) + 1,
-      }
+      },
+      audioBase64 || undefined
     );
     setSubmitted(true);
+  };
+
+  const handlePlaySub = (subId: string, b64?: string) => {
+    if (!b64) return;
+    if (playingSubId === subId) {
+      if (subAudioRef.current) subAudioRef.current.pause();
+      setPlayingSubId(null);
+      return;
+    }
+
+    if (subAudioRef.current) {
+      subAudioRef.current.pause();
+      subAudioRef.current.src = b64;
+      subAudioRef.current.currentTime = 0;
+      subAudioRef.current.play().then(() => {
+        setPlayingSubId(subId);
+      }).catch(console.error);
+    }
   };
 
   return (
@@ -275,7 +395,7 @@ export default function RoomPage() {
           <div className="text-4xl mb-4">🚪</div>
           <h2 className="font-space font-bold text-xl mb-2" style={{ color: "var(--text)" }}>Waiting in Lobby</h2>
           <p className="text-sm mb-6" style={{ color: "var(--text-dim)" }}>
-            Invite friends using code <strong>{room.inviteCode}</strong>, then start when everyone's ready.
+            Invite friends using code <strong>{room.inviteCode}</strong>, then start when everyone&apos;s ready.
           </p>
           {isHost && (
             <button
@@ -338,10 +458,11 @@ export default function RoomPage() {
                 key="start"
                 initial={{ scale: 0.9 }} animate={{ scale: 1 }}
                 onClick={startRecording}
-                className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6"
+                className="w-20 h-20 rounded-full mx-auto flex items-center justify-center mb-6 shadow-md cursor-pointer"
                 style={{ background: "var(--terra)" }}
                 whileHover={{ scale: 1.08 }}
                 whileTap={{ scale: 0.95 }}
+                title="Click to start recording"
               >
                 <Mic size={28} color="white" />
               </motion.button>
@@ -349,26 +470,74 @@ export default function RoomPage() {
               <motion.div key="recording" initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="mb-6">
                 <motion.button
                   onClick={stopRecording}
-                  className="w-20 h-20 rounded-full mx-auto flex items-center justify-center"
+                  className="w-20 h-20 rounded-full mx-auto flex items-center justify-center cursor-pointer"
                   style={{ background: "#DC2626" }}
                   whileHover={{ scale: 1.08 }}
                   animate={{ boxShadow: ["0 0 0 0 rgba(220,38,38,0.4)", "0 0 0 14px rgba(220,38,38,0)", "0 0 0 0 rgba(220,38,38,0)"] }}
                   transition={{ repeat: Infinity, duration: 1.5 }}
+                  title="Click to stop recording"
                 >
                   <StopCircle size={28} color="white" />
                 </motion.button>
                 <div className="font-mono text-2xl font-bold mt-4" style={{ color: "var(--text)" }}>
                   {String(Math.floor(recordingSec / 60)).padStart(2, "0")}:{String(recordingSec % 60).padStart(2, "0")}
                 </div>
+                <p className="text-xs mt-1 text-[var(--text-mute)]">Click to finish your speech</p>
               </motion.div>
             )}
           </AnimatePresence>
 
           {!recording && recordingSec > 0 && (
-            <button onClick={handleSubmit} className="btn-terra">
-              Submit Recording →
-            </button>
+            <div className="max-w-md mx-auto space-y-4">
+              {audioUrl ? (
+                <div
+                  className="rounded-xl p-4 border text-left surface-input"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-xs font-semibold flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                      <Volume2 size={13} className="text-[var(--terra)]" /> Review Your Recording
+                    </span>
+                    <span className="text-xs font-mono" style={{ color: "var(--text-mute)" }}>
+                      {String(Math.floor(recordingSec / 60)).padStart(2, "0")}:{String(recordingSec % 60).padStart(2, "0")}
+                    </span>
+                  </div>
+
+                  <audio
+                    ref={selfAudioRef}
+                    controls
+                    src={audioUrl}
+                    className="w-full h-9 rounded-lg"
+                  />
+
+                  <div className="flex items-center justify-between mt-3 pt-2 border-t" style={{ borderColor: "var(--border-dim)" }}>
+                    <button
+                      type="button"
+                      onClick={handleResetRecording}
+                      className="text-xs text-[var(--text-mute)] hover:text-[var(--terra)] transition-colors flex items-center gap-1 cursor-pointer"
+                    >
+                      <RotateCcw size={12} /> Re-record explanation
+                    </button>
+                    <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+                      Sound good? Ready to submit!
+                    </span>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-[var(--text-mute)]">Recorded {recordingSec}s.</p>
+              )}
+
+              <div className="flex items-center justify-center gap-3">
+                <button onClick={handleSubmit} className="btn-terra px-6 py-2.5 rounded-xl font-semibold">
+                  Submit Recording →
+                </button>
+                <button onClick={handleResetRecording} className="btn-ghost px-4 py-2.5 rounded-xl text-xs">
+                  Discard & Retry
+                </button>
+              </div>
+            </div>
           )}
+
           {!recording && recordingSec === 0 && (
             <p className="text-xs" style={{ color: "var(--text-mute)" }}>Tap the mic to start recording.</p>
           )}
@@ -380,9 +549,14 @@ export default function RoomPage() {
         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="surface rounded-2xl p-8 text-center">
           <div className="text-4xl mb-4">✅</div>
           <h2 className="font-space font-bold text-xl mb-2" style={{ color: "var(--text)" }}>Recording Submitted!</h2>
-          <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-            Waiting for other participants to finish...
+          <p className="text-sm mb-4" style={{ color: "var(--text-dim)" }}>
+            Waiting for other participants to finish speaking...
           </p>
+          {audioUrl && (
+            <div className="max-w-xs mx-auto">
+              <audio controls src={audioUrl} className="w-full h-8" />
+            </div>
+          )}
         </motion.div>
       )}
 
@@ -392,15 +566,11 @@ export default function RoomPage() {
           <div className="text-label mb-1">Vote on Submissions</div>
           {room.submissions.map((sub) => {
             const hover = hoverStar[sub.id] || 0;
+            const isPlaying = playingSubId === sub.id;
             return (
               <div key={sub.id} className="surface rounded-xl p-5">
                 <div className="flex items-center gap-2.5 mb-3">
-                  <div
-                    className="w-8 h-8 rounded-full flex items-center justify-center border"
-                    style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}
-                  >
-                    {sub.user.avatar}
-                  </div>
+                  <UserAvatar avatar={sub.user.avatar} size="sm" />
                   <div>
                     <div className="text-xs font-bold" style={{ color: "var(--text)" }}>{sub.user.username}</div>
                     <div className="text-[10px]" style={{ color: "var(--text-mute)" }}>
@@ -408,22 +578,54 @@ export default function RoomPage() {
                     </div>
                   </div>
                 </div>
+
                 <div
                   className="rounded-lg px-4 py-2.5 flex items-center gap-3 mb-3"
                   style={{ background: "var(--bg-input)" }}
                 >
                   <button
-                    className="w-7 h-7 rounded-full flex items-center justify-center"
+                    type="button"
+                    onClick={() => handlePlaySub(sub.id, sub.audioBase64)}
+                    disabled={!sub.audioBase64}
+                    className={cn(
+                      "w-8 h-8 rounded-full flex items-center justify-center transition-all hover:scale-105",
+                      !sub.audioBase64 ? "opacity-35 cursor-not-allowed" : "cursor-pointer"
+                    )}
                     style={{ background: catColor }}
+                    title={sub.audioBase64 ? (isPlaying ? "Pause" : "Play recording") : "No audio recorded"}
                   >
-                    <Play size={10} color="white" />
+                    {isPlaying ? (
+                      <Pause size={12} color="white" />
+                    ) : (
+                      <Play size={12} color="white" className="ml-0.5" />
+                    )}
                   </button>
+
                   <div className="flex-1 flex items-center gap-0.5 h-4">
-                    {Array.from({ length: 28 }).map((_, i) => (
-                      <div key={i} className="w-0.5 rounded-full" style={{ height: `${Math.max(20, Math.random() * 100)}%`, background: `${catColor}60` }} />
+                    {Array.from({ length: 30 }).map((_, i) => (
+                      <motion.div
+                        key={i}
+                        className="w-0.5 rounded-full"
+                        animate={
+                          isPlaying
+                            ? { height: ["25%", `${Math.max(30, ((i * 13) % 85) + 15)}%`, "25%"] }
+                            : { height: "30%" }
+                        }
+                        transition={
+                          isPlaying
+                            ? { duration: 0.6, repeat: Infinity, delay: (i % 6) * 0.08 }
+                            : {}
+                        }
+                        style={{ background: isPlaying ? catColor : `${catColor}60` }}
+                      />
                     ))}
                   </div>
+
+                  <span className="text-[11px] font-mono shrink-0" style={{ color: "var(--text-mute)" }}>
+                    {sub.audioBase64 ? (isPlaying ? "Playing" : `${Math.floor(sub.durationSec / 60)}:${String(sub.durationSec % 60).padStart(2, "0")}`) : "No audio"}
+                  </span>
                 </div>
+
                 <div className="flex items-center gap-3">
                   {[1, 2, 3].map((n) => (
                     <button
@@ -464,20 +666,51 @@ export default function RoomPage() {
               View Topic Leaderboard <ChevronRight size={14} />
             </a>
           </div>
-          {room.submissions.map((sub, i) => (
-            <div key={sub.id} className="surface rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <span className="font-bold text-lg">{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
-                <span className="text-sm font-medium" style={{ color: "var(--text)" }}>{sub.user.username}</span>
+          {room.submissions.map((sub, i) => {
+            const isPlaying = playingSubId === sub.id;
+            return (
+              <div key={sub.id} className="surface rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <span className="font-bold text-lg">{i === 0 ? "🥇" : i === 1 ? "🥈" : "🥉"}</span>
+                  <UserAvatar avatar={sub.user.avatar} size="sm" />
+                  <div>
+                    <span className="text-sm font-semibold" style={{ color: "var(--text)" }}>{sub.user.username}</span>
+                    <div className="text-[10px]" style={{ color: "var(--text-mute)" }}>
+                      {Math.floor(sub.durationSec / 60)}:{String(sub.durationSec % 60).padStart(2, "0")}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-3">
+                  {sub.audioBase64 && (
+                    <button
+                      type="button"
+                      onClick={() => handlePlaySub(sub.id, sub.audioBase64)}
+                      className="px-3 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1.5 transition-all hover:bg-[var(--bg-input)] cursor-pointer"
+                      style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                    >
+                      {isPlaying ? <Pause size={12} /> : <Play size={12} />}
+                      <span>{isPlaying ? "Pause" : "Listen"}</span>
+                    </button>
+                  )}
+                  <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-mute)" }}>
+                    <span>★ {sub.votes.avgStars.toFixed(1)}</span>
+                    <span>↑ {sub.votes.upvotes}</span>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-3 text-xs" style={{ color: "var(--text-mute)" }}>
-                <span>★ {sub.votes.avgStars.toFixed(1)}</span>
-                <span>↑ {sub.votes.upvotes}</span>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </motion.div>
       )}
+
+      {/* Hidden audio element for submission playback */}
+      <audio
+        ref={subAudioRef}
+        onEnded={() => setPlayingSubId(null)}
+        onError={() => setPlayingSubId(null)}
+        className="hidden"
+      />
 
       {/* User profile inspection & follow modal */}
       <UserProfileModal
