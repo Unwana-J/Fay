@@ -2,10 +2,10 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, ArrowRight, ArrowLeft, Check, Compass, BookOpen } from "lucide-react";
+import { Sparkles, ArrowRight, ArrowLeft, Check, Compass, BookOpen, ChevronDown } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/topics";
-import { AVATARS, DEFAULT_AVATAR_PATH } from "@/lib/avatars";
+import { AVATARS, DEFAULT_AVATAR_PATH, PRESET_MISSIONS } from "@/lib/avatars";
 import UserAvatar from "@/components/ui/UserAvatar";
 
 export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
@@ -13,7 +13,8 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR_PATH);
-  const [bio, setBio] = useState("");
+  const [mission, setMission] = useState(PRESET_MISSIONS[0]);
+  const [customMission, setCustomMission] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
     "Artificial Intelligence",
     "Technology",
@@ -47,10 +48,14 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
   }
 
   function handleComplete() {
+    const finalBio = mission.startsWith("Custom")
+      ? (customMission.trim() || "Building knowledge one topic at a time.")
+      : mission;
+
     createAccount({
       username: username.trim(),
       avatar,
-      bio: bio.trim() || "Building knowledge one topic at a time.",
+      bio: finalBio,
       interests: selectedCategories,
     });
   }
@@ -185,20 +190,49 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                 />
               </div>
 
-              {/* Bio / Motivation */}
+              {/* Learning Mission Dropdown */}
               <div>
                 <label className="text-xs font-semibold block mb-1.5" style={{ color: "var(--text)" }}>
-                  Your Learning Mission <span className="text-[10px] font-normal" style={{ color: "var(--text-mute)" }}>(Optional)</span>
+                  Your Learning Mission
                 </label>
-                <input
-                  type="text"
-                  maxLength={100}
-                  placeholder="e.g. Sharpening my verbal communication skills."
-                  value={bio}
-                  onChange={(e) => setBio(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border text-xs focus:outline-none transition-all surface-input"
-                  style={{ borderColor: "var(--border)", color: "var(--text)" }}
-                />
+                <div className="relative">
+                  <select
+                    value={mission}
+                    onChange={(e) => setMission(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium focus:outline-none transition-all surface-input appearance-none pr-10 cursor-pointer"
+                    style={{ borderColor: "var(--border)", color: "var(--text)" }}
+                  >
+                    {PRESET_MISSIONS.map((m) => (
+                      <option key={m} value={m} style={{ background: "var(--bg-card)", color: "var(--text)" }}>
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown
+                    size={15}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 pointer-events-none"
+                    style={{ color: "var(--text-mute)" }}
+                  />
+                </div>
+
+                {mission.startsWith("Custom") && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mt-2"
+                  >
+                    <input
+                      type="text"
+                      maxLength={100}
+                      placeholder="e.g. Synthesizing research into actionable insights."
+                      value={customMission}
+                      onChange={(e) => setCustomMission(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border text-xs focus:outline-none transition-all surface-input"
+                      style={{ borderColor: "var(--border)", color: "var(--text)" }}
+                      autoFocus
+                    />
+                  </motion.div>
+                )}
               </div>
 
               {error && (

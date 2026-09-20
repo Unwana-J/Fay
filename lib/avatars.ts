@@ -44,3 +44,15 @@ export function resolveAvatarSrc(avatar?: string | null): { isImage: boolean; va
   // Legacy emoji fallback
   return { isImage: false, value: avatar };
 }
+
+export const PRESET_MISSIONS = [
+  "Sharpening verbal articulation & public speaking",
+  "Deepening critical thinking & mental models",
+  "Exploring new disciplines outside my comfort zone",
+  "Building a consistent daily research habit",
+  "Preparing for high-stakes presentations & interviews",
+  "Mastering technology, business & modern economics",
+  "Explaining complex ideas in simple, memorable terms",
+  "Custom (Write your own mission...)",
+];
+
