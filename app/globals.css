@@ -1,0 +1,498 @@
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+@import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════
+   FEY DESIGN SYSTEM — Bookish Print Editorial (Burgundy & Forest Olive)
+   ═══════════════════════════════════════════════════════════════════
+   Color semantics:
+   --terra     → Primary action ONLY: CTAs, start buttons, record (Wine Red)
+   --gold      → Rewards ONLY: XP, achievements, stars (Bronze Gold)
+   --olive     → Structural: borders, labels, tags, nav active
+   --red       → Urgency ONLY: timer low, errors, abandon
+   Everything else: surfaces + text
+   ═══════════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Surfaces (Warm vintage book paper) ── */
+  --bg-base:    #F4EFE6;   /* warm cream book canvas */
+  --bg-panel:   #EBE5DA;   /* warm sand sidebar background (light-mode cohesive) */
+  --bg-card:    #FDFCFA;   /* slightly lighter warm card surface */
+  --bg-input:   #DCD5C9;   /* warm sand accent for inputs & buttons */
+  --bg-overlay: #FDFCFA;   /* modals */
+
+  /* ── Olive — structural / informational ── */
+  --olive:      #444E2C;   /* deep forest olive green */
+  --olive-br:   #5C6A36;   /* medium bright olive green */
+  --olive-dim:  #DCD5C9;   /* soft sand divider line */
+  --olive-text: #333C1A;   /* high contrast forest text */
+
+  /* ── Terracotta (Burgundy / Wine Red) — ACTION only ── */
+  --terra:      #7A1C2E;   /* luxurious wine red */
+  --terra-dk:   #58101E;   /* 3D press bevel shadow */
+  --terra-bg:   rgba(122,28,46,0.06);
+
+  /* ── Gold — rewards only ── */
+  --gold:       #A67C1E;   /* bronze gold */
+  --gold-bg:    rgba(166,124,30,0.06);
+
+  /* ── Danger — urgency only ── */
+  --red:        #B53A3A;
+  --red-bg:     rgba(181,58,58,0.06);
+
+  /* ── Text (Light-mode page content) ── */
+  --text:       #1E2211;   /* primary text — deep forest black-brown */
+  --text-dim:   #525645;   /* secondary */
+  --text-mute:  #828574;   /* tertiary / disabled */
+
+  /* ── Borders ── */
+  --border:     rgba(68,78,44,0.18);   /* olive hairline border */
+  --border-dim: rgba(68,78,44,0.08);   /* thin divide stroke */
+
+  /* ── Fonts ── */
+  --font-serif: var(--font-serif);
+  --font-space: var(--font-space);
+  --font-inter: var(--font-inter);
+}
+
+/* ── Reset & Base ── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  background: var(--bg-base);
+  color: var(--text);
+  font-family: var(--font-inter), 'Inter', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  scroll-behavior: smooth;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 4px; height: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb {
+  background: var(--olive-dim);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover { background: var(--olive); }
+
+/* ── Selection ── */
+::selection {
+  background: rgba(92,106,54,0.12);
+  color: var(--text);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SURFACES — Flat, crisp printed blocks (no SaaS shadows)
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Primary card */
+.surface {
+  background: var(--bg-card);
+  border: 1px solid rgba(68,78,44,0.16);
+  box-shadow: none;
+}
+
+/* Raised card */
+.surface-raised {
+  background: var(--bg-card);
+  border: 1.5px solid rgba(68,78,44,0.26);
+  box-shadow: none;
+}
+
+/* Panel — sidebar, persistent nav */
+.surface-panel {
+  background: var(--bg-panel);
+  border-right: 1px solid var(--border-dim);
+}
+
+/* Input / interactive field */
+.surface-input {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  transition: border-color 150ms;
+}
+.surface-input:focus-within { border-color: var(--olive); }
+
+/* Modal overlay */
+.surface-modal {
+  background: rgba(244,239,230,0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid var(--border);
+}
+
+/* Olive-tinted card */
+.surface-olive {
+  background: rgba(92,106,54,0.03);
+  border: 1px solid var(--border);
+}
+
+/* Terra-tinted (challenge hero) */
+.surface-hero {
+  background: var(--bg-card);
+  border: 1.5px solid rgba(122,28,46,0.22);
+  box-shadow: none;
+}
+
+/* Legacy overrides */
+.glass {
+  background: var(--bg-card);
+  border: 1px solid var(--border-dim);
+}
+.glass-violet {
+  background: rgba(92,106,54,0.03);
+  border: 1px solid var(--border-dim);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BUTTONS — Duolingo 3D bevel system
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Primary CTA — burgundy, Duolingo-style 3D press */
+.btn-terra {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px 28px;
+  background: var(--terra);
+  color: #FFFFFF;
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: 0.01em;
+  border: none;
+  border-bottom: 4px solid var(--terra-dk);
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none;
+  transition: transform 75ms ease, border-bottom-width 75ms ease, background 150ms;
+}
+.btn-terra:hover { background: #8C2135; }
+.btn-terra:active {
+  transform: translateY(3px);
+  border-bottom-width: 1px;
+}
+.btn-terra:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+}
+
+/* Secondary — olive outline */
+.btn-olive {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 24px;
+  background: transparent;
+  color: var(--olive-text);
+  font-weight: 600;
+  font-size: 14px;
+  border: 1.5px solid var(--olive);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+.btn-olive:hover {
+  background: rgba(92,106,54,0.05);
+  color: var(--olive-text);
+  border-color: var(--olive-br);
+}
+
+/* Ghost */
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 10px 16px;
+  background: var(--bg-card);
+  color: var(--text-dim);
+  font-weight: 500;
+  font-size: 13px;
+  border: 1px solid var(--olive-dim);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 150ms, color 150ms, border-color 150ms;
+}
+.btn-ghost:hover {
+  background: var(--bg-panel);
+  color: var(--text);
+  border-color: var(--olive-br);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SIDEBAR NAVIGATION SYSTEM (Light Sand Theme Matching Print base)
+   ═══════════════════════════════════════════════════════════════════ */
+
+.nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 550;
+  color: var(--text-dim);
+  border-left: 2px solid transparent;
+  transition: all 150ms;
+  cursor: pointer;
+}
+.nav-item:hover {
+  color: var(--text);
+  background: rgba(68,78,44,0.04);
+  border-left-color: var(--olive-dim);
+}
+.nav-item.active {
+  color: var(--terra);
+  background: rgba(122,28,46,0.05);
+  border-left-color: var(--terra);
+  font-weight: 650;
+}
+.nav-item.active svg {
+  color: var(--terra);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   TYPOGRAPHY SYSTEM
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Display — Lora Serif for high-end print look */
+.text-display {
+  font-family: var(--font-serif), 'Lora', Georgia, serif;
+  font-size: clamp(2.25rem, 5vw, 3.5rem);
+  font-weight: 700;
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+  color: var(--text);
+}
+
+.text-stat {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: clamp(2.5rem, 5vw, 4rem);
+  font-weight: 600;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  color: var(--text);
+}
+
+.text-heading {
+  font-family: var(--font-serif), 'Lora', Georgia, serif;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  color: var(--text);
+}
+
+.text-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-mute);
+}
+
+.text-olive {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--olive-text);
+}
+
+/* ── Print divider line ── */
+.print-divider {
+  border-bottom: 2px solid var(--olive);
+  margin-bottom: 20px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ANIMATIONS
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes shimmer {
+  0% { background-position: -200% 0; }
+  100% { background-position: 200% 0; }
+}
+.shimmer {
+  background: linear-gradient(90deg, transparent 25%, rgba(92,106,54,0.06) 50%, transparent 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.6s infinite;
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-6px); }
+}
+.float { animation: float 3.5s ease-in-out infinite; }
+
+@keyframes pulse-ring {
+  0% { transform: scale(1); opacity: 0.7; }
+  70% { transform: scale(1.6); opacity: 0; }
+  100% { transform: scale(1.6); opacity: 0; }
+}
+.pulse-ring::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  border: 2px solid currentColor;
+  animation: pulse-ring 2s ease-out infinite;
+}
+
+.xp-float {
+  animation: xp-float 1.4s ease-out forwards;
+  pointer-events: none;
+  position: absolute;
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 700;
+  color: var(--gold);
+  font-size: 1rem;
+  z-index: 50;
+}
+
+.flame-pulse { animation: flame-pulse 1.8s ease-in-out infinite; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TAG / BADGE PILLS
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 5px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+.tag-olive {
+  background: rgba(92,106,54,0.05);
+  color: var(--olive-text);
+  border: 1px solid var(--olive-dim);
+}
+.tag-terra {
+  background: var(--terra-bg);
+  color: var(--terra);
+  border: 1px solid rgba(122,28,46,0.12);
+}
+.tag-gold {
+  background: var(--gold-bg);
+  color: var(--gold);
+  border: 1px solid rgba(166,124,30,0.12);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HEATMAP
+   ═══════════════════════════════════════════════════════════════════ */
+
+.heat-0 { background: var(--olive-dim); }
+.heat-1 { background: rgba(92,106,54,0.18); }
+.heat-2 { background: rgba(92,106,54,0.42); }
+.heat-3 { background: var(--olive); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   TIPTAP EDITOR
+   ═══════════════════════════════════════════════════════════════════ */
+
+.tiptap {
+  min-height: 200px;
+  outline: none;
+  font-size: 14px;
+  line-height: 1.75;
+  color: var(--text);
+}
+.tiptap h1 { font-family: var(--font-serif), 'Lora', Georgia, serif; font-size: 1.5em; font-weight: 700; margin: 0.75em 0 0.4em; }
+.tiptap h2 { font-family: var(--font-serif), 'Lora', Georgia, serif; font-size: 1.25em; font-weight: 600; margin: 0.6em 0 0.3em; }
+.tiptap p { margin: 0 0 0.75em; }
+.tiptap strong { font-weight: 700; color: var(--text); }
+.tiptap em { color: var(--olive-text); font-style: italic; }
+.tiptap ul { list-style: disc; padding-left: 1.5em; margin: 0.5em 0; }
+.tiptap ol { list-style: decimal; padding-left: 1.5em; margin: 0.5em 0; }
+.tiptap li { margin: 0.25em 0; }
+.tiptap a { color: var(--olive-br); text-decoration: underline; }
+.tiptap code {
+  background: rgba(92,106,54,0.06);
+  border-radius: 4px;
+  padding: 0.1em 0.4em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85em;
+}
+.tiptap blockquote {
+  border-left: 3px solid var(--olive-dim);
+  padding-left: 1em;
+  color: var(--text-dim);
+  font-style: italic;
+}
+.tiptap ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+.tiptap ul[data-type="taskList"] li { display: flex; align-items: flex-start; gap: 0.5em; }
+.tiptap ul[data-type="taskList"] li input[type="checkbox"] { margin-top: 3px; accent-color: var(--terra); }
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--text-mute);
+  pointer-events: none;
+  float: left;
+  height: 0;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   REACTFLOW OVERRIDES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.react-flow__background { background: var(--bg-base); }
+.react-flow__edge-path { stroke: var(--olive-dim); }
+.react-flow__attribution { display: none; }
+.react-flow__controls {
+  background: var(--bg-card);
+  border: 1px solid var(--olive-dim);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.react-flow__controls-button {
+  background: transparent;
+  border: none;
+  border-bottom: 1px solid var(--olive-dim);
+  color: var(--text-dim);
+  padding: 8px;
+}
+.react-flow__controls-button:hover { background: var(--bg-input); color: var(--text); }
+.react-flow__minimap {
+  background: var(--bg-card);
+  border: 1px solid var(--olive-dim);
+  border-radius: 10px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WAVEFORM
+   ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes wave-bar {
+  0%, 100% { transform: scaleY(0.3); }
+  50% { transform: scaleY(1); }
+}
+.wave-bar {
+  display: inline-block;
+  width: 3px;
+  border-radius: 2px;
+  transform-origin: bottom;
+  animation: wave-bar 0.8s ease-in-out infinite;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MISC UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
+
+.font-mono { font-family: 'IBM Plex Mono', monospace; }
+
+.divider {
+  height: 1px;
+  background: var(--olive-dim);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ml-64 { margin-left: 0 !important; }
+}
