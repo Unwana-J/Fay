@@ -7,7 +7,7 @@ import {
   ArrowLeft, ChevronRight, Clock, CheckCircle2, XCircle,
   RefreshCcw, BarChart3, Star, Zap, BookOpen
 } from "lucide-react";
-import { getShuffledQuestions, QUESTION_COUNTS, type TriviaQuestion, type TriviaCategory } from "@/lib/trivia-questions";
+import { getFreshQuestions, QUESTION_COUNTS, TRIVIA_QUESTIONS, type TriviaQuestion, type TriviaCategory } from "@/lib/trivia-questions";
 import { useAppStore } from "@/store/useAppStore";
 import { cn } from "@/lib/utils";
 
@@ -39,24 +39,63 @@ const OPTION_LABELS = ["A", "B", "C", "D"];
 
 // ─── Setup Screen ─────────────────────────────────────────────────────────────
 
-function SetupScreen({ onStart }: { onStart: (minutes: number, mode: ReviewMode) => void }) {
+function SetupScreen({
+  onStart,
+  seenCount,
+  totalCount,
+  onResetSeen,
+}: {
+  onStart: (minutes: number, mode: ReviewMode) => void;
+  seenCount: number;
+  totalCount: number;
+  onResetSeen: () => void;
+}) {
   const [duration, setDuration] = useState<DurationOption>(DURATION_OPTIONS[1]);
   const [mode, setMode] = useState<ReviewMode>("instant");
 
   return (
     <div className="min-h-screen p-8 max-w-2xl mx-auto flex flex-col justify-center">
       {/* Back */}
-      <Link href="/games" className="flex items-center gap-1.5 text-xs font-semibold mb-10 w-fit hover:text-[var(--text)] transition-colors" style={{ color: "var(--text-dim)" }}>
+      <Link href="/games" className="flex items-center gap-1.5 text-xs font-semibold mb-8 w-fit hover:text-[var(--text)] transition-colors" style={{ color: "var(--text-dim)" }}>
         <ArrowLeft size={13} /> Back to Games
       </Link>
 
       {/* Hero */}
-      <div className="text-center mb-10">
-        <div className="text-8xl mb-4">🇳🇬</div>
+      <div className="text-center mb-6">
+        <div className="text-7xl mb-3">🇳🇬</div>
         <h1 className="font-space text-4xl font-extrabold tracking-tight mb-2" style={{ color: "var(--text)" }}>Naija Trivia</h1>
         <p className="text-sm" style={{ color: "var(--text-dim)" }}>
           Test your knowledge of Nigerian history, pop culture &amp; general knowledge.
         </p>
+      </div>
+
+      {/* Bank Progress & Deduplication Tracker */}
+      <div className="surface rounded-2xl p-4 border mb-6 flex items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-[var(--olive)]/10 text-[var(--olive)] flex items-center justify-center font-space font-bold text-sm">
+            🎯
+          </div>
+          <div>
+            <div className="text-xs font-bold" style={{ color: "var(--text)" }}>
+              {seenCount} of {totalCount} questions explored
+            </div>
+            <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+              {seenCount >= totalCount
+                ? "You have explored all questions! Next game will cycle fresh."
+                : "No repeats — you will only see fresh questions until the bank is exhausted."}
+            </div>
+          </div>
+        </div>
+        {seenCount > 0 && (
+          <button
+            onClick={onResetSeen}
+            title="Reset question history to allow all questions again"
+            className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border hover:bg-[var(--bg-input)] transition-colors shrink-0"
+            style={{ color: "var(--text-mute)", borderColor: "var(--border-dim)" }}
+          >
+            Reset History
+          </button>
+        )}
       </div>
 
       <div className="space-y-6">
@@ -480,7 +519,12 @@ function ResultsScreen({
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
 
 export default function TriviaPage() {
-  const { addXP } = useAppStore();
+  const {
+    addXP,
+    seenTriviaQuestionIds = [],
+    markTriviaQuestionsSeen,
+    resetSeenTriviaQuestions,
+  } = useAppStore();
   const [phase, setPhase] = useState<GamePhase>("setup");
   const [questions, setQuestions] = useState<TriviaQuestion[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
@@ -490,7 +534,20 @@ export default function TriviaPage() {
 
   function handleStart(minutes: number, mode: ReviewMode) {
     const count = QUESTION_COUNTS[minutes];
-    setQuestions(getShuffledQuestions(count));
+    const { questions: freshQuestions, wasReset } = getFreshQuestions(
+      count,
+      seenTriviaQuestionIds
+    );
+
+    // If the bank was completely exhausted and cycle reset, clear the seen list first
+    if (wasReset) {
+      resetSeenTriviaQuestions();
+    }
+
+    // Mark current selected questions as seen
+    markTriviaQuestionsSeen(freshQuestions.map((q) => q.id));
+
+    setQuestions(freshQuestions);
     setTotalSeconds(minutes * 60);
     setReviewMode(mode);
     setPhase("playing");
@@ -519,7 +576,12 @@ export default function TriviaPage() {
     <AnimatePresence mode="wait">
       {phase === "setup" && (
         <motion.div key="setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <SetupScreen onStart={handleStart} />
+          <SetupScreen
+            onStart={handleStart}
+            seenCount={seenTriviaQuestionIds.length}
+            totalCount={TRIVIA_QUESTIONS.length}
+            onResetSeen={resetSeenTriviaQuestions}
+          />
         </motion.div>
       )}
       {phase === "playing" && (

@@ -80,6 +80,9 @@ export interface AppState {
   // Custom topics
   customTopics: Topic[];
 
+  // Trivia tracking
+  seenTriviaQuestionIds: string[];
+
   // Actions
   startSession: (topic: Topic, researchMin: number) => string;
   updateActiveSessionStage: (stage: ActiveSession["stage"]) => void;
@@ -99,6 +102,8 @@ export interface AppState {
   addCustomTopic: (topic: Omit<Topic, "id">) => void;
   removeCustomTopic: (id: string) => void;
   addXP: (amount: number) => void;
+  markTriviaQuestionsSeen: (ids: string[]) => void;
+  resetSeenTriviaQuestions: () => void;
 }
 
 const DEFAULT_ENABLED_CATEGORIES = [
@@ -148,6 +153,7 @@ export const useAppStore = create<AppState>()(
         mode: "roulette",
       },
       customTopics: [],
+      seenTriviaQuestionIds: [],
 
       startSession: (topic, researchMin) => {
         const id = uid();
@@ -330,6 +336,16 @@ export const useAppStore = create<AppState>()(
             xp: s.profile.xp + amount,
           },
         })),
+
+      markTriviaQuestionsSeen: (ids) =>
+        set((s) => {
+          const current = s.seenTriviaQuestionIds || [];
+          const merged = Array.from(new Set([...current, ...ids]));
+          return { seenTriviaQuestionIds: merged };
+        }),
+
+      resetSeenTriviaQuestions: () =>
+        set({ seenTriviaQuestionIds: [] }),
     }),
     {
       name: "fey-app-store",
