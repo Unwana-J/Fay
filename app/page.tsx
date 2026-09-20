@@ -4,8 +4,8 @@ import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  Flame, Zap, BookOpen, Mic, ArrowRight,
-  Star, ChevronRight, Shuffle, Trophy
+  Zap, BookOpen, Mic, ArrowRight,
+  Star, Shuffle
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress, getNextLevel, ACHIEVEMENTS } from "@/lib/achievements";
@@ -14,6 +14,7 @@ import { relativeDate, getLast52Weeks, getDayOfWeek } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import FeyLogo from "@/components/ui/FeyLogo";
+import FocusCategoryModal from "@/components/dashboard/FocusCategoryModal";
 
 const DAYS_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -187,13 +188,16 @@ const cardVariants = {
 /* ─── Dashboard ──────────────────────────────────────────────────── */
 export default function Dashboard() {
   const router = useRouter();
-  const { profile, streak, sessions, activeSession, settings, startSession } = useAppStore();
+  const { profile, streak, sessions, activeSession, settings, customTopics, startSession } = useAppStore();
   const level     = getLevelForXP(profile.xp);
   const nextLevel = getNextLevel(profile.xp);
   const progress  = getLevelProgress(profile.xp);
   const [mounted, setMounted] = useState(false);
   const [skippedToday, setSkippedToday] = useState<string[]>([]);
   const [spinning, setSpinning] = useState(false);
+  const [focusCategory, setFocusCategory] = useState<string | null>(null);
+  const [showFocusModal, setShowFocusModal] = useState(false);
+  const [spinOffset, setSpinOffset] = useState(0);
   useEffect(() => setMounted(true), []);
 
   if (!mounted) return null;
@@ -208,10 +212,10 @@ export default function Dashboard() {
 
   /* ── Smart topic suggestion ──────────────────────────────────────────────
      Rules (in priority order):
-     1. Never show a topic the user has already completed
-     2. Prefer the user's enabled categories
-     3. Stable across the day — same topic until midnight or user skips
-     4. If all topics in enabled categories are done, open to all categories
+     1. If focusCategory is set, strictly pick from that category
+     2. Otherwise, strictly prefer the user's favorite and enabled categories
+     3. Never show a topic the user has already completed unless all are completed
+     4. Stable across the day, but changes when user skips or selects a focus
   ── */
   const completedTopicIds = new Set(sessions.map((s) => s.topicId));
 
@@ -221,29 +225,63 @@ export default function Dashboard() {
     return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
   })();
 
+  const allTopics = [...TOPIC_BANK, ...(customTopics || [])];
+
   const suggestedTopic = (() => {
     const excluded = new Set([...completedTopicIds, ...skippedToday]);
 
-    // Pool 1: enabled categories, not done, not skipped
-    let pool = TOPIC_BANK.filter(
-      (t) => settings.enabledCategories.includes(t.category) && !excluded.has(t.id)
+    // 1. If user chose a specific focus category via the modal
+    if (focusCategory) {
+      const focusPool = allTopics.filter(
+        (t) => t.category === focusCategory && !excluded.has(t.id)
+      );
+      if (focusPool.length > 0) {
+        return focusPool[(todayIndex + spinOffset) % focusPool.length];
+      }
+      const focusPoolAll = allTopics.filter((t) => t.category === focusCategory);
+      if (focusPoolAll.length > 0) {
+        return focusPoolAll[(todayIndex + spinOffset) % focusPoolAll.length];
+      }
+    }
+
+    // 2. User's active categories: prioritize favoriteCategories, then enabledCategories
+    const userCategories =
+      settings.favoriteCategories.length > 0
+        ? settings.favoriteCategories
+        : settings.enabledCategories.length > 0
+        ? settings.enabledCategories
+        : ["Artificial Intelligence", "Technology"];
+
+    // Pool 1: User's chosen categories, not done, not skipped
+    let pool = allTopics.filter(
+      (t) => userCategories.includes(t.category) && !excluded.has(t.id)
     );
 
-    // Pool 2: fallback — any category not done
-    if (pool.length === 0) {
-      pool = TOPIC_BANK.filter((t) => !excluded.has(t.id));
+    // Pool 2: If favorites exhausted, try other enabled categories (if any exist)
+    if (pool.length === 0 && settings.enabledCategories.length > 0) {
+      pool = allTopics.filter(
+        (t) => settings.enabledCategories.includes(t.category) && !excluded.has(t.id)
+      );
     }
 
-    // Pool 3: everything (user has done every topic — reset skips but keep completed filter)
+    // Pool 3: User categories even if skipped today
     if (pool.length === 0) {
-      pool = TOPIC_BANK.filter((t) => !completedTopicIds.has(t.id));
+      pool = allTopics.filter(
+        (t) => userCategories.includes(t.category) && !completedTopicIds.has(t.id)
+      );
     }
 
-    // Final fallback — everything (user has completed every topic)
-    if (pool.length === 0) pool = TOPIC_BANK;
+    // Pool 4: User categories reset
+    if (pool.length === 0) {
+      pool = allTopics.filter((t) => userCategories.includes(t.category));
+    }
 
-    // Stable pick for the day using seeded index
-    return pool[todayIndex % pool.length];
+    // Ultimate fallback if user has zero matching topics
+    if (pool.length === 0) {
+      pool = allTopics;
+    }
+
+    return pool[(todayIndex + spinOffset) % pool.length];
   })();
 
   function handleStartSuggested() {
@@ -256,8 +294,18 @@ export default function Dashboard() {
     setSpinning(true);
     setTimeout(() => {
       setSkippedToday((prev) => [...prev, suggestedTopic.id]);
+      setSpinOffset((prev) => prev + 1);
       setSpinning(false);
-    }, 1000);
+    }, 600);
+  }
+
+  function handleSelectFocus(category: string | null) {
+    setFocusCategory(category);
+    setSpinning(true);
+    setSpinOffset((prev) => prev + 1);
+    setTimeout(() => {
+      setSpinning(false);
+    }, 600);
   }
 
   const dailyQuote = DAILY_QUOTES[todayIndex % DAILY_QUOTES.length];
@@ -348,7 +396,40 @@ export default function Dashboard() {
               /* Suggested topic */
               <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                 <div className="flex-1 min-w-0">
-                  <div className="text-olive mb-3 text-label">Today's suggested topic</div>
+                  <div className="flex items-center gap-2.5 mb-3 flex-wrap">
+                    <div className="text-olive text-label">Today&apos;s suggested topic</div>
+                    {focusCategory ? (
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="text-[10px] uppercase font-mono tracking-wider font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 border"
+                          style={{
+                            backgroundColor: `${catColor}15`,
+                            color: catColor,
+                            borderColor: `${catColor}30`,
+                          }}
+                        >
+                          <span>Focus:</span> {focusCategory}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleSelectFocus(null)}
+                          className="text-[10px] text-[var(--text-mute)] hover:text-[var(--terra)] transition-colors px-1"
+                          title="Reset focus to all categories"
+                        >
+                          ✕ Clear
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => setShowFocusModal(true)}
+                        className="text-[10px] uppercase font-mono tracking-wider font-medium text-[var(--text-mute)] hover:text-[var(--olive-text)] transition-colors underline decoration-dotted"
+                        title="Click to focus on a specific category"
+                      >
+                        Customize focus
+                      </button>
+                    )}
+                  </div>
                   <p
                     className={cn(
                       "font-space font-bold mb-6 text-display transition-all duration-300",
@@ -363,20 +444,23 @@ export default function Dashboard() {
                     <button onClick={handleStartSuggested} className="btn-terra">
                       Begin Research <ArrowRight size={15} />
                     </button>
-                    <button onClick={handleSkipTopic} className="btn-ghost">
+                    <button onClick={handleSkipTopic} className="btn-ghost" title="Pick a different topic from your preferences">
                       <Shuffle size={13} /> Pick a different topic
                     </button>
                     <div className="flex items-center gap-2 ml-auto">
-                      <span
-                        className="tag font-bold"
+                      <button
+                        type="button"
+                        onClick={() => setShowFocusModal(true)}
+                        className="tag font-bold cursor-pointer hover:opacity-85 transition-all"
                         style={{
                           backgroundColor: `${catColor}15`,
                           color: catColor,
                           border: `1px solid ${catColor}30`,
                         }}
+                        title="Click to select or focus a category"
                       >
                         {CATEGORY_ICONS[heroCat]} {heroCat}
-                      </span>
+                      </button>
                       <span className="tag tag-olive capitalize">{suggestedTopic.difficulty}</span>
                       <span className="tag tag-gold">+{suggestedTopic.difficulty === "beginner" ? 100 : suggestedTopic.difficulty === "intermediate" ? 150 : 200} XP</span>
                     </div>
@@ -387,14 +471,14 @@ export default function Dashboard() {
                 <div className="flex flex-col items-center gap-2 shrink-0 self-center">
                   <button
                     disabled={spinning}
-                    onClick={handleSkipTopic}
-                    className="relative group w-20 h-20 rounded-2xl flex items-center justify-center border transition-all duration-300 hover:border-[var(--gold)]"
+                    onClick={() => setShowFocusModal(true)}
+                    className="relative group w-20 h-20 rounded-2xl flex items-center justify-center border transition-all duration-300 hover:border-[var(--gold)] hover:scale-105 cursor-pointer shadow-sm hover:shadow-md"
                     style={{
                       background: "var(--bg-input)",
-                      borderColor: "var(--border-dim)",
-                      boxShadow: "0 4px 12px rgba(0, 0, 0, 0.02)"
+                      borderColor: focusCategory ? catColor : "var(--border-dim)",
+                      boxShadow: focusCategory ? `0 0 0 1px ${catColor}35` : "0 4px 12px rgba(0, 0, 0, 0.02)"
                     }}
-                    title="Click to spin a different topic"
+                    title="Click to customize roulette focus or change category"
                   >
                     {spinning && (
                       <motion.div
@@ -405,8 +489,8 @@ export default function Dashboard() {
                     )}
                     <FeyLogo size={46} spinning={spinning} />
                   </button>
-                  <span className="text-[9px] uppercase tracking-[0.15em] font-mono" style={{ color: "var(--text-mute)" }}>
-                    {spinning ? "Spinning..." : "Click to Spin"}
+                  <span className="text-[9px] uppercase tracking-[0.15em] font-mono text-center" style={{ color: "var(--text-mute)" }}>
+                    {spinning ? "Spinning..." : focusCategory ? "Focused" : "Click to Focus"}
                   </span>
                 </div>
               </div>
@@ -637,6 +721,14 @@ export default function Dashboard() {
           )}
         </motion.div>
       </div>
+
+      {/* Topic Focus Modal */}
+      <FocusCategoryModal
+        isOpen={showFocusModal}
+        onClose={() => setShowFocusModal(false)}
+        activeFocus={focusCategory}
+        onSelectFocus={handleSelectFocus}
+      />
     </motion.div>
   );
 }

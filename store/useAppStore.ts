@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { type Topic, type Difficulty, DIFFICULTY_XP } from "@/lib/topics";
-import { ACHIEVEMENTS, checkNewAchievements, type AchievementStats } from "@/lib/achievements";
+import { checkNewAchievements, type AchievementStats } from "@/lib/achievements";
 import { todayStr, daysBetween, uid } from "@/lib/utils";
 
 export interface CompletedSession {
@@ -181,10 +181,7 @@ export const useAppStore = create<AppState>()(
           settings: {
             ...s.settings,
             favoriteCategories: interests.length > 0 ? interests : s.settings.favoriteCategories,
-            enabledCategories:
-              interests.length > 0
-                ? Array.from(new Set([...interests, ...s.settings.enabledCategories]))
-                : s.settings.enabledCategories,
+            enabledCategories: interests.length > 0 ? interests : s.settings.enabledCategories,
           },
         }));
       },
@@ -409,9 +406,10 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "fey-app-store",
-      version: 4,
+      version: 5,
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       migrate: (persistedState: any, fromVersion: number) => {
-        let state = { ...persistedState };
+        const state = { ...persistedState };
         // Always clear activeSession on cold start from persisted state 
         // to prevent being trapped in a stale session
         state.activeSession = null;
@@ -436,6 +434,17 @@ export const useAppStore = create<AppState>()(
           state.isOnboarded = Boolean(hasUsername || hasSessions);
           if (!state.profile?.avatar || state.profile.avatar === "🧠") {
             state.profile = { ...(state?.profile ?? {}), avatar: "/avatars/avatar-scholar.svg" };
+          }
+        }
+
+        // v4 → v5: ensure enabledCategories strictly reflects user's chosen favorite categories if set
+        if (fromVersion === undefined || fromVersion < 5) {
+          const favs: string[] = state?.settings?.favoriteCategories ?? [];
+          if (favs.length > 0) {
+            state.settings = {
+              ...(state?.settings ?? {}),
+              enabledCategories: favs,
+            };
           }
         }
 

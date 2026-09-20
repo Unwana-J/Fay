@@ -437,7 +437,24 @@ function DiscoverPageContent() {
           <div className="rounded-xl p-5 surface">
             <div className="flex items-center justify-between mb-3">
               <span className="text-label">Categories in pool</span>
-              <span className="text-xs font-mono" style={{ color: "var(--text-mute)" }}>{enabledPool.length} active</span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const allCatStrings = [...CATEGORIES];
+                    const allActive = allCatStrings.every((c) => settings.enabledCategories.includes(c));
+                    updateSettings({
+                      enabledCategories: allActive
+                        ? (settings.favoriteCategories.length > 0 ? settings.favoriteCategories : ["Artificial Intelligence", "Technology"])
+                        : allCatStrings,
+                    });
+                  }}
+                  className="text-[10px] font-mono text-[var(--olive-text)] hover:underline cursor-pointer"
+                >
+                  {CATEGORIES.every((c) => settings.enabledCategories.includes(c)) ? "Favorites only" : "Enable all"}
+                </button>
+                <span className="text-xs font-mono" style={{ color: "var(--text-mute)" }}>{enabledPool.length} active</span>
+              </div>
             </div>
             
             <div className="space-y-1 max-h-[380px] overflow-y-auto pr-1">
