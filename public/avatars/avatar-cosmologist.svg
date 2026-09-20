@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-cosmo" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#202847"/>
+      <stop offset="100%" stop-color="#0E1224"/>
+    </linearGradient>
+    <linearGradient id="skin-cosmo" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#F2D1BB"/>
+      <stop offset="100%" stop-color="#D9A88F"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="50" fill="url(#bg-cosmo)"/>
+  <circle cx="50" cy="50" r="48" fill="none" stroke="#E4D090" stroke-width="1.5" stroke-opacity="0.3"/>
+  <!-- Starfield & Constellation -->
+  <circle cx="25" cy="25" r="1.5" fill="#FFF"/>
+  <circle cx="75" cy="20" r="1.5" fill="#FFF"/>
+  <circle cx="80" cy="35" r="1" fill="#E4D090"/>
+  <line x1="75" y1="20" x2="80" y2="35" stroke="#E4D090" stroke-width="0.8" stroke-opacity="0.6"/>
+  <!-- Crescent Moon watermark -->
+  <path d="M24 16 C28 16 31 19 31 24 C31 29 27 32 22 32 C26 30 27 26 27 23 C27 19 25 17 24 16 Z" fill="#E4D090" opacity="0.7"/>
+  <!-- Deep Blue Robe -->
+  <path d="M22 100 C22 75 34 69 50 69 C66 69 78 75 78 100 Z" fill="#141930"/>
+  <path d="M46 69 L50 100 L54 69 Z" fill="#E4D090" opacity="0.4"/>
+  <rect x="44" y="56" width="12" height="16" rx="3" fill="url(#skin-cosmo)"/>
+  <!-- Head & Hair -->
+  <ellipse cx="50" cy="44" rx="17" ry="20" fill="url(#skin-cosmo)"/>
+  <path d="M31 38 C31 22 41 17 50 17 C59 17 69 22 69 38 C68 28 58 23 50 23 C42 23 32 28 31 38 Z" fill="#1C182B"/>
+  <path d="M31 34 C36 24 45 22 55 22 C64 22 69 30 69 34 C64 26 56 24 48 24 C39 24 34 28 31 34 Z" fill="#2E2845"/>
+  <!-- Dreamy Eyes -->
+  <circle cx="43" cy="44" r="2" fill="#130F1E"/>
+  <circle cx="57" cy="44" r="2" fill="#130F1E"/>
+  <circle cx="44" cy="43" r="0.7" fill="#FFF"/>
+  <circle cx="58" cy="43" r="0.7" fill="#FFF"/>
+  <path d="M39 38 C41 37 45 37 47 39" stroke="#2E2845" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <path d="M53 39 C55 37 59 37 61 38" stroke="#2E2845" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <path d="M46 54 C48 56 52 56 54 54" stroke="#874737" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+</svg>

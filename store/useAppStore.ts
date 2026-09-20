@@ -141,7 +141,7 @@ export const useAppStore = create<AppState>()(
         id: uid(),
         username: "",
         bio: "Building knowledge one topic at a time.",
-        avatar: "🧠",
+        avatar: "/avatars/avatar-scholar.svg",
         xp: 0,
         unlockedAchievements: [],
         createdAt: Date.now(),
@@ -174,7 +174,7 @@ export const useAppStore = create<AppState>()(
             ...s.profile,
             id: s.profile.id || uid(),
             username: username.trim(),
-            avatar: avatar || "🧠",
+            avatar: avatar || "/avatars/avatar-scholar.svg",
             bio: bio?.trim() || "Building knowledge one topic at a time.",
             createdAt: s.profile.createdAt || Date.now(),
           },
@@ -196,7 +196,7 @@ export const useAppStore = create<AppState>()(
             id: uid(),
             username: "",
             bio: "Building knowledge one topic at a time.",
-            avatar: "🧠",
+            avatar: "/avatars/avatar-scholar.svg",
             xp: 0,
             unlockedAchievements: [],
             createdAt: Date.now(),
@@ -434,8 +434,8 @@ export const useAppStore = create<AppState>()(
             state.profile.username !== "Learner";
           const hasSessions = Array.isArray(state?.sessions) && state.sessions.length > 0;
           state.isOnboarded = Boolean(hasUsername || hasSessions);
-          if (!state.profile?.avatar) {
-            state.profile = { ...(state?.profile ?? {}), avatar: "🧠" };
+          if (!state.profile?.avatar || state.profile.avatar === "🧠") {
+            state.profile = { ...(state?.profile ?? {}), avatar: "/avatars/avatar-scholar.svg" };
           }
         }
 

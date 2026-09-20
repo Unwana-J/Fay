@@ -5,27 +5,14 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, ArrowRight, ArrowLeft, Check, Compass, BookOpen } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/topics";
-
-const AVATAR_OPTIONS = [
-  { emoji: "🧠", label: "Mind" },
-  { emoji: "🎙️", label: "Speaker" },
-  { emoji: "🦉", label: "Scholar" },
-  { emoji: "⚡", label: "Catalyst" },
-  { emoji: "🚀", label: "Pioneer" },
-  { emoji: "📚", label: "Bookworm" },
-  { emoji: "🇳🇬", label: "Naija" },
-  { emoji: "💡", label: "Innovator" },
-  { emoji: "🎨", label: "Creative" },
-  { emoji: "🔬", label: "Scientist" },
-  { emoji: "🏛️", label: "Historian" },
-  { emoji: "🌍", label: "Explorer" },
-];
+import { AVATARS, DEFAULT_AVATAR_PATH } from "@/lib/avatars";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
   const { createAccount } = useAppStore();
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [username, setUsername] = useState("");
-  const [avatar, setAvatar] = useState("🧠");
+  const [avatar, setAvatar] = useState(DEFAULT_AVATAR_PATH);
   const [bio, setBio] = useState("");
   const [selectedCategories, setSelectedCategories] = useState<string[]>([
     "Artificial Intelligence",
@@ -136,29 +123,35 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                 <label className="text-xs font-semibold block mb-2" style={{ color: "var(--text)" }}>
                   Choose Your Learning Avatar
                 </label>
-                <div className="grid grid-cols-4 sm:grid-cols-6 gap-2">
-                  {AVATAR_OPTIONS.map((item) => {
-                    const isSelected = avatar === item.emoji;
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                  {AVATARS.map((item) => {
+                    const isSelected = avatar === item.path;
                     return (
                       <button
-                        key={item.emoji}
+                        key={item.id}
                         type="button"
-                        onClick={() => setAvatar(item.emoji)}
-                        className="flex flex-col items-center justify-center p-2.5 rounded-xl border transition-all text-center group"
+                        onClick={() => setAvatar(item.path)}
+                        className="flex flex-col items-center justify-center p-2 rounded-xl border transition-all text-center group"
                         style={{
                           background: isSelected ? "var(--bg-input)" : "transparent",
                           borderColor: isSelected ? "var(--olive)" : "var(--border-dim)",
                           boxShadow: isSelected ? "0 0 0 2px var(--olive)" : "none",
                         }}
                       >
-                        <span className="text-2xl mb-1 group-hover:scale-110 transition-transform">
-                          {item.emoji}
+                        <div className="w-12 h-12 rounded-full overflow-hidden mb-1.5 border group-hover:scale-105 transition-transform" style={{ borderColor: isSelected ? "var(--olive)" : "var(--border)" }}>
+                          <img src={item.path} alt={item.title} className="w-full h-full object-cover" />
+                        </div>
+                        <span
+                          className="text-[11px] font-semibold truncate max-w-full leading-tight"
+                          style={{ color: isSelected ? "var(--text)" : "var(--text-dim)" }}
+                        >
+                          {item.title}
                         </span>
                         <span
-                          className="text-[10px] truncate max-w-full font-medium"
-                          style={{ color: isSelected ? "var(--text)" : "var(--text-mute)" }}
+                          className="text-[9px] truncate max-w-full"
+                          style={{ color: "var(--text-mute)" }}
                         >
-                          {item.label}
+                          {item.role}
                         </span>
                       </button>
                     );
@@ -304,8 +297,8 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
               transition={{ duration: 0.2 }}
               className="space-y-6 text-center"
             >
-              <div className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center text-3xl border shadow-inner" style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}>
-                {avatar}
+              <div className="mx-auto flex items-center justify-center">
+                <UserAvatar avatar={avatar} size="2xl" className="shadow-lg" />
               </div>
 
               <div>

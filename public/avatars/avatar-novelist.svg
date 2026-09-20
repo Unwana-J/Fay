@@ -1,0 +1,35 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-nov" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#61426C"/>
+      <stop offset="100%" stop-color="#341E3B"/>
+    </linearGradient>
+    <linearGradient id="skin-nov" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" fill="#8D5538" stop-color="#8D5538"/>
+      <stop offset="100%" fill="#6E3F27" stop-color="#6E3F27"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="50" fill="url(#bg-nov)"/>
+  <circle cx="50" cy="50" r="48" fill="none" stroke="#ECC482" stroke-width="1.5" stroke-opacity="0.3"/>
+  <!-- Feather / Quill Pen in background -->
+  <path d="M78 20 C76 34 68 44 60 50 C66 42 70 32 78 20 Z" fill="#ECC482" opacity="0.6"/>
+  <line x1="78" y1="20" x2="56" y2="58" stroke="#ECC482" stroke-width="1.2"/>
+  <!-- Stylish Knitwear / Scarf -->
+  <path d="M22 100 C22 75 34 69 50 69 C66 69 78 75 78 100 Z" fill="#281A2D"/>
+  <path d="M35 70 C35 80 43 85 50 85 C57 85 65 80 65 70 Z" fill="#B38A56"/>
+  <!-- Head & Tilted Beret -->
+  <rect x="44" y="56" width="12" height="16" rx="3" fill="url(#skin-nov)"/>
+  <ellipse cx="50" cy="44" rx="17" ry="20" fill="url(#skin-nov)"/>
+  <!-- French Beret -->
+  <ellipse cx="52" cy="27" rx="22" ry="9" fill="#1C1320" transform="rotate(-10 52 27)"/>
+  <circle cx="50" cy="18" r="2" fill="#1C1320"/>
+  <!-- Earring -->
+  <circle cx="33" cy="46" r="2.5" fill="none" stroke="#ECC482" stroke-width="1.5"/>
+  <!-- Eyes -->
+  <circle cx="43" cy="45" r="2" fill="#1A0F0A"/>
+  <circle cx="57" cy="45" r="2" fill="#1A0F0A"/>
+  <path d="M39 39 C41 38 46 38 47 40" stroke="#1A0F0A" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <path d="M53 40 C54 38 59 38 61 39" stroke="#1A0F0A" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <!-- Poised thoughtful lips -->
+  <path d="M46 55 C48 57 52 57 54 55" stroke="#BA6C4D" stroke-width="2" stroke-linecap="round" fill="none"/>
+</svg>

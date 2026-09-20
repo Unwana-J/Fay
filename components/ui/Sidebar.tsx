@@ -12,6 +12,7 @@ import { useAppStore, type CompletedSession } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress } from "@/lib/achievements";
 import { cn } from "@/lib/utils";
 import FeyLogo from "@/components/ui/FeyLogo";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 const NAV_ITEMS = [
   { href: "/",              label: "Dashboard",     icon: BookOpen },
@@ -389,9 +390,7 @@ export default function Sidebar() {
 
         {/* ── User Profile ── */}
         <div className="px-4 py-3 flex items-center gap-3" style={{ borderTop: "1px solid var(--border-dim)" }}>
-          <div className="w-8 h-8 rounded-full bg-[var(--bg-card)] border flex items-center justify-center text-sm border-[var(--border)]">
-            {profile.avatar || "🧠"}
-          </div>
+          <UserAvatar avatar={profile.avatar} size="sm" />
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold truncate" style={{ color: "var(--text)" }}>{profile.username}</div>
             <div className="text-[10px]" style={{ color: "var(--text-mute)" }}>Level {level.level}</div>

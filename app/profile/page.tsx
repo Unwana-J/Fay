@@ -7,8 +7,8 @@ import { useAppStore } from "@/store/useAppStore";
 import { ACHIEVEMENTS, getLevelForXP, getNextLevel, getLevelProgress } from "@/lib/achievements";
 import { CATEGORY_ICONS, CATEGORIES } from "@/lib/topics";
 import { cn } from "@/lib/utils";
-
-const AVATAR_OPTIONS = ["🧠", "🎙️", "📚", "🔬", "💡", "🌌", "⚡", "🏆", "🎯", "🚀"];
+import { AVATARS } from "@/lib/avatars";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 /* ─── Framer Motion Stagger Variants ──────────────────────────────── */
 const containerVariants = {
@@ -84,24 +84,50 @@ export default function ProfilePage() {
             <div className="flex flex-col items-center gap-3 mb-5">
               <button
                 onClick={() => setShowAvatarPicker(!showAvatarPicker)}
-                className="relative w-20 h-20 rounded-xl flex items-center justify-center text-4xl hover:scale-105 transition-transform border"
-                style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}
+                className="relative group hover:scale-105 transition-transform"
+                title="Change Avatar"
               >
-                {profile.avatar || "🧠"}
-                <div className="absolute -bottom-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center border" style={{ backgroundColor: "var(--olive)", borderColor: "var(--bg-base)" }}>
-                  <Pencil size={8} className="text-white" />
+                <UserAvatar avatar={profile.avatar} size="2xl" className="shadow-md" />
+                <div
+                  className="absolute bottom-0 right-0 w-6 h-6 rounded-full flex items-center justify-center border shadow"
+                  style={{ backgroundColor: "var(--olive)", borderColor: "var(--bg-base)" }}
+                >
+                  <Pencil size={10} className="text-white" />
                 </div>
               </button>
 
               {showAvatarPicker && (
-                <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
-                  className="grid grid-cols-5 gap-1.5 p-3 rounded-xl border bg-[var(--bg-card)]" style={{ borderColor: "var(--border)" }}>
-                  {AVATAR_OPTIONS.map((a) => (
-                    <button key={a} onClick={() => { updateProfile({ avatar: a }); setShowAvatarPicker(false); }}
-                      className="w-8 h-8 rounded-lg hover:bg-[var(--bg-input)] flex items-center justify-center text-lg transition-colors">
-                      {a}
-                    </button>
-                  ))}
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.95, y: -5 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  className="grid grid-cols-4 gap-2 p-3 rounded-2xl border bg-[var(--bg-card)] shadow-xl max-h-60 overflow-y-auto w-full"
+                  style={{ borderColor: "var(--border)" }}
+                >
+                  {AVATARS.map((a) => {
+                    const isSelected = profile.avatar === a.path;
+                    return (
+                      <button
+                        key={a.id}
+                        onClick={() => {
+                          updateProfile({ avatar: a.path });
+                          setShowAvatarPicker(false);
+                        }}
+                        title={`${a.title} (${a.role})`}
+                        className="p-1.5 rounded-xl border flex flex-col items-center gap-1 transition-all hover:bg-[var(--bg-input)]"
+                        style={{
+                          borderColor: isSelected ? "var(--olive)" : "transparent",
+                          background: isSelected ? "var(--bg-input)" : "transparent",
+                        }}
+                      >
+                        <div className="w-10 h-10 rounded-full overflow-hidden">
+                          <img src={a.path} alt={a.title} className="w-full h-full object-cover" />
+                        </div>
+                        <span className="text-[9px] font-semibold truncate max-w-[55px]" style={{ color: "var(--text-dim)" }}>
+                          {a.title.replace("The ", "")}
+                        </span>
+                      </button>
+                    );
+                  })}
                 </motion.div>
               )}
             </div>
