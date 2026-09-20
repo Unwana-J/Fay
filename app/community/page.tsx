@@ -5,15 +5,21 @@ import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   Users, Globe, Lock, Plus, ArrowRight, Star, ThumbsUp,
-  Clock, Mic, Trophy, Search, Filter, Flame, Zap
+  Clock, Mic, Trophy, Search, Filter, Flame, Zap, KeyRound,
+  UserCheck, UserPlus, Sparkles, Check
 } from "lucide-react";
 import { useCommunityStore } from "@/store/useCommunityStore";
+import { useAppStore } from "@/store/useAppStore";
 import {
-  MOCK_SUBMISSIONS, MOCK_ROOMS, LEADERBOARD_TOPICS,
-  type ResearchRoom, type RoomSubmission
+  type ResearchRoom,
+  type RoomSubmission,
+  type CommunityUser,
+  type FollowedUser,
 } from "@/lib/mockCommunity";
-
 import CreateRoomModal from "@/components/community/CreateRoomModal";
+import JoinRoomModal from "@/components/community/JoinRoomModal";
+import UserProfileModal from "@/components/community/UserProfileModal";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "Artificial Intelligence": "#7A1C2E",
@@ -53,10 +59,17 @@ const STATUS_LABELS: Record<string, { label: string; color: string }> = {
 
 // ─── Submission Card ──────────────────────────────────────────────────────────
 
-function SubmissionCard({ sub }: { sub: RoomSubmission }) {
-  const { voteOnSubmission } = useCommunityStore();
+function SubmissionCard({
+  sub,
+  onInspectUser,
+}: {
+  sub: RoomSubmission;
+  onInspectUser: (u: CommunityUser) => void;
+}) {
+  const { voteOnSubmission, following } = useCommunityStore();
   const [hoverStar, setHoverStar] = useState(0);
   const catColor = CATEGORY_COLORS[sub.category] || "var(--terra)";
+  const isFollowed = following.some((u) => u.id === sub.user.id);
 
   return (
     <motion.div
@@ -67,20 +80,28 @@ function SubmissionCard({ sub }: { sub: RoomSubmission }) {
     >
       {/* Header */}
       <div className="flex items-start justify-between gap-3">
-        <div className="flex items-center gap-2.5">
-          <div
-            className="w-9 h-9 rounded-full flex items-center justify-center text-base font-bold shrink-0"
-            style={{ background: `${catColor}18`, border: `1.5px solid ${catColor}40` }}
-          >
-            {sub.user.avatar}
-          </div>
+        <button
+          type="button"
+          onClick={() => onInspectUser(sub.user)}
+          className="flex items-center gap-2.5 text-left group"
+        >
+          <UserAvatar avatar={sub.user.avatar} size="md" className="group-hover:scale-105 transition-transform" />
           <div>
-            <div className="text-xs font-bold" style={{ color: "var(--text)" }}>{sub.user.username}</div>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs font-bold group-hover:underline" style={{ color: "var(--text)" }}>
+                {sub.user.username}
+              </span>
+              {isFollowed && (
+                <span className="text-[9px] font-semibold px-1.5 py-0.2 rounded-full bg-[var(--bg-input)] text-[var(--olive-text)] flex items-center gap-0.5">
+                  <UserCheck size={9} /> Following
+                </span>
+              )}
+            </div>
             <div className="text-[10px]" style={{ color: "var(--text-mute)" }}>
               {timeAgo(sub.submittedAt)} · {formatDuration(sub.durationSec)}
             </div>
           </div>
-        </div>
+        </button>
         <span
           className="tag text-[10px] shrink-0"
           style={{ background: `${catColor}18`, color: catColor, border: `1px solid ${catColor}30` }}
@@ -94,25 +115,25 @@ function SubmissionCard({ sub }: { sub: RoomSubmission }) {
         {sub.topicText}
       </p>
 
-      {/* Audio placeholder */}
+      {/* Audio player / bar */}
       <div
         className="rounded-lg px-4 py-2.5 flex items-center gap-3"
         style={{ background: "var(--bg-input)" }}
       >
-        <button
-          className="w-7 h-7 rounded-full flex items-center justify-center shrink-0 transition-transform hover:scale-110"
+        <div
+          className="w-7 h-7 rounded-full flex items-center justify-center shrink-0"
           style={{ background: "var(--terra)" }}
         >
           <Mic size={12} color="white" />
-        </button>
+        </div>
         <div className="flex-1 flex items-center gap-0.5 h-5">
-          {Array.from({ length: 36 }).map((_, i) => (
+          {Array.from({ length: 32 }).map((_, i) => (
             <div
               key={i}
               className="w-0.5 rounded-full"
               style={{
-                height: `${Math.max(20, Math.random() * 100)}%`,
-                background: `${catColor}${i < 18 ? "cc" : "40"}`,
+                height: `${25 + ((i * 7) % 65)}%`,
+                background: `${catColor}${i < 16 ? "cc" : "40"}`,
               }}
             />
           ))}
@@ -125,7 +146,6 @@ function SubmissionCard({ sub }: { sub: RoomSubmission }) {
       {/* Vote row */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          {/* Stars */}
           <div className="flex items-center gap-0.5">
             {[1, 2, 3].map((n) => (
               <button
@@ -148,7 +168,6 @@ function SubmissionCard({ sub }: { sub: RoomSubmission }) {
               {sub.votes.avgStars > 0 ? sub.votes.avgStars.toFixed(1) : "—"}
             </span>
           </div>
-          {/* Upvotes */}
           <button
             disabled={!!sub.userVoted}
             onClick={() => voteOnSubmission(sub.id, 2)}
@@ -159,10 +178,12 @@ function SubmissionCard({ sub }: { sub: RoomSubmission }) {
             <span>{sub.votes.upvotes}</span>
           </button>
         </div>
-        <Link href={`/community/topics/${sub.topicId}`}>
-          <span className="text-[10px] hover:underline" style={{ color: "var(--terra)" }}>
-            View leaderboard →
-          </span>
+        <Link
+          href={`/community/room/${sub.roomId}`}
+          className="text-[11px] flex items-center gap-1 hover:opacity-70 transition-opacity"
+          style={{ color: "var(--text-mute)" }}
+        >
+          View Room <ArrowRight size={11} />
         </Link>
       </div>
     </motion.div>
@@ -171,30 +192,53 @@ function SubmissionCard({ sub }: { sub: RoomSubmission }) {
 
 // ─── Room Card ────────────────────────────────────────────────────────────────
 
-function RoomCard({ room }: { room: ResearchRoom }) {
-  const { joinRoom } = useCommunityStore();
+function RoomCard({
+  room,
+  onInspectUser,
+}: {
+  room: ResearchRoom;
+  onInspectUser: (u: CommunityUser) => void;
+}) {
+  const { following } = useCommunityStore();
   const catColor = CATEGORY_COLORS[room.category] || "var(--terra)";
-  const { label, color } = STATUS_LABELS[room.status];
-  const isJoinable = room.status === "research" || room.status === "lobby";
+  const statusInfo = STATUS_LABELS[room.status] || STATUS_LABELS.lobby;
+  const isJoinable = room.status === "lobby" || room.status === "research";
+
+  // Check if any followed user is participating
+  const followedParticipants = room.participants.filter((p) =>
+    following.some((f) => f.id === p.user.id)
+  );
 
   return (
     <motion.div
-      initial={{ opacity: 0, y: 12 }}
+      initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       whileHover={{ y: -2 }}
       className="surface rounded-xl p-5"
     >
-      <div className="flex items-start justify-between gap-2 mb-3">
-        <span
-          className="tag text-[10px]"
-          style={{ background: `${catColor}18`, color: catColor, border: `1px solid ${catColor}30` }}
-        >
-          {room.category}
-        </span>
-        <div className="flex items-center gap-1.5 text-[10px]" style={{ color }}>
-          <span className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ background: color }} />
-          {label}
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2">
+          <span
+            className="tag text-[10px]"
+            style={{ background: `${catColor}18`, color: catColor, border: `1px solid ${catColor}30` }}
+          >
+            {room.category}
+          </span>
+          <span
+            className="tag text-[10px] uppercase font-mono"
+            style={{ color: "var(--text-mute)", background: "var(--bg-input)" }}
+          >
+            {room.difficulty}
+          </span>
+          {followedParticipants.length > 0 && (
+            <span className="tag text-[10px] bg-[var(--olive-light)] text-[var(--olive-text)] flex items-center gap-1 font-semibold">
+              <UserCheck size={10} /> {followedParticipants[0].user.username.split(" ")[0]} here
+            </span>
+          )}
         </div>
+        <span className="text-[11px] font-medium" style={{ color: statusInfo.color }}>
+          ● {statusInfo.label}
+        </span>
       </div>
 
       <p className="text-sm font-semibold leading-snug mb-3" style={{ color: "var(--text)" }}>
@@ -205,58 +249,43 @@ function RoomCard({ room }: { room: ResearchRoom }) {
         <div className="flex items-center gap-3 text-[11px]" style={{ color: "var(--text-mute)" }}>
           <div className="flex items-center gap-1">
             <Users size={11} />
-            <span>{room.participants.length}</span>
+            <span>{room.participants.length} participant{room.participants.length === 1 ? "" : "s"}</span>
           </div>
           <div className="flex items-center gap-1">
             <Clock size={11} />
-            <span>{room.researchDurationMin}min</span>
+            <span>{room.researchDurationMin}m research</span>
           </div>
           <div className="flex items-center gap-1">
             {room.visibility === "public" ? <Globe size={11} /> : <Lock size={11} />}
-            <span>{room.visibility}</span>
+            <span className="capitalize">{room.visibility}</span>
           </div>
         </div>
 
-        {isJoinable ? (
-          <Link href={`/community/room/${room.id}`}>
-            <button
-              onClick={() => joinRoom(room.id)}
-              className="btn-terra text-xs px-3 py-1.5"
-            >
-              Join <ArrowRight size={11} />
-            </button>
-          </Link>
-        ) : room.status === "voting" ? (
-          <Link href={`/community/room/${room.id}`}>
-            <button className="btn-ghost text-xs px-3 py-1.5">Vote →</button>
-          </Link>
-        ) : (
-          <Link href={`/community/topics/${room.topicId}`}>
-            <button className="btn-ghost text-xs px-3 py-1.5">Results →</button>
-          </Link>
-        )}
+        <Link href={`/community/room/${room.id}`}>
+          <button className="btn-primary text-xs px-3.5 py-1.5 rounded-xl flex items-center gap-1">
+            {isJoinable ? "Enter Room" : "View Results"} <ArrowRight size={11} />
+          </button>
+        </Link>
       </div>
 
       {/* Participant avatars */}
-      <div className="flex items-center gap-1 mt-3 pt-3" style={{ borderTop: "1px solid var(--border-dim)" }}>
-        {room.participants.slice(0, 6).map((p, i) => (
-          <div
-            key={i}
-            title={p.user.username}
-            className="w-6 h-6 rounded-full flex items-center justify-center text-xs border"
-            style={{
-              background: "var(--bg-input)",
-              borderColor: p.status === "researching" ? "var(--terra)" : "var(--border-dim)",
-            }}
-          >
-            {p.user.avatar}
-          </div>
-        ))}
-        {room.participants.length > 6 && (
-          <span className="text-[10px] ml-1" style={{ color: "var(--text-mute)" }}>
-            +{room.participants.length - 6}
-          </span>
-        )}
+      <div className="flex items-center gap-2 mt-3 pt-3" style={{ borderTop: "1px solid var(--border-dim)" }}>
+        <div className="flex items-center -space-x-1.5">
+          {room.participants.slice(0, 5).map((p, i) => (
+            <button
+              key={i}
+              type="button"
+              onClick={() => onInspectUser(p.user)}
+              title={`${p.user.username}${p.isHost ? " (Host)" : ""}`}
+              className="hover:scale-110 transition-transform"
+            >
+              <UserAvatar avatar={p.user.avatar} size="xs" className="border-2 border-[var(--bg-card)]" />
+            </button>
+          ))}
+        </div>
+        <span className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+          Hosted by <strong style={{ color: "var(--text-dim)" }}>{room.host.username}</strong>
+        </span>
       </div>
     </motion.div>
   );
@@ -264,21 +293,49 @@ function RoomCard({ room }: { room: ResearchRoom }) {
 
 // ─── Main Community Page ──────────────────────────────────────────────────────
 
-type Tab = "feed" | "rooms" | "leaderboards";
+type Tab = "feed" | "rooms" | "following" | "leaderboards";
 
 export default function CommunityPage() {
-  const [tab, setTab] = useState<Tab>("feed");
+  const [tab, setTab] = useState<Tab>("rooms");
   const [showCreate, setShowCreate] = useState(false);
-  const [search, setSearch] = useState("");
-  const { rooms } = useCommunityStore();
+  const [showJoin, setShowJoin] = useState(false);
+  const [inspectUser, setInspectUser] = useState<CommunityUser | null>(null);
 
-  const activeRooms = rooms.filter((r) => r.status !== "closed" && r.visibility === "public");
-  const feedSubs = MOCK_SUBMISSIONS.filter((s) => s.isPublic);
+  const { rooms, mySubmissions, following } = useCommunityStore();
+  const profile = useAppStore((s) => s.profile);
+
+  // Active rooms
+  const activeRooms = rooms.filter((r) => r.status !== "closed");
+
+  // Public submissions across all rooms + user's own submissions
+  const allSubmissionsMap = new Map<string, RoomSubmission>();
+  rooms.forEach((r) => {
+    r.submissions.forEach((s) => {
+      if (s.isPublic) allSubmissionsMap.set(s.id, s);
+    });
+  });
+  mySubmissions.forEach((s) => {
+    if (s.isPublic) allSubmissionsMap.set(s.id, s);
+  });
+  const publicSubs = Array.from(allSubmissionsMap.values()).sort(
+    (a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime()
+  );
+
+  // Filtered rooms for "Following"
+  const followingRooms = rooms.filter((r) =>
+    r.participants.some((p) => following.some((f) => f.id === p.user.id))
+  );
+
+  // Filtered submissions for "Following"
+  const followingSubs = publicSubs.filter((s) =>
+    following.some((f) => f.id === s.user.id)
+  );
 
   const tabs: { id: Tab; label: string; count?: number }[] = [
-    { id: "feed", label: "Community Feed", count: feedSubs.length },
     { id: "rooms", label: "Live Rooms", count: activeRooms.length },
-    { id: "leaderboards", label: "Leaderboards" },
+    { id: "feed", label: "Community Feed", count: publicSubs.length },
+    { id: "following", label: "Following", count: following.length },
+    { id: "leaderboards", label: "Members" },
   ];
 
   return (
@@ -287,33 +344,44 @@ export default function CommunityPage() {
       <motion.div
         initial={{ opacity: 0, y: -12 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-start justify-between mb-8"
+        className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-8"
       >
         <div>
           <h1 className="font-space font-bold text-display mb-1" style={{ fontSize: "2rem" }}>
             Community
           </h1>
           <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-            Research together, challenge each other, top the leaderboards.
+            Study together in live research rooms, explore ideas, and follow fellow learners.
           </p>
         </div>
-        <button
-          onClick={() => setShowCreate(true)}
-          className="btn-terra flex items-center gap-2 whitespace-nowrap"
-        >
-          <Plus size={14} /> Start a Room
-        </button>
+        <div className="flex items-center gap-2 shrink-0">
+          <button
+            onClick={() => setShowJoin(true)}
+            className="px-4 py-2.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all hover:bg-[var(--bg-input)]"
+            style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+          >
+            <KeyRound size={14} /> Join with Code
+          </button>
+          <button
+            onClick={() => setShowCreate(true)}
+            className="btn-primary flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold shadow-sm"
+          >
+            <Plus size={14} /> Start a Room
+          </button>
+        </div>
       </motion.div>
 
       {/* Stats bar */}
       <div className="grid grid-cols-3 gap-3 mb-8">
         {[
-          { icon: <Users size={14} style={{ color: "var(--terra)" }} />, label: "Active Rooms", value: activeRooms.length },
-          { icon: <Mic size={14} style={{ color: "var(--gold)" }} />, label: "Recordings Today", value: 12 },
-          { icon: <Trophy size={14} style={{ color: "var(--terra)" }} />, label: "Topics Covered", value: LEADERBOARD_TOPICS.length },
+          { icon: <Users size={14} style={{ color: "var(--olive)" }} />, label: "Active Rooms", value: activeRooms.length },
+          { icon: <Mic size={14} style={{ color: "var(--terra)" }} />, label: "Recordings", value: publicSubs.length },
+          { icon: <UserCheck size={14} style={{ color: "var(--gold)" }} />, label: "Following", value: following.length },
         ].map((s, i) => (
           <div key={i} className="surface rounded-xl p-4 flex items-center gap-3">
-            {s.icon}
+            <div className="w-8 h-8 rounded-lg flex items-center justify-center border" style={{ background: "var(--bg-input)", borderColor: "var(--border-dim)" }}>
+              {s.icon}
+            </div>
             <div>
               <div className="text-lg font-mono font-bold" style={{ color: "var(--text)" }}>{s.value}</div>
               <div className="text-[10px]" style={{ color: "var(--text-mute)" }}>{s.label}</div>
@@ -328,7 +396,7 @@ export default function CommunityPage() {
           <button
             key={t.id}
             onClick={() => setTab(t.id)}
-            className="flex-1 py-2 px-3 rounded-lg text-sm font-medium transition-all"
+            className="flex-1 py-2 px-3 rounded-lg text-xs font-semibold transition-all"
             style={{
               background: tab === t.id ? "var(--bg-card)" : "transparent",
               color: tab === t.id ? "var(--text)" : "var(--text-mute)",
@@ -338,9 +406,9 @@ export default function CommunityPage() {
             {t.label}
             {t.count !== undefined && (
               <span
-                className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-mono"
+                className="ml-1.5 text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold"
                 style={{
-                  background: tab === t.id ? "var(--terra)" : "var(--bg-panel)",
+                  background: tab === t.id ? "var(--olive)" : "var(--bg-input)",
                   color: tab === t.id ? "white" : "var(--text-mute)",
                 }}
               >
@@ -351,98 +419,258 @@ export default function CommunityPage() {
         ))}
       </div>
 
-      {/* Feed */}
-      <AnimatePresence mode="wait">
-        {tab === "feed" && (
-          <motion.div
-            key="feed"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-4"
-          >
-            {feedSubs.map((sub) => (
-              <SubmissionCard key={sub.id} sub={sub} />
-            ))}
-          </motion.div>
-        )}
-
-        {tab === "rooms" && (
-          <motion.div
-            key="rooms"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            {activeRooms.length === 0 ? (
-              <div className="text-center py-16" style={{ color: "var(--text-mute)" }}>
-                <Users size={32} className="mx-auto mb-3 opacity-30" />
-                <p className="text-sm">No active rooms right now.</p>
-                <button onClick={() => setShowCreate(true)} className="btn-terra mt-4">
-                  Start one →
+      {/* ── TAB: LIVE ROOMS ── */}
+      {tab === "rooms" && (
+        <div className="space-y-4">
+          {activeRooms.length === 0 ? (
+            <div className="text-center py-16 surface rounded-2xl p-8 border" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center text-2xl border" style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}>
+                🚪
+              </div>
+              <h3 className="font-space font-bold text-base mb-1" style={{ color: "var(--text)" }}>
+                No active rooms right now
+              </h3>
+              <p className="text-xs max-w-sm mx-auto mb-5" style={{ color: "var(--text-dim)" }}>
+                Start a research room, pick a topic, and share the invite code with friends to study and speak together.
+              </p>
+              <div className="flex items-center justify-center gap-3">
+                <button
+                  onClick={() => setShowCreate(true)}
+                  className="btn-primary text-xs px-4 py-2.5 rounded-xl font-semibold"
+                >
+                  <Plus size={13} className="inline mr-1" /> Start the First Room
+                </button>
+                <button
+                  onClick={() => setShowJoin(true)}
+                  className="px-4 py-2.5 rounded-xl border text-xs font-medium"
+                  style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                >
+                  Enter Code
                 </button>
               </div>
-            ) : (
-              <div className="grid grid-cols-1 gap-4">
-                {activeRooms.map((room) => (
-                  <RoomCard key={room.id} room={room} />
-                ))}
-              </div>
-            )}
-          </motion.div>
-        )}
+            </div>
+          ) : (
+            activeRooms.map((room) => (
+              <RoomCard key={room.id} room={room} onInspectUser={setInspectUser} />
+            ))
+          )}
+        </div>
+      )}
 
-        {tab === "leaderboards" && (
-          <motion.div
-            key="lb"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className="space-y-4"
-          >
-            {LEADERBOARD_TOPICS.map((topic, i) => {
-              const catColor = CATEGORY_COLORS[topic.category] || "var(--terra)";
-              return (
-                <Link key={topic.topicId} href={`/community/topics/${topic.topicId}`}>
-                  <motion.div
-                    whileHover={{ y: -2 }}
-                    className="surface rounded-xl p-5 flex items-center justify-between gap-4 cursor-pointer"
+      {/* ── TAB: COMMUNITY FEED ── */}
+      {tab === "feed" && (
+        <div className="space-y-4">
+          {publicSubs.length === 0 ? (
+            <div className="text-center py-16 surface rounded-2xl p-8 border" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center text-2xl border" style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}>
+                🎙️
+              </div>
+              <h3 className="font-space font-bold text-base mb-1" style={{ color: "var(--text)" }}>
+                No community recordings yet
+              </h3>
+              <p className="text-xs max-w-sm mx-auto mb-5" style={{ color: "var(--text-dim)" }}>
+                Complete a session in a research room and choose to publish your synthesis talk to the community feed.
+              </p>
+              <button
+                onClick={() => setShowCreate(true)}
+                className="btn-primary text-xs px-4 py-2.5 rounded-xl font-semibold"
+              >
+                Start a Room Session
+              </button>
+            </div>
+          ) : (
+            publicSubs.map((sub) => (
+              <SubmissionCard key={sub.id} sub={sub} onInspectUser={setInspectUser} />
+            ))
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: FOLLOWING ── */}
+      {tab === "following" && (
+        <div className="space-y-6">
+          {following.length === 0 ? (
+            <div className="text-center py-16 surface rounded-2xl p-8 border" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center text-2xl border" style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}>
+                👥
+              </div>
+              <h3 className="font-space font-bold text-base mb-1" style={{ color: "var(--text)" }}>
+                You aren't following anyone yet
+              </h3>
+              <p className="text-xs max-w-sm mx-auto mb-4" style={{ color: "var(--text-dim)" }}>
+                When you follow peers in community rooms or leaderboards, you'll see the future research groups they join and their latest talks here.
+              </p>
+              <button
+                onClick={() => setTab("rooms")}
+                className="btn-primary text-xs px-4 py-2.5 rounded-xl font-semibold"
+              >
+                Browse Live Rooms
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Followed Members Horizontal Strip */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-mute)" }}>
+                  People You Follow ({following.length})
+                </h3>
+                <div className="flex items-center gap-3 overflow-x-auto pb-2">
+                  {following.map((u) => (
+                    <button
+                      key={u.id}
+                      onClick={() =>
+                        setInspectUser({
+                          id: u.id,
+                          username: u.username,
+                          avatar: u.avatar,
+                          bio: u.bio,
+                          level: u.level || 1,
+                          xp: u.xp || 0,
+                        })
+                      }
+                      className="surface p-3 rounded-2xl border flex flex-col items-center gap-1.5 shrink-0 hover:scale-105 transition-all text-center min-w-[90px]"
+                      style={{ borderColor: "var(--border-dim)" }}
+                    >
+                      <UserAvatar avatar={u.avatar} size="lg" />
+                      <span className="text-xs font-semibold truncate max-w-[80px]" style={{ color: "var(--text)" }}>
+                        {u.username}
+                      </span>
+                      <span className="text-[10px] text-[var(--olive-text)] font-mono">
+                        Lvl {u.level || 1}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Rooms where followed users are participating */}
+              <div>
+                <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-mute)" }}>
+                  Active Rooms with Followed Peers
+                </h3>
+                {followingRooms.length === 0 ? (
+                  <div className="surface p-5 rounded-xl border text-center text-xs" style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}>
+                    None of the learners you follow are currently in an active room.
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {followingRooms.map((room) => (
+                      <RoomCard key={room.id} room={room} onInspectUser={setInspectUser} />
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Submissions by followed users */}
+              {followingSubs.length > 0 && (
+                <div>
+                  <h3 className="text-xs font-semibold uppercase tracking-wider mb-3" style={{ color: "var(--text-mute)" }}>
+                    Recent Talks by Followed Peers
+                  </h3>
+                  <div className="space-y-3">
+                    {followingSubs.map((sub) => (
+                      <SubmissionCard key={sub.id} sub={sub} onInspectUser={setInspectUser} />
+                    ))}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
+      {/* ── TAB: MEMBERS / LEADERBOARD ── */}
+      {tab === "leaderboards" && (
+        <div className="space-y-4">
+          <div className="surface p-5 rounded-2xl border" style={{ borderColor: "var(--border-dim)" }}>
+            <div className="flex items-center gap-2 mb-2">
+              <Trophy size={16} className="text-[var(--gold)]" />
+              <h3 className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
+                Community Members
+              </h3>
+            </div>
+            <p className="text-xs mb-4" style={{ color: "var(--text-dim)" }}>
+              Fellow researchers in the Fey beta community. Click any learner to inspect their profile and follow them.
+            </p>
+
+            {/* Current user card */}
+            <div className="p-3 rounded-xl border flex items-center justify-between mb-3" style={{ background: "var(--bg-input)", borderColor: "var(--border-dim)" }}>
+              <div className="flex items-center gap-3">
+                <UserAvatar avatar={profile.avatar} size="md" />
+                <div>
+                  <div className="text-xs font-bold" style={{ color: "var(--text)" }}>
+                    {profile.username || "You"} <span className="text-[10px] text-[var(--olive-text)] font-semibold">(You)</span>
+                  </div>
+                  <div className="text-[10px]" style={{ color: "var(--text-mute)" }}>
+                    "{profile.bio || "Exploring ideas."}"
+                  </div>
+                </div>
+              </div>
+              <span className="font-mono text-xs font-semibold" style={{ color: "var(--gold)" }}>
+                {profile.xp} XP
+              </span>
+            </div>
+
+            {/* Followed peers */}
+            {following.length > 0 ? (
+              <div className="space-y-2 pt-2">
+                <span className="text-[10px] font-semibold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                  Followed Scholars
+                </span>
+                {following.map((u) => (
+                  <button
+                    key={u.id}
+                    type="button"
+                    onClick={() =>
+                      setInspectUser({
+                        id: u.id,
+                        username: u.username,
+                        avatar: u.avatar,
+                        bio: u.bio,
+                        level: u.level || 1,
+                        xp: u.xp || 0,
+                      })
+                    }
+                    className="w-full p-3 rounded-xl border flex items-center justify-between hover:bg-[var(--bg-input)] transition-colors text-left"
+                    style={{ borderColor: "var(--border-dim)" }}
                   >
-                    <div className="flex items-center gap-4">
-                      <div
-                        className="w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm shrink-0"
-                        style={{ background: `${catColor}18`, color: catColor }}
-                      >
-                        {i === 0 ? "👑" : i === 1 ? "🥈" : "🥉"}
-                      </div>
+                    <div className="flex items-center gap-3">
+                      <UserAvatar avatar={u.avatar} size="md" />
                       <div>
-                        <p className="text-sm font-semibold mb-0.5" style={{ color: "var(--text)" }}>
-                          {topic.topicText}
-                        </p>
-                        <div className="flex items-center gap-2 text-[11px]" style={{ color: "var(--text-mute)" }}>
-                          <span
-                            className="inline-block px-1.5 py-0.5 rounded"
-                            style={{ background: `${catColor}18`, color: catColor }}
-                          >
-                            {topic.category}
-                          </span>
-                          <span>{topic.totalSubmissions} recordings</span>
+                        <div className="text-xs font-bold" style={{ color: "var(--text)" }}>
+                          {u.username}
+                        </div>
+                        <div className="text-[10px] truncate max-w-xs" style={{ color: "var(--text-mute)" }}>
+                          {u.bio || "Active thinker"}
                         </div>
                       </div>
                     </div>
-                    <ArrowRight size={16} style={{ color: "var(--text-mute)" }} className="shrink-0" />
-                  </motion.div>
-                </Link>
-              );
-            })}
-          </motion.div>
-        )}
-      </AnimatePresence>
+                    <span className="text-[11px] font-semibold px-2 py-0.5 rounded-md bg-[var(--bg-input)] text-[var(--olive-text)] flex items-center gap-1">
+                      <UserCheck size={11} /> Following
+                    </span>
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="text-xs text-center py-4" style={{ color: "var(--text-mute)" }}>
+                Meet learners in live rooms to follow them here.
+              </p>
+            )}
+          </div>
+        </div>
+      )}
 
-      {/* Create Room Modal */}
+      {/* Modals */}
       <AnimatePresence>
         {showCreate && <CreateRoomModal onClose={() => setShowCreate(false)} />}
+        {showJoin && <JoinRoomModal onClose={() => setShowJoin(false)} />}
       </AnimatePresence>
+
+      <UserProfileModal
+        user={inspectUser}
+        isOpen={!!inspectUser}
+        onClose={() => setInspectUser(null)}
+      />
     </div>
   );
 }

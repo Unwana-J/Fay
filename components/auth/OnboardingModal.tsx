@@ -8,8 +8,13 @@ import { CATEGORIES, CATEGORY_ICONS } from "@/lib/topics";
 import { AVATARS, DEFAULT_AVATAR_PATH, PRESET_MISSIONS } from "@/lib/avatars";
 import UserAvatar from "@/components/ui/UserAvatar";
 
+import { useRouter, usePathname } from "next/navigation";
+
 export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
+  const router = useRouter();
+  const pathname = usePathname();
   const { createAccount } = useAppStore();
+  const [mode, setMode] = useState<"create" | "signin">("create");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [username, setUsername] = useState("");
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR_PATH);
@@ -31,6 +36,22 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
     }
     setError("");
     setStep(2);
+  }
+
+  function handleQuickSignIn() {
+    if (!username.trim()) {
+      setError("Please enter your username to log in.");
+      return;
+    }
+    createAccount({
+      username: username.trim(),
+      avatar,
+      bio: "Exploring ideas on Fey.",
+      interests: selectedCategories,
+    });
+    if (pathname && pathname.includes("/community/room/")) {
+      router.refresh();
+    }
   }
 
   function toggleCategory(cat: string) {
@@ -58,6 +79,10 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
       bio: finalBio,
       interests: selectedCategories,
     });
+
+    if (pathname && pathname.includes("/community/room/")) {
+      router.refresh();
+    }
   }
 
   return (
@@ -114,13 +139,28 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
               transition={{ duration: 0.2 }}
               className="space-y-6"
             >
-              <div>
-                <h2 className="font-space text-2xl sm:text-3xl font-bold mb-1.5" style={{ color: "var(--text)" }}>
-                  Welcome to Fey
-                </h2>
-                <p className="text-xs sm:text-sm" style={{ color: "var(--text-dim)" }}>
-                  Research deeply, articulate clearly, and synthesize ideas in your own voice. Let's create your beta account.
-                </p>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="font-space text-2xl sm:text-3xl font-bold mb-1.5" style={{ color: "var(--text)" }}>
+                    {mode === "signin" ? "Welcome Back to Fey" : "Welcome to Fey"}
+                  </h2>
+                  <p className="text-xs sm:text-sm" style={{ color: "var(--text-dim)" }}>
+                    {mode === "signin"
+                      ? "Enter your display name to jump right in."
+                      : "Research deeply, articulate clearly, and synthesize ideas in your own voice."}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMode(mode === "create" ? "signin" : "create");
+                    setError("");
+                  }}
+                  className="text-xs font-semibold px-2.5 py-1.5 rounded-xl border text-[var(--olive-text)] hover:bg-[var(--bg-input)] transition-colors shrink-0 mt-0.5"
+                  style={{ borderColor: "var(--border-dim)" }}
+                >
+                  {mode === "signin" ? "New Account" : "Log In"}
+                </button>
               </div>
 
               {/* Avatar Selector */}
@@ -240,13 +280,23 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
               )}
 
               <div className="pt-2 flex justify-end">
-                <button
-                  type="button"
-                  onClick={handleNextFromStep1}
-                  className="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
-                >
-                  Continue <ArrowRight size={15} />
-                </button>
+                {mode === "signin" ? (
+                  <button
+                    type="button"
+                    onClick={handleQuickSignIn}
+                    className="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
+                  >
+                    Log In & Enter <ArrowRight size={15} />
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleNextFromStep1}
+                    className="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
+                  >
+                    Continue <ArrowRight size={15} />
+                  </button>
+                )}
               </div>
             </motion.div>
           )}

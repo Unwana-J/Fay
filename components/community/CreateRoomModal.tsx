@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { X, Globe, Lock, Clock, Mic, ChevronDown } from "lucide-react";
 import { useCommunityStore } from "@/store/useCommunityStore";
+import { useAppStore } from "@/store/useAppStore";
 import { TOPIC_BANK } from "@/lib/topics";
 
 const DURATIONS = [10, 15, 20, 30];
@@ -13,6 +14,7 @@ const SPEAKING_DURATIONS = [60, 90, 120, 150, 180];
 export default function CreateRoomModal({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const { createRoom } = useCommunityStore();
+  const profile = useAppStore((s) => s.profile);
 
   const [visibility, setVisibility] = useState<"public" | "private">("public");
   const [researchMin, setResearchMin] = useState(15);
@@ -26,15 +28,25 @@ export default function CreateRoomModal({ onClose }: { onClose: () => void }) {
 
   const handleCreate = () => {
     if (!selectedTopic) return;
-    const id = createRoom({
-      topicId: selectedTopic.id,
-      topicText: selectedTopic.text,
-      category: selectedTopic.category,
-      difficulty: selectedTopic.difficulty,
-      visibility,
-      researchDurationMin: researchMin,
-      speakingDurationSec: speakingSec,
-    });
+    const id = createRoom(
+      {
+        topicId: selectedTopic.id,
+        topicText: selectedTopic.text,
+        category: selectedTopic.category,
+        difficulty: selectedTopic.difficulty,
+        visibility,
+        researchDurationMin: researchMin,
+        speakingDurationSec: speakingSec,
+      },
+      {
+        id: profile.id,
+        username: profile.username || "Learner",
+        avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+        bio: profile.bio,
+        xp: profile.xp,
+        level: Math.floor(profile.xp / 500) + 1,
+      }
+    );
     onClose();
     router.push(`/community/room/${id}`);
   };

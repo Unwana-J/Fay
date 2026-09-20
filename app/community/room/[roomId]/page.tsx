@@ -2,13 +2,22 @@
 
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import {
   Users, Globe, Lock, Copy, Check, Clock, Mic, StopCircle,
-  ChevronRight, Star, ThumbsUp, ArrowLeft, Play
+  ChevronRight, Star, ThumbsUp, ArrowLeft, Play, Share2
 } from "lucide-react";
 import { useCommunityStore } from "@/store/useCommunityStore";
-import { SELF_USER, type RoomParticipant, type RoomSubmission } from "@/lib/mockCommunity";
+import { useAppStore } from "@/store/useAppStore";
+import {
+  type RoomParticipant,
+  type RoomSubmission,
+  type CommunityUser,
+  encodeRoomPayload,
+  decodeRoomPayload
+} from "@/lib/mockCommunity";
+import UserAvatar from "@/components/ui/UserAvatar";
+import UserProfileModal from "@/components/community/UserProfileModal";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "Artificial Intelligence": "#7A1C2E",
@@ -23,7 +32,13 @@ const CATEGORY_COLORS: Record<string, string> = {
   "Wildcard": "#6B4C7A",
 };
 
-function ParticipantBadge({ p }: { p: RoomParticipant }) {
+function ParticipantBadge({
+  p,
+  onInspect,
+}: {
+  p: RoomParticipant;
+  onInspect: (u: CommunityUser) => void;
+}) {
   const statusColor: Record<string, string> = {
     waiting: "var(--border)",
     researching: "var(--terra)",
@@ -31,24 +46,24 @@ function ParticipantBadge({ p }: { p: RoomParticipant }) {
     submitted: "#22C55E",
   };
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <div className="relative">
-        <div
-          className="w-11 h-11 rounded-full flex items-center justify-center text-lg border-2"
-          style={{ background: "var(--bg-input)", borderColor: statusColor[p.status] }}
-        >
-          {p.user.avatar}
-        </div>
+    <button
+      type="button"
+      onClick={() => onInspect(p.user)}
+      className="flex flex-col items-center gap-1.5 group cursor-pointer"
+      title={`Click to view ${p.user.username}`}
+    >
+      <div className="relative group-hover:scale-105 transition-transform">
+        <UserAvatar avatar={p.user.avatar} size="lg" className="border-2 shadow-sm" />
         <span
           className="absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-[var(--bg-card)]"
-          style={{ background: statusColor[p.status] }}
+          style={{ background: statusColor[p.status] || "var(--border)" }}
         />
       </div>
-      <span className="text-[10px] font-medium text-center" style={{ color: "var(--text-dim)" }}>
+      <span className="text-[10px] font-medium text-center truncate max-w-[64px]" style={{ color: "var(--text-dim)" }}>
         {p.user.username.split(" ")[0]}
-        {p.isHost && <span className="block text-[9px]" style={{ color: "var(--terra)" }}>host</span>}
+        {p.isHost && <span className="block text-[9px] font-semibold" style={{ color: "var(--terra)" }}>host</span>}
       </span>
-    </div>
+    </button>
   );
 }
 
@@ -94,10 +109,12 @@ function CountdownTimer({ totalSec, onComplete }: { totalSec: number; onComplete
 export default function RoomPage() {
   const params = useParams();
   const router = useRouter();
+  const searchParams = useSearchParams();
   const roomId = params.roomId as string;
-  const { rooms, advanceRoomStatus, submitRecording, voteOnSubmission } = useCommunityStore();
-  const room = rooms.find((r) => r.id === roomId);
+  const { rooms, advanceRoomStatus, submitRecording, voteOnSubmission, importRoom, joinRoom } = useCommunityStore();
+  const profile = useAppStore((s) => s.profile);
 
+  const [inspectUser, setInspectUser] = useState<CommunityUser | null>(null);
   const [copied, setCopied] = useState(false);
   const [notes, setNotes] = useState("");
   const [recording, setRecording] = useState(false);
@@ -106,18 +123,67 @@ export default function RoomPage() {
   const [hoverStar, setHoverStar] = useState<Record<string, number>>({});
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Sync room from URL param if opened via shared link
+  useEffect(() => {
+    const rParam = searchParams.get("r");
+    if (rParam) {
+      const decoded = decodeRoomPayload(rParam);
+      if (decoded && decoded.id) {
+        importRoom(decoded as any);
+      }
+    }
+  }, [searchParams]);
+
+  const room = rooms.find((r) => r.id === roomId || r.inviteCode === roomId);
+
+  // Auto-join room when ready
+  useEffect(() => {
+    if (room && profile.username && profile.username !== "Learner") {
+      const alreadyIn = room.participants.some(
+        (p) => p.user.id === profile.id || p.user.username === profile.username
+      );
+      if (!alreadyIn) {
+        joinRoom(room.id, {
+          id: profile.id,
+          username: profile.username,
+          avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+          bio: profile.bio,
+          xp: profile.xp,
+          level: Math.floor(profile.xp / 500) + 1,
+        });
+      }
+    }
+  }, [room, profile.id, profile.username]);
+
   if (!room) return (
-    <div className="flex items-center justify-center h-screen text-sm" style={{ color: "var(--text-mute)" }}>
-      Room not found. <button onClick={() => router.back()} className="ml-2 underline">Go back</button>
+    <div className="flex flex-col items-center justify-center h-[70vh] gap-3 text-center px-4">
+      <div className="w-12 h-12 rounded-2xl flex items-center justify-center text-xl border mb-1" style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}>
+        🔍
+      </div>
+      <h2 className="font-space font-bold text-lg" style={{ color: "var(--text)" }}>Research Room Not Found</h2>
+      <p className="text-xs max-w-xs mb-3" style={{ color: "var(--text-dim)" }}>
+        This room may have ended or the invite link is incomplete.
+      </p>
+      <button
+        onClick={() => router.push("/community")}
+        className="btn-primary text-xs px-4 py-2 rounded-xl"
+      >
+        Return to Community
+      </button>
     </div>
   );
 
   const catColor = CATEGORY_COLORS[room.category] || "var(--terra)";
-  const selfParticipant = room.participants.find((p) => p.user.id === SELF_USER.id);
+  const selfParticipant = room.participants.find(
+    (p) => p.user.id === profile.id || p.user.username === profile.username
+  );
   const isHost = selfParticipant?.isHost;
 
   const copyInvite = () => {
-    navigator.clipboard.writeText(`${window.location.origin}/community/room/${room.id}?code=${room.inviteCode}`);
+    const encoded = encodeRoomPayload(room);
+    const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const url = `${origin}/community/room/${room.id}?code=${room.inviteCode}${encoded ? `&r=${encoded}` : ""}`;
+    navigator.clipboard.writeText(url);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
@@ -134,7 +200,18 @@ export default function RoomPage() {
   };
 
   const handleSubmit = () => {
-    submitRecording(room.id, recordingSec);
+    submitRecording(
+      room.id,
+      recordingSec,
+      {
+        id: profile.id,
+        username: profile.username || "Learner",
+        avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+        bio: profile.bio,
+        xp: profile.xp,
+        level: Math.floor(profile.xp / 500) + 1,
+      }
+    );
     setSubmitted(true);
   };
 
@@ -180,7 +257,9 @@ export default function RoomPage() {
 
         {/* Participants */}
         <div className="flex items-center gap-4 flex-wrap">
-          {room.participants.map((p, i) => <ParticipantBadge key={i} p={p} />)}
+          {room.participants.map((p, i) => (
+            <ParticipantBadge key={i} p={p} onInspect={setInspectUser} />
+          ))}
           <div
             className="w-11 h-11 rounded-full border-2 border-dashed flex items-center justify-center"
             style={{ borderColor: "var(--border)" }}
@@ -399,6 +478,13 @@ export default function RoomPage() {
           ))}
         </motion.div>
       )}
+
+      {/* User profile inspection & follow modal */}
+      <UserProfileModal
+        user={inspectUser}
+        isOpen={!!inspectUser}
+        onClose={() => setInspectUser(null)}
+      />
     </div>
   );
 }

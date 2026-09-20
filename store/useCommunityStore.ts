@@ -1,8 +1,13 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import {
-  MOCK_ROOMS, MOCK_SUBMISSIONS, SELF_USER,
-  type ResearchRoom, type RoomSubmission, type RoomStatus, type RoomVisibility,
+  type ResearchRoom,
+  type RoomSubmission,
+  type RoomStatus,
+  type RoomVisibility,
+  type CommunityUser,
+  type FollowedUser,
+  DEFAULT_COMMUNITY_USER,
 } from "@/lib/mockCommunity";
 import { uid } from "@/lib/utils";
 
@@ -10,29 +15,49 @@ interface CommunityState {
   rooms: ResearchRoom[];
   mySubmissions: RoomSubmission[];
   activeRoomId: string | null;
+  following: FollowedUser[];
 
   // Actions
-  createRoom: (opts: {
-    topicId: string; topicText: string; category: string; difficulty: string;
-    visibility: RoomVisibility; researchDurationMin: number; speakingDurationSec: number;
-  }) => string;
-  joinRoom: (roomId: string) => void;
+  createRoom: (
+    opts: {
+      topicId: string;
+      topicText: string;
+      category: string;
+      difficulty: string;
+      visibility: RoomVisibility;
+      researchDurationMin: number;
+      speakingDurationSec: number;
+    },
+    user?: CommunityUser
+  ) => string;
+  importRoom: (room: ResearchRoom) => void;
+  joinRoom: (roomId: string, user?: CommunityUser) => void;
   advanceRoomStatus: (roomId: string, status: RoomStatus) => void;
-  submitRecording: (roomId: string, durationSec: number, audioBase64?: string) => void;
+  submitRecording: (
+    roomId: string,
+    durationSec: number,
+    user?: CommunityUser,
+    audioBase64?: string
+  ) => void;
   voteOnSubmission: (submissionId: string, stars: 1 | 2 | 3) => void;
   makeSubmissionPublic: (submissionId: string) => void;
+  followUser: (user: FollowedUser) => void;
+  unfollowUser: (userId: string) => void;
 }
 
 export const useCommunityStore = create<CommunityState>()(
   persist(
     (set, get) => ({
-      rooms: MOCK_ROOMS,
+      rooms: [],
       mySubmissions: [],
       activeRoomId: null,
+      following: [],
 
-      createRoom: (opts) => {
+      createRoom: (opts, user) => {
         const id = `room-${uid()}`;
         const code = `FEY-${Math.random().toString(36).substring(2, 6).toUpperCase()}`;
+        const hostUser = user || DEFAULT_COMMUNITY_USER;
+
         const newRoom: ResearchRoom = {
           id,
           topicId: opts.topicId,
@@ -41,36 +66,57 @@ export const useCommunityStore = create<CommunityState>()(
           difficulty: opts.difficulty,
           visibility: opts.visibility,
           status: "lobby",
-          host: SELF_USER,
-          participants: [{ user: SELF_USER, status: "waiting", isHost: true }],
+          host: hostUser,
+          participants: [{ user: hostUser, status: "waiting", isHost: true }],
           inviteCode: code,
           researchDurationMin: opts.researchDurationMin,
           speakingDurationSec: opts.speakingDurationSec,
           createdAt: new Date().toISOString(),
           submissions: [],
         };
-        set((s) => ({ rooms: [newRoom, ...s.rooms], activeRoomId: id }));
+        set((s) => ({ rooms: [newRoom, ...s.rooms.filter((r) => r.id !== id)], activeRoomId: id }));
         return id;
       },
 
-      joinRoom: (roomId) => {
+      importRoom: (room) => {
+        set((s) => {
+          const exists = s.rooms.find((r) => r.id === room.id || r.inviteCode === room.inviteCode);
+          if (exists) {
+            return {
+              rooms: s.rooms.map((r) =>
+                r.id === room.id || r.inviteCode === room.inviteCode
+                  ? { ...r, ...room, participants: r.participants }
+                  : r
+              ),
+            };
+          }
+          return { rooms: [room, ...s.rooms] };
+        });
+      },
+
+      joinRoom: (roomId, user) => {
+        const joinUser = user || DEFAULT_COMMUNITY_USER;
         set((s) => ({
           activeRoomId: roomId,
-          rooms: s.rooms.map((r) =>
-            r.id === roomId && !r.participants.find((p) => p.user.id === SELF_USER.id)
-              ? {
-                  ...r,
-                  participants: [...r.participants, { user: SELF_USER, status: "waiting", isHost: false }],
-                }
-              : r
-          ),
+          rooms: s.rooms.map((r) => {
+            if (r.id !== roomId && r.inviteCode !== roomId) return r;
+            const alreadyIn = r.participants.some((p) => p.user.id === joinUser.id);
+            if (alreadyIn) return r;
+            return {
+              ...r,
+              participants: [
+                ...r.participants,
+                { user: joinUser, status: "waiting", isHost: false },
+              ],
+            };
+          }),
         }));
       },
 
       advanceRoomStatus: (roomId, status) => {
         set((s) => ({
           rooms: s.rooms.map((r) =>
-            r.id === roomId
+            r.id === roomId || r.inviteCode === roomId
               ? {
                   ...r,
                   status,
@@ -82,13 +128,14 @@ export const useCommunityStore = create<CommunityState>()(
         }));
       },
 
-      submitRecording: (roomId, durationSec, audioBase64) => {
-        const room = get().rooms.find((r) => r.id === roomId);
+      submitRecording: (roomId, durationSec, user, audioBase64) => {
+        const room = get().rooms.find((r) => r.id === roomId || r.inviteCode === roomId);
         if (!room) return;
+        const subUser = user || DEFAULT_COMMUNITY_USER;
         const sub: RoomSubmission = {
           id: `sub-${uid()}`,
-          roomId,
-          user: SELF_USER,
+          roomId: room.id,
+          user: subUser,
           topicId: room.topicId,
           topicText: room.topicText,
           category: room.category,
@@ -102,12 +149,12 @@ export const useCommunityStore = create<CommunityState>()(
         set((s) => ({
           mySubmissions: [sub, ...s.mySubmissions],
           rooms: s.rooms.map((r) =>
-            r.id === roomId
+            r.id === room.id
               ? {
                   ...r,
-                  submissions: [...r.submissions, sub],
+                  submissions: [...r.submissions.filter((x) => x.id !== sub.id), sub],
                   participants: r.participants.map((p) =>
-                    p.user.id === SELF_USER.id ? { ...p, status: "submitted" } : p
+                    p.user.id === subUser.id ? { ...p, status: "submitted" } : p
                   ),
                 }
               : r
@@ -140,9 +187,40 @@ export const useCommunityStore = create<CommunityState>()(
           mySubmissions: s.mySubmissions.map((sub) =>
             sub.id === submissionId ? { ...sub, isPublic: true } : sub
           ),
+          rooms: s.rooms.map((r) => ({
+            ...r,
+            submissions: r.submissions.map((sub) =>
+              sub.id === submissionId ? { ...sub, isPublic: true } : sub
+            ),
+          })),
+        }));
+      },
+
+      followUser: (user) => {
+        set((s) => {
+          if (s.following.some((u) => u.id === user.id)) return s;
+          return { following: [user, ...s.following] };
+        });
+      },
+
+      unfollowUser: (userId) => {
+        set((s) => ({
+          following: s.following.filter((u) => u.id !== userId),
         }));
       },
     }),
-    { name: "fey-community-store", version: 1 }
+    {
+      name: "fey-community-store",
+      version: 2,
+      migrate: (persistedState: any, fromVersion: number) => {
+        let state = { ...persistedState };
+        // Purge dummy mock rooms from v1
+        if (fromVersion === undefined || fromVersion < 2) {
+          state.rooms = [];
+          state.following = [];
+        }
+        return state;
+      },
+    }
   )
 );
