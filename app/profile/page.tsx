@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { Pencil, Check, Star, Flame, Zap, BookOpen, Mic, Trophy } from "lucide-react";
+import { Pencil, Check, Star, Flame, Zap, BookOpen, Mic, Trophy, RotateCcw, AlertTriangle, ShieldCheck } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { ACHIEVEMENTS, getLevelForXP, getNextLevel, getLevelProgress } from "@/lib/achievements";
 import { CATEGORY_ICONS, CATEGORIES } from "@/lib/topics";
@@ -35,11 +35,12 @@ const cardVariants = {
 };
 
 export default function ProfilePage() {
-  const { profile, streak, sessions, settings, updateProfile, updateSettings } = useAppStore();
+  const { profile, streak, sessions, settings, updateProfile, updateSettings, resetUserData } = useAppStore();
   const [editing, setEditing] = useState(false);
   const [draftUsername, setDraftUsername] = useState(profile.username);
   const [draftBio, setDraftBio] = useState(profile.bio);
   const [showAvatarPicker, setShowAvatarPicker] = useState(false);
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
@@ -208,6 +209,71 @@ export default function ProfilePage() {
                 );
               })}
             </div>
+          </motion.div>
+
+          {/* Account & Beta Controls */}
+          <motion.div variants={cardVariants} className="rounded-2xl p-5 surface border" style={{ borderColor: "var(--border)" }}>
+            <div className="flex items-center gap-2 mb-3">
+              <ShieldCheck size={16} className="text-[var(--olive)]" />
+              <h3 className="text-heading text-sm font-semibold" style={{ color: "var(--text)" }}>Account & Data</h3>
+            </div>
+            
+            <div className="space-y-2 mb-4 text-xs">
+              <div className="flex justify-between items-center py-1 border-b" style={{ borderColor: "var(--border-dim)" }}>
+                <span style={{ color: "var(--text-mute)" }}>User ID</span>
+                <span className="font-mono text-[11px]" style={{ color: "var(--text-dim)" }}>
+                  {profile.id ? `${profile.id.slice(0, 10)}...` : "beta-user"}
+                </span>
+              </div>
+              <div className="flex justify-between items-center py-1 border-b" style={{ borderColor: "var(--border-dim)" }}>
+                <span style={{ color: "var(--text-mute)" }}>Data Mode</span>
+                <span className="text-[11px] font-semibold text-[var(--olive)]">Local / Private</span>
+              </div>
+              <div className="flex justify-between items-center py-1">
+                <span style={{ color: "var(--text-mute)" }}>Member Status</span>
+                <span className="text-[11px] font-medium" style={{ color: "var(--text)" }}>Beta Tester</span>
+              </div>
+            </div>
+
+            {!showResetConfirm ? (
+              <button
+                type="button"
+                onClick={() => setShowResetConfirm(true)}
+                className="w-full py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-2 transition-all hover:bg-[var(--bg-input)]"
+                style={{ borderColor: "var(--border-dim)", color: "var(--terra)" }}
+              >
+                <RotateCcw size={13} /> Reset Data & Re-onboard
+              </button>
+            ) : (
+              <div className="p-3 rounded-xl border space-y-3" style={{ background: "rgba(122, 28, 46, 0.06)", borderColor: "rgba(122, 28, 46, 0.25)" }}>
+                <div className="flex items-start gap-2">
+                  <AlertTriangle size={15} className="text-[var(--terra)] shrink-0 mt-0.5" />
+                  <p className="text-[11px] leading-tight" style={{ color: "var(--text)" }}>
+                    This will clear your local sessions, streaks, and seen trivia so you can restart fresh.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowResetConfirm(false)}
+                    className="flex-1 py-1.5 rounded-lg border text-xs font-medium"
+                    style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowResetConfirm(false);
+                      resetUserData();
+                    }}
+                    className="flex-1 py-1.5 rounded-lg bg-[var(--terra)] text-white text-xs font-semibold"
+                  >
+                    Confirm Reset
+                  </button>
+                </div>
+              </div>
+            )}
           </motion.div>
         </div>
 

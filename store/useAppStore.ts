@@ -49,15 +49,24 @@ export interface StreakData {
   history: Array<{ date: string; count: number }>;
 }
 
+export interface UserProfile {
+  id: string;
+  username: string;
+  bio: string;
+  avatar: string;
+  xp: number;
+  unlockedAchievements: string[];
+  createdAt?: number;
+}
+
 export interface AppState {
+  // Authentication & Onboarding
+  isOnboarded: boolean;
+  createAccount: (data: { username: string; avatar: string; bio?: string; interests: string[] }) => void;
+  resetUserData: () => void;
+
   // Profile
-  profile: {
-    username: string;
-    bio: string;
-    avatar: string;
-    xp: number;
-    unlockedAchievements: string[];
-  };
+  profile: UserProfile;
 
   // Sessions
   sessions: CompletedSession[];
@@ -127,12 +136,15 @@ const DEFAULT_ENABLED_CATEGORIES = [
 export const useAppStore = create<AppState>()(
   persist(
     (set, get) => ({
+      isOnboarded: false,
       profile: {
-        username: "Learner",
+        id: uid(),
+        username: "",
         bio: "Building knowledge one topic at a time.",
-        avatar: "",
+        avatar: "🧠",
         xp: 0,
         unlockedAchievements: [],
+        createdAt: Date.now(),
       },
       sessions: [],
       activeSession: null,
@@ -154,6 +166,54 @@ export const useAppStore = create<AppState>()(
       },
       customTopics: [],
       seenTriviaQuestionIds: [],
+
+      createAccount: ({ username, avatar, bio, interests }) => {
+        set((s) => ({
+          isOnboarded: true,
+          profile: {
+            ...s.profile,
+            id: s.profile.id || uid(),
+            username: username.trim(),
+            avatar: avatar || "🧠",
+            bio: bio?.trim() || "Building knowledge one topic at a time.",
+            createdAt: s.profile.createdAt || Date.now(),
+          },
+          settings: {
+            ...s.settings,
+            favoriteCategories: interests.length > 0 ? interests : s.settings.favoriteCategories,
+            enabledCategories:
+              interests.length > 0
+                ? Array.from(new Set([...interests, ...s.settings.enabledCategories]))
+                : s.settings.enabledCategories,
+          },
+        }));
+      },
+
+      resetUserData: () => {
+        set({
+          isOnboarded: false,
+          profile: {
+            id: uid(),
+            username: "",
+            bio: "Building knowledge one topic at a time.",
+            avatar: "🧠",
+            xp: 0,
+            unlockedAchievements: [],
+            createdAt: Date.now(),
+          },
+          sessions: [],
+          activeSession: null,
+          streak: {
+            current: 0,
+            longest: 0,
+            lastDate: null,
+            total: 0,
+            history: [],
+          },
+          seenTriviaQuestionIds: [],
+          customTopics: [],
+        });
+      },
 
       startSession: (topic, researchMin) => {
         const id = uid();
@@ -349,7 +409,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "fey-app-store",
-      version: 3,
+      version: 4,
       migrate: (persistedState: any, fromVersion: number) => {
         let state = { ...persistedState };
         // Always clear activeSession on cold start from persisted state 
@@ -360,14 +420,25 @@ export const useAppStore = create<AppState>()(
         if (fromVersion === undefined || fromVersion < 3) {
           const existing: string[] = state?.settings?.enabledCategories ?? [];
           const merged = Array.from(new Set([...existing, ...DEFAULT_ENABLED_CATEGORIES]));
-          return {
-            ...state,
-            settings: {
-              ...(state?.settings ?? {}),
-              enabledCategories: merged,
-            },
+          state.settings = {
+            ...(state?.settings ?? {}),
+            enabledCategories: merged,
           };
         }
+
+        // v3 → v4: handle onboarding state for existing beta testers/users
+        if (fromVersion === undefined || fromVersion < 4) {
+          const hasUsername =
+            typeof state?.profile?.username === "string" &&
+            state.profile.username.trim().length > 0 &&
+            state.profile.username !== "Learner";
+          const hasSessions = Array.isArray(state?.sessions) && state.sessions.length > 0;
+          state.isOnboarded = Boolean(hasUsername || hasSessions);
+          if (!state.profile?.avatar) {
+            state.profile = { ...(state?.profile ?? {}), avatar: "🧠" };
+          }
+        }
+
         return state;
       },
     }

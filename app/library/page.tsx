@@ -1,8 +1,9 @@
 "use client";
 
 import React, { useState } from "react";
+import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Star, Globe, Lock, Play, Filter, Clock } from "lucide-react";
+import { Mic, Star, Globe, Lock, Play, Filter, Clock, Sparkles } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useCommunityStore } from "@/store/useCommunityStore";
 import { MOCK_SUBMISSIONS, SELF_USER } from "@/lib/mockCommunity";
@@ -157,12 +158,20 @@ export default function LibraryPage() {
 
       {/* Recordings list */}
       {filtered.length === 0 ? (
-        <div className="text-center py-20">
-          <Mic size={36} className="mx-auto mb-4 opacity-20" />
-          <p className="text-sm font-medium mb-1" style={{ color: "var(--text-mute)" }}>No recordings yet</p>
-          <p className="text-xs" style={{ color: "var(--text-mute)" }}>
-            Complete a session or join a community room to see recordings here.
+        <div className="text-center py-20 rounded-2xl border surface p-8" style={{ borderColor: "var(--border-dim)" }}>
+          <div className="w-12 h-12 rounded-xl mx-auto mb-3 flex items-center justify-center text-xl border" style={{ background: "var(--bg-input)", borderColor: "var(--border)" }}>
+            🎙️
+          </div>
+          <p className="text-base font-semibold mb-1" style={{ color: "var(--text)" }}>Your library is waiting</p>
+          <p className="text-xs max-w-sm mx-auto mb-6" style={{ color: "var(--text-dim)" }}>
+            Recordings from your solo research speaking sessions and community room submissions will be stored privately here.
           </p>
+          <Link
+            href="/"
+            className="btn-primary inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-xs font-semibold"
+          >
+            <Sparkles size={14} /> Start a Session
+          </Link>
         </div>
       ) : (
         <div className="space-y-4">
