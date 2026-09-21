@@ -1,23 +1,21 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
-  BookOpen,
   Mic,
   Share2,
   Sparkles,
   ArrowRight,
   Check,
-  Compass,
   Award,
   Clock,
   Quote,
   Feather,
 } from "lucide-react";
 import FeyLogo from "@/components/ui/FeyLogo";
-import { decodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
+import type { SharedNotePayload } from "@/lib/share-note";
 import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
@@ -28,27 +26,16 @@ import {
 import { useAppStore } from "@/store/useAppStore";
 import OnboardingModal from "@/components/auth/OnboardingModal";
 
-export default function NoteContent({ code: rawCode }: { code: string }) {
-
-  const [note, setNote] = useState<SharedNotePayload | null>(null);
-  const [decodingError, setDecodingError] = useState(false);
+/** Note is decoded server-side and passed as a prop — no client-side decode needed. */
+export default function NoteContent({
+  note,
+}: {
+  note: SharedNotePayload | null;
+}) {
   const [copied, setCopied] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
-  const { isOnboarded, profile } = useAppStore();
-
-  useEffect(() => {
-    if (!rawCode) {
-      setDecodingError(true);
-      return;
-    }
-    const decoded = decodeSharedNote(rawCode);
-    if (!decoded) {
-      setDecodingError(true);
-    } else {
-      setNote(decoded);
-    }
-  }, [rawCode]);
+  const { isOnboarded } = useAppStore();
 
   function handleCopyLink() {
     if (typeof window !== "undefined" && navigator.clipboard) {
@@ -76,7 +63,7 @@ export default function NoteContent({ code: rawCode }: { code: string }) {
     );
   }
 
-  if (decodingError) {
+  if (!note) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center max-w-lg mx-auto">
         <div className="w-16 h-16 rounded-2xl surface flex items-center justify-center mb-5 border border-[var(--border)]">
@@ -93,17 +80,6 @@ export default function NoteContent({ code: rawCode }: { code: string }) {
             Return to Fey <ArrowRight size={15} />
           </button>
         </Link>
-      </div>
-    );
-  }
-
-  if (!note) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center">
-        <div className="flex items-center gap-3 text-sm font-mono text-[var(--text-mute)]">
-          <FeyLogo size={20} spinning={true} />
-          <span>Decoding scholar manuscript…</span>
-        </div>
       </div>
     );
   }

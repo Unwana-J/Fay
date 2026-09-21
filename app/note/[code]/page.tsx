@@ -1,12 +1,11 @@
 /**
  * Server component wrapper for /note/[code]
  *
- * generateMetadata decodes the note payload server-side so that WhatsApp,
- * iMessage, Twitter, LinkedIn etc. receive per-note Open Graph tags:
- *   og:title    → the topic the scholar wrote about
- *   og:description → the first ~200 chars of the actual note
+ * Decodes the note payload once, server-side. The decoded object is passed
+ * directly to the NoteContent client component — no client-side decode needed.
  *
- * The interactive UI lives in NoteContent.tsx (client component).
+ * generateMetadata also uses the decoded note to produce per-note Open Graph
+ * tags (topic title + note snippet) that WhatsApp, iMessage, Twitter etc read.
  */
 
 import type { Metadata } from "next";
@@ -45,8 +44,6 @@ export async function generateMetadata({
       description: snippet,
       siteName: "Fey — Think Deeper, Articulate Clearly",
       type: "article",
-      // If you add a /public/og-default.png, reference it here:
-      // images: [{ url: "/og-default.png", width: 1200, height: 630 }],
     },
     twitter: {
       card: "summary",
@@ -54,7 +51,6 @@ export async function generateMetadata({
       description: snippet,
     },
     other: {
-      // WhatsApp reads these directly
       "og:site_name": "Fey",
       "article:author": byline,
     },
@@ -69,5 +65,7 @@ export default async function NotePage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  return <NoteContent code={code} />;
+  // Decode once on the server — pass the result directly to the client component
+  const note = decodeSharedNote(code);
+  return <NoteContent note={note} />;
 }
