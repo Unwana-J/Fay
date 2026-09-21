@@ -1,8 +1,9 @@
 /**
  * Server component wrapper for /note/[code]
  *
- * Decodes the note payload once, server-side. The decoded object is passed
- * directly to the NoteContent client component — no client-side decode needed.
+ * Decodes the note payload on the server. Passes both the decoded note and
+ * the raw `code` parameter to NoteContent so it has both instant SSR hydration
+ * and a client-side fallback if required.
  *
  * generateMetadata also uses the decoded note to produce per-note Open Graph
  * tags (topic title + note snippet) that WhatsApp, iMessage, Twitter etc read.
@@ -65,7 +66,6 @@ export default async function NotePage({
   params: Promise<{ code: string }>;
 }) {
   const { code } = await params;
-  // Decode once on the server — pass the result directly to the client component
   const note = decodeSharedNote(code);
-  return <NoteContent note={note} />;
+  return <NoteContent initialNote={note} code={code} />;
 }

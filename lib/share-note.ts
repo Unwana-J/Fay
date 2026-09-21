@@ -29,11 +29,26 @@ export interface SharedNotePayload {
   _v?: string;
 }
 
+const DEFAULT_NOTES_FALLBACK =
+  "Understanding proven through Feynman vocal articulation and synthesis.";
+
 // ── Encode ────────────────────────────────────────────────────────────────────
 
 export function encodeSharedNote(payload: SharedNotePayload): string {
   try {
-    const jsonStr = JSON.stringify({ ...payload, _v: "2" });
+    const sanitizedPayload: SharedNotePayload = {
+      ...payload,
+      notes: payload.notes && payload.notes.trim().length > 0
+        ? payload.notes
+        : DEFAULT_NOTES_FALLBACK,
+      author: payload.author || "Scholar",
+      category: payload.category || "General",
+      difficulty: payload.difficulty || "Scholar",
+      date: payload.date || new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+      _v: "2",
+    };
+
+    const jsonStr = JSON.stringify(sanitizedPayload);
     // compressToEncodedURIComponent produces a URL-safe string directly
     return LZString.compressToEncodedURIComponent(jsonStr);
   } catch (err) {
@@ -45,19 +60,43 @@ export function encodeSharedNote(payload: SharedNotePayload): string {
 // ── Decode ────────────────────────────────────────────────────────────────────
 
 export function decodeSharedNote(encoded: string): SharedNotePayload | null {
+  if (!encoded || typeof encoded !== "string") return null;
+
   try {
-    // ── Try lz-string first (v2 links) ──────────────────────────────────────
-    const lzDecompressed = LZString.decompressFromEncodedURIComponent(encoded);
-    if (lzDecompressed) {
-      const data = JSON.parse(lzDecompressed);
-      if (!data.topicText || !data.notes) return null;
-      return data as SharedNotePayload;
+    // ── 1. Try lz-string directly (v2 compressed links) ───────────────────────
+    let lzDecompressed = LZString.decompressFromEncodedURIComponent(encoded);
+
+    // If direct decompress fails, try after decodeURIComponent (in case the web framework double-encoded it)
+    if (!lzDecompressed) {
+      try {
+        lzDecompressed = LZString.decompressFromEncodedURIComponent(decodeURIComponent(encoded));
+      } catch {}
     }
 
-    // ── Fallback: legacy base64-encoded links (v1) ───────────────────────────
-    const decodedUri = decodeURIComponent(encoded);
-    let jsonStr = "";
+    // Also try replacing spaces with '+' if URL proxies converted '+' to ' '
+    if (!lzDecompressed && encoded.includes(" ")) {
+      try {
+        lzDecompressed = LZString.decompressFromEncodedURIComponent(encoded.replace(/ /g, "+"));
+      } catch {}
+    }
 
+    if (lzDecompressed) {
+      const data = JSON.parse(lzDecompressed);
+      if (data && data.topicText) {
+        if (!data.notes || typeof data.notes !== "string" || data.notes.trim().length === 0) {
+          data.notes = DEFAULT_NOTES_FALLBACK;
+        }
+        return data as SharedNotePayload;
+      }
+    }
+
+    // ── 2. Fallback: legacy base64-encoded links (v1) ───────────────────────────
+    let decodedUri = encoded;
+    try {
+      decodedUri = decodeURIComponent(encoded);
+    } catch {}
+
+    let jsonStr = "";
     if (typeof window !== "undefined" && typeof window.atob === "function") {
       const binary = atob(decodedUri);
       const bytes = new Uint8Array(binary.length);
@@ -74,8 +113,14 @@ export function decodeSharedNote(encoded: string): SharedNotePayload | null {
     }
 
     const data = JSON.parse(jsonStr);
-    if (!data.topicText || !data.notes) return null;
-    return data as SharedNotePayload;
+    if (data && data.topicText) {
+      if (!data.notes || typeof data.notes !== "string" || data.notes.trim().length === 0) {
+        data.notes = DEFAULT_NOTES_FALLBACK;
+      }
+      return data as SharedNotePayload;
+    }
+
+    return null;
   } catch (err) {
     console.error("Failed to decode shared note payload", err);
     return null;

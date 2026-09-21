@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import {
@@ -15,27 +15,55 @@ import {
   Feather,
 } from "lucide-react";
 import FeyLogo from "@/components/ui/FeyLogo";
-import type { SharedNotePayload } from "@/lib/share-note";
+import { decodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
 import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
   DIFFICULTY_LABELS,
-  DIFFICULTY_COLORS,
   type Difficulty,
 } from "@/lib/topics";
 import { useAppStore } from "@/store/useAppStore";
 import OnboardingModal from "@/components/auth/OnboardingModal";
 
-/** Note is decoded server-side and passed as a prop — no client-side decode needed. */
 export default function NoteContent({
-  note,
+  initialNote,
+  code,
 }: {
-  note: SharedNotePayload | null;
+  initialNote: SharedNotePayload | null;
+  code?: string;
 }) {
+  const [note, setNote] = useState<SharedNotePayload | null>(initialNote);
   const [copied, setCopied] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
 
   const { isOnboarded } = useAppStore();
+
+  // Dual hydration: if server didn't supply initialNote or on client navigation,
+  // attempt decoding in client with full access to window.location
+  useEffect(() => {
+    if (!note) {
+      // 1. Try prop code if provided
+      if (code) {
+        const decoded = decodeSharedNote(code);
+        if (decoded) {
+          setNote(decoded);
+          return;
+        }
+      }
+
+      // 2. Fallback: extract directly from window.location.pathname
+      if (typeof window !== "undefined") {
+        const parts = window.location.pathname.split("/note/");
+        if (parts.length > 1 && parts[1]) {
+          const rawParam = parts[1].split("?")[0].split("#")[0];
+          const decoded = decodeSharedNote(rawParam);
+          if (decoded) {
+            setNote(decoded);
+          }
+        }
+      }
+    }
+  }, [note, code]);
 
   function handleCopyLink() {
     if (typeof window !== "undefined" && navigator.clipboard) {
@@ -221,7 +249,7 @@ export default function NoteContent({
               className="w-10 h-10 rounded-full flex items-center justify-center font-serif font-bold text-sm text-white"
               style={{ background: categoryColor }}
             >
-              {note.author.slice(0, 1).toUpperCase()}
+              {note.author ? note.author.slice(0, 1).toUpperCase() : "S"}
             </div>
             <div>
               <div className="text-sm font-semibold font-serif text-[var(--text)]">
