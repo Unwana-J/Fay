@@ -38,13 +38,20 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 - **Trivia Arcade (`/games/trivia`)**: 1,000+ curated questions with countdown timers, scoring multipliers, detailed explanations, and local deduplication.
 - **Word Description Party Game (`/play`)**: Local multiplayer team game with speech recognition and Google Gemini 2.0 Flash AI referee (`/api/ai/validate`).
 
+### 2.5. Habit Formation & Retention Mechanics
+- **Impromptu Articulation (Two-Minute Rule)**: Direct-to-speech sprint option on the daily suggested topic that bypasses research for users who want to prove their existing understanding in 90 seconds.
+- **Daily Vows (3 Daily Quests)**: Deterministic daily micro-quests resetting at midnight (Daily Voice, Sustained Articulation, Conviction & Clarity) with claimable XP bonuses.
+- **Loss Aversion (Scholar's Seal / Streak Freeze)**: Users hold seals (default 1) that automatically protect active streaks if they miss a single day. Additional seals can be acquired for 150 XP.
+- **Proof of Intellect (Shareable Feynman Card)**: Completing a sprint unlocks a constellation star celebration and a 1-click clipboard export for social sharing.
+- **Store Migration v6**: Seamlessly hydrates user profiles with default streak shields and quest tracking.
+
 ---
 
 ## 3. Tech Stack & State Management
 - **Framework**: Next.js 16 (App Router), React 19, TypeScript
 - **Styling**: Tailwind CSS, CSS Custom Properties (`var(--fey-...)`), Framer Motion, Lucide icons
 - **State Stores**:
-  - `lib/store.ts`: `useAppStore` (profile, daily topic, solo sessions, library, streak, trivia stats)
+  - `store/useAppStore.ts`: `useAppStore` (profile, daily topic, solo sessions, library, streak, daily quests, trivia stats, v6)
   - `lib/community-store.ts`: `useCommunityStore` (rooms, room history, followed scholars)
   - `lib/game-store.ts`: `useGameStore` (party game state)
 - **AI Endpoints**: Next.js App Router API handlers (`/api/ai/*`) invoking `@google/genai` (Gemini 2.0 Flash)
@@ -55,7 +62,7 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 
 | Layer | Current Status (Phase 1) | Target Next Status (Phase 2 & 3) |
 | :--- | :--- | :--- |
-| **Data Storage** | Local-First (`localStorage` via Zustand v5) | Supabase / PostgreSQL cloud synchronization |
+| **Data Storage** | Local-First (`localStorage` via Zustand v6) | Supabase / PostgreSQL cloud synchronization |
 | **Audio Storage** | Base64 in LocalStorage | Cloudflare R2 / AWS S3 pre-signed storage |
 | **Room Real-time** | URL Payload + Poll/Refresh | WebSockets / LiveKit live synchronized salons |
 | **Speech Review** | Self-rating (1–5) | Whisper transcription + Gemini Socratic critique |

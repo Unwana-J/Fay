@@ -94,17 +94,24 @@ function StreakCalendarModal({
   streakCurrent,
   streakLongest,
   streakLastDate,
+  streakShields,
+  profileXp,
+  onBuyShield,
   sessions,
 }: {
   onClose: () => void;
   streakCurrent: number;
   streakLongest: number;
   streakLastDate: string | null;
+  streakShields: number;
+  profileXp: number;
+  onBuyShield: () => boolean;
   sessions: CompletedSession[];
 }) {
   const streakDates = getStreakDates(streakCurrent, streakLastDate);
   const hasSession = (dateStr: string) => sessions.some((s) => s.date === dateStr);
   const isStreak = (dateStr: string) => streakDates.includes(dateStr);
+  const [shieldMsg, setShieldMsg] = useState<string | null>(null);
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -119,6 +126,16 @@ function StreakCalendarModal({
     { label: prevMonthDate.toLocaleDateString("en-US", { month: "long", year: "numeric" }), days: getMonthDays(prevYear, prevMonth) },
     { label: now.toLocaleDateString("en-US", { month: "long", year: "numeric" }), days: getMonthDays(currentYear, currentMonth) },
   ];
+
+  function handleAcquireShield() {
+    const ok = onBuyShield();
+    if (ok) {
+      setShieldMsg("Scholar's Seal secured! Your streak is protected.");
+    } else {
+      setShieldMsg("Insufficient XP. Complete sprints to earn 150 XP.");
+    }
+    setTimeout(() => setShieldMsg(null), 3000);
+  }
 
   return (
     <motion.div
@@ -166,37 +183,11 @@ function StreakCalendarModal({
                   const played = hasSession(day.dateStr);
                   const active = isStreak(day.dateStr);
 
-                  // Compute borders for streak styling to merge adjacent days horizontally
-                  const dayOfWeek = new Date(day.dateStr + "T00:00:00").getDay();
-                  
-                  const yesterdayStr = (() => {
-                    const d = new Date(day.dateStr + "T00:00:00");
-                    d.setDate(d.getDate() - 1);
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                  })();
-                  const tomorrowStr = (() => {
-                    const d = new Date(day.dateStr + "T00:00:00");
-                    d.setDate(d.getDate() + 1);
-                    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-                  })();
-
-                  const mergeLeft = active && streakDates.includes(yesterdayStr) && dayOfWeek !== 0;
-                  const mergeRight = active && streakDates.includes(tomorrowStr) && dayOfWeek !== 6;
-
-                  let cellStyle: React.CSSProperties = {};
-                  let cellClass = "w-8 h-8 flex items-center justify-center text-xs font-semibold transition-all relative ";
+                  let cellClass = "w-8 h-8 flex items-center justify-center text-xs font-mono transition-all relative ";
+                  const cellStyle: React.CSSProperties = {};
 
                   if (active) {
-                    cellClass += "bg-[var(--terra)] text-white font-bold ";
-                    if (mergeLeft && mergeRight) {
-                      cellClass += "rounded-none";
-                    } else if (mergeLeft) {
-                      cellClass += "rounded-r-full rounded-l-none";
-                    } else if (mergeRight) {
-                      cellClass += "rounded-l-full rounded-r-none";
-                    } else {
-                      cellClass += "rounded-full";
-                    }
+                    cellClass += "text-white font-bold bg-[var(--terra)] ";
                   } else if (played) {
                     cellClass += "rounded-full bg-[var(--bg-input)] border border-[var(--olive)] text-[var(--olive-text)]";
                   } else {
@@ -211,7 +202,6 @@ function StreakCalendarModal({
                       style={cellStyle}
                     >
                       {day.dayNum}
-                      {/* Sub dot for sessions on streak days */}
                       {active && played && (
                         <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white/60" />
                       )}
@@ -223,8 +213,49 @@ function StreakCalendarModal({
           ))}
         </div>
 
+        {/* Scholar's Seal (Loss Aversion / Streak Protection) */}
+        <div
+          className="p-4 rounded-xl border mb-4 flex items-center justify-between gap-4"
+          style={{ background: "var(--bg-input)/30", borderColor: "var(--border-dim)" }}
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-2xl select-none">🛡️</span>
+            <div>
+              <div className="text-xs font-bold font-serif" style={{ color: "var(--text)" }}>
+                Scholar&apos;s Seal of Protection
+              </div>
+              <p className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+                Automatically shields your streak if you miss a single day. You hold{" "}
+                <span className="font-bold font-mono" style={{ color: "var(--terra)" }}>
+                  {streakShields} active
+                </span>
+                .
+              </p>
+              {shieldMsg && (
+                <p className="text-[10px] font-mono text-[var(--terra)] mt-1 font-semibold">
+                  {shieldMsg}
+                </p>
+              )}
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleAcquireShield}
+            disabled={profileXp < 150}
+            className="btn-ghost text-xs px-3 py-1.5 whitespace-nowrap font-mono cursor-pointer"
+            style={{
+              opacity: profileXp >= 150 ? 1 : 0.5,
+              borderColor: "var(--gold)",
+              color: "var(--text)",
+            }}
+            title={profileXp < 150 ? "Earn 150 XP to acquire a seal" : "Acquire streak seal"}
+          >
+            Acquire (+1) · 150 XP
+          </button>
+        </div>
+
         {/* Legend */}
-        <div className="flex flex-wrap items-center justify-center gap-6 pt-4 border-t" style={{ borderColor: "var(--border-dim)" }}>
+        <div className="flex flex-wrap items-center justify-center gap-6 pt-3 border-t" style={{ borderColor: "var(--border-dim)" }}>
           <div className="flex items-center gap-2 text-xs">
             <div className="w-5 h-5 rounded-full bg-[var(--bg-input)] border border-[var(--olive)] flex items-center justify-center text-[10px] text-[var(--olive-text)] font-bold">12</div>
             <span style={{ color: "var(--text-dim)" }}>Completed Session</span>
@@ -242,7 +273,7 @@ function StreakCalendarModal({
 // ─── Main Sidebar ────────────────────────────────────────────────────────────
 export default function Sidebar() {
   const pathname = usePathname();
-  const { profile, streak, sessions } = useAppStore();
+  const { profile, streak, sessions, buyStreakShield } = useAppStore();
   const [showStreakModal, setShowStreakModal] = useState(false);
   
   const level   = getLevelForXP(profile.xp);
@@ -328,9 +359,14 @@ export default function Sidebar() {
                 {streak.current} {streak.current === 1 ? "day streak" : "days streak"}
               </span>
             </div>
-            <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>
-              History →
-            </span>
+            <div className="flex items-center gap-1">
+              {(streak.shields ?? 0) > 0 && (
+                <span className="text-[10px] select-none" title={`${streak.shields} streak shield active`}>🛡️</span>
+              )}
+              <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>
+                History →
+              </span>
+            </div>
           </button>
         </div>
 
@@ -369,6 +405,9 @@ export default function Sidebar() {
             streakCurrent={streak.current}
             streakLongest={streak.longest}
             streakLastDate={streak.lastDate}
+            streakShields={streak.shields ?? 1}
+            profileXp={profile.xp}
+            onBuyShield={buyStreakShield}
             sessions={sessions}
           />
         )}

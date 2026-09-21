@@ -798,19 +798,41 @@ function StarRating({ label, value, onChange }: { label: string; value: number; 
 }
 
 // ─── Completion screen ────────────────────────────────────────────────────────
-function StageComplete({ xpEarned, newAchievements, streak, onNext, topicId }: {
+function StageComplete({
+  xpEarned,
+  newAchievements,
+  streak,
+  onNext,
+  topicId,
+  topicText,
+  topicCategory,
+  speakingSeconds,
+}: {
   xpEarned: number;
   newAchievements: string[];
   streak: number;
   onNext: () => void;
   topicId: string;
+  topicText: string;
+  topicCategory: string;
+  speakingSeconds: number;
 }) {
   const { ACHIEVEMENTS } = require("@/lib/achievements");
   const unlockedAchs = ACHIEVEMENTS.filter((a: any) => newAchievements.includes(a.id));
   const { toggleFavoriteTopic, settings } = useAppStore();
   const isFav = settings.favoriteTopics?.includes(topicId);
+  const [copied, setCopied] = useState(false);
 
   useEffect(() => { fireConfetti(); }, []);
+
+  function handleShare() {
+    const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\nhttps://fey-eight-liard.vercel.app`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(dispatch);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2500);
+    }
+  }
 
   return (
     <motion.div
@@ -828,8 +850,12 @@ function StageComplete({ xpEarned, newAchievements, streak, onNext, topicId }: {
       </motion.div>
 
       <div>
-        <h2 className="font-space text-4xl font-bold mb-1" style={{ color: "var(--text)" }}>Session Complete!</h2>
-        <p style={{ color: "var(--text-dim)" }}>You've earned it. Great work thinking deeper.</p>
+        <h2 className="font-serif text-3xl md:text-4xl font-bold mb-1" style={{ color: "var(--text)" }}>
+          Session Complete!
+        </h2>
+        <p className="font-serif italic text-sm" style={{ color: "var(--text-dim)" }}>
+          True understanding proven. Your synthesis is permanently archived.
+        </p>
       </div>
 
       <div className="flex gap-4">
@@ -837,36 +863,71 @@ function StageComplete({ xpEarned, newAchievements, streak, onNext, topicId }: {
           initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.25 }}
-          className="rounded-2xl px-8 py-5 text-center surface"
+          className="rounded-2xl px-8 py-5 text-center surface border"
+          style={{ borderColor: "var(--border-dim)" }}
         >
           <div className="text-4xl font-bold font-mono" style={{ color: "var(--gold)" }}>
             +<CountUp end={xpEarned} />
           </div>
-          <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>XP Earned</div>
+          <div className="text-xs font-mono mt-1" style={{ color: "var(--text-dim)" }}>XP Earned</div>
         </motion.div>
         <motion.div
           initial={{ y: 12, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ delay: 0.3 }}
-          className="rounded-2xl px-8 py-5 text-center surface"
+          className="rounded-2xl px-8 py-5 text-center surface border"
+          style={{ borderColor: "var(--border-dim)" }}
         >
           <div className="text-4xl font-bold font-mono" style={{ color: "var(--terra)" }}>
             <CountUp end={streak} />
           </div>
-          <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>Day Streak</div>
+          <div className="text-xs font-mono mt-1" style={{ color: "var(--text-dim)" }}>Day Streak</div>
         </motion.div>
       </div>
 
-      <div className="flex gap-3">
+      {/* Constellation star notification */}
+      <div
+        className="p-3.5 rounded-xl border flex items-center justify-between gap-4 max-w-md w-full surface"
+        style={{ borderColor: "var(--border-dim)" }}
+      >
+        <div className="flex items-center gap-2.5 text-left">
+          <span className="text-xl select-none">✨</span>
+          <div>
+            <div className="text-xs font-bold font-serif" style={{ color: "var(--text)" }}>
+              New Star Ignited
+            </div>
+            <div className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>
+              Added to your {topicCategory} constellation cluster
+            </div>
+          </div>
+        </div>
+        <a
+          href="/constellation"
+          className="text-xs font-mono font-semibold hover:underline"
+          style={{ color: "var(--terra)" }}
+        >
+          View Map →
+        </a>
+      </div>
+
+      <div className="flex gap-3 flex-wrap justify-center">
+        <button
+          onClick={handleShare}
+          className="btn-ghost flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border cursor-pointer font-mono"
+          style={{ borderColor: "var(--border-dim)" }}
+        >
+          <span>{copied ? "✓ Copied Dispatch!" : "📋 Share Feynman Card"}</span>
+        </button>
+
         <button
           onClick={() => toggleFavoriteTopic(topicId)}
           className={cn(
-            "btn-ghost flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border",
+            "btn-ghost flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border cursor-pointer font-mono",
             isFav && "border-yellow-500/30 bg-yellow-500/5 text-yellow-600"
           )}
         >
           <Star size={13} className={isFav ? "fill-yellow-500 text-yellow-500" : "text-gray-400"} />
-          {isFav ? "Favorited" : "Add to Favorites"}
+          {isFav ? "Favorited" : "Save Topic"}
         </button>
       </div>
 
@@ -1029,6 +1090,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               streak={streak.current}
               onNext={() => router.push("/")}
               topicId={activeSession.topic.id}
+              topicText={activeSession.topic.text}
+              topicCategory={activeSession.topic.category}
+              speakingSeconds={speakingSeconds}
             />
           </motion.div>
         ) : activeSession.stage === "research" ? (

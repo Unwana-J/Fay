@@ -47,6 +47,7 @@ export interface StreakData {
   lastDate: string | null;
   total: number;
   history: Array<{ date: string; count: number }>;
+  shields: number; // Scholar's seals of protection
 }
 
 export interface UserProfile {
@@ -75,6 +76,11 @@ export interface AppState {
   // Streak
   streak: StreakData;
 
+  // Daily Quests
+  claimedQuestIds: string[];
+  claimQuestXP: (questId: string, xpReward: number) => void;
+  buyStreakShield: () => boolean;
+
   // Settings
   settings: {
     enabledCategories: string[];
@@ -93,7 +99,7 @@ export interface AppState {
   seenTriviaQuestionIds: string[];
 
   // Actions
-  startSession: (topic: Topic, researchMin: number) => string;
+  startSession: (topic: Topic, researchMin: number, initialStage?: "research" | "speaking") => string;
   updateActiveSessionStage: (stage: ActiveSession["stage"]) => void;
   updateNotes: (notes: string) => void;
   completeSession: (data: {
@@ -154,7 +160,9 @@ export const useAppStore = create<AppState>()(
         lastDate: null,
         total: 0,
         history: [],
+        shields: 1, // 1 free Scholar's Seal on account creation
       },
+      claimedQuestIds: [],
       settings: {
         enabledCategories: DEFAULT_ENABLED_CATEGORIES,
         favoriteCategories: ["Artificial Intelligence", "Technology"],
@@ -206,22 +214,25 @@ export const useAppStore = create<AppState>()(
             lastDate: null,
             total: 0,
             history: [],
+            shields: 1,
           },
+          claimedQuestIds: [],
           seenTriviaQuestionIds: [],
           customTopics: [],
         });
       },
 
-      startSession: (topic, researchMin) => {
+      startSession: (topic, researchMin, initialStage = "research") => {
         const id = uid();
         set({
           activeSession: {
             id,
             topic,
-            stage: "research",
+            stage: initialStage,
             startedAt: Date.now(),
             researchDurationMin: researchMin,
-            notes: "",
+            notes: initialStage === "speaking" ? "Impromptu Articulation (Direct-to-speech sprint)" : "",
+            ...(initialStage === "speaking" ? { researchCompletedAt: Date.now() } : {}),
           },
         });
         return id;
@@ -256,10 +267,16 @@ export const useAppStore = create<AppState>()(
         let xpEarned = DIFFICULTY_XP[topic.difficulty] ?? 100;
         const streak = state.streak;
         let currentStreak = streak.current;
+        let remainingShields = streak.shields ?? 1;
+
         if (streak.lastDate === today) {
           // already counted
         } else if (streak.lastDate && daysBetween(streak.lastDate, today) === 1) {
           currentStreak += 1;
+        } else if (streak.lastDate && daysBetween(streak.lastDate, today) === 2 && remainingShields > 0) {
+          // Scholar's Seal preserved the streak!
+          currentStreak += 1;
+          remainingShields -= 1;
         } else {
           currentStreak = 1;
         }
@@ -331,6 +348,7 @@ export const useAppStore = create<AppState>()(
             lastDate: today,
             total: streak.total + 1,
             history: newHistory.slice(0, 400),
+            shields: remainingShields,
           },
           profile: {
             ...state.profile,
@@ -343,6 +361,36 @@ export const useAppStore = create<AppState>()(
       },
 
       abandonSession: () => set({ activeSession: null }),
+
+      claimQuestXP: (questId, xpReward) => {
+        const state = get();
+        if (state.claimedQuestIds.includes(questId)) return;
+        set({
+          claimedQuestIds: [...state.claimedQuestIds, questId],
+          profile: {
+            ...state.profile,
+            xp: state.profile.xp + xpReward,
+          },
+        });
+      },
+
+      buyStreakShield: () => {
+        const state = get();
+        const cost = 150;
+        if (state.profile.xp < cost) return false;
+        const currentShields = state.streak.shields ?? 0;
+        set({
+          profile: {
+            ...state.profile,
+            xp: state.profile.xp - cost,
+          },
+          streak: {
+            ...state.streak,
+            shields: currentShields + 1,
+          },
+        });
+        return true;
+      },
 
       updateProfile: (data) =>
         set((s) => ({ profile: { ...s.profile, ...data } })),
@@ -406,7 +454,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "fey-app-store",
-      version: 5,
+      version: 6,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       migrate: (persistedState: any, fromVersion: number) => {
         const state = { ...persistedState };
@@ -446,6 +494,15 @@ export const useAppStore = create<AppState>()(
               enabledCategories: favs,
             };
           }
+        }
+
+        // v5 → v6: habit mechanics (Scholar's Seal and daily quests)
+        if (fromVersion === undefined || fromVersion < 6) {
+          state.streak = {
+            ...(state?.streak ?? {}),
+            shields: state?.streak?.shields ?? 1,
+          };
+          state.claimedQuestIds = state?.claimedQuestIds ?? [];
         }
 
         return state;

@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation";
 import FeyLogo from "@/components/ui/FeyLogo";
 import FocusCategoryModal from "@/components/dashboard/FocusCategoryModal";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { getDailyQuests } from "@/lib/quests";
 
 const DAYS_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -182,7 +183,17 @@ const cardVariants = {
 /* ─── Dashboard ──────────────────────────────────────────────────── */
 export default function Dashboard() {
   const router = useRouter();
-  const { profile, streak, sessions, activeSession, settings, customTopics, startSession } = useAppStore();
+  const {
+    profile,
+    streak,
+    sessions,
+    activeSession,
+    settings,
+    customTopics,
+    startSession,
+    claimedQuestIds,
+    claimQuestXP,
+  } = useAppStore();
   const level     = getLevelForXP(profile.xp);
   const nextLevel = getNextLevel(profile.xp);
   const progress  = getLevelProgress(profile.xp);
@@ -195,6 +206,13 @@ export default function Dashboard() {
   useEffect(() => setMounted(true), []);
 
   if (!mounted) return null;
+
+  const dailyQuests = getDailyQuests(sessions, streak, claimedQuestIds);
+
+  function handleStartImpromptu() {
+    const id = startSession(suggestedTopic, 0, "speaking");
+    router.push(`/session/${id}`);
+  }
 
   /* ── Stats ── */
   const totalResearchMin = sessions.reduce((a, s) => a + s.researchMinutes, 0);
@@ -315,6 +333,13 @@ export default function Dashboard() {
             <span>Scholar {profile.username}</span>
             <span>·</span>
             <span style={{ color: "var(--olive)" }}>{level.title}</span>
+            <span>·</span>
+            <span className="flex items-center gap-1 font-semibold" style={{ color: "var(--terra)" }}>
+              <span>🔥 {streak.current}d</span>
+              {(streak.shields ?? 0) > 0 && (
+                <span className="select-none" title={`${streak.shields} Scholar's Seal active`}>🛡️</span>
+              )}
+            </span>
           </div>
         </div>
 
@@ -461,20 +486,28 @@ export default function Dashboard() {
             </p>
 
             {/* Action Bar */}
-            <div className="flex items-center gap-3 pt-2 border-t flex-wrap" style={{ borderColor: "var(--border-dim)" }}>
+            <div className="flex items-center gap-3 pt-3 border-t flex-wrap" style={{ borderColor: "var(--border-dim)" }}>
               <button onClick={handleStartSuggested} className="btn-terra">
                 Begin Research (15m) <ArrowRight size={15} />
               </button>
 
               <button
+                onClick={handleStartImpromptu}
+                className="btn-ghost text-xs flex items-center gap-1.5 cursor-pointer font-mono"
+                title="Already know the concept? Skip research and articulate immediately"
+              >
+                <Zap size={13} style={{ color: "var(--gold)" }} /> Impromptu Speech (90s)
+              </button>
+
+              <button
                 onClick={handleSkipTopic}
-                className="btn-ghost"
+                className="btn-ghost text-xs cursor-pointer font-mono"
                 title="Pick another question from your preferences"
               >
                 <Shuffle size={13} /> Next Topic
               </button>
 
-              <div className="ml-auto text-[11px] font-mono hidden sm:flex items-center gap-2" style={{ color: "var(--text-mute)" }}>
+              <div className="ml-auto text-[11px] font-mono hidden md:flex items-center gap-2" style={{ color: "var(--text-mute)" }}>
                 <span>15m Notes</span>
                 <span>·</span>
                 <span>90s Vocal Articulation</span>
@@ -482,6 +515,92 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+      </motion.div>
+
+      {/* ── Daily Vows (Duolingo Habit Engine: 3 Daily Quests) ── */}
+      <motion.div
+        variants={cardVariants}
+        className="surface rounded-xl p-5 mb-6 border"
+        style={{ borderColor: "var(--border-dim)" }}
+      >
+        <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <span className="text-base select-none">📜</span>
+            <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
+              Daily Vows & Quests
+            </span>
+            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--bg-input)]/50" style={{ color: "var(--text-mute)" }}>
+              Resets at midnight
+            </span>
+          </div>
+
+          <div className="text-xs font-mono" style={{ color: "var(--text-mute)" }}>
+            {dailyQuests.filter((q) => q.completed).length}/{dailyQuests.length} Fulfilled
+          </div>
+        </div>
+
+        <div className="grid md:grid-cols-3 gap-3">
+          {dailyQuests.map((quest) => {
+            const isDone = quest.completed;
+            const isClaimed = quest.claimed;
+
+            return (
+              <div
+                key={quest.id}
+                className="p-3.5 rounded-xl border flex flex-col justify-between transition-all"
+                style={{
+                  background: isClaimed
+                    ? "var(--bg-input)/20"
+                    : isDone
+                    ? "rgba(166, 124, 30, 0.08)"
+                    : "var(--bg-card)",
+                  borderColor: isDone ? "var(--gold)" : "var(--border-dim)",
+                }}
+              >
+                <div>
+                  <div className="flex items-center justify-between gap-2 mb-1.5">
+                    <span className="text-lg select-none">{quest.icon}</span>
+                    <span className="tag tag-gold font-mono text-[10px] px-1.5 py-0.5">
+                      +{quest.rewardXP} XP
+                    </span>
+                  </div>
+                  <div className="text-xs font-serif font-bold mb-1" style={{ color: "var(--text)" }}>
+                    {quest.title}
+                  </div>
+                  <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                    {quest.description}
+                  </p>
+                </div>
+
+                {/* Status & Claim Button */}
+                <div className="pt-2 border-t flex items-center justify-between" style={{ borderColor: "var(--border-dim)" }}>
+                  <span className="font-mono text-[10px]" style={{ color: "var(--text-mute)" }}>
+                    {quest.current}/{quest.target} {quest.key === "vocal-conviction" ? "sec" : "done"}
+                  </span>
+
+                  {isClaimed ? (
+                    <span className="text-[11px] font-mono text-[var(--olive-br)] font-bold flex items-center gap-1">
+                      ✓ Claimed
+                    </span>
+                  ) : isDone ? (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        claimQuestXP(quest.id, quest.rewardXP);
+                      }}
+                      className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold text-white transition-all shadow-sm hover:scale-105 cursor-pointer"
+                      style={{ background: "var(--gold)" }}
+                    >
+                      Claim +{quest.rewardXP} XP
+                    </button>
+                  ) : (
+                    <span className="text-[10px] font-mono text-[var(--text-mute)]">In Progress</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </motion.div>
 
       {/* ── Consolidated Scholar Ledger (Replaces 4 isolated SaaS cards) ── */}
