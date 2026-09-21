@@ -3,10 +3,12 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
-import { Mic, Star, Globe, Lock, Play, Filter, Clock, Sparkles } from "lucide-react";
+import { Mic, Star, Globe, Lock, Play, Filter, Clock, Sparkles, Share2 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useCommunityStore } from "@/store/useCommunityStore";
 import { MOCK_SUBMISSIONS, SELF_USER } from "@/lib/mockCommunity";
+import ShareNoteModal from "@/components/notes/ShareNoteModal";
+import type { SharedNotePayload } from "@/lib/share-note";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "Artificial Intelligence": "#7A1C2E",
@@ -40,11 +42,12 @@ type Filter = "all" | "public" | "private";
 type Sort = "recent" | "rated" | "longest";
 
 export default function LibraryPage() {
-  const { sessions } = useAppStore();
+  const { sessions, profile } = useAppStore();
   const { mySubmissions, makeSubmissionPublic } = useCommunityStore();
   const [filter, setFilter] = useState<Filter>("all");
   const [sort, setSort] = useState<Sort>("recent");
   const [playingId, setPlayingId] = useState<string | null>(null);
+  const [noteToShare, setNoteToShare] = useState<SharedNotePayload | null>(null);
   
   // Ref for global audio playback
   const audioRef = React.useRef<HTMLAudioElement | null>(null);
@@ -57,8 +60,13 @@ export default function LibraryPage() {
       type: "solo" as const,
       topicText: s.topicText,
       category: s.category,
+      difficulty: s.difficulty,
+      notes: s.notes,
       durationSec: s.speakingSeconds,
       submittedAt: s.date + "T12:00:00Z",
+      dateStr: s.date,
+      xpEarned: s.xpEarned,
+      tags: s.tags,
       isPublic: false,
       votes: { upvotes: 0, starRatings: [], avgStars: 0 },
       audioBase64: s.audioBase64,
@@ -281,13 +289,45 @@ export default function LibraryPage() {
                     )}
                     {rec.votes.upvotes > 0 && <span>↑ {rec.votes.upvotes}</span>}
                   </div>
-                  <Clock size={10} />
+
+                  <div className="flex items-center gap-2">
+                    {"notes" in rec && rec.notes && (
+                      <button
+                        onClick={() =>
+                          setNoteToShare({
+                            topicId: rec.id,
+                            topicText: rec.topicText,
+                            category: rec.category,
+                            difficulty: ("difficulty" in rec && rec.difficulty) || "Scholar",
+                            notes: rec.notes || "",
+                            author: profile.username || "Scholar",
+                            date: ("dateStr" in rec && rec.dateStr) || "September 2026",
+                            speakingSeconds: rec.durationSec,
+                            xpEarned: ("xpEarned" in rec && rec.xpEarned) || 150,
+                            tags: ("tags" in rec && rec.tags) || [],
+                          })
+                        }
+                        className="btn-ghost flex items-center gap-1 px-2.5 py-1 text-[10px] font-mono rounded-lg border border-[var(--border-dim)] hover:border-[var(--terra)] hover:text-[var(--terra)] transition-colors cursor-pointer"
+                      >
+                        <Share2 size={10} />
+                        <span>Share Notes</span>
+                      </button>
+                    )}
+                    <Clock size={10} />
+                  </div>
                 </div>
               </motion.div>
             );
           })}
         </div>
       )}
+
+      {/* Share Note Modal */}
+      <ShareNoteModal
+        isOpen={Boolean(noteToShare)}
+        onClose={() => setNoteToShare(null)}
+        note={noteToShare}
+      />
 
       {/* Global hidden audio element for playback */}
       <audio 

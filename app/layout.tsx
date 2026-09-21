@@ -1,8 +1,6 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Lora } from "next/font/google";
 import "./globals.css";
-import Sidebar from "@/components/ui/Sidebar";
-import AuthGate from "@/components/auth/AuthGate";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -29,6 +27,8 @@ export const metadata: Metadata = {
   keywords: ["learning", "critical thinking", "public speaking", "knowledge", "education"],
 };
 
+import AppLayout from "@/components/ui/AppLayout";
+
 export default function RootLayout({
   children,
 }: {
@@ -40,16 +40,7 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} ${lora.variable} font-sans antialiased`}
         style={{ background: "var(--bg-base)", color: "var(--text)" }}
       >
-        <AuthGate>
-          <div className="flex min-h-screen">
-            <Sidebar />
-            <main className="flex-1 min-h-screen flex flex-col" style={{ marginLeft: "240px" }}>
-              <div className="flex-1">
-                {children}
-              </div>
-            </main>
-          </div>
-        </AuthGate>
+        <AppLayout>{children}</AppLayout>
       </body>
     </html>
   );

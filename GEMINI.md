@@ -43,7 +43,14 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 - **Daily Vows (3 Daily Quests)**: Deterministic daily micro-quests resetting at midnight (Daily Voice, Sustained Articulation, Conviction & Clarity) with claimable XP bonuses.
 - **Loss Aversion (Scholar's Seal / Streak Freeze)**: Users hold seals (default 1) that automatically protect active streaks if they miss a single day. Additional seals can be acquired for 150 XP.
 - **Proof of Intellect (Shareable Feynman Card)**: Completing a sprint unlocks a constellation star celebration and a 1-click clipboard export for social sharing.
-- **Store Migration v6**: Seamlessly hydrates user profiles with default streak shields and quest tracking.
+- **Store Migration v6 & v7**: Seamlessly hydrates user profiles with default streak shields, quest tracking, and difficulty mode preferences.
+
+### 2.6. Public Note Sharing & Viral Growth Loop
+- **Portable URL State**: Notes are UTF-8 Base64 encoded directly into the URL (`/note/[code]`), allowing instant public sharing without database dependencies.
+- **Bespoke Broadside Viewer**: Non-users can read the complete synthesized manuscript in Fey's classical editorial aesthetic with reading time estimates, category badges, and scholar attribution.
+- **Non-User Conversion**: An embedded banner at the bottom of public notes encourages visitors to "Start Your Learning Journey" with frictionless account creation via `OnboardingModal`.
+- **Pre-Publish Preview**: `ShareNoteModal` offers a live card preview, 1-click link copying, and direct posting to X/Twitter and LinkedIn.
+- **Library Sharing**: Past notes can be published and shared at any time directly from the `/library`.
 
 ---
 

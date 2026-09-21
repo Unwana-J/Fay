@@ -12,11 +12,12 @@ import Placeholder from "@tiptap/extension-placeholder";
 import {
   Clock, BookOpen, Mic, CheckCircle2, AlertCircle, X,
   Bold, Italic, List, ListOrdered, CheckSquare,
-  ChevronRight, Star, ArrowLeft, Zap, Volume2, RefreshCcw
+  ChevronRight, Star, ArrowLeft, Zap, Volume2, RefreshCcw, Globe
 } from "lucide-react";
 import { useAppStore, type ActiveSession } from "@/store/useAppStore";
 import { CATEGORY_ICONS } from "@/lib/topics";
 import { formatTime, cn } from "@/lib/utils";
+import ShareNoteModal from "@/components/notes/ShareNoteModal";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -806,6 +807,9 @@ function StageComplete({
   topicId,
   topicText,
   topicCategory,
+  topicDifficulty,
+  notes,
+  tags,
   speakingSeconds,
 }: {
   xpEarned: number;
@@ -815,13 +819,17 @@ function StageComplete({
   topicId: string;
   topicText: string;
   topicCategory: string;
+  topicDifficulty?: string;
+  notes?: string;
+  tags?: string[];
   speakingSeconds: number;
 }) {
   const { ACHIEVEMENTS } = require("@/lib/achievements");
   const unlockedAchs = ACHIEVEMENTS.filter((a: any) => newAchievements.includes(a.id));
-  const { toggleFavoriteTopic, settings } = useAppStore();
+  const { toggleFavoriteTopic, settings, profile } = useAppStore();
   const isFav = settings.favoriteTopics?.includes(topicId);
   const [copied, setCopied] = useState(false);
+  const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => { fireConfetti(); }, []);
 
@@ -911,6 +919,16 @@ function StageComplete({
       </div>
 
       <div className="flex gap-3 flex-wrap justify-center">
+        {notes && notes.trim().length > 0 && (
+          <button
+            onClick={() => setShowShareModal(true)}
+            className="btn-terra flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer font-mono shadow-sm hover:shadow-md transition-all"
+          >
+            <Globe size={13} />
+            <span>Publish &amp; Share Notes</span>
+          </button>
+        )}
+
         <button
           onClick={handleShare}
           className="btn-ghost flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border cursor-pointer font-mono"
@@ -930,6 +948,25 @@ function StageComplete({
           {isFav ? "Favorited" : "Save Topic"}
         </button>
       </div>
+
+      {notes && (
+        <ShareNoteModal
+          isOpen={showShareModal}
+          onClose={() => setShowShareModal(false)}
+          note={{
+            topicId,
+            topicText,
+            category: topicCategory,
+            difficulty: topicDifficulty || "Scholar",
+            notes,
+            author: profile.username || "Scholar",
+            date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+            speakingSeconds,
+            xpEarned,
+            tags: tags || [],
+          }}
+        />
+      )}
 
       {unlockedAchs.length > 0 && (
         <motion.div
@@ -1092,6 +1129,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               topicId={activeSession.topic.id}
               topicText={activeSession.topic.text}
               topicCategory={activeSession.topic.category}
+              topicDifficulty={activeSession.topic.difficulty}
+              notes={activeSession.notes}
+              tags={activeSession.topic.tags}
               speakingSeconds={speakingSeconds}
             />
           </motion.div>
