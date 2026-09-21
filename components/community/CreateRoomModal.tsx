@@ -28,7 +28,7 @@ export default function CreateRoomModal({ onClose }: { onClose: () => void }) {
   // Custom topic inputs
   const [customText, setCustomText] = useState("");
   const [customCategory, setCustomCategory] = useState<string>("Technology");
-  const [customDifficulty, setCustomDifficulty] = useState<Difficulty>("intermediate");
+  const [customDifficulty, setCustomDifficulty] = useState<Difficulty>("Scholar");
 
   const allTopics = useMemo(() => {
     return [...(customTopics || []), ...TOPIC_BANK];
@@ -57,7 +57,7 @@ export default function CreateRoomModal({ onClose }: { onClose: () => void }) {
       id: `custom-${uid()}`,
       text: trimmed,
       category: customCategory || "Technology",
-      difficulty: customDifficulty || "intermediate",
+      difficulty: customDifficulty || "Scholar",
       tags: ["custom", "community"],
     };
     addCustomTopic(newTopic);
@@ -395,14 +395,14 @@ export default function CreateRoomModal({ onClose }: { onClose: () => void }) {
                         className="w-full px-2.5 py-1.5 rounded-lg text-xs outline-none border surface-input cursor-pointer"
                         style={{ borderColor: "var(--border)", color: "var(--text)" }}
                       >
-                        <option value="beginner" style={{ background: "var(--bg-card)", color: "var(--text)" }}>
-                          Beginner
+                        <option value="Novice" style={{ background: "var(--bg-card)", color: "var(--text)" }}>
+                          🌱 Novice
                         </option>
-                        <option value="intermediate" style={{ background: "var(--bg-card)", color: "var(--text)" }}>
-                          Intermediate
+                        <option value="Scholar" style={{ background: "var(--bg-card)", color: "var(--text)" }}>
+                          📖 Scholar
                         </option>
-                        <option value="advanced" style={{ background: "var(--bg-card)", color: "var(--text)" }}>
-                          Advanced
+                        <option value="Expert" style={{ background: "var(--bg-card)", color: "var(--text)" }}>
+                          🔥 Expert
                         </option>
                       </select>
                     </div>

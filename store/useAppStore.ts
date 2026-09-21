@@ -87,6 +87,7 @@ export interface AppState {
     favoriteCategories: string[];
     favoriteTopics: string[]; // List of favorited topic IDs
     preferredDifficulty: Difficulty | "any";
+    difficultyMode: Difficulty; // The active difficulty mode for the daily sprint
     researchMin: number;
     speakingSec: number;
     mode: "roulette" | "path";
@@ -168,6 +169,7 @@ export const useAppStore = create<AppState>()(
         favoriteCategories: ["Artificial Intelligence", "Technology"],
         favoriteTopics: [],
         preferredDifficulty: "any",
+        difficultyMode: "Scholar",
         researchMin: 15,
         speakingSec: 60,
         mode: "roulette",
@@ -329,7 +331,7 @@ export const useAppStore = create<AppState>()(
           researchMinutes: newSessions.reduce((a, s) => a + s.researchMinutes, 0),
           speakingMinutes: Math.round(newSessions.reduce((a, s) => a + s.speakingSeconds, 0) / 60),
           topicsMastered: newSessions.length,
-          expertTopicsCompleted: newSessions.filter((s) => s.difficulty === "expert").length,
+          expertTopicsCompleted: newSessions.filter((s) => s.difficulty === "Expert").length,
           uniqueCategories: new Set(newSessions.map((s) => s.category)).size,
           constellationNodes: newSessions.length,
           xp: newXP,
@@ -454,7 +456,7 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: "fey-app-store",
-      version: 6,
+      version: 7,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       migrate: (persistedState: any, fromVersion: number) => {
         const state = { ...persistedState };
@@ -503,6 +505,26 @@ export const useAppStore = create<AppState>()(
             shields: state?.streak?.shields ?? 1,
           };
           state.claimedQuestIds = state?.claimedQuestIds ?? [];
+        }
+
+        // v6 → v7: difficulty modes (Novice / Scholar / Expert)
+        if (fromVersion === undefined || fromVersion < 7) {
+          state.settings = {
+            ...(state?.settings ?? {}),
+            difficultyMode: state?.settings?.difficultyMode ?? "Scholar",
+          };
+          // Normalize any legacy difficulty strings on completed sessions
+          if (Array.isArray(state?.sessions)) {
+            state.sessions = state.sessions.map((s: { difficulty?: string }) => {
+              const d = s.difficulty?.toLowerCase();
+              const normalized =
+                d === "beginner" ? "Novice" :
+                d === "intermediate" ? "Scholar" :
+                (d === "advanced" || d === "expert") ? "Expert" :
+                s.difficulty ?? "Scholar";
+              return { ...s, difficulty: normalized };
+            });
+          }
         }
 
         return state;

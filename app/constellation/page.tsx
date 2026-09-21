@@ -321,7 +321,7 @@ function NodeDetail({ session, onClose }: { session: CompletedSession; onClose: 
       id: `gen-${Date.now()}`,
       text: pickedText,
       category: session.category,
-      difficulty: "intermediate",
+      difficulty: "Scholar",
       tags: ["generative", ...(session.tags || [])]
     };
     setCustomTopicList((prev) => [...prev, generated]);

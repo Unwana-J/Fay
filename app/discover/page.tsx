@@ -243,7 +243,7 @@ function ConfirmModal({
             </div>
             <div>
               <div className="text-xl font-bold font-mono" style={{ color: "var(--gold)" }}>
-                +{topic.difficulty === "beginner" ? 100 : topic.difficulty === "intermediate" ? 150 : topic.difficulty === "advanced" ? 200 : 300}
+                +{({ Novice: 100, Scholar: 150, Expert: 250 } as Record<string, number>)[topic.difficulty] ?? 150}
               </div>
               <div className="text-[10px] text-[var(--text-mute)] mt-0.5">XP reward</div>
             </div>
@@ -603,7 +603,7 @@ function DiscoverPageContent() {
                             onChange={(e) => setNewTopicText(e.target.value)}
                             onKeyDown={(e) => {
                               if (e.key === "Enter" && newTopicText.trim()) {
-                                useAppStore.getState().addCustomTopic({ text: newTopicText.trim(), category: "Startups", difficulty: "intermediate", tags: ["custom"] });
+                                useAppStore.getState().addCustomTopic({ text: newTopicText.trim(), category: "Startups", difficulty: "Scholar", tags: ["custom"] });
                                 setNewTopicText("");
                                 setShowAddCustom(false);
                               }
@@ -614,7 +614,7 @@ function DiscoverPageContent() {
                           <button
                             onClick={() => {
                               if (newTopicText.trim()) {
-                                useAppStore.getState().addCustomTopic({ text: newTopicText.trim(), category: "Startups", difficulty: "intermediate", tags: ["custom"] });
+                                useAppStore.getState().addCustomTopic({ text: newTopicText.trim(), category: "Startups", difficulty: "Scholar", tags: ["custom"] });
                                 setNewTopicText("");
                                 setShowAddCustom(false);
                               }

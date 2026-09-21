@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress, getNextLevel, ACHIEVEMENTS } from "@/lib/achievements";
-import { CATEGORY_COLORS, CATEGORY_ICONS, TOPIC_BANK } from "@/lib/topics";
+import { CATEGORY_COLORS, CATEGORY_ICONS, TOPIC_BANK, DIFFICULTY_LABELS, DIFFICULTY_XP, DIFFICULTY_BONUS_XP, type Difficulty } from "@/lib/topics";
 import { relativeDate, getLast52Weeks, getDayOfWeek } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
@@ -193,7 +193,9 @@ export default function Dashboard() {
     startSession,
     claimedQuestIds,
     claimQuestXP,
+    updateSettings,
   } = useAppStore();
+  const difficultyMode: Difficulty = (settings.difficultyMode as Difficulty) ?? "Scholar";
   const level     = getLevelForXP(profile.xp);
   const nextLevel = getNextLevel(profile.xp);
   const progress  = getLevelProgress(profile.xp);
@@ -238,14 +240,19 @@ export default function Dashboard() {
     // 1. If user chose a specific focus category via the modal
     if (focusCategory) {
       const focusPool = allTopics.filter(
-        (t) => t.category === focusCategory && !excluded.has(t.id)
+        (t) => t.category === focusCategory && t.difficulty === difficultyMode && !excluded.has(t.id)
       );
       if (focusPool.length > 0) {
         return focusPool[(todayIndex + spinOffset) % focusPool.length];
       }
-      const focusPoolAll = allTopics.filter((t) => t.category === focusCategory);
+      // Fallback: ignore difficulty filter for this category if pool is empty
+      const focusPoolAll = allTopics.filter((t) => t.category === focusCategory && !excluded.has(t.id));
       if (focusPoolAll.length > 0) {
         return focusPoolAll[(todayIndex + spinOffset) % focusPoolAll.length];
+      }
+      const focusPoolCompleted = allTopics.filter((t) => t.category === focusCategory);
+      if (focusPoolCompleted.length > 0) {
+        return focusPoolCompleted[(todayIndex + spinOffset) % focusPoolCompleted.length];
       }
     }
 
@@ -257,13 +264,21 @@ export default function Dashboard() {
         ? settings.enabledCategories
         : ["Artificial Intelligence", "Technology"];
 
+    // Filter by both category AND difficulty mode
     let pool = allTopics.filter(
-      (t) => userCategories.includes(t.category) && !excluded.has(t.id)
+      (t) => userCategories.includes(t.category) && t.difficulty === difficultyMode && !excluded.has(t.id)
     );
 
     if (pool.length === 0 && settings.enabledCategories.length > 0) {
       pool = allTopics.filter(
-        (t) => settings.enabledCategories.includes(t.category) && !excluded.has(t.id)
+        (t) => settings.enabledCategories.includes(t.category) && t.difficulty === difficultyMode && !excluded.has(t.id)
+      );
+    }
+
+    // Fallback: relax difficulty filter if the mode pool is exhausted
+    if (pool.length === 0) {
+      pool = allTopics.filter(
+        (t) => userCategories.includes(t.category) && !excluded.has(t.id)
       );
     }
 
@@ -411,7 +426,7 @@ export default function Dashboard() {
           /* Suggested topic */
           <div>
             {/* Metadata and Unified Focus Trigger */}
-            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <span
                   className="tag font-bold font-mono text-[11px]"
@@ -423,9 +438,17 @@ export default function Dashboard() {
                 >
                   {CATEGORY_ICONS[heroCat]} {heroCat}
                 </span>
-                <span className="tag tag-olive capitalize">{suggestedTopic.difficulty}</span>
-                <span className="tag tag-gold font-mono">
-                  +{suggestedTopic.difficulty === "beginner" ? 100 : suggestedTopic.difficulty === "intermediate" ? 150 : 200} XP
+                <span className="tag tag-olive font-mono text-[11px]">
+                  {DIFFICULTY_LABELS[suggestedTopic.difficulty as Difficulty]?.icon ?? "📖"}{" "}
+                  {suggestedTopic.difficulty}
+                </span>
+                <span className="tag tag-gold font-mono text-[11px]">
+                  +{DIFFICULTY_XP[suggestedTopic.difficulty as Difficulty] ?? 150} XP
+                  {DIFFICULTY_BONUS_XP[suggestedTopic.difficulty as Difficulty] > 0 && (
+                    <span className="ml-1 opacity-70">
+                      (+{DIFFICULTY_BONUS_XP[suggestedTopic.difficulty as Difficulty]} bonus)
+                    </span>
+                  )}
                 </span>
               </div>
 
@@ -459,6 +482,31 @@ export default function Dashboard() {
                   </button>
                 )}
               </div>
+            </div>
+
+            {/* ── Difficulty Mode Toggle ── */}
+            <div className="flex items-center gap-1.5 mb-4">
+              {(["Novice", "Scholar", "Expert"] as Difficulty[]).map((mode) => {
+                const isActive = difficultyMode === mode;
+                const meta = DIFFICULTY_LABELS[mode];
+                return (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => updateSettings({ difficultyMode: mode })}
+                    title={meta.description}
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-medium transition-all border"
+                    style={{
+                      borderColor: isActive ? "var(--terra)" : "var(--border-dim)",
+                      backgroundColor: isActive ? "rgba(122,28,46,0.08)" : "transparent",
+                      color: isActive ? "var(--terra)" : "var(--text-mute)",
+                    }}
+                  >
+                    <span>{meta.icon}</span>
+                    <span>{meta.label}</span>
+                  </button>
+                );
+              })}
             </div>
 
             {/* The Question in classic editorial typography */}
