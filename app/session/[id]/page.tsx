@@ -638,12 +638,38 @@ function StageReflection({ session, speakingSeconds, onComplete, onAbandon }: {
 
   const canSubmit = ratings.confidence > 0 && ratings.understanding > 0 && ratings.communication > 0;
 
+  function handleSkip() {
+    onComplete({
+      reflection: {
+        interesting: reflection.interesting.trim(),
+        hardest: reflection.hardest.trim(),
+        different: reflection.different.trim(),
+      },
+      ratings: {
+        confidence: ratings.confidence || 4,
+        understanding: ratings.understanding || 4,
+        communication: ratings.communication || 4,
+      },
+    });
+  }
+
   return (
     <div className="max-w-2xl mx-auto">
-      <div className="text-center mb-8">
-        <div className="text-4xl mb-3">🧠</div>
-        <h2 className="font-space text-3xl font-bold mb-2" style={{ color: "var(--text)" }}>Reflection</h2>
-        <p style={{ color: "var(--text-dim)" }}>The final step. What did you actually learn?</p>
+      <div className="flex items-center justify-between mb-8">
+        <div className="w-16" />
+        <div className="text-center">
+          <div className="text-4xl mb-3">🧠</div>
+          <h2 className="font-serif text-3xl font-bold mb-1" style={{ color: "var(--text)" }}>Reflection</h2>
+          <p className="font-serif italic text-sm" style={{ color: "var(--text-dim)" }}>The final step. What did you actually learn?</p>
+        </div>
+        <button
+          type="button"
+          onClick={handleSkip}
+          className="text-xs font-mono text-[var(--text-dim)] hover:text-[var(--terra)] flex items-center gap-1 transition-colors px-3 py-1.5 rounded-lg border border-[var(--border-dim)] hover:border-[var(--terra)] cursor-pointer"
+        >
+          <span>Skip</span>
+          <ChevronRight size={13} />
+        </button>
       </div>
 
       <div className="space-y-4 mb-8">
@@ -675,16 +701,24 @@ function StageReflection({ session, speakingSeconds, onComplete, onAbandon }: {
         </div>
       </div>
 
-      <div className="flex gap-3">
-        <button onClick={onAbandon} className="btn-ghost">
+      <div className="flex items-center gap-3">
+        <button onClick={onAbandon} className="btn-ghost text-xs">
           Abandon
+        </button>
+        <button
+          type="button"
+          onClick={handleSkip}
+          className="btn-ghost text-xs font-mono border border-[var(--border-dim)] hover:border-[var(--text)] hover:text-[var(--text)] transition-all px-4 py-3.5 rounded-xl flex items-center gap-1.5 cursor-pointer"
+        >
+          <span>Skip Reflection</span>
+          <ChevronRight size={13} />
         </button>
         <button
           disabled={!canSubmit}
           onClick={() => onComplete({ reflection, ratings })}
-          className="flex-1 btn-terra h-14"
+          className="flex-1 btn-terra h-14 font-mono font-medium"
         >
-          <Zap size={16} /> Complete & Earn XP
+          <Zap size={16} /> Complete &amp; Earn XP
         </button>
       </div>
     </div>
