@@ -54,7 +54,7 @@ function SetupScreen({
   const [mode, setMode] = useState<ReviewMode>("instant");
 
   return (
-    <div className="min-h-screen p-8 max-w-2xl mx-auto flex flex-col justify-center">
+    <div className="min-h-screen p-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-center">
       {/* Back */}
       <Link href="/games" className="flex items-center gap-1.5 text-xs font-semibold mb-8 w-fit hover:text-[var(--text)] transition-colors" style={{ color: "var(--text-dim)" }}>
         <ArrowLeft size={13} /> Back to Games
@@ -421,7 +421,7 @@ function ResultsScreen({
                 { label: "Keep studying! 📚", color: "var(--text-mute)" };
 
   return (
-    <div className="min-h-screen p-8 max-w-2xl mx-auto">
+    <div className="min-h-screen p-4 sm:p-8 max-w-2xl mx-auto">
       <div className="text-center mb-8">
         <div className="text-6xl mb-3">🇳🇬</div>
         <h1 className="font-space text-3xl font-extrabold mb-1" style={{ color: "var(--text)" }}>Results</h1>

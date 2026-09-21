@@ -33,7 +33,7 @@ export default function GamesHub() {
   ];
 
   return (
-    <div className="min-h-screen p-8 max-w-5xl mx-auto">
+    <div className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto">
       <div className="mb-10">
         <h1 className="font-space text-4xl font-bold mb-3" style={{ color: "var(--text)" }}>Games</h1>
         <p style={{ color: "var(--text-dim)" }}>Take a break and challenge your mind with these games.</p>

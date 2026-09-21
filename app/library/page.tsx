@@ -101,7 +101,7 @@ export default function LibraryPage() {
     });
 
   return (
-    <div className="max-w-3xl mx-auto px-6 py-10">
+    <div className="max-w-3xl mx-auto px-4 sm:px-6 py-6 sm:py-10">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -10 }}
@@ -117,7 +117,7 @@ export default function LibraryPage() {
       </motion.div>
 
       {/* Stats */}
-      <div className="grid grid-cols-3 gap-3 mb-8">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-8">
         {[
           { label: "Total Recordings", value: all.length },
           { label: "Total Time", value: `${Math.round(all.reduce((a, r) => a + r.durationSec, 0) / 60)}m` },

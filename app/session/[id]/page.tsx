@@ -1269,15 +1269,15 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const stageLabels = ["Research", "Speak", "Reflect", "Done"];
 
   return (
-    <div className="min-h-screen p-8 max-w-5xl">
+    <div className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex items-center justify-between mb-6 sm:mb-8">
         <button onClick={handleAbandon} className="flex items-center gap-1.5 text-xs font-semibold hover:text-[var(--text)] transition-colors" style={{ color: "var(--text-dim)" }}>
           <ArrowLeft size={13} /> Leave session
         </button>
 
-        {/* Stage progress */}
-        <div className="flex items-center gap-2">
+        {/* Stage progress — hidden on small screens, shown on sm+ */}
+        <div className="hidden sm:flex items-center gap-2">
           {stageLabels.map((label, i) => (
             <div key={i} className="flex items-center gap-2">
               <div className={cn(
@@ -1294,7 +1294,22 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
           ))}
         </div>
 
-        <div className="w-32" />
+        {/* Mobile stage dots indicator */}
+        <div className="sm:hidden flex items-center gap-1.5">
+          {stageLabels.map((_, i) => (
+            <div
+              key={i}
+              className={cn(
+                "rounded-full transition-all",
+                i < stageIndex ? "w-2 h-2 bg-[var(--olive)]" :
+                i === stageIndex ? "w-3 h-3 bg-[var(--terra)]" :
+                "w-2 h-2 bg-[var(--bg-input)]"
+              )}
+            />
+          ))}
+        </div>
+
+        <div className="w-20 sm:w-32" />
       </div>
 
       {/* Stage content */}

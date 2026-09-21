@@ -271,7 +271,7 @@ function StreakCalendarModal({
 }
 
 // ─── Main Sidebar ────────────────────────────────────────────────────────────
-export default function Sidebar() {
+export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
   const { profile, streak, sessions, buyStreakShield } = useAppStore();
   const [showStreakModal, setShowStreakModal] = useState(false);
@@ -284,11 +284,11 @@ export default function Sidebar() {
 
   return (
     <>
-      <aside className="fixed left-0 top-0 h-screen w-60 surface-panel flex flex-col z-40">
+      <aside className="h-screen w-60 surface-panel flex flex-col">
 
         {/* ── Wordmark ── */}
-        <div className="px-5 pt-6 pb-4" style={{ borderBottom: "1px solid var(--border-dim)" }}>
-          <Link href="/" className="group flex items-center gap-2.5">
+        <div className="px-5 pt-6 pb-4 flex items-center justify-between" style={{ borderBottom: "1px solid var(--border-dim)" }}>
+          <Link href="/" onClick={onClose} className="group flex items-center gap-2.5">
             {/* Custom Brain + Fairy Wings SVG Logo */}
             <FeyLogo size={28} />
             <div>
@@ -303,6 +303,16 @@ export default function Sidebar() {
               </div>
             </div>
           </Link>
+          {/* Mobile close button */}
+          {onClose && (
+            <button
+              onClick={onClose}
+              className="md:hidden p-1.5 rounded-lg hover:bg-[var(--bg-input)] transition-colors"
+              aria-label="Close navigation"
+            >
+              <X size={16} style={{ color: "var(--text-dim)" }} />
+            </button>
+          )}
         </div>
 
         {/* ── Navigation ── */}
@@ -310,7 +320,7 @@ export default function Sidebar() {
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const active = isActive(href);
             return (
-              <Link key={href} href={href}>
+              <Link key={href} href={href} onClick={onClose}>
                 <motion.div
                   whileHover={{ x: 3 }}
                   whileTap={{ scale: 0.98 }}

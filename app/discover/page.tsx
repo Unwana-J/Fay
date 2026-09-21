@@ -365,7 +365,7 @@ function DiscoverPageContent() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen p-8 max-w-5xl"
+      className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto"
     >
       {/* Header */}
       <motion.div variants={cardVariants} className="mb-6">

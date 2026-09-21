@@ -66,7 +66,7 @@ export default function ProfilePage() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen p-8 max-w-5xl"
+      className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto"
     >
       <motion.div variants={cardVariants} className="mb-10">
         <h1 className="font-space text-3xl font-bold mb-1 text-display" style={{ color: "var(--text)" }}>Profile</h1>

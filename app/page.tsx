@@ -332,19 +332,19 @@ export default function Dashboard() {
       variants={containerVariants}
       initial="hidden"
       animate="visible"
-      className="min-h-screen p-8 max-w-5xl"
+      className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto"
     >
       {/* ── Editorial Folio Header ── */}
       <motion.div variants={cardVariants} className="mb-8">
         {/* Folio top dateline */}
-        <div className="flex items-center justify-between border-b pb-2.5 mb-4" style={{ borderColor: "var(--border-dim)" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-2.5 mb-4 gap-1" style={{ borderColor: "var(--border-dim)" }}>
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-mute)" }}>
             <span>Daily Dispatch</span>
             <span>·</span>
             <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
           </div>
 
-          <div className="flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--text-mute)" }}>
+          <div className="hidden sm:flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--text-mute)" }}>
             <span>Scholar {profile.username}</span>
             <span>·</span>
             <span style={{ color: "var(--olive)" }}>{level.title}</span>
