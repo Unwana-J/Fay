@@ -12,12 +12,14 @@ import Placeholder from "@tiptap/extension-placeholder";
 import {
   Clock, BookOpen, Mic, CheckCircle2, AlertCircle, X,
   Bold, Italic, List, ListOrdered, CheckSquare,
-  ChevronRight, Star, ArrowLeft, Zap, Volume2, RefreshCcw, Globe
+  ChevronRight, Star, ArrowLeft, Zap, Volume2, RefreshCcw, Globe,
+  Share2, Check, ExternalLink, Sparkles
 } from "lucide-react";
 import { useAppStore, type ActiveSession } from "@/store/useAppStore";
-import { CATEGORY_ICONS } from "@/lib/topics";
+import { CATEGORY_ICONS, CATEGORY_COLORS } from "@/lib/topics";
 import { formatTime, cn } from "@/lib/utils";
 import ShareNoteModal from "@/components/notes/ShareNoteModal";
+import { encodeSharedNote } from "@/lib/share-note";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -828,25 +830,80 @@ function StageComplete({
   const unlockedAchs = ACHIEVEMENTS.filter((a: any) => newAchievements.includes(a.id));
   const { toggleFavoriteTopic, settings, profile } = useAppStore();
   const isFav = settings.favoriteTopics?.includes(topicId);
-  const [copied, setCopied] = useState(false);
+  const [copiedDispatch, setCopiedDispatch] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
 
   useEffect(() => { fireConfetti(); }, []);
 
-  function handleShare() {
-    const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\nhttps://fey-eight-liard.vercel.app`;
+  const catColor = CATEGORY_COLORS[topicCategory] || "var(--terra)";
+  const displayNotes = notes && notes.trim().length > 0
+    ? notes.trim()
+    : "Understanding proven through Feynman vocal articulation.";
+
+  const sharePayload = {
+    topicId,
+    topicText,
+    category: topicCategory,
+    difficulty: topicDifficulty || "Scholar",
+    notes: displayNotes,
+    author: profile.username || "Scholar",
+    date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
+    speakingSeconds,
+    xpEarned,
+    tags: tags || [],
+  };
+
+  const shareUrl = (() => {
+    try {
+      const code = encodeSharedNote(sharePayload);
+      const origin = typeof window !== "undefined" && window.location.origin
+        ? window.location.origin
+        : "https://fey-eight-liard.vercel.app";
+      return `${origin}/note/${code}`;
+    } catch {
+      return "";
+    }
+  })();
+
+  function handleCopyShareLink() {
+    if (!shareUrl) return;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(shareUrl);
+      setCopiedLink(true);
+      setTimeout(() => setCopiedLink(false), 2500);
+    }
+  }
+
+  function handleShareDispatch() {
+    const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\n${shareUrl || "https://fey-eight-liard.vercel.app"}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(dispatch);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      setCopiedDispatch(true);
+      setTimeout(() => setCopiedDispatch(false), 2500);
     }
+  }
+
+  function handleShareTwitter() {
+    const tweet = `Read my synthesis on "${topicText}" — written using the Feynman Technique on @FeyPlatform:\n\n`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(shareUrl)}`,
+      "_blank"
+    );
+  }
+
+  function handleShareLinkedIn() {
+    window.open(
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
+      "_blank"
+    );
   }
 
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col items-center justify-center min-h-[500px] gap-6 text-center"
+      className="flex flex-col items-center justify-center min-h-[500px] gap-6 text-center max-w-2xl mx-auto"
     >
       <motion.div
         initial={{ scale: 0 }}
@@ -893,9 +950,113 @@ function StageComplete({
         </motion.div>
       </div>
 
+      {/* ── Prominent Broadside Note Preview Card ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.35 }}
+        className="w-full text-left rounded-2xl p-6 border surface-raised relative overflow-hidden"
+        style={{
+          borderColor: "var(--border)",
+          background: "var(--bg-card)",
+          boxShadow: "0 4px 24px -6px rgba(0,0,0,0.06)",
+        }}
+      >
+        <div className="flex items-center justify-between mb-3 text-[10px] font-mono uppercase tracking-widest text-[var(--text-mute)] border-b pb-2" style={{ borderColor: "var(--border-dim)" }}>
+          <div className="flex items-center gap-1.5">
+            <Sparkles size={12} className="text-[var(--gold)]" />
+            <span className="font-semibold text-[var(--text)]">Your Synthesized Note Preview</span>
+          </div>
+          <span className="text-[var(--olive)] font-semibold flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--olive)] animate-pulse" />
+            Ready to Share
+          </span>
+        </div>
+
+        <div className="flex items-center gap-2 mb-2.5 flex-wrap">
+          <span
+            className="tag text-[10px] font-mono font-bold"
+            style={{
+              backgroundColor: `${catColor}18`,
+              color: catColor,
+              border: `1px solid ${catColor}30`,
+            }}
+          >
+            {CATEGORY_ICONS[topicCategory] || "📜"} {topicCategory}
+          </span>
+          {topicDifficulty && (
+            <span className="tag tag-olive text-[10px] font-mono">
+              {topicDifficulty}
+            </span>
+          )}
+          {speakingSeconds > 0 && (
+            <span className="tag tag-gold text-[10px] font-mono flex items-center gap-1">
+              <Mic size={9} />
+              <span>{speakingSeconds}s Spoken Synthesis</span>
+            </span>
+          )}
+        </div>
+
+        <h3 className="font-serif font-bold text-lg mb-2.5 leading-snug" style={{ color: "var(--text)" }}>
+          {topicText}
+        </h3>
+
+        <div className="rounded-xl p-4 surface border mb-4" style={{ borderColor: "var(--border-dim)", background: "var(--bg-panel)" }}>
+          <p className="font-serif italic text-xs sm:text-sm leading-relaxed text-[var(--text-dim)] whitespace-pre-wrap max-h-40 overflow-y-auto">
+            &ldquo;{displayNotes}&rdquo;
+          </p>
+          <div className="mt-3 pt-2 border-t text-[10px] font-mono text-[var(--text-mute)] flex items-center justify-between" style={{ borderColor: "var(--border-dim)" }}>
+            <span>Scholar {profile.username || "Scholar"}</span>
+            <span>Fey Academic Archive</span>
+          </div>
+        </div>
+
+        {/* Action controls directly inside the preview card */}
+        <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleCopyShareLink}
+              className="btn-terra px-4 py-2 text-xs font-mono rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm hover:opacity-90 transition-opacity"
+            >
+              {copiedLink ? <Check size={13} /> : <Share2 size={13} />}
+              <span>{copiedLink ? "✓ Copied Public Link!" : "Copy Public Link"}</span>
+            </button>
+
+            {shareUrl && (
+              <a
+                href={shareUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="btn-ghost px-3 py-2 text-xs font-mono rounded-lg border border-[var(--border-dim)] hover:border-[var(--text)] transition-colors flex items-center gap-1.5"
+              >
+                <span>View Full Page</span>
+                <ExternalLink size={12} />
+              </a>
+            )}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={handleShareTwitter}
+              className="px-3 py-1.5 rounded-lg text-xs font-mono border border-[var(--border-dim)] hover:border-[var(--text)] text-[var(--text-dim)] transition-colors cursor-pointer"
+              title="Post to X / Twitter"
+            >
+              Post to X
+            </button>
+            <button
+              onClick={handleShareLinkedIn}
+              className="px-3 py-1.5 rounded-lg text-xs font-mono border border-[var(--border-dim)] hover:border-[var(--text)] text-[var(--text-dim)] transition-colors cursor-pointer"
+              title="Share on LinkedIn"
+            >
+              LinkedIn
+            </button>
+          </div>
+        </div>
+      </motion.div>
+
       {/* Constellation star notification */}
       <div
-        className="p-3.5 rounded-xl border flex items-center justify-between gap-4 max-w-md w-full surface"
+        className="p-3.5 rounded-xl border flex items-center justify-between gap-4 w-full surface"
         style={{ borderColor: "var(--border-dim)" }}
       >
         <div className="flex items-center gap-2.5 text-left">
@@ -919,22 +1080,12 @@ function StageComplete({
       </div>
 
       <div className="flex gap-3 flex-wrap justify-center">
-        {notes && notes.trim().length > 0 && (
-          <button
-            onClick={() => setShowShareModal(true)}
-            className="btn-terra flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl cursor-pointer font-mono shadow-sm hover:shadow-md transition-all"
-          >
-            <Globe size={13} />
-            <span>Publish &amp; Share Notes</span>
-          </button>
-        )}
-
         <button
-          onClick={handleShare}
+          onClick={handleShareDispatch}
           className="btn-ghost flex items-center gap-1.5 px-4 py-2 text-xs font-semibold rounded-xl border cursor-pointer font-mono"
           style={{ borderColor: "var(--border-dim)" }}
         >
-          <span>{copied ? "✓ Copied Dispatch!" : "📋 Share Feynman Card"}</span>
+          <span>{copiedDispatch ? "✓ Copied Dispatch!" : "📋 Copy Text Feynman Card"}</span>
         </button>
 
         <button
@@ -949,24 +1100,11 @@ function StageComplete({
         </button>
       </div>
 
-      {notes && (
-        <ShareNoteModal
-          isOpen={showShareModal}
-          onClose={() => setShowShareModal(false)}
-          note={{
-            topicId,
-            topicText,
-            category: topicCategory,
-            difficulty: topicDifficulty || "Scholar",
-            notes,
-            author: profile.username || "Scholar",
-            date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }),
-            speakingSeconds,
-            xpEarned,
-            tags: tags || [],
-          }}
-        />
-      )}
+      <ShareNoteModal
+        isOpen={showShareModal}
+        onClose={() => setShowShareModal(false)}
+        note={sharePayload}
+      />
 
       {unlockedAchs.length > 0 && (
         <motion.div
@@ -1028,21 +1166,26 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [speakingSeconds, setSpeakingSeconds] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [completionData, setCompletionData] = useState<{ xpEarned: number; newAchievements: string[] } | null>(null);
+  const [completedSession, setCompletedSession] = useState<ActiveSession | null>(null);
+
+  const currentSession = activeSession || completedSession;
 
   const STAGES = ["research", "speaking", "reflection", "complete"] as const;
   const stageIndex = completionData
     ? 3
-    : activeSession?.stage === "research" ? 0
-    : activeSession?.stage === "speaking" ? 1
+    : currentSession?.stage === "research" ? 0
+    : currentSession?.stage === "speaking" ? 1
     : 2;
 
   useEffect(() => {
+    if (completionData) return;
     if (!activeSession || activeSession.id !== unwrappedParams.id) {
       router.replace("/discover");
     }
-  }, [activeSession, unwrappedParams.id, router]);
+  }, [activeSession, unwrappedParams.id, router, completionData]);
 
-  if (!activeSession) return null;
+  if (!currentSession && !completionData) return null;
+  if (!currentSession) return null;
 
   function handleResearchDone(notes: string) {
     updateNotes(notes);
@@ -1061,6 +1204,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }) {
     if (!activeSession) return;
     
+    // Preserve snapshot so completion screen renders smoothly without null dereference
+    setCompletedSession({ ...activeSession });
+
     let audioBase64 = undefined;
     if (recordedBlob) {
       try {
@@ -1126,27 +1272,27 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               newAchievements={completionData.newAchievements}
               streak={streak.current}
               onNext={() => router.push("/")}
-              topicId={activeSession.topic.id}
-              topicText={activeSession.topic.text}
-              topicCategory={activeSession.topic.category}
-              topicDifficulty={activeSession.topic.difficulty}
-              notes={activeSession.notes}
-              tags={activeSession.topic.tags}
+              topicId={currentSession.topic.id}
+              topicText={currentSession.topic.text}
+              topicCategory={currentSession.topic.category}
+              topicDifficulty={currentSession.topic.difficulty}
+              notes={currentSession.notes}
+              tags={currentSession.topic.tags}
               speakingSeconds={speakingSeconds}
             />
           </motion.div>
-        ) : activeSession.stage === "research" ? (
+        ) : currentSession.stage === "research" ? (
           <motion.div key="research" variants={stageSlideVariants} initial="enter" animate="center" exit="exit">
-            <StageResearch session={activeSession} onAdvance={handleResearchDone} onAbandon={handleAbandon} />
+            <StageResearch session={currentSession} onAdvance={handleResearchDone} onAbandon={handleAbandon} />
           </motion.div>
-        ) : activeSession.stage === "speaking" ? (
+        ) : currentSession.stage === "speaking" ? (
           <motion.div key="speaking" variants={stageSlideVariants} initial="enter" animate="center" exit="exit">
-            <StageSpeaking session={activeSession} onComplete={handleSpeakDone} onAbandon={handleAbandon} />
+            <StageSpeaking session={currentSession} onComplete={handleSpeakDone} onAbandon={handleAbandon} />
           </motion.div>
         ) : (
           <motion.div key="reflection" variants={stageSlideVariants} initial="enter" animate="center" exit="exit">
             <StageReflection
-              session={activeSession}
+              session={currentSession}
               speakingSeconds={speakingSeconds}
               onComplete={handleReflectionDone}
               onAbandon={handleAbandon}
