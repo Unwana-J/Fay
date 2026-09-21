@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   Zap, BookOpen, Mic, ArrowRight,
-  Star, Shuffle
+  Star, Shuffle, Sparkles, Compass
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress, getNextLevel, ACHIEVEMENTS } from "@/lib/achievements";
@@ -15,26 +15,25 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import FeyLogo from "@/components/ui/FeyLogo";
 import FocusCategoryModal from "@/components/dashboard/FocusCategoryModal";
+import UserAvatar from "@/components/ui/UserAvatar";
 
 const DAYS_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /* ─── Motivational copy & Wisdom Library ─────────────────────────── */
 const HABIT_PROMPTS = [
-  "You're building a habit.",
   "Consistency beats intensity.",
   "Small efforts compound quickly.",
-  "One day at a time.",
-  "Focus on progress, not perfection.",
+  "One concept at a time.",
+  "Quiet progress is still progress.",
   "Curiosity has its own reason for existing.",
   "Thinking deeper is a super power.",
-  "Make learning a daily ritual.",
-  "Quiet progress is still progress.",
-  "Keep your mind active and open.",
+  "Make articulation a daily ritual.",
+  "Focus on synthesis, not memorization.",
   "Your future self will thank you.",
   "Feed your mind daily.",
   "Great thinkers are lifelong learners.",
   "Stay curious, keep seeking.",
-  "Build the discipline of learning.",
+  "Build the discipline of explanation.",
 ];
 
 const DAILY_QUOTES = [
@@ -49,7 +48,6 @@ const DAILY_QUOTES = [
   { quote: "He who asks is a fool for five minutes, but he who does not ask remains a fool forever.", author: "Chinese Proverb" },
   { quote: "Real knowledge is to know the extent of one's ignorance.", author: "Confucius" },
   { quote: "The roots of education are bitter, but the fruit is sweet.", author: "Aristotle" },
-  { quote: "The more that you read, the more things you will know. The more that you learn, the more places you'll go.", author: "Dr. Seuss" },
   { quote: "Live as if you were to die tomorrow. Learn as if you were to live forever.", author: "Mahatma Gandhi" },
   { quote: "Tell me and I forget. Teach me and I remember. Involve me and I learn.", author: "Benjamin Franklin" },
   { quote: "The beautiful thing about learning is nobody can take it away from you.", author: "B.B. King" },
@@ -57,13 +55,9 @@ const DAILY_QUOTES = [
   { quote: "Curiosity is the wick in the candle of learning.", author: "William Arthur Ward" },
   { quote: "Doubt is the origin of wisdom.", author: "René Descartes" },
   { quote: "Wonder is the beginning of wisdom.", author: "Socrates" },
-  { quote: "The capacity to learn is a gift; the ability to learn is a skill; the willingness to learn is a choice.", author: "Brian Herbert" },
-  { quote: "By three methods we may learn wisdom: First, by reflection, which is noblest; Second, by imitation, which is easiest; and third by experience, which is the bitterest.", author: "Confucius" },
   { quote: "Knowledge has to be improved, challenged, and increased constantly, or it vanishes.", author: "Peter Drucker" },
   { quote: "The important thing is not to stop questioning.", author: "Albert Einstein" },
-  { quote: "There is no end to education. The whole of life is a process of learning.", author: "Jiddu Krishnamurti" },
   { quote: "An unexamined life is not worth living.", author: "Socrates" },
-  { quote: "Nature has written her laws in the language of mathematics.", author: "Galileo Galilei" },
   { quote: "We do not write in order to be understood; we write in order to understand.", author: "C.S. Lewis" },
   { quote: "Self-education is, I firmly believe, the only kind of education there is.", author: "Isaac Asimov" },
   { quote: "I would rather have questions that can't be answered than answers that can't be questioned.", author: "Richard Feynman" },
@@ -154,7 +148,7 @@ function WeeklyBars({ sessions }: { sessions: Array<{ date: string }> }) {
                 : "rgba(68,78,44,0.06)",
             }}
           />
-          <span className="text-[9px]" style={{ color: "var(--text-mute)" }}>{d.label}</span>
+          <span className="text-[9px] font-mono" style={{ color: "var(--text-mute)" }}>{d.label}</span>
         </div>
       ))}
     </div>
@@ -173,14 +167,14 @@ const containerVariants = {
 };
 
 const cardVariants = {
-  hidden: { opacity: 0, y: 15 },
+  hidden: { opacity: 0, y: 12 },
   visible: {
     opacity: 1,
     y: 0,
     transition: {
       type: "spring",
       stiffness: 260,
-      damping: 18
+      damping: 20
     }
   }
 };
@@ -210,16 +204,9 @@ export default function Dashboard() {
   sessions.forEach((s) => { histMap[s.date] = (histMap[s.date] ?? 0) + 1; });
   const history = Object.entries(histMap).map(([date, count]) => ({ date, count }));
 
-  /* ── Smart topic suggestion ──────────────────────────────────────────────
-     Rules (in priority order):
-     1. If focusCategory is set, strictly pick from that category
-     2. Otherwise, strictly prefer the user's favorite and enabled categories
-     3. Never show a topic the user has already completed unless all are completed
-     4. Stable across the day, but changes when user skips or selects a focus
-  ── */
+  /* ── Smart topic suggestion ────────────────────────────────────── */
   const completedTopicIds = new Set(sessions.map((s) => s.topicId));
 
-  // Deterministic daily seed: changes at midnight, stable on refresh
   const todayIndex = (() => {
     const today = new Date();
     return today.getFullYear() * 10000 + (today.getMonth() + 1) * 100 + today.getDate();
@@ -252,31 +239,26 @@ export default function Dashboard() {
         ? settings.enabledCategories
         : ["Artificial Intelligence", "Technology"];
 
-    // Pool 1: User's chosen categories, not done, not skipped
     let pool = allTopics.filter(
       (t) => userCategories.includes(t.category) && !excluded.has(t.id)
     );
 
-    // Pool 2: If favorites exhausted, try other enabled categories (if any exist)
     if (pool.length === 0 && settings.enabledCategories.length > 0) {
       pool = allTopics.filter(
         (t) => settings.enabledCategories.includes(t.category) && !excluded.has(t.id)
       );
     }
 
-    // Pool 3: User categories even if skipped today
     if (pool.length === 0) {
       pool = allTopics.filter(
         (t) => userCategories.includes(t.category) && !completedTopicIds.has(t.id)
       );
     }
 
-    // Pool 4: User categories reset
     if (pool.length === 0) {
       pool = allTopics.filter((t) => userCategories.includes(t.category));
     }
 
-    // Ultimate fallback if user has zero matching topics
     if (pool.length === 0) {
       pool = allTopics;
     }
@@ -296,7 +278,7 @@ export default function Dashboard() {
       setSkippedToday((prev) => [...prev, suggestedTopic.id]);
       setSpinOffset((prev) => prev + 1);
       setSpinning(false);
-    }, 600);
+    }, 500);
   }
 
   function handleSelectFocus(category: string | null) {
@@ -305,10 +287,12 @@ export default function Dashboard() {
     setSpinOffset((prev) => prev + 1);
     setTimeout(() => {
       setSpinning(false);
-    }, 600);
+    }, 500);
   }
 
   const dailyQuote = DAILY_QUOTES[todayIndex % DAILY_QUOTES.length];
+  const heroCat = activeSession ? activeSession.topic.category : suggestedTopic.category;
+  const catColor = CATEGORY_COLORS[heroCat] || "var(--terra)";
 
   return (
     <motion.div
@@ -317,312 +301,388 @@ export default function Dashboard() {
       animate="visible"
       className="min-h-screen p-8 max-w-5xl"
     >
-
-      {/* ── Page heading ── */}
-      <motion.div
-        variants={cardVariants}
-        className="mb-10 flex flex-col md:flex-row md:items-end justify-between gap-6"
-      >
-        <div>
-          <div className="text-label mb-2">
-            {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+      {/* ── Editorial Folio Header ── */}
+      <motion.div variants={cardVariants} className="mb-8">
+        {/* Folio top dateline */}
+        <div className="flex items-center justify-between border-b pb-2.5 mb-4" style={{ borderColor: "var(--border-dim)" }}>
+          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-mute)" }}>
+            <span>Daily Dispatch</span>
+            <span>·</span>
+            <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
           </div>
-          <h1
-            className="font-space font-extrabold leading-tight text-display"
-            style={{ fontSize: "2.4rem", color: "var(--text)" }}
-          >
-            {streakMessage(streak.current, todayIndex)}
-          </h1>
+
+          <div className="flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--text-mute)" }}>
+            <span>Scholar {profile.username}</span>
+            <span>·</span>
+            <span style={{ color: "var(--olive)" }}>{level.title}</span>
+          </div>
         </div>
 
-        {/* Daily Wisdom / Quote */}
-        <div className="max-w-sm md:max-w-md bg-[var(--bg-card)] rounded-2xl p-5 border border-[var(--border-dim)] self-start md:self-auto shadow-sm hover:shadow-md transition-all duration-200 relative overflow-hidden group">
-          {/* Elegant quote mark background */}
-          <div className="absolute -top-1 -left-1 text-7xl font-serif text-[var(--olive-dim)]/30 pointer-events-none select-none">
-            “
+        {/* Lead title & Integrated Epigraph */}
+        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          <div>
+            <h1
+              className="font-serif font-bold leading-tight tracking-tight"
+              style={{ fontSize: "clamp(1.9rem, 3.2vw, 2.5rem)", color: "var(--text)" }}
+            >
+              {streakMessage(streak.current, todayIndex)}
+            </h1>
+            
+            {/* Literary Epigraph (no awkward floating quote box!) */}
+            <div
+              className="mt-2.5 pl-3.5 border-l-2 text-sm font-serif italic max-w-2xl leading-relaxed"
+              style={{
+                borderColor: "rgba(122, 28, 46, 0.4)",
+                color: "var(--text-dim)",
+              }}
+            >
+              &ldquo;{dailyQuote.quote}&rdquo;
+              <span className="ml-2 not-italic font-sans text-[10px] uppercase font-bold tracking-wider" style={{ color: "var(--text-mute)" }}>
+                — {dailyQuote.author}
+              </span>
+            </div>
           </div>
-          <p className="text-sm font-serif leading-relaxed relative z-10 pl-2 pr-1" style={{ color: "var(--text)" }}>
-            {dailyQuote.quote}
-          </p>
-          <p className="text-[10px] uppercase tracking-widest font-bold mt-3 text-right" style={{ color: "var(--text-mute)" }}>
-            — {dailyQuote.author}
-          </p>
         </div>
       </motion.div>
 
-      {/* ── Hero: Today's Challenge ── */}
-      {(() => {
-        const heroCat = activeSession ? activeSession.topic.category : suggestedTopic.category;
-        const catColor = CATEGORY_COLORS[heroCat] || "var(--terra)";
-        
-        return (
-          <motion.div
-            variants={cardVariants}
-            whileHover={{ y: -3, boxShadow: "0 12px 30px rgba(92,106,54,0.06)" }}
-            className="surface rounded-2xl p-7 mb-5"
-          >
-            {activeSession ? (
-              /* Resume in-progress session */
-              <div className="flex items-center justify-between flex-wrap gap-4">
-                <div>
-                  <div className="text-olive mb-2 text-label">Session in progress</div>
-                  <p
-                    className="font-space font-bold text-display"
-                    style={{ fontSize: "1.35rem", color: "var(--text)", lineHeight: 1.25, maxWidth: "52ch" }}
-                  >
-                    {activeSession.topic.text}
-                  </p>
-                  <div className="flex items-center gap-2 mt-3">
-                    <span className="tag tag-terra capitalize">{activeSession.stage}</span>
-                    <span
-                      className="tag font-bold"
-                      style={{
-                        backgroundColor: `${catColor}15`,
-                        color: catColor,
-                        border: `1px solid ${catColor}30`,
-                      }}
-                    >
-                      {CATEGORY_ICONS[heroCat]} {heroCat}
-                    </span>
-                  </div>
-                </div>
-                <Link href={`/session/${activeSession.id}`}>
-                  <button className="btn-terra whitespace-nowrap">
-                    Resume Session <ArrowRight size={15} />
-                  </button>
-                </Link>
+      {/* ── The Centerpiece: Today's Feynman Inquiry ── */}
+      <motion.div
+        variants={cardVariants}
+        className="surface rounded-2xl p-7 md:p-8 mb-6 border relative overflow-hidden"
+        style={{ borderColor: "var(--border)" }}
+      >
+        {activeSession ? (
+          /* Resume in-progress session */
+          <div className="flex items-center justify-between flex-wrap gap-4">
+            <div>
+              <div className="text-olive mb-2 text-label">Session in progress</div>
+              <p
+                className="font-serif font-bold text-2xl"
+                style={{ color: "var(--text)", lineHeight: 1.3, maxWidth: "52ch" }}
+              >
+                {activeSession.topic.text}
+              </p>
+              <div className="flex items-center gap-2 mt-3">
+                <span className="tag tag-terra capitalize">{activeSession.stage}</span>
+                <span
+                  className="tag font-bold"
+                  style={{
+                    backgroundColor: `${catColor}15`,
+                    color: catColor,
+                    border: `1px solid ${catColor}30`,
+                  }}
+                >
+                  {CATEGORY_ICONS[heroCat]} {heroCat}
+                </span>
               </div>
-            ) : (
-              /* Suggested topic */
-              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2.5 mb-3 flex-wrap">
-                    <div className="text-olive text-label">Today&apos;s suggested topic</div>
-                    {focusCategory ? (
-                      <div className="flex items-center gap-1.5">
-                        <span
-                          className="text-[10px] uppercase font-mono tracking-wider font-semibold px-2 py-0.5 rounded-full flex items-center gap-1 border"
-                          style={{
-                            backgroundColor: `${catColor}15`,
-                            color: catColor,
-                            borderColor: `${catColor}30`,
-                          }}
-                        >
-                          <span>Focus:</span> {focusCategory}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleSelectFocus(null)}
-                          className="text-[10px] text-[var(--text-mute)] hover:text-[var(--terra)] transition-colors px-1"
-                          title="Reset focus to all categories"
-                        >
-                          ✕ Clear
-                        </button>
-                      </div>
-                    ) : (
-                      <button
-                        type="button"
-                        onClick={() => setShowFocusModal(true)}
-                        className="text-[10px] uppercase font-mono tracking-wider font-medium text-[var(--text-mute)] hover:text-[var(--olive-text)] transition-colors underline decoration-dotted"
-                        title="Click to focus on a specific category"
-                      >
-                        Customize focus
-                      </button>
-                    )}
-                  </div>
-                  <p
-                    className={cn(
-                      "font-space font-bold mb-6 text-display transition-all duration-300",
-                      spinning ? "blur-sm scale-[0.99] opacity-50" : ""
-                    )}
-                    style={{ fontSize: "clamp(1.2rem, 2.5vw, 1.75rem)", color: "var(--text)", lineHeight: 1.25, maxWidth: "52ch" }}
-                  >
-                    {spinning ? "Accessing neural data core..." : suggestedTopic.text}
-                  </p>
+            </div>
+            <Link href={`/session/${activeSession.id}`}>
+              <button className="btn-terra whitespace-nowrap">
+                Resume Session <ArrowRight size={15} />
+              </button>
+            </Link>
+          </div>
+        ) : (
+          /* Suggested topic */
+          <div>
+            {/* Metadata and Unified Focus Trigger */}
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span
+                  className="tag font-bold font-mono text-[11px]"
+                  style={{
+                    backgroundColor: `${catColor}15`,
+                    color: catColor,
+                    border: `1px solid ${catColor}30`,
+                  }}
+                >
+                  {CATEGORY_ICONS[heroCat]} {heroCat}
+                </span>
+                <span className="tag tag-olive capitalize">{suggestedTopic.difficulty}</span>
+                <span className="tag tag-gold font-mono">
+                  +{suggestedTopic.difficulty === "beginner" ? 100 : suggestedTopic.difficulty === "intermediate" ? 150 : 200} XP
+                </span>
+              </div>
 
-                  <div className="flex items-center gap-4 flex-wrap">
-                    <button onClick={handleStartSuggested} className="btn-terra">
-                      Begin Research <ArrowRight size={15} />
-                    </button>
-                    <button onClick={handleSkipTopic} className="btn-ghost" title="Pick a different topic from your preferences">
-                      <Shuffle size={13} /> Pick a different topic
-                    </button>
-                    <div className="flex items-center gap-2 ml-auto">
-                      <button
-                        type="button"
-                        onClick={() => setShowFocusModal(true)}
-                        className="tag font-bold cursor-pointer hover:opacity-85 transition-all"
-                        style={{
-                          backgroundColor: `${catColor}15`,
-                          color: catColor,
-                          border: `1px solid ${catColor}30`,
-                        }}
-                        title="Click to select or focus a category"
-                      >
-                        {CATEGORY_ICONS[heroCat]} {heroCat}
-                      </button>
-                      <span className="tag tag-olive capitalize">{suggestedTopic.difficulty}</span>
-                      <span className="tag tag-gold">+{suggestedTopic.difficulty === "beginner" ? 100 : suggestedTopic.difficulty === "intermediate" ? 150 : 200} XP</span>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Animated Logo neural spinner */}
-                <div className="flex flex-col items-center gap-2 shrink-0 self-center">
-                  <button
-                    disabled={spinning}
-                    onClick={() => setShowFocusModal(true)}
-                    className="relative group w-20 h-20 rounded-2xl flex items-center justify-center border transition-all duration-300 hover:border-[var(--gold)] hover:scale-105 cursor-pointer shadow-sm hover:shadow-md"
-                    style={{
-                      background: "var(--bg-input)",
-                      borderColor: focusCategory ? catColor : "var(--border-dim)",
-                      boxShadow: focusCategory ? `0 0 0 1px ${catColor}35` : "0 4px 12px rgba(0, 0, 0, 0.02)"
-                    }}
-                    title="Click to customize roulette focus or change category"
-                  >
-                    {spinning && (
-                      <motion.div
-                        className="absolute inset-0 rounded-2xl border-2 border-dashed border-[var(--gold)]"
-                        animate={{ rotate: 360 }}
-                        transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
-                      />
-                    )}
-                    <FeyLogo size={46} spinning={spinning} />
-                  </button>
-                  <span className="text-[9px] uppercase tracking-[0.15em] font-mono text-center" style={{ color: "var(--text-mute)" }}>
-                    {spinning ? "Spinning..." : focusCategory ? "Focused" : "Click to Focus"}
+              {/* Single, purposeful Focus selector pill */}
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setShowFocusModal(true)}
+                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono transition-all surface hover:border-[var(--olive-br)] hover:bg-[var(--bg-input)]/50 cursor-pointer"
+                  style={{
+                    borderColor: focusCategory ? catColor : "var(--border-dim)",
+                    backgroundColor: focusCategory ? `${catColor}12` : undefined,
+                  }}
+                  title="Select or focus specific categories"
+                >
+                  <FeyLogo size={14} spinning={spinning} />
+                  <span style={{ color: focusCategory ? catColor : "var(--text)" }}>
+                    {focusCategory ? `Focus: ${focusCategory}` : "All Disciplines"}
                   </span>
-                </div>
+                  <span className="text-[10px] opacity-60">▾</span>
+                </button>
+
+                {focusCategory && (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectFocus(null)}
+                    className="text-[11px] font-mono text-[var(--text-mute)] hover:text-[var(--terra)] transition-colors px-1"
+                    title="Reset focus to all categories"
+                  >
+                    ✕
+                  </button>
+                )}
               </div>
-            )}
-          </motion.div>
-        );
-      })()}
-
-      {/* ── Stat row ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
-        {[
-          {
-            value: sessions.length.toString(),
-            label: "Sessions",
-            icon: <BookOpen size={13} style={{ color: "var(--olive)" }} />,
-          },
-          {
-            value: totalResearchMin >= 60
-              ? `${Math.floor(totalResearchMin / 60)}h ${totalResearchMin % 60}m`
-              : `${totalResearchMin}m`,
-            label: "Research",
-            icon: <BookOpen size={13} style={{ color: "var(--terra)" }} />,
-          },
-          {
-            value: `${Math.round(totalSpeakSec / 60)}m`,
-            label: "Speaking",
-            icon: <Mic size={13} style={{ color: "var(--olive-br)" }} />,
-          },
-          {
-            value: profile.xp.toLocaleString(),
-            label: "Total XP",
-            icon: <Zap size={13} style={{ color: "var(--gold)" }} />,
-          },
-        ].map((s, i) => (
-          <motion.div
-            key={i}
-            variants={cardVariants}
-            whileHover={{ y: -4, scale: 1.01, boxShadow: "0 10px 24px rgba(92,106,54,0.05)" }}
-            className="surface rounded-xl p-4"
-          >
-            <div className="flex items-center gap-1.5 mb-2">
-              {s.icon}
-              <span className="text-label">{s.label}</span>
             </div>
-            <div
-              className="font-mono font-semibold"
-              style={{ fontSize: "2rem", color: "var(--text)", lineHeight: 1 }}
+
+            {/* The Question in classic editorial typography */}
+            <p
+              className={cn(
+                "font-serif font-bold mb-3 tracking-tight transition-all duration-300",
+                spinning ? "blur-sm scale-[0.99] opacity-50" : ""
+              )}
+              style={{
+                fontSize: "clamp(1.35rem, 2.7vw, 1.85rem)",
+                color: "var(--text)",
+                lineHeight: 1.3,
+                maxWidth: "54ch",
+              }}
             >
-              {s.value}
-            </div>
-          </motion.div>
-        ))}
-      </div>
+              {spinning ? "Consulting scholarship..." : suggestedTopic.text}
+            </p>
 
-      {/* ── Activity + weekly ── */}
-      <div className="grid lg:grid-cols-3 gap-3 mb-5">
-        {/* Heatmap */}
+            {/* Feynman challenge prompt */}
+            <p
+              className="text-sm font-serif italic mb-6 max-w-2xl leading-relaxed"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Can you break down the essential concepts of this topic and articulate them simply in your own voice under 90 seconds?
+            </p>
+
+            {/* Action Bar */}
+            <div className="flex items-center gap-3 pt-2 border-t flex-wrap" style={{ borderColor: "var(--border-dim)" }}>
+              <button onClick={handleStartSuggested} className="btn-terra">
+                Begin Research (15m) <ArrowRight size={15} />
+              </button>
+
+              <button
+                onClick={handleSkipTopic}
+                className="btn-ghost"
+                title="Pick another question from your preferences"
+              >
+                <Shuffle size={13} /> Next Topic
+              </button>
+
+              <div className="ml-auto text-[11px] font-mono hidden sm:flex items-center gap-2" style={{ color: "var(--text-mute)" }}>
+                <span>15m Notes</span>
+                <span>·</span>
+                <span>90s Vocal Articulation</span>
+              </div>
+            </div>
+          </div>
+        )}
+      </motion.div>
+
+      {/* ── Consolidated Scholar Ledger (Replaces 4 isolated SaaS cards) ── */}
+      <motion.div
+        variants={cardVariants}
+        className="surface rounded-xl p-4 md:p-5 mb-6 border"
+        style={{ borderColor: "var(--border-dim)" }}
+      >
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--border-dim)]">
+          <div className="px-4 py-2 text-left">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+              Completed Sprints
+            </span>
+            <span className="font-mono text-2xl font-bold" style={{ color: "var(--text)" }}>
+              {sessions.length}
+            </span>
+            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+              sessions recorded
+            </span>
+          </div>
+
+          <div className="px-4 py-2 text-left">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+              Deep Research
+            </span>
+            <span className="font-mono text-2xl font-bold" style={{ color: "var(--text)" }}>
+              {totalResearchMin >= 60
+                ? `${Math.floor(totalResearchMin / 60)}h ${totalResearchMin % 60}m`
+                : `${totalResearchMin}m`}
+            </span>
+            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+              reading & notes
+            </span>
+          </div>
+
+          <div className="px-4 py-2 text-left">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+              Vocal Synthesis
+            </span>
+            <span className="font-mono text-2xl font-bold" style={{ color: "var(--text)" }}>
+              {Math.round(totalSpeakSec / 60)}m
+            </span>
+            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+              spoken articulation
+            </span>
+          </div>
+
+          <div className="px-4 py-2 text-left">
+            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+              Scholarly XP
+            </span>
+            <span className="font-mono text-2xl font-bold" style={{ color: "var(--gold)" }}>
+              {profile.xp.toLocaleString()}
+            </span>
+            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+              {level.title}
+            </span>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* ── Day 0 Orientation vs. Active Scholar Activity ── */}
+      {sessions.length === 0 ? (
+        /* Day 0: Thoughtful onboarding orientation guide */
         <motion.div
           variants={cardVariants}
-          whileHover={{ y: -3, scale: 1.005, boxShadow: "0 10px 24px rgba(92,106,54,0.04)" }}
-          className="lg:col-span-2 surface rounded-xl p-5"
+          className="surface rounded-xl p-6 mb-6 border"
+          style={{ borderColor: "var(--border-dim)" }}
         >
           <div className="flex items-center justify-between mb-4">
-            <span className="text-heading" style={{ fontSize: "0.9rem" }}>Activity</span>
-            <span className="text-label">{sessions.length} sessions this year</span>
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider font-semibold block mb-0.5" style={{ color: "var(--olive)" }}>
+                The Feynman Ritual
+              </span>
+              <h3 className="font-serif text-lg font-semibold" style={{ color: "var(--text)" }}>
+                How your articulation practice works
+              </h3>
+            </div>
+            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--bg-input)]/50" style={{ color: "var(--text-mute)" }}>
+              First Sprint
+            </span>
           </div>
-          <ActivityHeatmap history={history} />
-          <div className="flex items-center justify-end gap-1.5 mt-3">
-            <span className="text-label">Less</span>
-            {[0.4, 0.55, 0.75, 1].map((op, i) => (
-              <div
-                key={i}
-                className="w-2.5 h-2.5 rounded-[2px]"
-                style={{ background: `var(--olive)`, opacity: op }}
-              />
-            ))}
-            <span className="text-label">More</span>
+
+          <div className="grid md:grid-cols-3 gap-4 pt-1">
+            <div className="p-4 rounded-lg border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
+              <div className="font-mono text-xs font-bold mb-1.5" style={{ color: "var(--terra)" }}>
+                01 / Deep Research (15m)
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                Read the prompt, outline core tenets in the distraction-free editor, and organize key analogies without rote memorization.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
+              <div className="font-mono text-xs font-bold mb-1.5" style={{ color: "var(--olive)" }}>
+                02 / Vocal Synthesis (90s)
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                Explain the concept aloud under pressure using real microphone capture. Listen back, re-record if needed, and refine your delivery.
+              </p>
+            </div>
+
+            <div className="p-4 rounded-lg border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
+              <div className="font-mono text-xs font-bold mb-1.5" style={{ color: "var(--gold)" }}>
+                03 / Reflect & Expand
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                Rate your understanding. Each completed sprint unlocks new nodes on your interactive Constellation Graph and lights up your activity ledger.
+              </p>
+            </div>
           </div>
         </motion.div>
-
-        {/* Weekly bars */}
-        <motion.div
-          variants={cardVariants}
-          whileHover={{ y: -3, scale: 1.005, boxShadow: "0 10px 24px rgba(92,106,54,0.04)" }}
-          className="surface rounded-xl p-5"
-        >
-          <div className="text-heading mb-4" style={{ fontSize: "0.9rem" }}>This week</div>
-          <WeeklyBars sessions={sessions} />
-
-          {/* XP progress to next level */}
-          <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--olive-dim)" }}>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-label">Level {level.level}</span>
-              {nextLevel && <span className="text-label">→ Lv {level.level + 1}</span>}
+      ) : (
+        /* Active Scholar: Genuine Activity Heatmap & Weekly Rhythm */
+        <div className="grid lg:grid-cols-3 gap-3 mb-6">
+          <motion.div
+            variants={cardVariants}
+            className="lg:col-span-2 surface rounded-xl p-5 border"
+            style={{ borderColor: "var(--border-dim)" }}
+          >
+            <div className="flex items-center justify-between mb-4">
+              <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
+                Scholarly Consistency
+              </span>
+              <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>
+                {sessions.length} sessions this year
+              </span>
             </div>
-            <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--olive-dim)" }}>
-              <motion.div
-                className="h-full rounded-full"
-                style={{ background: "var(--gold)" }}
-                initial={{ width: 0 }}
-                animate={{ width: `${progress}%` }}
-                transition={{ type: "spring", stiffness: 100, damping: 15 }}
-              />
+            <ActivityHeatmap history={history} />
+            <div className="flex items-center justify-end gap-1.5 mt-3">
+              <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>Less</span>
+              {[0.4, 0.55, 0.75, 1].map((op, i) => (
+                <div
+                  key={i}
+                  className="w-2.5 h-2.5 rounded-[2px]"
+                  style={{ background: `var(--olive)`, opacity: op }}
+                />
+              ))}
+              <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>More</span>
             </div>
-            <div className="text-label mt-1.5">{level.title}</div>
-          </div>
-        </motion.div>
-      </div>
+          </motion.div>
+
+          <motion.div
+            variants={cardVariants}
+            className="surface rounded-xl p-5 border"
+            style={{ borderColor: "var(--border-dim)" }}
+          >
+            <div className="font-serif font-semibold text-sm mb-4" style={{ color: "var(--text)" }}>
+              This Week
+            </div>
+            <WeeklyBars sessions={sessions} />
+
+            <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--border-dim)" }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>Level {level.level}</span>
+                {nextLevel && (
+                  <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>→ Lv {level.level + 1}</span>
+                )}
+              </div>
+              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-input)" }}>
+                <motion.div
+                  className="h-full rounded-full"
+                  style={{ background: "var(--gold)" }}
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progress}%` }}
+                  transition={{ type: "spring", stiffness: 100, damping: 15 }}
+                />
+              </div>
+              <div className="text-[11px] font-mono mt-1.5" style={{ color: "var(--text-mute)" }}>{level.title}</div>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* ── Recent sessions + Achievements ── */}
-      <div className="grid lg:grid-cols-2 gap-3">
-
+      <div className="grid lg:grid-cols-2 gap-4">
         {/* Recent sessions */}
         <motion.div
           variants={cardVariants}
-          whileHover={{ y: -3, scale: 1.005, boxShadow: "0 10px 24px rgba(92,106,54,0.04)" }}
-          className="surface rounded-xl p-5"
+          className="surface rounded-xl p-5 border"
+          style={{ borderColor: "var(--border-dim)" }}
         >
           <div className="flex items-center justify-between mb-4">
-            <span className="text-heading" style={{ fontSize: "0.9rem" }}>Recent sessions</span>
-            <Link href="/analytics">
-              <span className="text-label hover:underline cursor-pointer" style={{ color: "var(--olive-text)" }}>
-                View all
+            <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
+              Recent Sprints
+            </span>
+            <Link href="/library">
+              <span className="text-xs font-mono hover:underline cursor-pointer" style={{ color: "var(--terra)" }}>
+                View in Library →
               </span>
             </Link>
           </div>
 
           {recentSessions.length === 0 ? (
             <div className="py-8 text-center">
-              <div className="text-4xl mb-3 opacity-30">📖</div>
-              <p style={{ color: "var(--text-mute)", fontSize: "13px" }}>
-                No sessions yet. Complete your first above.
+              <div className="text-3xl mb-2 opacity-35">🎙️</div>
+              <p className="font-serif text-sm italic" style={{ color: "var(--text-dim)" }}>
+                No speeches recorded yet.
+              </p>
+              <p className="text-xs font-mono mt-1" style={{ color: "var(--text-mute)" }}>
+                Complete today&apos;s inquiry above to record your first synthesis.
               </p>
             </div>
           ) : (
@@ -646,15 +706,15 @@ export default function Dashboard() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <p
-                      className="text-sm font-medium leading-snug truncate"
+                      className="text-sm font-serif font-medium leading-snug truncate"
                       style={{ color: "var(--text)" }}
                     >
                       {s.topicText}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-label">{relativeDate(s.date)}</span>
+                      <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>{relativeDate(s.date)}</span>
                       <span style={{ color: "var(--text-mute)", fontSize: "10px" }}>·</span>
-                      <span className="tag tag-gold" style={{ fontSize: "10px", padding: "1px 5px" }}>
+                      <span className="tag tag-gold font-mono" style={{ fontSize: "10px", padding: "1px 5px" }}>
                         +{s.xpEarned} XP
                       </span>
                     </div>
@@ -663,7 +723,7 @@ export default function Dashboard() {
                     {[1, 2, 3, 4, 5].map((i) => (
                       <Star
                         key={i}
-                        size={9}
+                        size={10}
                         className={i <= s.ratings.confidence ? "" : "opacity-15"}
                         style={{ color: i <= s.ratings.confidence ? "var(--gold)" : "var(--text-mute)" }}
                         fill={i <= s.ratings.confidence ? "var(--gold)" : "none"}
@@ -679,12 +739,14 @@ export default function Dashboard() {
         {/* Achievements */}
         <motion.div
           variants={cardVariants}
-          whileHover={{ y: -3, scale: 1.005, boxShadow: "0 10px 24px rgba(92,106,54,0.04)" }}
-          className="surface rounded-xl p-5"
+          className="surface rounded-xl p-5 border"
+          style={{ borderColor: "var(--border-dim)" }}
         >
           <div className="flex items-center justify-between mb-4">
-            <span className="text-heading" style={{ fontSize: "0.9rem" }}>Achievements</span>
-            <span className="text-label">
+            <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
+              Scholarly Milestones
+            </span>
+            <span className="text-xs font-mono" style={{ color: "var(--text-mute)" }}>
               {profile.unlockedAchievements.length}/{ACHIEVEMENTS.length}
             </span>
           </div>
@@ -695,17 +757,17 @@ export default function Dashboard() {
                 <div
                   key={ach.id}
                   title={`${ach.title}: ${ach.description}`}
-                  className="rounded-xl p-2.5 text-center transition-all"
+                  className="rounded-lg p-2.5 text-center transition-all"
                   style={{
-                    background: unlocked ? "rgba(92,106,54,0.05)" : "var(--bg-input)",
-                    border: `1px solid ${unlocked ? "var(--olive-dim)" : "transparent"}`,
-                    opacity: unlocked ? 1 : 0.35,
+                    background: unlocked ? "rgba(92,106,54,0.06)" : "var(--bg-input)/35",
+                    border: `1px solid ${unlocked ? "rgba(68,78,44,0.2)" : "transparent"}`,
+                    opacity: unlocked ? 1 : 0.4,
                     filter: unlocked ? "none" : "grayscale(1)",
                   }}
                 >
                   <div className="text-xl mb-1">{ach.icon}</div>
                   <div
-                    className="text-[10px] font-medium leading-tight"
+                    className="text-[10px] font-medium leading-tight truncate"
                     style={{ color: unlocked ? "var(--text)" : "var(--text-mute)" }}
                   >
                     {ach.title}
@@ -715,8 +777,8 @@ export default function Dashboard() {
             })}
           </div>
           {profile.unlockedAchievements.length === 0 && (
-            <p className="mt-3 text-label text-center">
-              Complete sessions to unlock achievements.
+            <p className="mt-3 text-xs font-mono text-center" style={{ color: "var(--text-mute)" }}>
+              Complete sessions to unlock your first achievement.
             </p>
           )}
         </motion.div>

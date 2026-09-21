@@ -244,29 +244,6 @@ export default function Sidebar() {
   const pathname = usePathname();
   const { profile, streak, sessions } = useAppStore();
   const [showStreakModal, setShowStreakModal] = useState(false);
-  const x = useMotionValue(0.5);
-  const y = useMotionValue(0.5);
-
-  const rotateX = useSpring(useTransform(y, [0, 1], [15, -15]), { stiffness: 180, damping: 20 });
-  const rotateY = useSpring(useTransform(x, [0, 1], [-15, 15]), { stiffness: 180, damping: 20 });
-
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const width = rect.width;
-    const height = rect.height;
-    
-    // Normalized coordinates from 0 to 1
-    const mouseX = (e.clientX - rect.left) / width;
-    const mouseY = (e.clientY - rect.top) / height;
-
-    x.set(mouseX);
-    y.set(mouseY);
-  };
-
-  const handleMouseLeave = () => {
-    x.set(0.5);
-    y.set(0.5);
-  };
   
   const level   = getLevelForXP(profile.xp);
   const progress = getLevelProgress(profile.xp);
@@ -297,80 +274,15 @@ export default function Sidebar() {
           </Link>
         </div>
 
-        {/* ── Streak — hero metric in the sidebar ── */}
-        <div style={{ perspective: 1000 }}>
-          <motion.div 
-            onClick={() => setShowStreakModal(true)}
-            onMouseMove={handleMouseMove}
-            onMouseLeave={handleMouseLeave}
-            className={cn(
-              "px-5 py-4 rounded-xl cursor-pointer group m-2 border shadow-sm relative overflow-hidden",
-              streak.current > 0 
-                ? "border-transparent shadow-md hover:shadow-lg"
-                : "border-dashed border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-input)]/40 hover:border-solid"
-            )}
-            style={{
-              backgroundColor: streak.current > 0 ? "var(--terra)" : undefined,
-              color: streak.current > 0 ? "#FFFFFF" : undefined,
-              transformStyle: "preserve-3d",
-              rotateX,
-              rotateY,
-            }}
-          >
-          <div className="flex items-center justify-between mb-2" style={{ transform: "translateZ(10px)" }}>
-            <div 
-              className="text-label"
-              style={{ color: streak.current > 0 ? "rgba(255, 255, 255, 0.8)" : "var(--text-mute)" }}
-            >
-              Today's streak
-            </div>
-            <Calendar size={12} className={cn("transition-colors", streak.current > 0 ? "text-white/80 group-hover:text-white" : "text-[var(--text-mute)] group-hover:text-[var(--text)]")} />
-          </div>
-          <div className="flex items-end gap-3" style={{ transform: "translateZ(15px)" }}>
-            <motion.span
-              whileHover={{ scale: 1.22, rotate: [0, -8, 8, 0] }}
-              transition={{ type: "spring", stiffness: 350, damping: 10 }}
-              className={cn("text-4xl leading-none select-none inline-block cursor-pointer", streak.current > 0 ? "flame-pulse" : "opacity-40")}
-              style={{ filter: streak.current > 0 ? "drop-shadow(0 4px 12px rgba(255,255,255,0.25))" : "none" }}
-            >
-              🔥
-            </motion.span>
-            <div>
-              <div
-                className="font-mono font-bold leading-none"
-                style={{
-                  fontSize: "3rem",
-                  color: streak.current > 0 ? "#FFFFFF" : "var(--text-mute)",
-                  lineHeight: 1,
-                }}
-              >
-                <CountUp end={streak.current} />
-              </div>
-              <div className="text-label mt-1" style={{ color: streak.current > 0 ? "rgba(255, 255, 255, 0.8)" : undefined }}>
-                {streak.current === 0 ? "days" : streak.current === 1 ? "day" : "days"}
-              </div>
-            </div>
-          </div>
-          {streak.current > 0 && (
-            <div
-              className="mt-2 text-xs"
-              style={{ color: "rgba(255, 255, 255, 0.9)", transform: "translateZ(10px)" }}
-            >
-              Best: {streak.longest}d — click to view
-            </div>
-          )}
-        </motion.div>
-      </div>
-
         {/* ── Navigation ── */}
-        <nav className="flex-1 px-3 py-3 space-y-0.5">
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const active = isActive(href);
             return (
               <Link key={href} href={href}>
                 <motion.div
-                  whileHover={{ x: 4 }}
-                  whileTap={{ scale: 0.97 }}
+                  whileHover={{ x: 3 }}
+                  whileTap={{ scale: 0.98 }}
                   className={cn("nav-item", active && "active")}
                 >
                   <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
@@ -378,7 +290,7 @@ export default function Sidebar() {
                   {active && (
                     <motion.span
                       layoutId="nav-dot"
-                      className="ml-auto w-1 h-1 rounded-full"
+                      className="ml-auto w-1.5 h-1.5 rounded-full"
                       style={{ background: "var(--terra)" }}
                     />
                   )}
@@ -388,19 +300,46 @@ export default function Sidebar() {
           })}
         </nav>
 
-        {/* ── User Profile ── */}
-        <div className="px-4 py-3 flex items-center gap-3" style={{ borderTop: "1px solid var(--border-dim)" }}>
-          <UserAvatar avatar={profile.avatar} size="sm" />
-          <div className="flex-1 min-w-0">
-            <div className="text-xs font-bold truncate" style={{ color: "var(--text)" }}>{profile.username}</div>
-            <div className="text-[10px]" style={{ color: "var(--text-mute)" }}>Level {level.level}</div>
+        {/* ── User Profile & Streak ── */}
+        <div className="px-4 py-3.5 space-y-3" style={{ borderTop: "1px solid var(--border-dim)" }}>
+          <div className="flex items-center gap-3">
+            <UserAvatar avatar={profile.avatar} size="sm" />
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-bold truncate" style={{ color: "var(--text)" }}>{profile.username}</div>
+              <div className="text-[10px] truncate" style={{ color: "var(--text-mute)" }}>{level.title} · Lv {level.level}</div>
+            </div>
           </div>
+
+          {/* Elegant Streak Trigger */}
+          <button
+            type="button"
+            onClick={() => setShowStreakModal(true)}
+            className="w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs transition-colors hover:bg-[var(--bg-input)]/70 border border-[var(--border-dim)] cursor-pointer text-left"
+            style={{
+              background: streak.current > 0 ? "rgba(122, 28, 46, 0.08)" : "var(--bg-input)/30",
+            }}
+          >
+            <div className="flex items-center gap-1.5">
+              <span className={streak.current > 0 ? "flame-pulse text-base" : "opacity-45 text-sm"}>🔥</span>
+              <span
+                className="font-medium font-mono text-[11px]"
+                style={{ color: streak.current > 0 ? "var(--terra)" : "var(--text)" }}
+              >
+                {streak.current} {streak.current === 1 ? "day streak" : "days streak"}
+              </span>
+            </div>
+            <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>
+              History →
+            </span>
+          </button>
         </div>
 
         {/* ── XP / Level ── */}
-        <div className="px-4 pb-5 pt-3" style={{ borderTop: "1px solid var(--border-dim)" }}>
+        <div className="px-4 pb-4 pt-1">
           <div className="flex items-center justify-between mb-1.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>{level.title}</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider font-mono" style={{ color: "var(--text-mute)" }}>
+              Level {level.level}
+            </span>
             <span className="font-mono text-xs font-semibold" style={{ color: "var(--gold)" }}>
               {profile.xp} XP
             </span>
