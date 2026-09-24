@@ -30,6 +30,8 @@ export const CATEGORIES = [
   "Wildcard",
   "Medicine",
   "Personal Finance",
+  "Internet Culture",
+  "Sex & Sexuality",
 ] as const;
 
 export type Category = (typeof CATEGORIES)[number];
@@ -55,6 +57,8 @@ export const CATEGORY_COLORS: Record<string, string> = {
   "Wildcard": "#6B4C7A",                  // Deep Violet
   "Medicine": "#8B2635",                  // Deep Berry Red
   "Personal Finance": "#2C6E49",          // Forest Green
+  "Internet Culture": "#4A5568",          // Digital Slate
+  "Sex & Sexuality": "#8B5B6B",           // Warm Mauve
 };
 
 export const CATEGORY_ICONS: Record<string, string> = {
@@ -78,6 +82,8 @@ export const CATEGORY_ICONS: Record<string, string> = {
   "Wildcard": "🎲",
   "Medicine": "🩺",
   "Personal Finance": "💳",
+  "Internet Culture": "📱",
+  "Sex & Sexuality": "🌸",
 };
 
 export const TOPIC_BANK: Topic[] = [
@@ -1047,6 +1053,98 @@ export const TOPIC_BANK: Topic[] = [
   { id: "pf-exp-09", text: "What is FIRE (Financial Independence, Retire Early) and what are the math and assumptions behind it?", category: "Personal Finance", difficulty: "Expert", tags: ["fire", "financial-independence", "early-retirement", "savings-rate"] },
   { id: "pf-exp-10", text: "How do options strategies like covered calls or protective puts work for personal portfolios?", category: "Personal Finance", difficulty: "Expert", tags: ["covered-calls", "protective-puts", "options", "hedging"] },
   { id: "pf-sch-03", text: "What is net worth, how do you calculate it, and why does it matter more than income?", category: "Personal Finance", difficulty: "Scholar", tags: ["net-worth","wealth","income","calculation"] },
+
+  // ─── Internet Culture (54 topics) ──────────────────────────────────────────────────────────
+  // Novice
+  { id: "ic-nov-01", text: "What is a meme and why do they spread so fast?", category: "Internet Culture", difficulty: "Novice", tags: ["memes","virality","culture","sharing"] },
+  { id: "ic-nov-02", text: "What does 'going viral' actually mean and what makes content do it?", category: "Internet Culture", difficulty: "Novice", tags: ["viral","content","algorithm","spread"] },
+  { id: "ic-nov-03", text: "What is a parasocial relationship and why do people form them with strangers online?", category: "Internet Culture", difficulty: "Novice", tags: ["parasocial","influencers","fandom","psychology"] },
+  { id: "ic-nov-04", text: "What is cancel culture and how does it work in practice?", category: "Internet Culture", difficulty: "Novice", tags: ["cancel-culture","accountability","twitter","controversy"] },
+  { id: "ic-nov-05", text: "What is a Twitter (X) ratio and what does it reveal about public opinion?", category: "Internet Culture", difficulty: "Novice", tags: ["ratio","twitter","public-opinion","engagement"] },
+  { id: "ic-nov-06", text: "What is FOMO and how did social media turn it into a permanent condition?", category: "Internet Culture", difficulty: "Novice", tags: ["fomo","anxiety","social-media","comparison"] },
+  { id: "ic-nov-07", text: "What is a hot take and why does Twitter reward them?", category: "Internet Culture", difficulty: "Novice", tags: ["hot-take","opinion","engagement","discourse"] },
+  { id: "ic-nov-08", text: "What does 'chronically online' mean and is it a real phenomenon?", category: "Internet Culture", difficulty: "Novice", tags: ["chronically-online","internet","identity","behavior"] },
+  { id: "ic-nov-09", text: "What is main character energy and why did that phrase take over Twitter?", category: "Internet Culture", difficulty: "Novice", tags: ["main-character","narcissism","culture","twitter"] },
+  { id: "ic-nov-10", text: "What is doomerism and why has it become a defining mood of the internet generation?", category: "Internet Culture", difficulty: "Novice", tags: ["doomerism","nihilism","gen-z","pessimism"] },
+  { id: "ic-nov-11", text: "What is clout and why do people pursue it even at personal cost?", category: "Internet Culture", difficulty: "Novice", tags: ["clout","status","social-media","validation"] },
+  { id: "ic-nov-12", text: "What is a stan and how did 'stanning' become a cultural force?", category: "Internet Culture", difficulty: "Novice", tags: ["stan","fandom","celebrity","obsession"] },
+  { id: "ic-nov-13", text: "What is Black Twitter and why has it been such a powerful cultural engine?", category: "Internet Culture", difficulty: "Novice", tags: ["black-twitter","culture","community","influence"] },
+  { id: "ic-nov-14", text: "What is doomscrolling and what does it do to your brain?", category: "Internet Culture", difficulty: "Novice", tags: ["doomscrolling","mental-health","attention","media"] },
+  { id: "ic-nov-15", text: "What is a vibe and why is 'the vibe' now a legitimate measure of quality?", category: "Internet Culture", difficulty: "Novice", tags: ["vibe","aesthetics","culture","gen-z"] },
+  // Scholar
+  { id: "ic-sch-01", text: "How do recommendation algorithms create echo chambers and filter bubbles?", category: "Internet Culture", difficulty: "Scholar", tags: ["algorithm","echo-chamber","filter-bubble","polarization"] },
+  { id: "ic-sch-02", text: "What is attention economy theory and how has it reshaped media and culture?", category: "Internet Culture", difficulty: "Scholar", tags: ["attention-economy","media","engagement","business"] },
+  { id: "ic-sch-03", text: "How does online discourse differ from face-to-face conversation — and why does it get uglier?", category: "Internet Culture", difficulty: "Scholar", tags: ["online-discourse","deindividuation","anonymity","psychology"] },
+  { id: "ic-sch-04", text: "What is context collapse and how does it change what we say online?", category: "Internet Culture", difficulty: "Scholar", tags: ["context-collapse","audience","identity","communication"] },
+  { id: "ic-sch-05", text: "What is digital blackface and why is it a contested concept online?", category: "Internet Culture", difficulty: "Scholar", tags: ["digital-blackface","appropriation","memes","race"] },
+  { id: "ic-sch-06", text: "How did TikTok's algorithm change what we mean by 'going viral'?", category: "Internet Culture", difficulty: "Scholar", tags: ["tiktok","algorithm","virality","for-you-page"] },
+  { id: "ic-sch-07", text: "What is the discourse cycle on social media and why does every topic peak and die in 72 hours?", category: "Internet Culture", difficulty: "Scholar", tags: ["discourse","news-cycle","outrage","attention"] },
+  { id: "ic-sch-08", text: "What makes someone an 'influencer' vs a 'celebrity' and does the distinction still matter?", category: "Internet Culture", difficulty: "Scholar", tags: ["influencer","celebrity","authenticity","brand"] },
+  { id: "ic-sch-09", text: "What is irony poisoning and how does nihilistic internet humor affect real beliefs?", category: "Internet Culture", difficulty: "Scholar", tags: ["irony","nihilism","humor","radicalization"] },
+  { id: "ic-sch-10", text: "What is the relationship between internet subcultures and mainstream cultural shifts?", category: "Internet Culture", difficulty: "Scholar", tags: ["subculture","mainstream","trickle-up","culture"] },
+  { id: "ic-sch-11", text: "What is reply guy culture and what does it reveal about power dynamics online?", category: "Internet Culture", difficulty: "Scholar", tags: ["reply-guy","mansplaining","power","gender"] },
+  { id: "ic-sch-12", text: "How did 'posting through it' become a coping strategy — and what are its psychological costs?", category: "Internet Culture", difficulty: "Scholar", tags: ["posting","coping","oversharing","identity"] },
+  { id: "ic-sch-13", text: "What is the bystander effect online and why do tweets calling for help go ignored?", category: "Internet Culture", difficulty: "Scholar", tags: ["bystander","diffusion","responsibility","online"] },
+  // Expert
+  { id: "ic-exp-01", text: "Is cancel culture a form of accountability or a moral panic — and what does the evidence show?", category: "Internet Culture", difficulty: "Expert", tags: ["cancel-culture","accountability","moral-panic","debate"] },
+  { id: "ic-exp-02", text: "How does platform capitalism commodify human relationships and social expression?", category: "Internet Culture", difficulty: "Expert", tags: ["platform-capitalism","commodification","social-media","labor"] },
+  { id: "ic-exp-03", text: "What is Goodhart's Law and how does it explain why every social media metric gets gamed?", category: "Internet Culture", difficulty: "Expert", tags: ["goodharts-law","metrics","gaming","measurement"] },
+  { id: "ic-exp-04", text: "Is social media making political polarization worse — or just making existing polarization more visible?", category: "Internet Culture", difficulty: "Expert", tags: ["polarization","social-media","politics","research"] },
+  { id: "ic-exp-05", text: "What is networked individualism and how has it replaced community with audience?", category: "Internet Culture", difficulty: "Expert", tags: ["networked-individualism","community","audience","Castells"] },
+  { id: "ic-exp-06", text: "How did Weird Twitter shape a generation of comedians, writers, and cultural critics?", category: "Internet Culture", difficulty: "Expert", tags: ["weird-twitter","comedy","absurdism","culture"] },
+  { id: "ic-exp-07", text: "What is the attention residue effect and how does constant scrolling impair deep thinking?", category: "Internet Culture", difficulty: "Expert", tags: ["attention-residue","cognition","focus","deep-work"] },
+  { id: "ic-exp-08", text: "How do misinformation campaigns spread and what makes fact-checking so ineffective at stopping them?", category: "Internet Culture", difficulty: "Expert", tags: ["misinformation","fact-checking","psychology","inoculation"] },
+  { id: "ic-exp-09", text: "What is the relationship between online anonymity and both freedom of expression and harm?", category: "Internet Culture", difficulty: "Expert", tags: ["anonymity","free-speech","harm","moderation"] },
+  { id: "ic-exp-10", text: "How has the creator economy restructured labor, ownership, and creative value?", category: "Internet Culture", difficulty: "Expert", tags: ["creator-economy","labor","monetization","autonomy"] },
+  { id: "ic-exp-11", text: "What does the history of forum culture (from Usenet to Reddit) tell us about online community building?", category: "Internet Culture", difficulty: "Expert", tags: ["forums","usenet","reddit","community","moderation"] },
+  { id: "ic-exp-12", text: "What is linguistic drift online and how does slang born in marginalised communities get co-opted by the mainstream?", category: "Internet Culture", difficulty: "Expert", tags: ["aave","slang","appropriation","language","drift"] },
+  { id: "ic-exp-13", text: "How does the architecture of platforms (design, defaults, incentives) shape political and cultural outcomes?", category: "Internet Culture", difficulty: "Expert", tags: ["platform-design","incentives","choice-architecture","nudge"] },
+
+  // ─── Sex & Sexuality (51 topics) ──────────────────────────────────────────────────────────
+  // Novice
+  { id: "sx-nov-01", text: "What is consent and why is it the cornerstone of healthy sexual relationships?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["consent","relationships","boundaries","safety"] },
+  { id: "sx-nov-02", text: "What is gender identity and how is it different from biological sex?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["gender-identity","sex","biological","transgender"] },
+  { id: "sx-nov-03", text: "What is sexual orientation and what is the difference between who you're attracted to vs who you are?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["sexual-orientation","identity","attraction","spectrum"] },
+  { id: "sx-nov-04", text: "What is the Kinsey Scale and what did it reveal about human sexuality?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["kinsey-scale","sexuality","spectrum","research"] },
+  { id: "sx-nov-05", text: "What does LGBTQ+ stand for and what is the significance of each letter?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["lgbtq","identity","community","terminology"] },
+  { id: "sx-nov-06", text: "What is sexual health and why is it considered a public health issue?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["sexual-health","sti","public-health","prevention"] },
+  { id: "sx-nov-07", text: "What is asexuality and how does it differ from celibacy or low libido?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["asexuality","libido","spectrum","identity"] },
+  { id: "sx-nov-08", text: "What is the difference between sex, romance, and attraction — and why do people split them apart?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["sex","romance","attraction","distinctions"] },
+  { id: "sx-nov-09", text: "What is body image and how does media shape the way we feel about our sexual selves?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["body-image","media","self-esteem","sexuality"] },
+  { id: "sx-nov-10", text: "What is puberty and why does understanding it matter beyond the basics we're taught in school?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["puberty","development","education","biology"] },
+  { id: "sx-nov-11", text: "What is reproductive health and why is access to it considered a human right?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["reproductive-health","rights","access","policy"] },
+  { id: "sx-nov-12", text: "What is the difference between love and lust — and what does science say about the distinction?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["love","lust","neuroscience","relationships"] },
+  { id: "sx-nov-13", text: "What is slut-shaming and why does it harm everyone — not just women?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["slut-shaming","double-standard","culture","gender"] },
+  { id: "sx-nov-14", text: "What is safe sex and how has its meaning evolved with modern medicine?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["safe-sex","prevention","sti","prep"] },
+  { id: "sx-nov-15", text: "What is the orgasm gap and why does it exist between different demographic groups?", category: "Sex & Sexuality", difficulty: "Novice", tags: ["orgasm-gap","gender","pleasure","inequality"] },
+  // Scholar
+  { id: "sx-sch-01", text: "What is attachment theory and how does it shape adult romantic and sexual relationships?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["attachment-theory","bowlby","relationships","psychology"] },
+  { id: "sx-sch-02", text: "What is the difference between gender expression, gender identity, and gender roles?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["gender-expression","identity","roles","socialization"] },
+  { id: "sx-sch-03", text: "What is compulsory heterosexuality and how did Adrienne Rich's essay change the way we think about it?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["compulsory-heterosexuality","adrienne-rich","feminism","theory"] },
+  { id: "sx-sch-04", text: "How does porn consumption affect sexual expectations and real-world intimacy?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["pornography","expectations","intimacy","research"] },
+  { id: "sx-sch-05", text: "What is intersectionality and how does it apply to experiences of sexuality and discrimination?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["intersectionality","crenshaw","identity","discrimination"] },
+  { id: "sx-sch-06", text: "What is the neuroscience of love — what actually happens in the brain when we fall for someone?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["neuroscience","love","oxytocin","dopamine"] },
+  { id: "sx-sch-07", text: "What is polyamory and what does research say about how non-monogamous relationships function?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["polyamory","non-monogamy","research","relationships"] },
+  { id: "sx-sch-08", text: "How does culture shape what is considered 'normal' or 'deviant' sexual behavior?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["culture","sexual-norms","deviance","anthropology"] },
+  { id: "sx-sch-09", text: "What is rape culture and how does it operate as a systemic rather than individual phenomenon?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["rape-culture","systemic","consent","sociology"] },
+  { id: "sx-sch-10", text: "What is the medicalization of sexuality and how have conditions like 'hysteria' or 'homosexuality' been pathologized historically?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["medicalization","pathology","history","DSM"] },
+  { id: "sx-sch-11", text: "What is sexology and how did figures like Kinsey, Masters, and Johnson transform our scientific understanding of sex?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["sexology","kinsey","masters-and-johnson","research"] },
+  { id: "sx-sch-12", text: "What is body autonomy and how does it interact with laws governing reproductive choices?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["body-autonomy","reproductive-rights","law","ethics"] },
+  { id: "sx-sch-13", text: "How does social media change the way young people understand and perform their sexuality?", category: "Sex & Sexuality", difficulty: "Scholar", tags: ["social-media","youth","identity","sexuality"] },
+  // Expert
+  { id: "sx-exp-01", text: "What is queer theory and how does it challenge fixed categories of gender and sexuality?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["queer-theory","judith-butler","gender","performativity"] },
+  { id: "sx-exp-02", text: "How do power asymmetries shape sexual consent even when both parties technically agree?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["power","consent","asymmetry","coercion"] },
+  { id: "sx-exp-03", text: "What does evolutionary psychology say about sexual selection — and where does it fall short?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["evolutionary-psychology","sexual-selection","critique","biology"] },
+  { id: "sx-exp-04", text: "What is the Foucauldian view of sexuality as a social construct and why is it still contested?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["foucault","sexuality","social-construct","power-knowledge"] },
+  { id: "sx-exp-05", text: "What are the ethics of sex work and how do the different feminist positions differ?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["sex-work","ethics","feminism","decriminalization"] },
+  { id: "sx-exp-06", text: "What is the relationship between capitalism and sexuality — how does the market commodify desire?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["capitalism","commodification","desire","critical-theory"] },
+  { id: "sx-exp-07", text: "How should comprehensive sex education be designed, and what does the evidence say actually works?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["sex-education","evidence","policy","outcomes"] },
+  { id: "sx-exp-08", text: "What are the psychological and social consequences of sexual shame — and how is it transmitted across generations?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["shame","psychology","intergenerational","religion"] },
+  { id: "sx-exp-09", text: "How does the concept of 'normal' sexuality change across cultures and history — and who gets to define it?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["normality","history","anthropology","power"] },
+  { id: "sx-exp-10", text: "What is the ethics of genetic sex-selection and reproductive technologies?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["bioethics","genetics","reproduction","selection"] },
+  { id: "sx-exp-11", text: "How has the rise of dating apps changed mate selection, and what does it mean for long-term relationships?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["dating-apps","mate-selection","relationships","technology"] },
+  { id: "sx-exp-12", text: "What is the sociology of virginity — why is it a cultural construction and not a medical fact?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["virginity","social-construct","purity","culture"] },
+  { id: "sx-exp-13", text: "How do religious frameworks shape sexual ethics and where do secular and faith-based approaches most sharply diverge?", category: "Sex & Sexuality", difficulty: "Expert", tags: ["religion","sexual-ethics","secular","divergence"] },
 ];
 
 export const DIFFICULTIES: Difficulty[] = ["Novice", "Scholar", "Expert"];
