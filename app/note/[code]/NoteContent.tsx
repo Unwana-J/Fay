@@ -24,6 +24,7 @@ import {
 } from "@/lib/topics";
 import { useAppStore } from "@/store/useAppStore";
 import OnboardingModal from "@/components/auth/OnboardingModal";
+import { getShortenedUrl } from "@/lib/url-shortener";
 
 export default function NoteContent({
   initialNote,
@@ -35,6 +36,7 @@ export default function NoteContent({
   const [note, setNote] = useState<SharedNotePayload | null>(initialNote);
   const [copied, setCopied] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
+  const [shortUrl, setShortUrl] = useState<string>("");
 
   const { isOnboarded } = useAppStore();
 
@@ -65,9 +67,25 @@ export default function NoteContent({
     }
   }, [note, code]);
 
+  // Request a short URL for this note
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      let isMounted = true;
+      getShortenedUrl(window.location.href).then((res) => {
+        if (isMounted && res) {
+          setShortUrl(res);
+        }
+      });
+      return () => {
+        isMounted = false;
+      };
+    }
+  }, []);
+
   function handleCopyLink() {
     if (typeof window !== "undefined" && navigator.clipboard) {
-      navigator.clipboard.writeText(window.location.href);
+      const urlToCopy = shortUrl || window.location.href;
+      navigator.clipboard.writeText(urlToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     }
@@ -75,18 +93,18 @@ export default function NoteContent({
 
   function handleShareTwitter() {
     if (!note) return;
+    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
     const tweet = `Read this synthesis on "${note.topicText}" — written using the Feynman Technique on Fey.\n\n`;
-    const url = typeof window !== "undefined" ? window.location.href : "";
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(url)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }
 
   function handleShareLinkedIn() {
-    const url = typeof window !== "undefined" ? window.location.href : "";
+    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
     window.open(
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(url)}`,
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }
@@ -288,12 +306,20 @@ export default function NoteContent({
             </div>
 
             {/* Note text rendered gracefully */}
-            <div
-              className="font-serif leading-relaxed text-[1.12rem] whitespace-pre-wrap selection:bg-[var(--terra)] selection:text-white"
-              style={{ color: "var(--text)" }}
-            >
-              {note.notes}
-            </div>
+            {note.notes.includes("<") && note.notes.includes(">") ? (
+              <div
+                className="font-serif leading-relaxed text-[1.12rem] selection:bg-[var(--terra)] selection:text-white prose prose-stone max-w-none"
+                style={{ color: "var(--text)" }}
+                dangerouslySetInnerHTML={{ __html: note.notes }}
+              />
+            ) : (
+              <div
+                className="font-serif leading-relaxed text-[1.12rem] whitespace-pre-wrap selection:bg-[var(--terra)] selection:text-white"
+                style={{ color: "var(--text)" }}
+              >
+                {note.notes}
+              </div>
+            )}
 
             {/* Tags footer inside note */}
             {note.tags && note.tags.length > 0 && (

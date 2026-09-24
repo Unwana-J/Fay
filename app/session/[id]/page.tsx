@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, use } from "react";
+import { useEffect, useRef, useState, useMemo, use } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { useEditor, EditorContent } from "@tiptap/react";
@@ -20,6 +20,7 @@ import { CATEGORY_ICONS, CATEGORY_COLORS } from "@/lib/topics";
 import { formatTime, cn } from "@/lib/utils";
 import ShareNoteModal from "@/components/notes/ShareNoteModal";
 import { encodeSharedNote } from "@/lib/share-note";
+import { getShortenedUrl } from "@/lib/url-shortener";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -888,7 +889,9 @@ function StageComplete({
     tags: tags || [],
   };
 
-  const shareUrl = (() => {
+  const [shortUrl, setShortUrl] = useState<string>("");
+
+  const fullShareUrl = useMemo(() => {
     try {
       const code = encodeSharedNote(sharePayload);
       const origin = typeof window !== "undefined" && window.location.origin
@@ -898,19 +901,35 @@ function StageComplete({
     } catch {
       return "";
     }
-  })();
+  }, [topicId, topicText, topicCategory, topicDifficulty, displayNotes, profile.username, speakingSeconds, xpEarned]);
+
+  useEffect(() => {
+    if (!fullShareUrl) return;
+    setShortUrl(fullShareUrl);
+    let isMounted = true;
+    getShortenedUrl(fullShareUrl).then((res) => {
+      if (isMounted && res) {
+        setShortUrl(res);
+      }
+    });
+    return () => {
+      isMounted = false;
+    };
+  }, [fullShareUrl]);
+
+  const activeShareUrl = shortUrl || fullShareUrl;
 
   function handleCopyShareLink() {
-    if (!shareUrl) return;
+    if (!activeShareUrl) return;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
+      navigator.clipboard.writeText(activeShareUrl);
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
     }
   }
 
   function handleShareDispatch() {
-    const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\n${shareUrl || "https://fey-eight-liard.vercel.app"}`;
+    const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\n${activeShareUrl || "https://fey-eight-liard.vercel.app"}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(dispatch);
       setCopiedDispatch(true);
@@ -921,14 +940,14 @@ function StageComplete({
   function handleShareTwitter() {
     const tweet = `Read my synthesis on "${topicText}" — written using the Feynman Technique on @FeyPlatform:\n\n`;
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(shareUrl)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(activeShareUrl)}`,
       "_blank"
     );
   }
 
   function handleShareLinkedIn() {
     window.open(
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(activeShareUrl)}`,
       "_blank"
     );
   }
@@ -1056,9 +1075,9 @@ function StageComplete({
               <span>{copiedLink ? "✓ Copied Public Link!" : "Copy Public Link"}</span>
             </button>
 
-            {shareUrl && (
+            {activeShareUrl && (
               <a
-                href={shareUrl}
+                href={activeShareUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="btn-ghost px-3 py-2 text-xs font-mono rounded-lg border border-[var(--border-dim)] hover:border-[var(--text)] transition-colors flex items-center gap-1.5"

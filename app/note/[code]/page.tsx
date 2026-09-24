@@ -31,9 +31,12 @@ export async function generateMetadata({
     };
   }
 
-  // Trim note to a compelling preview snippet
-  const raw = note.notes.trim().replace(/\n+/g, " ");
-  const snippet = raw.length > 220 ? raw.slice(0, 220) + "…" : raw;
+  // Strip HTML tags (e.g. <p>, <br>, etc.) and trim note to a clean, compelling preview snippet
+  const cleanText = note.notes
+    .replace(/<[^>]*>/g, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  const snippet = cleanText.length > 220 ? cleanText.slice(0, 220) + "…" : cleanText;
   const title = `"${note.topicText}" · Scholar Dispatch — Fey`;
   const byline = `By ${note.author} · ${note.category} · ${note.difficulty}`;
 

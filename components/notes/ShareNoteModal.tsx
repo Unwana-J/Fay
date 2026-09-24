@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import FeyLogo from "@/components/ui/FeyLogo";
 import { encodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
+import { getShortenedUrl } from "@/lib/url-shortener";
 import { CATEGORY_COLORS, CATEGORY_ICONS, DIFFICULTY_LABELS, type Difficulty } from "@/lib/topics";
 
 interface ShareNoteModalProps {
@@ -29,8 +30,9 @@ export default function ShareNoteModal({
   note,
 }: ShareNoteModalProps) {
   const [copied, setCopied] = useState(false);
+  const [activeUrl, setActiveUrl] = useState<string>("");
 
-  const shareUrl = useMemo(() => {
+  const fullShareUrl = useMemo(() => {
     if (!note) return "";
     const code = encodeSharedNote(note);
     if (!code) return "";
@@ -40,6 +42,24 @@ export default function ShareNoteModal({
         : "https://fey-eight-liard.vercel.app";
     return `${origin}/note/${code}`;
   }, [note]);
+
+  // Attempt to shorten the URL when modal opens or note changes
+  React.useEffect(() => {
+    if (!fullShareUrl) {
+      setActiveUrl("");
+      return;
+    }
+    setActiveUrl(fullShareUrl);
+    let mounted = true;
+    getShortenedUrl(fullShareUrl).then((short) => {
+      if (mounted && short) {
+        setActiveUrl(short);
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [fullShareUrl]);
 
   if (!isOpen || !note) return null;
 
@@ -51,9 +71,10 @@ export default function ShareNoteModal({
   };
 
   function handleCopy() {
-    if (!shareUrl) return;
+    const urlToCopy = activeUrl || fullShareUrl;
+    if (!urlToCopy) return;
     if (navigator.clipboard) {
-      navigator.clipboard.writeText(shareUrl);
+      navigator.clipboard.writeText(urlToCopy);
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     }
@@ -61,16 +82,18 @@ export default function ShareNoteModal({
 
   function handleShareTwitter() {
     if (!note) return;
+    const urlToShare = activeUrl || fullShareUrl;
     const text = `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on @FeyPlatform:\n\n`;
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(shareUrl)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }
 
   function handleShareLinkedIn() {
+    const urlToShare = activeUrl || fullShareUrl;
     window.open(
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(shareUrl)}`,
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }
@@ -167,14 +190,17 @@ export default function ShareNoteModal({
 
         {/* Generated Link Field */}
         <div className="mb-5">
-          <label className="block text-[11px] font-mono text-[var(--text-dim)] mb-1.5">
-            Your Public Shareable URL:
+          <label className="block text-[11px] font-mono text-[var(--text-dim)] mb-1.5 flex items-center justify-between">
+            <span>Your Public Shareable URL:</span>
+            {activeUrl && activeUrl !== fullShareUrl && (
+              <span className="text-[10px] text-[var(--olive)] font-medium">✓ Shortened</span>
+            )}
           </label>
           <div className="flex items-center gap-2">
             <input
               type="text"
               readOnly
-              value={shareUrl}
+              value={activeUrl || fullShareUrl}
               className="flex-1 px-3 py-2 rounded-lg text-xs font-mono surface border outline-none truncate text-[var(--text-dim)] select-all"
               style={{ borderColor: "var(--border-dim)" }}
             />
@@ -200,7 +226,7 @@ export default function ShareNoteModal({
         {/* Social Share & External Preview Actions */}
         <div className="flex items-center justify-between gap-2 pt-2 border-t flex-wrap" style={{ borderColor: "var(--border-dim)" }}>
           <a
-            href={shareUrl}
+            href={activeUrl || fullShareUrl}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-1.5 text-xs font-mono text-[var(--terra)] hover:underline"
