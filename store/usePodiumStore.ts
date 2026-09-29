@@ -57,6 +57,7 @@ interface PodiumState {
   setGeneratedDeck: (deck: PodiumDeck | null) => void;
   setIsGenerating: (val: boolean) => void;
   setGenerationError: (err: string | null) => void;
+  updateSlide: (index: number, updates: Partial<import("@/lib/podium-types").PodiumSlide>) => void;
   setCurrentSlide: (index: number) => void;
   nextSlide: () => void;
   prevSlide: () => void;
@@ -123,6 +124,20 @@ export const usePodiumStore = create<PodiumState>()(
       setGeneratedDeck: (deck) => set({ generatedDeck: deck }),
       setIsGenerating: (val) => set({ isGenerating: val }),
       setGenerationError: (err) => set({ generationError: err }),
+
+      updateSlide: (index, updates) => {
+        const deck = get().generatedDeck;
+        if (!deck) return;
+        const newSlides = deck.slides.map((slide, i) =>
+          i === index ? { ...slide, ...updates } : slide
+        );
+        const newDeck = { ...deck, slides: newSlides };
+        // Also update in savedDecks if already saved
+        const savedDecks = get().savedDecks.map((d) =>
+          d.id === deck.id ? newDeck : d
+        );
+        set({ generatedDeck: newDeck, savedDecks });
+      },
 
       setCurrentSlide: (index) => {
         const deck = get().generatedDeck;

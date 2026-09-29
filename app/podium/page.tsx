@@ -14,6 +14,9 @@ import {
   ExternalLink,
   X,
   ArrowLeft,
+  Pencil,
+  Plus,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePodiumStore } from "@/store/usePodiumStore";
@@ -54,6 +57,7 @@ export default function PodiumPage() {
     savedDecks,
     saveDeck,
     deleteSavedDeck,
+    updateSlide,
     reset,
   } = usePodiumStore();
 
@@ -66,6 +70,7 @@ export default function PodiumPage() {
   const [timeLeft, setTimeLeft] = useState(notesTimeLimit);
   const [timerRunning, setTimerRunning] = useState(false);
   const [shareUrl, setShareUrl] = useState("");
+  const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
 
   // ── Countdown timer for notes phase ──────────────────────────────
   useEffect(() => {
@@ -618,110 +623,292 @@ export default function PodiumPage() {
         )}
 
         {/* ════════════════════════════════════════
-            PREVIEW
+            PREVIEW  (with inline slide editing)
             ════════════════════════════════════════ */}
-        {phase === "preview" && generatedDeck && (
-          <motion.div
-            key="preview"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="max-w-4xl mx-auto px-4 sm:px-8 py-8"
-          >
-            {/* Header */}
-            <div className="flex items-center justify-between mb-6">
-              <div>
-                <p
-                  className="text-xs font-bold uppercase tracking-widest mb-1"
-                  style={{ color: "var(--text-mute)" }}
-                >
-                  Preview
-                </p>
-                <h2
-                  className="font-space font-extrabold text-xl"
-                  style={{ color: "var(--text)" }}
-                >
-                  {generatedDeck.topic}
-                </h2>
+        {phase === "preview" && generatedDeck && (() => {
+          const editSlide = editingSlideIndex !== null ? generatedDeck.slides[editingSlideIndex] : null;
+          return (
+            <motion.div
+              key="preview"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-6xl mx-auto px-4 sm:px-8 py-8"
+            >
+              {/* Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <p className="text-xs font-bold uppercase tracking-widest mb-1" style={{ color: "var(--text-mute)" }}>
+                    Preview & Edit
+                  </p>
+                  <h2 className="font-space font-extrabold text-xl" style={{ color: "var(--text)" }}>
+                    {generatedDeck.topic}
+                  </h2>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPhase("present")}
+                    className="px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
+                    style={{ background: "var(--terra)", color: "#fff" }}
+                  >
+                    <Mic size={14} /> Present
+                  </button>
+                  <button
+                    onClick={handleShare}
+                    className="px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity border"
+                    style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
+                  >
+                    <ExternalLink size={14} /> Share
+                  </button>
+                </div>
               </div>
-              <div className="flex gap-2">
+
+              {/* Two-column layout: thumbnails + editor */}
+              <div className="flex gap-6 items-start">
+
+                {/* ── Left: slide list ── */}
+                <div className="flex-1 space-y-3 min-w-0">
+                  {generatedDeck.slides.map((slide, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: i * 0.06 }}
+                      className="rounded-2xl overflow-hidden border transition-all"
+                      style={{
+                        borderColor: editingSlideIndex === i ? "var(--terra)" : "var(--border-dim)",
+                        boxShadow: editingSlideIndex === i ? "0 0 0 2px var(--terra)" : "none",
+                      }}
+                    >
+                      {/* Thumbnail */}
+                      <div
+                        className="h-28 sm:h-36 cursor-pointer"
+                        style={{ background: slide.bgColor }}
+                        onClick={() => { setCurrentSlide(i); setPhase("present"); }}
+                      >
+                        <SlideRenderer slide={slide} isThumb />
+                      </div>
+
+                      {/* Footer row */}
+                      <div
+                        className="px-4 py-2 flex items-center gap-3"
+                        style={{ background: "var(--bg-card)" }}
+                      >
+                        <span className="font-mono text-xs" style={{ color: "var(--text-mute)" }}>
+                          {i + 1}
+                        </span>
+                        <span className="text-xs font-bold truncate flex-1" style={{ color: "var(--text)" }}>
+                          {slide.title}
+                        </span>
+                        <span
+                          className="text-xs px-2 py-0.5 rounded-full"
+                          style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}
+                        >
+                          {slide.layout}
+                        </span>
+                        <button
+                          onClick={() => setEditingSlideIndex(editingSlideIndex === i ? null : i)}
+                          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                          style={{
+                            borderColor: editingSlideIndex === i ? "var(--terra)" : "var(--border-dim)",
+                            color: editingSlideIndex === i ? "var(--terra)" : "var(--text-dim)",
+                            background: editingSlideIndex === i ? "color-mix(in srgb, var(--terra) 10%, transparent)" : "transparent",
+                          }}
+                        >
+                          <Pencil size={11} />
+                          {editingSlideIndex === i ? "Done" : "Edit"}
+                        </button>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* ── Right: edit panel ── */}
+                <AnimatePresence>
+                  {editSlide !== null && editingSlideIndex !== null && (
+                    <motion.div
+                      key={`edit-${editingSlideIndex}`}
+                      initial={{ opacity: 0, x: 24 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 24 }}
+                      transition={{ type: "spring", stiffness: 300, damping: 26 }}
+                      className="w-80 shrink-0 rounded-2xl border p-5 sticky top-6"
+                      style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
+                    >
+                      {/* Panel header */}
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                            Slide {editingSlideIndex + 1}
+                          </p>
+                          <p className="text-xs mt-0.5 font-mono" style={{ color: "var(--text-mute)" }}>
+                            {editSlide.layout}
+                          </p>
+                        </div>
+                        <button
+                          onClick={() => setEditingSlideIndex(null)}
+                          className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] cursor-pointer"
+                        >
+                          <X size={14} style={{ color: "var(--text-mute)" }} />
+                        </button>
+                      </div>
+
+                      <div className="space-y-4">
+
+                        {/* Title — all layouts */}
+                        <div>
+                          <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-dim)" }}>
+                            Title
+                          </label>
+                          <textarea
+                            rows={2}
+                            className="w-full px-3 py-2 rounded-xl border bg-transparent text-sm resize-none focus:outline-none focus:ring-1"
+                            style={{ borderColor: "var(--border-dim)", color: "var(--text)", outlineColor: "var(--terra)" }}
+                            value={editSlide.title}
+                            onChange={(e) => updateSlide(editingSlideIndex, { title: e.target.value })}
+                          />
+                        </div>
+
+                        {/* Subtitle — title-only */}
+                        {(editSlide.layout === "title-only") && (
+                          <div>
+                            <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-dim)" }}>
+                              Subtitle
+                            </label>
+                            <input
+                              type="text"
+                              className="w-full px-3 py-2 rounded-xl border bg-transparent text-sm focus:outline-none"
+                              style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                              value={editSlide.subtitle ?? ""}
+                              onChange={(e) => updateSlide(editingSlideIndex, { subtitle: e.target.value })}
+                            />
+                          </div>
+                        )}
+
+                        {/* Body — title-body */}
+                        {editSlide.layout === "title-body" && (
+                          <div>
+                            <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-dim)" }}>
+                              Body text
+                            </label>
+                            <textarea
+                              rows={4}
+                              className="w-full px-3 py-2 rounded-xl border bg-transparent text-sm resize-none focus:outline-none"
+                              style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                              value={editSlide.body ?? ""}
+                              onChange={(e) => updateSlide(editingSlideIndex, { body: e.target.value })}
+                            />
+                          </div>
+                        )}
+
+                        {/* Bullets — title-bullets */}
+                        {editSlide.layout === "title-bullets" && (
+                          <div>
+                            <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-dim)" }}>
+                              Bullet points
+                            </label>
+                            <div className="space-y-2">
+                              {(editSlide.bullets ?? []).map((bullet, bi) => (
+                                <div key={bi} className="flex gap-2 items-start">
+                                  <span className="mt-2.5 text-xs shrink-0" style={{ color: "var(--terra)" }}>→</span>
+                                  <input
+                                    type="text"
+                                    className="flex-1 px-3 py-2 rounded-xl border bg-transparent text-sm focus:outline-none"
+                                    style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                                    value={bullet}
+                                    onChange={(e) => {
+                                      const bullets = [...(editSlide.bullets ?? [])];
+                                      bullets[bi] = e.target.value;
+                                      updateSlide(editingSlideIndex, { bullets });
+                                    }}
+                                  />
+                                  <button
+                                    onClick={() => {
+                                      const bullets = (editSlide.bullets ?? []).filter((_, idx) => idx !== bi);
+                                      updateSlide(editingSlideIndex, { bullets });
+                                    }}
+                                    className="mt-1.5 p-1.5 rounded-lg hover:bg-red-500/10 cursor-pointer"
+                                  >
+                                    <Trash2 size={12} className="text-red-400" />
+                                  </button>
+                                </div>
+                              ))}
+                              <button
+                                onClick={() => {
+                                  const bullets = [...(editSlide.bullets ?? []), "New point"];
+                                  updateSlide(editingSlideIndex, { bullets });
+                                }}
+                                className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border cursor-pointer hover:opacity-80 w-full mt-1"
+                                style={{ borderColor: "var(--border-dim)", color: "var(--text-mute)", borderStyle: "dashed" }}
+                              >
+                                <Plus size={11} /> Add bullet
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Quote + Attribution — quote layout */}
+                        {editSlide.layout === "quote" && (
+                          <>
+                            <div>
+                              <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-dim)" }}>
+                                Quote
+                              </label>
+                              <textarea
+                                rows={3}
+                                className="w-full px-3 py-2 rounded-xl border bg-transparent text-sm resize-none focus:outline-none font-serif italic"
+                                style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                                value={editSlide.quote ?? ""}
+                                onChange={(e) => updateSlide(editingSlideIndex, { quote: e.target.value })}
+                              />
+                            </div>
+                            <div>
+                              <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-dim)" }}>
+                                Attribution
+                              </label>
+                              <input
+                                type="text"
+                                className="w-full px-3 py-2 rounded-xl border bg-transparent text-sm focus:outline-none"
+                                style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                                value={editSlide.attribution ?? ""}
+                                onChange={(e) => updateSlide(editingSlideIndex, { attribution: e.target.value })}
+                              />
+                            </div>
+                          </>
+                        )}
+
+                      </div>
+
+                      {/* Live preview strip */}
+                      <div className="mt-5">
+                        <p className="text-xs font-bold mb-2 uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
+                          Live preview
+                        </p>
+                        <div
+                          className="rounded-xl overflow-hidden"
+                          style={{ height: 120, background: editSlide.bgColor }}
+                        >
+                          <SlideRenderer slide={editSlide} isThumb />
+                        </div>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              {/* Bottom action */}
+              <div className="flex gap-3 mt-6">
                 <button
-                  onClick={() => setPhase("present")}
-                  className="px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
-                  style={{ background: "var(--terra)", color: "#fff" }}
-                >
-                  <Mic size={14} /> Present
-                </button>
-                <button
-                  onClick={handleShare}
-                  className="px-5 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer hover:opacity-80 transition-opacity border"
+                  onClick={() => { reset(); setPhase("lobby"); }}
+                  className="flex-1 py-3 rounded-2xl border font-bold text-sm cursor-pointer hover:opacity-80 transition-opacity"
                   style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
                 >
-                  <ExternalLink size={14} /> Share
+                  Start Over
                 </button>
               </div>
-            </div>
-
-            {/* Slide thumbnails */}
-            <div className="space-y-4">
-              {generatedDeck.slides.map((slide, i) => (
-                <motion.div
-                  key={i}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.07 }}
-                  onClick={() => {
-                    setCurrentSlide(i);
-                    setPhase("present");
-                  }}
-                  className="cursor-pointer rounded-2xl overflow-hidden border hover:ring-2 hover:ring-[var(--terra)] transition-all"
-                  style={{ borderColor: "var(--border-dim)" }}
-                >
-                  <div className="h-36 sm:h-48" style={{ background: slide.bgColor }}>
-                    <SlideRenderer slide={slide} isThumb />
-                  </div>
-                  <div
-                    className="px-4 py-2 flex items-center gap-3"
-                    style={{ background: "var(--bg-card)" }}
-                  >
-                    <span
-                      className="font-mono text-xs"
-                      style={{ color: "var(--text-mute)" }}
-                    >
-                      Slide {i + 1}
-                    </span>
-                    <span
-                      className="text-xs font-bold truncate"
-                      style={{ color: "var(--text)" }}
-                    >
-                      {slide.title}
-                    </span>
-                    <span
-                      className="ml-auto text-xs px-2 py-0.5 rounded-full"
-                      style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}
-                    >
-                      {slide.layout}
-                    </span>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {/* Start over */}
-            <div className="flex gap-3 mt-6">
-              <button
-                onClick={() => {
-                  reset();
-                  setPhase("lobby");
-                }}
-                className="flex-1 py-3 rounded-2xl border font-bold text-sm cursor-pointer hover:opacity-80 transition-opacity"
-                style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
-              >
-                Start Over
-              </button>
-            </div>
-          </motion.div>
-        )}
+            </motion.div>
+          );
+        })()}
 
         {/* ════════════════════════════════════════
             PRESENT  (full-screen, z-50)
