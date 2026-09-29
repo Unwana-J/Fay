@@ -8,6 +8,7 @@ import Link from "next/link";
 import { decodePodiumDeck } from "@/lib/podium-share";
 import { type PodiumDeck } from "@/lib/podium-types";
 import SlideRenderer from "@/components/podium/SlideRenderer";
+import FeyLogo from "@/components/ui/FeyLogo";
 
 export default function PodiumSlidesViewer() {
   const params = useParams();
@@ -48,8 +49,18 @@ export default function PodiumSlidesViewer() {
 
   if (!deck) {
     return (
-      <div className="min-h-screen flex items-center justify-center" style={{ background: "var(--bg)" }}>
-        <div className="text-3xl animate-pulse">✨</div>
+      <div className="min-h-screen flex flex-col items-center justify-center gap-4" style={{ background: "var(--bg)" }}>
+        <div className="relative w-20 h-20 flex items-center justify-center">
+          <motion.div 
+            className="absolute inset-0 rounded-full border-2 border-dashed border-[var(--gold)]"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+          />
+          <FeyLogo size={46} spinning={true} />
+        </div>
+        <span className="text-[10px] uppercase tracking-[0.2em] font-mono text-[var(--gold)] animate-pulse">
+          Loading Presentation...
+        </span>
       </div>
     );
   }
@@ -61,7 +72,9 @@ export default function PodiumSlidesViewer() {
       {/* Header */}
       <div className="flex items-center justify-between px-4 sm:px-8 py-4 border-b" style={{ borderColor: "var(--border-dim)", background: "var(--bg)" }}>
         <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base" style={{ background: "var(--gold)20" }}>🎤</div>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center text-base border" style={{ background: "var(--gold)15", borderColor: "var(--gold)30" }}>
+            <FeyLogo size={20} />
+          </div>
           <div>
             <div className="font-space font-bold text-sm leading-tight" style={{ color: "var(--text)" }}>{deck.topic}</div>
             <div className="text-xs" style={{ color: "var(--text-mute)" }}>Presented by {deck.author} · {deck.createdAt}</div>

@@ -26,6 +26,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { encodePodiumDeck } from "@/lib/podium-share";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import TopicSpinner from "@/components/podium/TopicSpinner";
+import FeyLogo from "@/components/ui/FeyLogo";
 
 // Compresses client-side uploaded photos to a lightweight data URL for instant rendering & shareability
 function compressImageFile(file: File): Promise<string> {
@@ -635,13 +636,20 @@ export default function PodiumPage() {
             exit={{ opacity: 0 }}
             className="min-h-screen flex flex-col items-center justify-center px-4 text-center"
           >
-            <motion.div
-              animate={{ rotate: 360 }}
-              transition={{ duration: 2, repeat: Infinity, ease: "linear" }}
-              className="text-6xl mb-6"
-            >
-              ✨
-            </motion.div>
+            {/* Spinning active ring around branded Fey logo */}
+            <div className="relative w-28 h-28 flex items-center justify-center mb-6">
+              <motion.div 
+                className="absolute inset-0 rounded-full border-2 border-dashed border-[var(--gold)]"
+                animate={{ rotate: 360 }}
+                transition={{ duration: 1.8, repeat: Infinity, ease: "linear" }}
+              />
+              <FeyLogo size={64} spinning={true} />
+            </div>
+
+            <span className="text-[11px] uppercase tracking-[0.2em] font-mono text-[var(--gold)] mb-2 animate-pulse">
+              Fay-re Synthesis...
+            </span>
+
             <h2
               className="font-space font-extrabold text-2xl mb-2"
               style={{ color: "var(--text)" }}
@@ -649,7 +657,7 @@ export default function PodiumPage() {
               Building your slides...
             </h2>
             <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-              Gemini is crafting your masterpiece.
+              Fay-re is crafting your masterpiece.
             </p>
             {generationError && (
               <div className="mt-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-sm text-red-400 max-w-sm">
