@@ -897,7 +897,7 @@ function StageComplete({
       const code = encodeSharedNote(sharePayload);
       const origin = typeof window !== "undefined" && window.location.origin
         ? window.location.origin
-        : "https://fey-eight-liard.vercel.app";
+        : "https://fey.lokinlabs.com.ng";
       return `${origin}/note/${code}`;
     } catch {
       return "";
@@ -930,7 +930,7 @@ function StageComplete({
   }
 
   function handleShareDispatch() {
-    const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\n${activeShareUrl || "https://fey-eight-liard.vercel.app"}`;
+    const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\n${activeShareUrl || "https://fey.lokinlabs.com.ng"}`;
     if (navigator.clipboard) {
       navigator.clipboard.writeText(dispatch);
       setCopiedDispatch(true);

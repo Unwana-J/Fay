@@ -42,7 +42,7 @@ export default function ShareNoteModal({
     const origin =
       typeof window !== "undefined" && window.location.origin
         ? window.location.origin
-        : "https://fey-eight-liard.vercel.app";
+        : "https://fey.lokinlabs.com.ng";
     return `${origin}/note/${code}`;
   }, [note]);
 

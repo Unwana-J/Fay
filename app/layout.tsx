@@ -21,6 +21,7 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://fey.lokinlabs.com.ng"),
   title: "Fey — Think Deeper. Speak Better.",
   description:
     "A premium learning platform that challenges you to research, synthesize, and explain ideas in your own words. Build genuine understanding through active learning.",
