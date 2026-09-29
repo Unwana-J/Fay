@@ -29,6 +29,18 @@ export default function GamesHub() {
       color: "var(--olive)",
       tags: ["Trivia", "Culture", "Knowledge"],
       isNew: true
+    },
+    {
+      id: "podium",
+      title: "The Podium",
+      description: "Spin a spicy hot-take topic, jot your angle, and let AI build your slide deck. Share with the crowd instantly.",
+      mainEmoji: "🎤",
+      bgEmoji1: "✨",
+      bgEmoji2: "📊",
+      href: "/podium",
+      color: "var(--gold)",
+      tags: ["Party", "Presentation", "Hot Takes"],
+      isNew: true
     }
   ];
 
