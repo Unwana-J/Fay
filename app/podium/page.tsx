@@ -17,6 +17,8 @@ import {
   Pencil,
   Plus,
   Trash2,
+  Image as ImageIcon,
+  Upload,
 } from "lucide-react";
 import Link from "next/link";
 import { usePodiumStore } from "@/store/usePodiumStore";
@@ -24,6 +26,47 @@ import { useAppStore } from "@/store/useAppStore";
 import { encodePodiumDeck } from "@/lib/podium-share";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import TopicSpinner from "@/components/podium/TopicSpinner";
+
+// Compresses client-side uploaded photos to a lightweight data URL for instant rendering & shareability
+function compressImageFile(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 800;
+        let width = img.width;
+        let height = img.height;
+        if (width > height) {
+          if (width > maxDim) {
+            height = Math.round((height * maxDim) / width);
+            width = maxDim;
+          }
+        } else {
+          if (height > maxDim) {
+            width = Math.round((width * maxDim) / height);
+            height = maxDim;
+          }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext("2d");
+        if (!ctx) {
+          resolve(dataUrl);
+          return;
+        }
+        ctx.drawImage(img, 0, 0, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.78));
+      };
+      img.onerror = () => resolve(dataUrl);
+      img.src = dataUrl;
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
 
 export default function PodiumPage() {
   const {
@@ -876,6 +919,103 @@ export default function PodiumPage() {
                             </div>
                           </>
                         )}
+
+                        {/* Slide Image (Available on any slide) */}
+                        <div className="pt-3 border-t" style={{ borderColor: "var(--border-dim)" }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-bold flex items-center gap-1.5" style={{ color: "var(--text-dim)" }}>
+                              <ImageIcon size={13} style={{ color: "var(--gold)" }} />
+                              Slide Image (optional)
+                            </label>
+                            {editSlide.imageUrl && (
+                              <button
+                                type="button"
+                                onClick={() => updateSlide(editingSlideIndex, { imageUrl: undefined })}
+                                className="text-[11px] text-red-400 hover:text-red-300 flex items-center gap-1 cursor-pointer transition-colors"
+                              >
+                                <Trash2 size={11} /> Remove
+                              </button>
+                            )}
+                          </div>
+
+                          {editSlide.imageUrl ? (
+                            <div className="space-y-2">
+                              <div
+                                className="relative rounded-xl overflow-hidden border p-1"
+                                style={{ borderColor: "var(--border-dim)", background: "var(--bg-base)" }}
+                              >
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={editSlide.imageUrl}
+                                  alt="Slide attachment"
+                                  className="w-full h-24 object-contain rounded-lg"
+                                />
+                              </div>
+                              <label
+                                className="w-full py-1.5 rounded-lg border text-center text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity flex items-center justify-center gap-1.5"
+                                style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
+                              >
+                                <Upload size={12} />
+                                Change Image
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const compressed = await compressImageFile(file);
+                                    updateSlide(editingSlideIndex, { imageUrl: compressed });
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <label
+                                className="w-full py-2.5 rounded-xl border border-dashed flex items-center justify-center gap-2 text-xs font-bold cursor-pointer hover:opacity-80 transition-opacity"
+                                style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)", background: "var(--bg-base)" }}
+                              >
+                                <Upload size={13} style={{ color: "var(--gold)" }} />
+                                Upload Photo / Meme
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                    const file = e.target.files?.[0];
+                                    if (!file) return;
+                                    const compressed = await compressImageFile(file);
+                                    updateSlide(editingSlideIndex, { imageUrl: compressed });
+                                  }}
+                                />
+                              </label>
+
+                              <input
+                                type="url"
+                                placeholder="Or paste image link (https://...)"
+                                className="w-full px-3 py-1.5 rounded-lg border bg-transparent text-xs focus:outline-none"
+                                style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") {
+                                    const val = (e.target as HTMLInputElement).value.trim();
+                                    if (val) {
+                                      updateSlide(editingSlideIndex, { imageUrl: val });
+                                      (e.target as HTMLInputElement).value = "";
+                                    }
+                                  }
+                                }}
+                                onBlur={(e) => {
+                                  const val = e.target.value.trim();
+                                  if (val) {
+                                    updateSlide(editingSlideIndex, { imageUrl: val });
+                                    e.target.value = "";
+                                  }
+                                }}
+                              />
+                            </div>
+                          )}
+                        </div>
 
                       </div>
 

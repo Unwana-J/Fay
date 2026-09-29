@@ -15,6 +15,8 @@ export interface PodiumSlide {
   bullets?: string[];
   quote?: string;
   attribution?: string;
+  imageUrl?: string;
+  imageAlt?: string;
   bgColor: string;
   textColor: string;
   accentColor: string;

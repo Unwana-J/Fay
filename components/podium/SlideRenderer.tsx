@@ -31,7 +31,19 @@ export default function SlideRenderer({ slide, isThumb = false }: SlideRendererP
     flexShrink: 0,
   };
 
-  // ── TITLE ONLY (title card & closing) ─────────────────────────────────────
+  const photoFrameStyle: React.CSSProperties = {
+    borderRadius: isThumb ? 8 : 16,
+    overflow: "hidden",
+    boxShadow: isThumb ? "0 2px 8px rgba(0,0,0,0.3)" : "0 12px 32px rgba(0,0,0,0.45)",
+    border: isThumb ? "2px solid rgba(255,255,255,0.25)" : "4px solid rgba(255,255,255,0.3)",
+    background: "rgba(0,0,0,0.2)",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    flexShrink: 0,
+  };
+
+  // ── TITLE ONLY & CLOSING ──────────────────────────────────────────────────
   if (slide.layout === "title-only" || slide.layout === "closing") {
     return (
       <div style={containerStyle}>
@@ -53,9 +65,9 @@ export default function SlideRenderer({ slide, isThumb = false }: SlideRendererP
             color: slide.textColor,
             fontFamily: "var(--font-space, 'Space Grotesk', sans-serif)",
             fontWeight: 900,
-            fontSize: isThumb ? "clamp(12px, 3.5vw, 18px)" : "clamp(32px, 5vw, 72px)",
+            fontSize: isThumb ? "clamp(11px, 3.2vw, 16px)" : "clamp(28px, 4.5vw, 64px)",
             lineHeight: 1.1,
-            marginBottom: isThumb ? 6 : 20,
+            marginBottom: isThumb ? 4 : 16,
             letterSpacing: "-0.02em",
           }}
         >
@@ -66,14 +78,33 @@ export default function SlideRenderer({ slide, isThumb = false }: SlideRendererP
             style={{
               color: slide.textColor,
               opacity: 0.7,
-              fontSize: isThumb ? "clamp(8px, 2vw, 11px)" : "clamp(14px, 1.8vw, 20px)",
+              fontSize: isThumb ? "clamp(7px, 1.8vw, 10px)" : "clamp(13px, 1.6vw, 18px)",
               fontWeight: 400,
               letterSpacing: "0.04em",
               textTransform: "uppercase",
+              marginBottom: slide.imageUrl ? (isThumb ? 6 : 20) : 0,
             }}
           >
             {slide.subtitle}
           </p>
+        )}
+
+        {slide.imageUrl && (
+          <div style={{ marginTop: isThumb ? 4 : 16, alignSelf: "center" }}>
+            <div style={photoFrameStyle}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={slide.imageUrl}
+                alt={slide.imageAlt || slide.title}
+                style={{
+                  maxHeight: isThumb ? 60 : 340,
+                  maxWidth: "100%",
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+          </div>
         )}
       </div>
     );
@@ -95,31 +126,52 @@ export default function SlideRenderer({ slide, isThumb = false }: SlideRendererP
           userSelect: "none",
         }}>"
         </div>
-        <p
-          style={{
-            color: slide.textColor,
-            fontFamily: "Georgia, 'Times New Roman', serif",
-            fontStyle: "italic",
-            fontSize: isThumb ? "clamp(10px, 2.5vw, 14px)" : "clamp(20px, 3vw, 40px)",
-            lineHeight: 1.4,
-            marginBottom: isThumb ? 8 : 24,
-            maxWidth: "90%",
-          }}
-        >
-          {slide.quote || slide.title}
-        </p>
-        {slide.attribution && (
-          <p
-            style={{
-              color: slide.accentColor,
-              fontSize: isThumb ? "clamp(8px, 1.5vw, 10px)" : "clamp(12px, 1.4vw, 16px)",
-              fontWeight: 600,
-              letterSpacing: "0.06em",
-            }}
-          >
-            — {slide.attribution}
-          </p>
-        )}
+
+        <div style={{ display: "flex", flexDirection: slide.imageUrl && !isThumb ? "row" : "column", alignItems: "center", gap: isThumb ? 8 : 32, width: "100%", zIndex: 1 }}>
+          <div style={{ flex: 1 }}>
+            <p
+              style={{
+                color: slide.textColor,
+                fontFamily: "Georgia, 'Times New Roman', serif",
+                fontStyle: "italic",
+                fontSize: isThumb ? "clamp(9px, 2.2vw, 13px)" : "clamp(18px, 2.6vw, 36px)",
+                lineHeight: 1.4,
+                marginBottom: isThumb ? 6 : 18,
+                maxWidth: "95%",
+              }}
+            >
+              {slide.quote || slide.title}
+            </p>
+            {slide.attribution && (
+              <p
+                style={{
+                  color: slide.accentColor,
+                  fontSize: isThumb ? "clamp(7px, 1.4vw, 9px)" : "clamp(11px, 1.3vw, 15px)",
+                  fontWeight: 600,
+                  letterSpacing: "0.06em",
+                }}
+              >
+                — {slide.attribution}
+              </p>
+            )}
+          </div>
+
+          {slide.imageUrl && (
+            <div style={photoFrameStyle}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={slide.imageUrl}
+                alt={slide.imageAlt || "Quote visual"}
+                style={{
+                  maxHeight: isThumb ? 54 : 280,
+                  maxWidth: isThumb ? 80 : 360,
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -136,22 +188,41 @@ export default function SlideRenderer({ slide, isThumb = false }: SlideRendererP
             fontWeight: 800,
             fontSize: isThumb ? "clamp(10px, 2.5vw, 13px)" : "clamp(18px, 2.5vw, 32px)",
             lineHeight: 1.2,
-            marginBottom: isThumb ? 8 : 28,
+            marginBottom: isThumb ? 8 : 24,
             letterSpacing: "-0.01em",
           }}
         >
           {slide.title}
         </h2>
-        <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: isThumb ? 4 : 16 }}>
-          {(slide.bullets || []).map((bullet, i) => (
-            <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: isThumb ? 6 : 16 }}>
-              <span style={{ color: slide.accentColor, fontWeight: 900, fontSize: isThumb ? 8 : 20, lineHeight: 1.4, flexShrink: 0 }}>→</span>
-              <span style={{ color: slide.textColor, fontSize: isThumb ? "clamp(8px, 2vw, 11px)" : "clamp(14px, 1.8vw, 20px)", lineHeight: 1.5, opacity: 0.9 }}>
-                {bullet}
-              </span>
-            </li>
-          ))}
-        </ul>
+
+        <div style={{ display: "flex", flexDirection: slide.imageUrl && !isThumb ? "row" : "column", alignItems: "flex-start", gap: isThumb ? 8 : 32, width: "100%", flex: 1 }}>
+          <ul style={{ listStyle: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: isThumb ? 4 : 16, flex: 1 }}>
+            {(slide.bullets || []).map((bullet, i) => (
+              <li key={i} style={{ display: "flex", alignItems: "flex-start", gap: isThumb ? 6 : 14 }}>
+                <span style={{ color: slide.accentColor, fontWeight: 900, fontSize: isThumb ? 8 : 18, lineHeight: 1.4, flexShrink: 0 }}>→</span>
+                <span style={{ color: slide.textColor, fontSize: isThumb ? "clamp(8px, 1.8vw, 11px)" : "clamp(13px, 1.6vw, 18px)", lineHeight: 1.5, opacity: 0.9 }}>
+                  {bullet}
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {slide.imageUrl && (
+            <div style={photoFrameStyle}>
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={slide.imageUrl}
+                alt={slide.imageAlt || slide.title}
+                style={{
+                  maxHeight: isThumb ? 54 : 300,
+                  maxWidth: isThumb ? 90 : 380,
+                  objectFit: "contain",
+                  display: "block",
+                }}
+              />
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -167,25 +238,44 @@ export default function SlideRenderer({ slide, isThumb = false }: SlideRendererP
           fontWeight: 800,
           fontSize: isThumb ? "clamp(10px, 2.5vw, 13px)" : "clamp(18px, 2.5vw, 32px)",
           lineHeight: 1.2,
-          marginBottom: isThumb ? 8 : 28,
+          marginBottom: isThumb ? 6 : 22,
           letterSpacing: "-0.01em",
         }}
       >
         {slide.title}
       </h2>
-      {slide.body && (
-        <p
-          style={{
-            color: slide.textColor,
-            opacity: 0.85,
-            fontSize: isThumb ? "clamp(8px, 2vw, 11px)" : "clamp(16px, 2vw, 24px)",
-            lineHeight: 1.6,
-            maxWidth: "80%",
-          }}
-        >
-          {slide.body}
-        </p>
-      )}
+
+      <div style={{ display: "flex", flexDirection: slide.imageUrl && !isThumb ? "row" : "column", alignItems: "flex-start", gap: isThumb ? 8 : 32, width: "100%", flex: 1 }}>
+        {slide.body && (
+          <p
+            style={{
+              color: slide.textColor,
+              opacity: 0.85,
+              fontSize: isThumb ? "clamp(8px, 1.8vw, 11px)" : "clamp(15px, 1.8vw, 22px)",
+              lineHeight: 1.6,
+              flex: 1,
+            }}
+          >
+            {slide.body}
+          </p>
+        )}
+
+        {slide.imageUrl && (
+          <div style={photoFrameStyle}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={slide.imageUrl}
+              alt={slide.imageAlt || slide.title}
+              style={{
+                maxHeight: isThumb ? 60 : 340,
+                maxWidth: isThumb ? 100 : 420,
+                objectFit: "contain",
+                display: "block",
+              }}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }
