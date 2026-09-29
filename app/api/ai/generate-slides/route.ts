@@ -96,14 +96,30 @@ Do NOT include bgColor, textColor, or accentColor — those will be added server
       }),
     });
 
-    if (!res.ok) throw new Error(`Gemini API error: ${res.status}`);
+    if (!res.ok) {
+      const errText = await res.text().catch(() => res.status.toString());
+      throw new Error(`Gemini API error ${res.status}: ${errText}`);
+    }
 
     const data = await res.json();
     const text = data.candidates?.[0]?.content?.parts?.[0]?.text ?? "[]";
     let rawSlides = JSON.parse(text);
 
+    // Gemini sometimes wraps the array in an object: { slides: [...] } or { data: [...] }
+    // Unwrap it if so.
     if (!Array.isArray(rawSlides)) {
-      throw new Error("Invalid slide format returned by AI");
+      const firstArrayValue = Object.values(rawSlides as Record<string, unknown>).find(
+        (v) => Array.isArray(v)
+      );
+      if (firstArrayValue) {
+        rawSlides = firstArrayValue;
+      } else {
+        throw new Error(`AI returned unexpected shape: ${JSON.stringify(rawSlides).slice(0, 200)}`);
+      }
+    }
+
+    if (rawSlides.length === 0) {
+      throw new Error("AI returned an empty slide array");
     }
 
     // Inject colour palette into each slide
@@ -126,8 +142,9 @@ Do NOT include bgColor, textColor, or accentColor — those will be added server
     };
 
     return NextResponse.json({ deck });
-  } catch (e) {
-    console.error("[ai/generate-slides]", e);
-    return NextResponse.json({ error: "Slide generation failed" }, { status: 500 });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Unknown error";
+    console.error("[ai/generate-slides]", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
