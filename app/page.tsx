@@ -5,7 +5,8 @@ import { motion } from "framer-motion";
 import Link from "next/link";
 import {
   Zap, BookOpen, Mic, ArrowRight,
-  Star, Shuffle, Sparkles, Compass
+  Star, Shuffle, Sparkles, Compass,
+  Gamepad2, ChevronRight,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress, getNextLevel, ACHIEVEMENTS } from "@/lib/achievements";
@@ -555,6 +556,14 @@ export default function Dashboard() {
                 <Shuffle size={13} /> Next Topic
               </button>
 
+              <Link
+                href="/games"
+                className="btn-ghost text-xs cursor-pointer font-mono flex items-center gap-1.5"
+                title="Explore parlor games, party presentations & trivia"
+              >
+                <Gamepad2 size={13} style={{ color: "var(--gold)" }} /> Games
+              </Link>
+
               <div className="ml-auto text-[11px] font-mono hidden md:flex items-center gap-2" style={{ color: "var(--text-mute)" }}>
                 <span>15m Notes</span>
                 <span>·</span>
@@ -563,6 +572,148 @@ export default function Dashboard() {
             </div>
           </div>
         )}
+      </motion.div>
+
+      {/* ── Games & Parlor Showcase (Direct Access to Games) ── */}
+      <motion.div
+        variants={cardVariants}
+        className="surface rounded-xl p-5 mb-6 border overflow-hidden relative"
+        style={{ borderColor: "var(--border-dim)" }}
+      >
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+          <div className="flex items-center gap-2.5">
+            <span className="text-base select-none">🎮</span>
+            <div>
+              <span className="font-serif font-semibold text-sm block" style={{ color: "var(--text)" }}>
+                The Parlor & Games
+              </span>
+              <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+                Take a break, challenge friends, or present unhinged hot takes
+              </span>
+            </div>
+          </div>
+
+          <Link
+            href="/games"
+            className="text-xs font-mono font-semibold flex items-center gap-1 hover:gap-1.5 transition-all text-[var(--gold)]"
+          >
+            <span>Explore All (3)</span>
+            <ChevronRight size={13} />
+          </Link>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+          {/* Card 1: The Podium */}
+          <Link href="/podium" className="group">
+            <div
+              className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(166, 124, 30, 0.08) 0%, var(--bg-card) 100%)",
+                borderColor: "var(--border-dim)",
+              }}
+            >
+              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                🎤
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--gold)15", borderColor: "var(--gold)30" }}>
+                    🎤
+                  </div>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--terra)] shadow-xs">
+                    ★ New
+                  </span>
+                </div>
+                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--gold)] transition-colors" style={{ color: "var(--text)" }}>
+                  The Podium
+                </h4>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  Spin a spicy topic, jot your angle & let Fay-re build your slide deck.
+                </p>
+              </div>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--gold)]" style={{ borderColor: "var(--border-dim)" }}>
+                <span>Party Slides</span>
+                <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                  Present <ChevronRight size={12} />
+                </span>
+              </div>
+            </div>
+          </Link>
+
+          {/* Card 2: Online Articulate */}
+          <Link href="/play" className="group">
+            <div
+              className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(122, 28, 46, 0.08) 0%, var(--bg-card) 100%)",
+                borderColor: "var(--border-dim)",
+              }}
+            >
+              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                🎭
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--terra)15", borderColor: "var(--terra)30" }}>
+                    🎭
+                  </div>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}>
+                    Multiplayer
+                  </span>
+                </div>
+                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--terra)] transition-colors" style={{ color: "var(--text)" }}>
+                  Online Articulate
+                </h4>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  Fast-paced word describing game with speech recognition & AI referee.
+                </p>
+              </div>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--terra)]" style={{ borderColor: "var(--border-dim)" }}>
+                <span>House Party</span>
+                <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                  Play <ChevronRight size={12} />
+                </span>
+              </div>
+            </div>
+          </Link>
+
+          {/* Card 3: Naija Trivia */}
+          <Link href="/games/trivia" className="group">
+            <div
+              className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(45, 106, 79, 0.08) 0%, var(--bg-card) 100%)",
+                borderColor: "var(--border-dim)",
+              }}
+            >
+              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                🇳🇬
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--olive)15", borderColor: "var(--olive)30" }}>
+                    🇳🇬
+                  </div>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}>
+                    Trivia Arcade
+                  </span>
+                </div>
+                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--olive)] transition-colors" style={{ color: "var(--text)" }}>
+                  Naija Trivia
+                </h4>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  Test your mastery of Nigerian history, culture & general knowledge.
+                </p>
+              </div>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--olive)]" style={{ borderColor: "var(--border-dim)" }}>
+                <span>Speed Quiz</span>
+                <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                  Challenge <ChevronRight size={12} />
+                </span>
+              </div>
+            </div>
+          </Link>
+        </div>
       </motion.div>
 
       {/* ── Daily Vows (Duolingo Habit Engine: 3 Daily Quests) ── */}
