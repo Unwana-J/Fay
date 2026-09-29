@@ -33,24 +33,25 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 - **Auth Gate Experience**: If an unauthenticated or new user opens a room link, they are prompted to create their scholarly identity / login, and immediately redirected back into the active room without state loss.
 - **Multi-Field Topic Search**: The `CreateRoomModal` supports fuzzy matching across title, category, and tags, as well as on-the-fly **Custom Topic** entry.
 
-### 2.4. Games & Knowledge Graphs
+### 2.4. Games & The Parlor
+- **The Podium (`/podium`)**: Party slide presentation game. Generates bold 5-slide decks with Gemini 3.8 Flash from 60+ hot-takes or custom topics. Features split-panel inline slide editing, photo/meme uploads with client canvas compression, presenter mode, and zero-database shareable deck links (`/podium/slides/[code]`).
 - **Constellation Graph (`/constellation`)**: Interactive ReactFlow canvas showing topical proximity and recommending adjacent disciplines based on completed sessions.
 - **Trivia Arcade (`/games/trivia`)**: 1,000+ curated questions with countdown timers, scoring multipliers, detailed explanations, and local deduplication.
-- **Word Description Party Game (`/play`)**: Local multiplayer team game with speech recognition and Google Gemini 2.0 Flash AI referee (`/api/ai/validate`).
+- **Word Description Party Game (`/play`)**: Local multiplayer team game with speech recognition and Google Gemini AI referee (`/api/ai/validate`).
+- **Dashboard Parlor Launcher**: 3-card quick-access parlor section on the dashboard for instant game play.
 
 ### 2.5. Habit Formation & Retention Mechanics
 - **Impromptu Articulation (Two-Minute Rule)**: Direct-to-speech sprint option on the daily suggested topic that bypasses research for users who want to prove their existing understanding in 90 seconds.
 - **Daily Vows (3 Daily Quests)**: Deterministic daily micro-quests resetting at midnight (Daily Voice, Sustained Articulation, Conviction & Clarity) with claimable XP bonuses.
 - **Loss Aversion (Scholar's Seal / Streak Freeze)**: Users hold seals (default 1) that automatically protect active streaks if they miss a single day. Additional seals can be acquired for 150 XP.
-- **Proof of Intellect (Shareable Feynman Card)**: Completing a sprint unlocks a constellation star celebration and a 1-click clipboard export for social sharing.
-- **Store Migration v6 & v7**: Seamlessly hydrates user profiles with default streak shields, quest tracking, and difficulty mode preferences.
+- **Store Migration v7**: Seamlessly hydrates user profiles with streak shields, quest tracking, and difficulty mode preferences.
 
-### 2.6. Public Note Sharing & Viral Growth Loop
-- **Portable URL State**: Notes are UTF-8 Base64 encoded directly into the URL (`/note/[code]`), allowing instant public sharing without database dependencies.
-- **Bespoke Broadside Viewer**: Non-users can read the complete synthesized manuscript in Fey's classical editorial aesthetic with reading time estimates, category badges, and scholar attribution.
-- **Non-User Conversion**: An embedded banner at the bottom of public notes encourages visitors to "Start Your Learning Journey" with frictionless account creation via `OnboardingModal`.
-- **Pre-Publish Preview**: `ShareNoteModal` offers a live card preview, 1-click link copying, and direct posting to X/Twitter and LinkedIn.
-- **Library Sharing**: Past notes can be published and shared at any time directly from the `/library`.
+### 2.6. Viral Growth Loops & Social Proof
+- **Portable URL State**: Notes and slide decks are compressed via `lz-string` directly into the URL (`/note/[code]`, `/podium/slides/[code]`), allowing instant public sharing without database dependencies.
+- **Dynamic Server-Side OG Metadata**: Both notes and podium slides run through Next.js server components with `generateMetadata`, generating rich previews on WhatsApp, iMessage, Twitter/X, and LinkedIn.
+- **Highlight-to-Tweet Tooltip**: Medium/Substack-style floating action pill on public dispatches; readers highlight any quote to tweet it formatted with attribution and source URL.
+- **The Feynman Rebuttal Challenge**: High-converting contextual CTA replacing generic sign-up banners on shared notes and slides ("Disagree? Articulate your take in 90 seconds"), launching visitors straight into a 90s sprint on the same topic.
+- **HTML5 Canvas Proof Card Generator (`lib/feynman-card-canvas.ts`)**: 1-click clipboard export of an aesthetic 1200x630 broadside proof card PNG for native image posting on social media.
 
 ---
 
@@ -58,10 +59,12 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 - **Framework**: Next.js 16 (App Router), React 19, TypeScript
 - **Styling**: Tailwind CSS, CSS Custom Properties (`var(--fey-...)`), Framer Motion, Lucide icons
 - **State Stores**:
-  - `store/useAppStore.ts`: `useAppStore` (profile, daily topic, solo sessions, library, streak, daily quests, trivia stats, v6)
+  - `store/useAppStore.ts`: `useAppStore` (profile, daily topic, solo sessions, library, streak, daily quests, trivia stats, v7)
+  - `store/usePodiumStore.ts`: `usePodiumStore` (phase state machine, slide editor, custom hot takes, saved decks)
   - `lib/community-store.ts`: `useCommunityStore` (rooms, room history, followed scholars)
   - `lib/game-store.ts`: `useGameStore` (party game state)
-- **AI Endpoints**: Next.js App Router API handlers (`/api/ai/*`) invoking `@google/genai` (Gemini 2.0 Flash)
+- **AI Endpoints**: Next.js App Router API handlers (`/api/ai/*`) using Google Gemini (`gemini-3.8-flash`)
+- **Brand & Domain**: Fey under Lokin Labs (`fey.lokinlabs.com.ng`)
 
 ---
 
@@ -69,7 +72,7 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 
 | Layer | Current Status (Phase 1) | Target Next Status (Phase 2 & 3) |
 | :--- | :--- | :--- |
-| **Data Storage** | Local-First (`localStorage` via Zustand v6) | Supabase / PostgreSQL cloud synchronization |
+| **Data Storage** | Local-First (`localStorage` via Zustand v7) | Supabase / PostgreSQL cloud synchronization |
 | **Audio Storage** | Base64 in LocalStorage | Cloudflare R2 / AWS S3 pre-signed storage |
 | **Room Real-time** | URL Payload + Poll/Refresh | WebSockets / LiveKit live synchronized salons |
 | **Speech Review** | Self-rating (1–5) | Whisper transcription + Gemini Socratic critique |
