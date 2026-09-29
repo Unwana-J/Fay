@@ -12,11 +12,13 @@ import {
   Mic,
   Copy,
   Globe,
+  Image as ImageIcon,
 } from "lucide-react";
 import FeyLogo from "@/components/ui/FeyLogo";
 import { encodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
 import { CATEGORY_COLORS, CATEGORY_ICONS, DIFFICULTY_LABELS, type Difficulty } from "@/lib/topics";
+import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 
 interface ShareNoteModalProps {
   isOpen: boolean;
@@ -30,6 +32,7 @@ export default function ShareNoteModal({
   note,
 }: ShareNoteModalProps) {
   const [copied, setCopied] = useState(false);
+  const [copiedCard, setCopiedCard] = useState(false);
   const [activeUrl, setActiveUrl] = useState<string>("");
 
   const fullShareUrl = useMemo(() => {
@@ -88,6 +91,25 @@ export default function ShareNoteModal({
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
+  }
+
+  async function handleCopyCardImage() {
+    if (!note) return;
+    const cardData = {
+      topicText: note.topicText,
+      category: note.category,
+      difficulty: note.difficulty,
+      author: note.author,
+      notesSnippet: note.notes,
+      speakingSeconds: note.speakingSeconds,
+    };
+    const success = await copyFeynmanCardToClipboard(cardData);
+    if (success) {
+      setCopiedCard(true);
+      setTimeout(() => setCopiedCard(false), 2500);
+    } else {
+      await downloadFeynmanCard(cardData);
+    }
   }
 
   function handleShareLinkedIn() {
@@ -235,7 +257,15 @@ export default function ShareNoteModal({
             <ExternalLink size={12} />
           </a>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleCopyCardImage}
+              className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[var(--border-dim)] hover:border-[var(--text)] transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Copy an aesthetic 1200x630 social proof card image to your clipboard"
+            >
+              {copiedCard ? <Check size={12} className="text-[var(--olive)]" /> : <ImageIcon size={12} className="text-[var(--gold)]" />}
+              <span>{copiedCard ? "Card Copied!" : "Copy Card Image"}</span>
+            </button>
             <button
               onClick={handleShareTwitter}
               className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[var(--border-dim)] hover:border-[var(--text)] transition-colors"

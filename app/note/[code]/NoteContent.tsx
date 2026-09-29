@@ -13,7 +13,9 @@ import {
   Clock,
   Quote,
   Feather,
+  Image as ImageIcon,
 } from "lucide-react";
+import { useRouter } from "next/navigation";
 import FeyLogo from "@/components/ui/FeyLogo";
 import { decodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
 import {
@@ -21,10 +23,12 @@ import {
   CATEGORY_ICONS,
   DIFFICULTY_LABELS,
   type Difficulty,
+  type Topic,
 } from "@/lib/topics";
 import { useAppStore } from "@/store/useAppStore";
 import OnboardingModal from "@/components/auth/OnboardingModal";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 
 export default function NoteContent({
   initialNote,
@@ -37,8 +41,43 @@ export default function NoteContent({
   const [copied, setCopied] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [shortUrl, setShortUrl] = useState<string>("");
+  const [selectedText, setSelectedText] = useState("");
+  const [selectionPosition, setSelectionPosition] = useState<{ x: number; y: number } | null>(null);
+  const [copiedQuote, setCopiedQuote] = useState(false);
+  const [copiedImageCard, setCopiedImageCard] = useState(false);
 
-  const { isOnboarded } = useAppStore();
+  const router = useRouter();
+  const { isOnboarded, startSession } = useAppStore();
+
+  // Floating highlight-to-quote listener
+  useEffect(() => {
+    const handleSelection = () => {
+      const sel = window.getSelection();
+      if (!sel || sel.isCollapsed) {
+        setSelectionPosition(null);
+        setSelectedText("");
+        return;
+      }
+      const text = sel.toString().trim();
+      if (text.length >= 10 && text.length <= 320) {
+        try {
+          const range = sel.getRangeAt(0);
+          const rect = range.getBoundingClientRect();
+          setSelectedText(text);
+          setSelectionPosition({
+            x: rect.left + rect.width / 2,
+            y: rect.top - 12,
+          });
+        } catch {}
+      } else {
+        setSelectionPosition(null);
+        setSelectedText("");
+      }
+    };
+
+    document.addEventListener("selectionchange", handleSelection);
+    return () => document.removeEventListener("selectionchange", handleSelection);
+  }, []);
 
   // Dual hydration: if server didn't supply initialNote or on client navigation,
   // attempt decoding in client with full access to window.location
@@ -107,6 +146,59 @@ export default function NoteContent({
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
+  }
+
+  function handleShareSelectedQuoteTwitter() {
+    if (!note || !selectedText) return;
+    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
+    const tweet = `“${selectedText}”\n\n— from Scholar ${note.author}'s synthesis on "${note.topicText}" on @FeyPlatform:\n`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
+      "_blank"
+    );
+  }
+
+  function handleCopySelectedQuote() {
+    if (!note || !selectedText) return;
+    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(`“${selectedText}”\n\n— Scholar ${note.author} on "${note.topicText}" via Fey: ${urlToShare}`);
+      setCopiedQuote(true);
+      setTimeout(() => setCopiedQuote(false), 2000);
+    }
+  }
+
+  async function handleCopyCardImage() {
+    if (!note) return;
+    const cardData = {
+      topicText: note.topicText,
+      category: note.category,
+      difficulty: note.difficulty,
+      author: note.author,
+      notesSnippet: note.notes,
+      speakingSeconds: note.speakingSeconds,
+    };
+    const success = await copyFeynmanCardToClipboard(cardData);
+    if (success) {
+      setCopiedImageCard(true);
+      setTimeout(() => setCopiedImageCard(false), 2500);
+    } else {
+      await downloadFeynmanCard(cardData);
+    }
+  }
+
+  function handleStartRebuttal() {
+    if (!note) return;
+    const rebuttalTopic: Topic = {
+      id: note.topicId || `rebuttal-${Date.now()}`,
+      text: note.topicText,
+      category: note.category || "General",
+      difficulty: (note.difficulty as Difficulty) || "Scholar",
+      tags: note.tags || [note.category || "General"],
+    };
+
+    const sessionId = startSession(rebuttalTopic, 0, "speaking");
+    router.push(`/session/${sessionId}`);
   }
 
   if (!note) {
@@ -352,28 +444,69 @@ export default function NoteContent({
             Enjoyed this synthesis? Share it with fellow thinkers:
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleCopyCardImage}
+              className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[var(--border-dim)] flex items-center gap-1.5 hover:border-[var(--text)] transition-colors cursor-pointer"
+              title="Copy or download an aesthetic social proof card image"
+            >
+              {copiedImageCard ? <Check size={12} className="text-[var(--olive)]" /> : <ImageIcon size={12} className="text-[var(--gold)]" />}
+              <span>{copiedImageCard ? "Card Copied!" : "Share Card Image"}</span>
+            </button>
+
             <button
               onClick={handleShareTwitter}
-              className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[var(--border-dim)] flex items-center gap-1.5 hover:border-[var(--text)] transition-colors"
+              className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[var(--border-dim)] flex items-center gap-1.5 hover:border-[var(--text)] transition-colors cursor-pointer"
             >
               <span>Share on X</span>
             </button>
             <button
               onClick={handleShareLinkedIn}
-              className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[var(--border-dim)] flex items-center gap-1.5 hover:border-[var(--text)] transition-colors"
+              className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[var(--border-dim)] flex items-center gap-1.5 hover:border-[var(--text)] transition-colors cursor-pointer"
             >
               <span>LinkedIn</span>
             </button>
             <button
               onClick={handleCopyLink}
-              className="btn-terra px-3 py-1.5 text-xs font-mono rounded-lg flex items-center gap-1.5"
+              className="btn-terra px-3 py-1.5 text-xs font-mono rounded-lg flex items-center gap-1.5 cursor-pointer"
             >
               {copied ? <Check size={12} /> : <Share2 size={12} />}
               <span>{copied ? "Copied!" : "Copy Link"}</span>
             </button>
           </div>
         </div>
+
+        {/* ── Floating Highlight-to-Tweet / Quote Tooltip (Substack/Medium Style) ── */}
+        {selectionPosition && selectedText && (
+          <div
+            className="fixed z-50 transform -translate-x-1/2 -translate-y-full flex items-center gap-1.5 p-1.5 rounded-xl shadow-2xl border backdrop-blur-md transition-all animate-in fade-in zoom-in-95"
+            style={{
+              left: `${selectionPosition.x}px`,
+              top: `${selectionPosition.y}px`,
+              background: "var(--bg-card)",
+              borderColor: "var(--gold)",
+              boxShadow: "0 10px 30px -5px rgba(0,0,0,0.3)",
+            }}
+          >
+            <button
+              onClick={handleShareSelectedQuoteTwitter}
+              className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity"
+              style={{ background: "#000", color: "#fff" }}
+              title="Post this quote to X"
+            >
+              <span>𝕏 Share Quote</span>
+            </button>
+            <button
+              onClick={handleCopySelectedQuote}
+              className="px-2.5 py-1 rounded-lg text-xs font-mono border hover:bg-black/5 flex items-center gap-1 cursor-pointer transition-colors"
+              style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+              title="Copy quote snippet"
+            >
+              {copiedQuote ? <Check size={11} className="text-[var(--olive)]" /> : null}
+              <span>{copiedQuote ? "Copied!" : "Copy"}</span>
+            </button>
+          </div>
+        )}
 
         {/* ── High-Converting Viral Onboarding CTA Banner ── */}
         <div
@@ -400,6 +533,27 @@ export default function NoteContent({
           >
             Passive reading creates the illusion of explanatory depth. Fey challenges you to research a topic for 15 minutes, then prove true understanding by speaking it aloud in 90 seconds.
           </p>
+
+          {/* Contextual Rebuttal Callout */}
+          <div
+            className="mb-8 p-4 rounded-xl border max-w-xl mx-auto text-left flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap"
+            style={{ background: "rgba(166, 124, 30, 0.08)", borderColor: "rgba(166, 124, 30, 0.35)" }}
+          >
+            <div>
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider block text-[var(--gold)]">
+                🎙️ The Feynman Rebuttal Challenge
+              </span>
+              <p className="text-xs text-[var(--text)] mt-0.5 leading-normal">
+                Disagree with this take or have a simpler way to explain it? Articulate your thesis in 90 seconds.
+              </p>
+            </div>
+            <button
+              onClick={handleStartRebuttal}
+              className="btn-terra px-4 py-2 text-xs font-mono whitespace-nowrap shadow-sm hover:scale-105 transition-transform cursor-pointer shrink-0"
+            >
+              Record Take →
+            </button>
+          </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
             {isOnboarded ? (

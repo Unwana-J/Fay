@@ -13,7 +13,7 @@ import {
   Clock, BookOpen, Mic, CheckCircle2, AlertCircle, X,
   Bold, Italic, List, ListOrdered, CheckSquare,
   ChevronRight, Star, ArrowLeft, Zap, Volume2, RefreshCcw, Globe,
-  Share2, Check, ExternalLink, Sparkles
+  Share2, Check, ExternalLink, Sparkles, Image as ImageIcon,
 } from "lucide-react";
 import { useAppStore, type ActiveSession } from "@/store/useAppStore";
 import { CATEGORY_ICONS, CATEGORY_COLORS } from "@/lib/topics";
@@ -21,6 +21,7 @@ import { formatTime, cn } from "@/lib/utils";
 import ShareNoteModal from "@/components/notes/ShareNoteModal";
 import { encodeSharedNote } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -945,6 +946,27 @@ function StageComplete({
     );
   }
 
+  const [copiedCardImage, setCopiedCardImage] = useState(false);
+
+  async function handleCopyCardImage() {
+    const cardData = {
+      topicText,
+      category: topicCategory,
+      difficulty: topicDifficulty || "Scholar",
+      author: profile.username || "Scholar",
+      notesSnippet: displayNotes,
+      speakingSeconds,
+      xpEarned,
+    };
+    const success = await copyFeynmanCardToClipboard(cardData);
+    if (success) {
+      setCopiedCardImage(true);
+      setTimeout(() => setCopiedCardImage(false), 2500);
+    } else {
+      await downloadFeynmanCard(cardData);
+    }
+  }
+
   function handleShareLinkedIn() {
     window.open(
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(activeShareUrl)}`,
@@ -1066,13 +1088,22 @@ function StageComplete({
 
         {/* Action controls directly inside the preview card */}
         <div className="flex items-center justify-between gap-3 pt-1 flex-wrap">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <button
               onClick={handleCopyShareLink}
               className="btn-terra px-4 py-2 text-xs font-mono rounded-lg flex items-center gap-1.5 cursor-pointer shadow-sm hover:opacity-90 transition-opacity"
             >
               {copiedLink ? <Check size={13} /> : <Share2 size={13} />}
               <span>{copiedLink ? "✓ Copied Public Link!" : "Copy Public Link"}</span>
+            </button>
+
+            <button
+              onClick={handleCopyCardImage}
+              className="btn-ghost px-3 py-2 text-xs font-mono rounded-lg border border-[var(--border-dim)] hover:border-[var(--text)] transition-colors flex items-center gap-1.5 cursor-pointer"
+              title="Copy an aesthetic 1200x630 social proof card image to your clipboard"
+            >
+              {copiedCardImage ? <Check size={13} className="text-[var(--olive)]" /> : <ImageIcon size={13} className="text-[var(--gold)]" />}
+              <span>{copiedCardImage ? "Card Copied!" : "Copy Card Image"}</span>
             </button>
 
             {activeShareUrl && (
