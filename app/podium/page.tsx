@@ -19,11 +19,13 @@ import {
   Trash2,
   Image as ImageIcon,
   Upload,
+  Palette,
 } from "lucide-react";
 import Link from "next/link";
 import { usePodiumStore } from "@/store/usePodiumStore";
 import { useAppStore } from "@/store/useAppStore";
 import { encodePodiumDeck } from "@/lib/podium-share";
+import { PODIUM_THEMES } from "@/lib/podium-themes";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import TopicSpinner from "@/components/podium/TopicSpinner";
 import FeyLogo from "@/components/ui/FeyLogo";
@@ -102,6 +104,8 @@ export default function PodiumPage() {
     saveDeck,
     deleteSavedDeck,
     updateSlide,
+    applyThemeToDeck,
+    applyThemeToSlide,
     reset,
   } = usePodiumStore();
 
@@ -714,8 +718,54 @@ export default function PodiumPage() {
                 </div>
               </div>
 
+              {/* Deck Theme Selector Bar */}
+              <div
+                className="p-3 sm:p-4 mb-6 rounded-2xl border flex flex-wrap items-center justify-between gap-3"
+                style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
+              >
+                <div className="flex items-center gap-2">
+                  <Palette size={15} style={{ color: "var(--gold)" }} />
+                  <span className="text-xs font-bold" style={{ color: "var(--text)" }}>Deck Theme:</span>
+                  <span className="text-xs hidden sm:inline" style={{ color: "var(--text-mute)" }}>
+                    Switch palette across all slides
+                  </span>
+                </div>
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  {PODIUM_THEMES.map((theme) => {
+                    const isCurrentTheme =
+                      generatedDeck.slides[0]?.bgColor.toLowerCase() === theme.bgColor.toLowerCase();
+                    return (
+                      <button
+                        key={theme.id}
+                        type="button"
+                        onClick={() => applyThemeToDeck(theme)}
+                        title={`${theme.name} — ${theme.description}`}
+                        className={`group relative flex items-center gap-1.5 px-2.5 py-1.5 rounded-full border text-xs font-semibold cursor-pointer transition-all ${
+                          isCurrentTheme
+                            ? "border-[var(--terra)] shadow-sm scale-105"
+                            : "border-[var(--border-dim)] hover:border-[var(--border)] opacity-85 hover:opacity-100"
+                        }`}
+                        style={{ background: "var(--bg-input)", color: "var(--text)" }}
+                      >
+                        <span
+                          className="w-3.5 h-3.5 rounded-full border border-black/20 flex items-center justify-center shrink-0"
+                          style={{ backgroundColor: theme.bgColor }}
+                        >
+                          <span
+                            className="w-1.5 h-1.5 rounded-full"
+                            style={{ backgroundColor: theme.accentColor }}
+                          />
+                        </span>
+                        <span className="text-[11px]">{theme.name}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
               {/* Two-column layout: thumbnails + editor */}
               <div className="flex gap-6 items-start">
+
 
                 {/* ── Left: slide list ── */}
                 <div className="flex-1 space-y-3 min-w-0">
@@ -1025,9 +1075,139 @@ export default function PodiumPage() {
                           )}
                         </div>
 
+                        {/* Slide Colors & Theme */}
+                        <div className="pt-3 border-t" style={{ borderColor: "var(--border-dim)" }}>
+                          <div className="flex items-center justify-between mb-2">
+                            <label className="text-xs font-bold flex items-center gap-1.5" style={{ color: "var(--text-dim)" }}>
+                              <Palette size={13} style={{ color: "var(--gold)" }} />
+                              Slide Colors
+                            </label>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                applyThemeToDeck({
+                                  bgColor: editSlide.bgColor,
+                                  textColor: editSlide.textColor,
+                                  accentColor: editSlide.accentColor,
+                                });
+                              }}
+                              className="text-[11px] font-semibold text-[var(--terra)] hover:underline cursor-pointer"
+                              title="Apply this color scheme to all slides in the deck"
+                            >
+                              Apply to all slides
+                            </button>
+                          </div>
+
+                          {/* Quick Palette Swatches */}
+                          <div className="grid grid-cols-5 gap-1.5 mb-3">
+                            {PODIUM_THEMES.map((theme) => {
+                              const isSelected =
+                                editSlide.bgColor.toLowerCase() === theme.bgColor.toLowerCase();
+                              return (
+                                <button
+                                  key={theme.id}
+                                  type="button"
+                                  onClick={() => {
+                                    updateSlide(editingSlideIndex, {
+                                      bgColor: theme.bgColor,
+                                      textColor: theme.textColor,
+                                      accentColor: theme.accentColor,
+                                    });
+                                  }}
+                                  title={theme.name}
+                                  className={`h-7 rounded-lg border flex items-center justify-center cursor-pointer transition-all hover:scale-105 ${
+                                    isSelected
+                                      ? "ring-2 ring-[var(--terra)]"
+                                      : "opacity-80 hover:opacity-100"
+                                  }`}
+                                  style={{
+                                    backgroundColor: theme.bgColor,
+                                    borderColor: isSelected ? "var(--terra)" : "var(--border-dim)",
+                                  }}
+                                >
+                                  <span
+                                    className="w-2 h-2 rounded-full"
+                                    style={{ backgroundColor: theme.accentColor }}
+                                  />
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Custom Color Inputs */}
+                          <div className="grid grid-cols-3 gap-2">
+                            <div>
+                              <span className="text-[10px] block font-mono text-[var(--text-mute)] mb-1">Background</span>
+                              <div
+                                className="flex items-center gap-1 border rounded-lg p-1"
+                                style={{ borderColor: "var(--border-dim)", background: "var(--bg-base)" }}
+                              >
+                                <input
+                                  type="color"
+                                  value={editSlide.bgColor.startsWith("#") ? editSlide.bgColor : "#0052cc"}
+                                  onChange={(e) => updateSlide(editingSlideIndex, { bgColor: e.target.value })}
+                                  className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={editSlide.bgColor}
+                                  onChange={(e) => updateSlide(editingSlideIndex, { bgColor: e.target.value })}
+                                  className="w-full text-[10px] font-mono bg-transparent focus:outline-none truncate"
+                                  style={{ color: "var(--text)" }}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="text-[10px] block font-mono text-[var(--text-mute)] mb-1">Text</span>
+                              <div
+                                className="flex items-center gap-1 border rounded-lg p-1"
+                                style={{ borderColor: "var(--border-dim)", background: "var(--bg-base)" }}
+                              >
+                                <input
+                                  type="color"
+                                  value={editSlide.textColor.startsWith("#") ? editSlide.textColor : "#ffffff"}
+                                  onChange={(e) => updateSlide(editingSlideIndex, { textColor: e.target.value })}
+                                  className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={editSlide.textColor}
+                                  onChange={(e) => updateSlide(editingSlideIndex, { textColor: e.target.value })}
+                                  className="w-full text-[10px] font-mono bg-transparent focus:outline-none truncate"
+                                  style={{ color: "var(--text)" }}
+                                />
+                              </div>
+                            </div>
+
+                            <div>
+                              <span className="text-[10px] block font-mono text-[var(--text-mute)] mb-1">Accent</span>
+                              <div
+                                className="flex items-center gap-1 border rounded-lg p-1"
+                                style={{ borderColor: "var(--border-dim)", background: "var(--bg-base)" }}
+                              >
+                                <input
+                                  type="color"
+                                  value={editSlide.accentColor.startsWith("#") ? editSlide.accentColor : "#ffd166"}
+                                  onChange={(e) => updateSlide(editingSlideIndex, { accentColor: e.target.value })}
+                                  className="w-4 h-4 rounded cursor-pointer border-0 bg-transparent p-0 shrink-0"
+                                />
+                                <input
+                                  type="text"
+                                  value={editSlide.accentColor}
+                                  onChange={(e) => updateSlide(editingSlideIndex, { accentColor: e.target.value })}
+                                  className="w-full text-[10px] font-mono bg-transparent focus:outline-none truncate"
+                                  style={{ color: "var(--text)" }}
+                                />
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
                       </div>
 
                       {/* Live preview strip */}
+
                       <div className="mt-5">
                         <p className="text-xs font-bold mb-2 uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
                           Live preview

@@ -58,6 +58,8 @@ interface PodiumState {
   setIsGenerating: (val: boolean) => void;
   setGenerationError: (err: string | null) => void;
   updateSlide: (index: number, updates: Partial<import("@/lib/podium-types").PodiumSlide>) => void;
+  applyThemeToDeck: (theme: { bgColor: string; textColor: string; accentColor: string }) => void;
+  applyThemeToSlide: (index: number, theme: { bgColor: string; textColor: string; accentColor: string }) => void;
   setCurrentSlide: (index: number) => void;
   nextSlide: () => void;
   prevSlide: () => void;
@@ -137,6 +139,30 @@ export const usePodiumStore = create<PodiumState>()(
           d.id === deck.id ? newDeck : d
         );
         set({ generatedDeck: newDeck, savedDecks });
+      },
+
+      applyThemeToDeck: (theme) => {
+        const deck = get().generatedDeck;
+        if (!deck) return;
+        const newSlides = deck.slides.map((slide) => ({
+          ...slide,
+          bgColor: theme.bgColor,
+          textColor: theme.textColor,
+          accentColor: theme.accentColor,
+        }));
+        const newDeck = { ...deck, slides: newSlides };
+        const savedDecks = get().savedDecks.map((d) =>
+          d.id === deck.id ? newDeck : d
+        );
+        set({ generatedDeck: newDeck, savedDecks });
+      },
+
+      applyThemeToSlide: (index, theme) => {
+        get().updateSlide(index, {
+          bgColor: theme.bgColor,
+          textColor: theme.textColor,
+          accentColor: theme.accentColor,
+        });
       },
 
       setCurrentSlide: (index) => {
