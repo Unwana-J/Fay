@@ -76,6 +76,7 @@ export interface TriviaHistoryItem {
   questionIds: string[];
   categoryBreakdown: { category: string; correct: number; total: number }[];
   reviewMode?: "instant" | "suspense";
+  difficultyMode?: "random" | "easy" | "medium" | "hard";
   challengerName?: string;
   challengerScore?: number;
   challengerTotal?: number;

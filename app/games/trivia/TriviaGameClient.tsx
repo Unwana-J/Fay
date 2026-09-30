@@ -26,6 +26,7 @@ import {
   TRIVIA_QUESTIONS,
   type TriviaQuestion,
   type TriviaCategory,
+  type TriviaDifficultyFilter,
 } from "@/lib/trivia-questions";
 import { useAppStore, type TriviaHistoryItem } from "@/store/useAppStore";
 import { cn } from "@/lib/utils";
@@ -40,6 +41,13 @@ export type GamePhase = "setup" | "playing" | "results";
 export type SetupTab = "quiz" | "history" | "leaderboard";
 export type DurationOption = { label: string; minutes: number; emoji: string };
 
+export interface DifficultyOption {
+  id: TriviaDifficultyFilter;
+  label: string;
+  emoji: string;
+  desc: string;
+}
+
 export interface ChallengerInfo {
   score: number;
   total: number;
@@ -53,6 +61,13 @@ const DURATION_OPTIONS: DurationOption[] = [
   { label: "Quick", minutes: 5, emoji: "⚡" },
   { label: "Standard", minutes: 10, emoji: "🎯" },
   { label: "Marathon", minutes: 15, emoji: "🏆" },
+];
+
+export const DIFFICULTY_OPTIONS: DifficultyOption[] = [
+  { id: "random", label: "Random", emoji: "🎲", desc: "Mixed Pool (Default)" },
+  { id: "easy", label: "Easy", emoji: "🌱", desc: "Cultural basics" },
+  { id: "medium", label: "Medium", emoji: "⚖️", desc: "Balanced level" },
+  { id: "hard", label: "Hard", emoji: "🔥", desc: "Scholar lore" },
 ];
 
 const CATEGORY_ICONS: Record<TriviaCategory, string> = {
@@ -77,23 +92,31 @@ function SetupScreen({
   historyCount,
   onStart,
   onPlayDeck,
-  seenCount,
-  totalCount,
+  seenQuestionIds,
   onResetSeen,
   challenger,
 }: {
   activeTab: SetupTab;
   onTabChange: (tab: SetupTab) => void;
   historyCount: number;
-  onStart: (minutes: number, mode: ReviewMode) => void;
+  onStart: (minutes: number, mode: ReviewMode, difficulty: TriviaDifficultyFilter) => void;
   onPlayDeck: (questionIds: string[], minutes: number) => void;
-  seenCount: number;
-  totalCount: number;
+  seenQuestionIds: string[];
   onResetSeen: () => void;
   challenger?: ChallengerInfo | null;
 }) {
   const [duration, setDuration] = useState<DurationOption>(DURATION_OPTIONS[1]);
   const [mode, setMode] = useState<ReviewMode>("instant");
+  const [difficulty, setDifficulty] = useState<TriviaDifficultyFilter>("random");
+
+  const filteredPool =
+    difficulty === "random"
+      ? TRIVIA_QUESTIONS
+      : TRIVIA_QUESTIONS.filter((q) => q.difficulty === difficulty);
+
+  const seenSet = new Set(seenQuestionIds);
+  const currentSeenCount = filteredPool.filter((q) => seenSet.has(q.id)).length;
+  const currentTotalCount = filteredPool.length;
 
   return (
     <div className="min-h-screen p-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-center">
@@ -222,17 +245,24 @@ function SetupScreen({
                 🎯
               </div>
               <div>
-                <div className="text-xs font-bold" style={{ color: "var(--text)" }}>
-                  {seenCount} of {totalCount} questions explored
+                <div className="text-xs font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
+                  <span>
+                    {currentSeenCount} of {currentTotalCount} questions explored
+                  </span>
+                  {difficulty !== "random" && (
+                    <span className="capitalize text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                      {difficulty} mode
+                    </span>
+                  )}
                 </div>
                 <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
-                  {seenCount >= totalCount
-                    ? "You have explored all questions! Next game will cycle fresh."
+                  {currentSeenCount >= currentTotalCount
+                    ? `You have explored all ${difficulty !== "random" ? difficulty : ""} questions! Next game will cycle fresh.`
                     : "No repeats — you will only see fresh questions until the bank is exhausted."}
                 </div>
               </div>
             </div>
-            {seenCount > 0 && (
+            {currentSeenCount > 0 && (
               <button
                 onClick={onResetSeen}
                 title="Reset question history to allow all questions again"
@@ -257,6 +287,7 @@ function SetupScreen({
                 {DURATION_OPTIONS.map((opt) => (
                   <button
                     key={opt.minutes}
+                    type="button"
                     onClick={() => setDuration(opt)}
                     className={cn(
                       "rounded-xl p-4 text-center border-2 transition-all cursor-pointer",
@@ -280,6 +311,47 @@ function SetupScreen({
               </div>
             </div>
 
+            {/* Difficulty Mode Selector */}
+            <div className="surface rounded-2xl p-5 border">
+              <div className="flex items-center justify-between mb-3">
+                <p
+                  className="text-xs font-bold uppercase tracking-wider"
+                  style={{ color: "var(--text-mute)" }}
+                >
+                  <Zap size={10} className="inline mr-1.5" /> Difficulty Mode
+                </p>
+                <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
+                  {difficulty === "random" ? "Default · All Levels" : `Filtered: ${difficulty}`}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                {DIFFICULTY_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => setDifficulty(opt.id)}
+                    className={cn(
+                      "rounded-xl p-3.5 text-center border-2 transition-all cursor-pointer",
+                      difficulty === opt.id
+                        ? "border-[var(--gold)] bg-[var(--gold)]/10 shadow-xs"
+                        : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                    )}
+                  >
+                    <div className="text-2xl mb-1.5">{opt.emoji}</div>
+                    <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
+                      {opt.label}
+                    </div>
+                    <div
+                      className="text-[10px] font-semibold mt-0.5"
+                      style={{ color: "var(--text-mute)" }}
+                    >
+                      {opt.desc}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Review Mode Toggle */}
             <div className="surface rounded-2xl p-5 border">
               <p
@@ -292,6 +364,7 @@ function SetupScreen({
                 {(["instant", "suspense"] as ReviewMode[]).map((m) => (
                   <button
                     key={m}
+                    type="button"
                     onClick={() => setMode(m)}
                     className={cn(
                       "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
@@ -317,7 +390,7 @@ function SetupScreen({
             {/* Start Button */}
             <motion.button
               whileTap={{ scale: 0.97 }}
-              onClick={() => onStart(duration.minutes, mode)}
+              onClick={() => onStart(duration.minutes, mode, difficulty)}
               className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg"
             >
               {challenger
@@ -425,6 +498,18 @@ function GameScreen({
           <span className="flex items-center gap-1.5" style={{ color: "var(--text-dim)" }}>
             <span>{CATEGORY_ICONS[q.category]}</span>
             <span>{q.category}</span>
+            <span
+              className={cn(
+                "text-[10px] font-bold px-1.5 py-0.5 rounded capitalize",
+                q.difficulty === "easy"
+                  ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
+                  : q.difficulty === "hard"
+                  ? "bg-rose-500/10 text-rose-600 border border-rose-500/20"
+                  : "bg-amber-500/10 text-amber-600 border border-amber-500/20"
+              )}
+            >
+              {q.difficulty}
+            </span>
           </span>
           <span className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
             {current + 1}
@@ -551,6 +636,7 @@ function ResultsScreen({
   answers,
   reviewMode,
   xpEarned,
+  difficultyMode,
   onRetry,
   onViewHistory,
   onViewLeaderboard,
@@ -560,6 +646,7 @@ function ResultsScreen({
   answers: (number | null)[];
   reviewMode: ReviewMode;
   xpEarned: number;
+  difficultyMode?: TriviaDifficultyFilter;
   onRetry: () => void;
   onViewHistory: () => void;
   onViewLeaderboard: () => void;
@@ -648,8 +735,16 @@ function ResultsScreen({
           {correct}
           <span className="text-3xl font-bold text-[var(--text-mute)]">/{total}</span>
         </div>
-        <div className="text-sm font-semibold" style={{ color: "var(--text-dim)" }}>
-          {pct}% accuracy
+        <div className="text-sm font-semibold flex items-center justify-center gap-2" style={{ color: "var(--text-dim)" }}>
+          <span>{pct}% accuracy</span>
+          {difficultyMode && (
+            <>
+              <span>•</span>
+              <span className="capitalize px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--bg-input)] border border-[var(--border-dim)]">
+                {difficultyMode === "random" ? "Random (Mixed)" : `${difficultyMode} Mode`}
+              </span>
+            </>
+          )}
         </div>
         {xpEarned > 0 && (
           <div
@@ -829,8 +924,13 @@ export default function TriviaGameClient({
   const [reviewMode, setReviewMode] = useState<ReviewMode>("instant");
   const [totalSeconds, setTotalSeconds] = useState(600);
   const [xpEarned, setXpEarned] = useState(0);
+  const [currentDifficulty, setCurrentDifficulty] = useState<TriviaDifficultyFilter>("random");
 
-  function handleStart(minutes: number, mode: ReviewMode) {
+  function handleStart(
+    minutes: number,
+    mode: ReviewMode,
+    difficulty: TriviaDifficultyFilter = "random"
+  ) {
     let selectedQuestions: TriviaQuestion[] = [];
 
     // If challenger specified exact question IDs, load those exact questions!
@@ -845,7 +945,8 @@ export default function TriviaGameClient({
       const count = QUESTION_COUNTS[minutes] || 15;
       const { questions: freshQuestions, wasReset } = getFreshQuestions(
         count,
-        seenTriviaQuestionIds
+        seenTriviaQuestionIds,
+        difficulty
       );
 
       if (wasReset) {
@@ -857,6 +958,7 @@ export default function TriviaGameClient({
 
     markTriviaQuestionsSeen(selectedQuestions.map((q) => q.id));
 
+    setCurrentDifficulty(difficulty);
     setQuestions(selectedQuestions);
     setTotalSeconds(minutes * 60);
     setReviewMode(mode);
@@ -869,6 +971,7 @@ export default function TriviaGameClient({
       setQuestions(matched);
       setTotalSeconds(minutes * 60);
       setReviewMode("instant");
+      setCurrentDifficulty("random");
       setPhase("playing");
     }
   }
@@ -914,6 +1017,7 @@ export default function TriviaGameClient({
       questionIds: questions.map((q) => q.id),
       categoryBreakdown: byCategory,
       reviewMode,
+      difficultyMode: currentDifficulty,
       challengerName: challenger?.by,
       challengerScore: challenger?.score,
       challengerTotal: challenger?.total,
@@ -962,8 +1066,7 @@ export default function TriviaGameClient({
             historyCount={triviaHistory.length}
             onStart={handleStart}
             onPlayDeck={handlePlayDeck}
-            seenCount={seenTriviaQuestionIds.length}
-            totalCount={TRIVIA_QUESTIONS.length}
+            seenQuestionIds={seenTriviaQuestionIds}
             onResetSeen={resetSeenTriviaQuestions}
             challenger={challenger}
           />
@@ -986,6 +1089,7 @@ export default function TriviaGameClient({
             answers={answers}
             reviewMode={reviewMode}
             xpEarned={xpEarned}
+            difficultyMode={currentDifficulty}
             onRetry={handleRetry}
             onViewHistory={() => {
               setSetupTab("history");

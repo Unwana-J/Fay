@@ -190,7 +190,15 @@ export default function TriviaHistoryView({ onPlayDeck, onNewGame }: TriviaHisto
                       </span>
                     </div>
 
-                    <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-mute)" }}>
+                    <div className="flex items-center gap-2 text-xs flex-wrap" style={{ color: "var(--text-mute)" }}>
+                      {item.difficultyMode && (
+                        <>
+                          <span className="capitalize text-[10px] font-bold px-1.5 py-0.5 rounded bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                            {item.difficultyMode === "random" ? "Random" : `${item.difficultyMode} Mode`}
+                          </span>
+                          <span>•</span>
+                        </>
+                      )}
                       <span className="flex items-center gap-1">
                         <Clock size={11} /> {item.durationMinutes || 10}m
                       </span>

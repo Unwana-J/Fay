@@ -1,5 +1,6 @@
 export type TriviaCategory = "History" | "Pop Culture" | "General Knowledge";
 export type TriviaDifficulty = "easy" | "medium" | "hard";
+export type TriviaDifficultyFilter = "random" | "easy" | "medium" | "hard";
 
 export interface TriviaQuestion {
   id: string;
@@ -6032,10 +6033,16 @@ export function getShuffledQuestions(count: number): TriviaQuestion[] {
 
 export function getFreshQuestions(
   count: number,
-  seenIds: string[] = []
+  seenIds: string[] = [],
+  difficulty: TriviaDifficultyFilter = "random"
 ): { questions: TriviaQuestion[]; wasReset: boolean } {
+  const basePool =
+    difficulty && difficulty !== "random"
+      ? TRIVIA_QUESTIONS.filter((q) => q.difficulty === difficulty)
+      : TRIVIA_QUESTIONS;
+
   const seenSet = new Set(seenIds);
-  const unseen = TRIVIA_QUESTIONS.filter((q) => !seenSet.has(q.id));
+  const unseen = basePool.filter((q) => !seenSet.has(q.id));
 
   // If we have enough unseen questions, shuffle and pick from them
   if (unseen.length >= count) {
@@ -6043,14 +6050,14 @@ export function getFreshQuestions(
     return { questions: shuffledUnseen.slice(0, count), wasReset: false };
   }
 
-  // Not enough unseen questions: exhaust what remains, then reset the pool
+  // Not enough unseen questions: exhaust what remains, then reset the pool for this mode
   const shuffledUnseen = [...unseen].sort(() => Math.random() - 0.5);
   const remainingNeeded = count - shuffledUnseen.length;
 
-  // Draw remaining from the previously seen pool
-  const seenPool = TRIVIA_QUESTIONS.filter((q) => seenSet.has(q.id)).sort(
-    () => Math.random() - 0.5
-  );
+  // Draw remaining from the previously seen pool of this basePool
+  const seenPool = basePool
+    .filter((q) => seenSet.has(q.id))
+    .sort(() => Math.random() - 0.5);
 
   const combined = [...shuffledUnseen, ...seenPool.slice(0, remainingNeeded)];
   return { questions: combined, wasReset: true };
