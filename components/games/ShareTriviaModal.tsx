@@ -65,17 +65,16 @@ export default function ShareTriviaModal({
     params.set("score", String(score));
     params.set("total", String(total));
     params.set("pct", String(pct));
-    params.set("by", authorName);
-    params.set("grade", gradeLabel);
-    if (xpEarned > 0) params.set("xp", String(xpEarned));
+    // Clean author name to avoid special characters in query string
+    params.set("by", authorName.replace(/[^\w\s-]/g, "").trim() || "Scholar");
     if (questionIds && questionIds.length > 0) {
       params.set("q", questionIds.join(","));
     }
 
     return `${origin}/games/trivia?${params.toString()}`;
-  }, [score, total, pct, authorName, gradeLabel, xpEarned, questionIds]);
+  }, [score, total, pct, authorName, questionIds]);
 
-  // Shorten URL for WhatsApp compatibility
+  // Shorten URL for social sharing & WhatsApp compatibility
   useEffect(() => {
     if (!fullShareUrl) {
       setActiveUrl("");
@@ -123,9 +122,8 @@ export default function ShareTriviaModal({
   }
 
   function handleShareTwitter() {
-    // Twitter has built-in t.co shortening and flags generic shorteners like TinyURL as potential spam
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterMessage)}&url=${encodeURIComponent(fullShareUrl)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterMessage)}&url=${encodeURIComponent(targetUrl)}`,
       "_blank"
     );
   }
