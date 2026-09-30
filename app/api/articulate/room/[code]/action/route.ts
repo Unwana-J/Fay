@@ -182,6 +182,36 @@ export async function POST(
       }
 
       // -------------------------------------------------------------
+      // 2b. SHUFFLE TEAMS (Host randomly balances players)
+      // -------------------------------------------------------------
+      case "shuffle_teams": {
+        if (room.status !== "lobby" && room.status !== "round_end") {
+          return NextResponse.json(
+            { error: "Can only shuffle teams between rounds" },
+            { status: 400 }
+          );
+        }
+
+        const allPlayers = [
+          ...room.teams.teamA.playerIds,
+          ...room.teams.teamB.playerIds,
+        ];
+
+        // Fisher-Yates shuffle
+        for (let i = allPlayers.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [allPlayers[i], allPlayers[j]] = [allPlayers[j], allPlayers[i]];
+        }
+
+        const half = Math.ceil(allPlayers.length / 2);
+        room.teams.teamA.playerIds = allPlayers.slice(0, half);
+        room.teams.teamB.playerIds = allPlayers.slice(half);
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
       // 3. START ROUND (LOCKS ROOM)
       // -------------------------------------------------------------
       case "start_round": {

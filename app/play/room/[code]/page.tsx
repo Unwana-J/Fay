@@ -44,30 +44,31 @@ export default function ArticulateRoomPage({
   const channelRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // 1. Fetch Room State
-  const fetchRoomState = useCallback(async () => {
+  // 1. Fetch Room State (Safe from transient serverless 404s)
+  const fetchRoomState = useCallback(async (isInitial = false) => {
     try {
       const res = await fetch(`/api/articulate/room?code=${roomCode}`);
       if (!res.ok) {
-        if (res.status === 404) {
+        // ONLY trigger fatal full-page error on initial load if room has never been loaded
+        if (isInitial && res.status === 404) {
           setError("Room not found. Check the code and try again.");
-        } else {
-          setError("Failed to load room.");
         }
-        setLoading(false);
         return null;
       }
       const data = await res.json();
       if (data.room) {
         setRoom(data.room);
+        setError(null);
         return data.room as ArticulateRoom;
       }
       return null;
     } catch (err) {
-      console.error("Error fetching room:", err);
+      console.warn("Background room sync notice:", err);
       return null;
     } finally {
-      setLoading(false);
+      if (isInitial) {
+        setLoading(false);
+      }
     }
   }, [roomCode]);
 
@@ -108,7 +109,7 @@ export default function ArticulateRoomPage({
     let mounted = true;
 
     async function init() {
-      const fetched = await fetchRoomState();
+      const fetched = await fetchRoomState(true);
       if (!fetched || !mounted) return;
 
       // Join the room on the server
@@ -308,6 +309,13 @@ export default function ArticulateRoomPage({
     });
   };
 
+  const handleShuffleTeams = () => {
+    dispatchAction({
+      action: "shuffle_teams",
+      hostId: myPlayerId,
+    });
+  };
+
   const handleSendReaction = (emoji: string) => {
     // Add locally
     const newReaction: FloatingReaction = {
@@ -458,6 +466,7 @@ export default function ArticulateRoomPage({
               presencePlayers={presencePlayers}
               onStartRound={handleStartRound}
               onSwitchTeam={handleSwitchTeam}
+              onShuffleTeams={handleShuffleTeams}
             />
           </motion.div>
         ) : room.status === "playing" ? (

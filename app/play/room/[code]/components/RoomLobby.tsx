@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers } from "lucide-react";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RoomLobbyProps {
@@ -12,6 +12,7 @@ interface RoomLobbyProps {
   presencePlayers: RoomPlayer[];
   onStartRound: () => void;
   onSwitchTeam: (targetTeam: "A" | "B") => void;
+  onShuffleTeams?: () => void;
 }
 
 export default function RoomLobby({
@@ -21,6 +22,7 @@ export default function RoomLobby({
   presencePlayers,
   onStartRound,
   onSwitchTeam,
+  onShuffleTeams,
 }: RoomLobbyProps) {
   const [copied, setCopied] = useState(false);
 
@@ -110,6 +112,23 @@ export default function RoomLobby({
         </div>
       </div>
 
+      {/* Teams Header with Host Shuffle Action */}
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-bold text-[var(--text-dim)] uppercase tracking-wider">
+          Teams & Speaking Order (Turns go in order of who joined)
+        </span>
+        {isHost && onShuffleTeams && (
+          <button
+            type="button"
+            onClick={onShuffleTeams}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text)] transition cursor-pointer shadow-xs"
+          >
+            <Dices className="w-3.5 h-3.5 text-[var(--olive)]" />
+            Randomize Teams
+          </button>
+        )}
+      </div>
+
       {/* Two Teams Column Display */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Team Alpha */}
@@ -127,13 +146,17 @@ export default function RoomLobby({
                 {room.teams.teamA.name}
               </h2>
             </div>
-            {myTeam !== "A" && (
+            {myTeam !== "A" ? (
               <button
                 onClick={() => onSwitchTeam("A")}
-                className="text-xs font-bold px-2.5 py-1 rounded-lg border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text-dim)] flex items-center gap-1 cursor-pointer transition"
+                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text)] flex items-center gap-1 cursor-pointer transition shadow-xs"
               >
-                <ArrowLeftRight className="w-3 h-3" /> Join A
+                <ArrowLeftRight className="w-3 h-3" /> Join {room.teams.teamA.name}
               </button>
+            ) : (
+              <span className="text-[11px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                Your Team
+              </span>
             )}
           </div>
 
@@ -143,7 +166,7 @@ export default function RoomLobby({
                 No scholars in Team Alpha yet
               </div>
             ) : (
-              room.teams.teamA.playerIds.map((pId) => {
+              room.teams.teamA.playerIds.map((pId, idx) => {
                 const p = getPlayerDisplay(pId);
                 const isMe = pId === myPlayerId;
                 return (
@@ -156,18 +179,23 @@ export default function RoomLobby({
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[var(--bg)] flex items-center justify-center text-[10px] font-bold border border-[var(--border-dim)]">
-                        {p.name.charAt(0)}
-                      </div>
+                      <span className="w-5 h-5 rounded-md bg-[var(--bg)] flex items-center justify-center text-[10px] font-bold text-[var(--text-mute)] border border-[var(--border-dim)]">
+                        #{idx + 1}
+                      </span>
                       <span className="text-[var(--text)]">
                         {p.name} {isMe && "(You)"}
                       </span>
                     </div>
-                    {pId === room.host_id && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">
-                        <Crown className="w-3 h-3" /> Host
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
+                        Round {idx * 2 + 1}
                       </span>
-                    )}
+                      {pId === room.host_id && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">
+                          <Crown className="w-3 h-3" /> Host
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })
@@ -190,13 +218,17 @@ export default function RoomLobby({
                 {room.teams.teamB.name}
               </h2>
             </div>
-            {myTeam !== "B" && (
+            {myTeam !== "B" ? (
               <button
                 onClick={() => onSwitchTeam("B")}
-                className="text-xs font-bold px-2.5 py-1 rounded-lg border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text-dim)] flex items-center gap-1 cursor-pointer transition"
+                className="text-xs font-bold px-3 py-1.5 rounded-xl border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text)] flex items-center gap-1 cursor-pointer transition shadow-xs"
               >
-                <ArrowLeftRight className="w-3 h-3" /> Join B
+                <ArrowLeftRight className="w-3 h-3" /> Join {room.teams.teamB.name}
               </button>
+            ) : (
+              <span className="text-[11px] font-bold text-emerald-600 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                Your Team
+              </span>
             )}
           </div>
 
@@ -206,7 +238,7 @@ export default function RoomLobby({
                 No scholars in Team Omega yet
               </div>
             ) : (
-              room.teams.teamB.playerIds.map((pId) => {
+              room.teams.teamB.playerIds.map((pId, idx) => {
                 const p = getPlayerDisplay(pId);
                 const isMe = pId === myPlayerId;
                 return (
@@ -219,18 +251,23 @@ export default function RoomLobby({
                     }`}
                   >
                     <div className="flex items-center gap-2">
-                      <div className="w-6 h-6 rounded-full bg-[var(--bg)] flex items-center justify-center text-[10px] font-bold border border-[var(--border-dim)]">
-                        {p.name.charAt(0)}
-                      </div>
+                      <span className="w-5 h-5 rounded-md bg-[var(--bg)] flex items-center justify-center text-[10px] font-bold text-[var(--text-mute)] border border-[var(--border-dim)]">
+                        #{idx + 1}
+                      </span>
                       <span className="text-[var(--text)]">
                         {p.name} {isMe && "(You)"}
                       </span>
                     </div>
-                    {pId === room.host_id && (
-                      <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">
-                        <Crown className="w-3 h-3" /> Host
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
+                        Round {idx * 2 + 2}
                       </span>
-                    )}
+                      {pId === room.host_id && (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">
+                          <Crown className="w-3 h-3" /> Host
+                        </span>
+                      )}
+                    </div>
                   </div>
                 );
               })
