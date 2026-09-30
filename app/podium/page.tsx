@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Mic,
@@ -26,6 +26,8 @@ import { usePodiumStore } from "@/store/usePodiumStore";
 import { useAppStore } from "@/store/useAppStore";
 import { encodePodiumDeck } from "@/lib/podium-share";
 import { PODIUM_THEMES } from "@/lib/podium-themes";
+import { copyTextToClipboard } from "@/lib/clipboard";
+import { getShortenedUrl } from "@/lib/url-shortener";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import TopicSpinner from "@/components/podium/TopicSpinner";
 import FeyLogo from "@/components/ui/FeyLogo";
@@ -99,7 +101,6 @@ export default function PodiumPage() {
     setCurrentSlide,
     nextSlide,
     prevSlide,
-    shareCode,
     savedDecks,
     saveDeck,
     deleteSavedDeck,
@@ -117,8 +118,65 @@ export default function PodiumPage() {
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState(notesTimeLimit);
   const [timerRunning, setTimerRunning] = useState(false);
-  const [shareUrl, setShareUrl] = useState("");
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
+
+  // Deterministic share code derived from generatedDeck
+  const shareCode = useMemo(() => {
+    if (!generatedDeck) return "";
+    return encodePodiumDeck(generatedDeck);
+  }, [generatedDeck]);
+
+  // Public-facing canonical URL: ensures social crawlers (X, WhatsApp) and TinyURL can resolve it
+  const publicShareUrl = useMemo(() => {
+    if (!shareCode) return "";
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.endsWith(".local"));
+    const origin =
+      typeof window !== "undefined" && !isLocalhost
+        ? window.location.origin
+        : "https://fey.lokinlabs.com.ng";
+    return `${origin}/podium/slides/${shareCode}`;
+  }, [shareCode]);
+
+  // Local URL for copying/testing locally when running on dev machine
+  const localShareUrl = useMemo(() => {
+    if (!shareCode) return "";
+    if (typeof window !== "undefined") {
+      return `${window.location.origin}/podium/slides/${shareCode}`;
+    }
+    return publicShareUrl;
+  }, [shareCode, publicShareUrl]);
+
+  // Shortened URL state (prefers compact 28-char link for WhatsApp & Status)
+  const [shortUrl, setShortUrl] = useState<string>("");
+  const [isShortening, setIsShortening] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (!publicShareUrl) {
+      setShortUrl("");
+      setIsShortening(false);
+      return;
+    }
+    let mounted = true;
+    setIsShortening(true);
+    getShortenedUrl(publicShareUrl).then((short) => {
+      if (mounted) {
+        setIsShortening(false);
+        if (short && short !== publicShareUrl) {
+          setShortUrl(short);
+        }
+      }
+    });
+    return () => {
+      mounted = false;
+    };
+  }, [publicShareUrl]);
+
+  // Effective share URL (prefers compact short link)
+  const effectiveShareUrl = shortUrl || publicShareUrl || localShareUrl;
 
   // ── Countdown timer for notes phase ──────────────────────────────
   useEffect(() => {
@@ -207,17 +265,26 @@ export default function PodiumPage() {
 
   const handleShare = () => {
     if (!generatedDeck) return;
-    const code = encodePodiumDeck(generatedDeck);
-    const url = `${window.location.origin}/podium/slides/${code}`;
-    setShareUrl(url);
     setPhase("share");
   };
 
   const handleCopyLink = async () => {
-    if (!shareUrl) return;
-    await navigator.clipboard.writeText(shareUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    let urlToCopy = shortUrl;
+    if (!urlToCopy) {
+      if (isShortening) {
+        try {
+          const res = await getShortenedUrl(publicShareUrl);
+          if (res && res !== publicShareUrl) urlToCopy = res;
+        } catch {}
+      }
+      if (!urlToCopy) urlToCopy = publicShareUrl || localShareUrl;
+    }
+    if (!urlToCopy) return;
+    const ok = await copyTextToClipboard(urlToCopy);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    }
   };
 
   const formatTime = (secs: number) => {
@@ -1348,11 +1415,27 @@ export default function PodiumPage() {
               </div>
             )}
 
+            {/* Link label and compact status badge */}
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-xs font-semibold" style={{ color: "var(--text-dim)" }}>
+                Shareable Link:
+              </span>
+              {isShortening ? (
+                <span className="text-[11px] flex items-center gap-1 font-mono text-[var(--gold)] animate-pulse">
+                  <Sparkles size={11} /> Shortening link for WhatsApp...
+                </span>
+              ) : shortUrl ? (
+                <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                  <Check size={11} /> WhatsApp & Status Ready
+                </span>
+              ) : null}
+            </div>
+
             {/* Copy link row */}
             <div className="flex gap-2 mb-4">
               <input
                 readOnly
-                value={shareUrl}
+                value={effectiveShareUrl}
                 className="flex-1 px-3 py-2.5 rounded-xl border text-xs font-mono bg-transparent focus:outline-none"
                 style={{
                   borderColor: "var(--border-dim)",
@@ -1372,15 +1455,30 @@ export default function PodiumPage() {
               </button>
             </div>
 
-            {/* Social share */}
-            <div className="flex gap-3 mb-6">
+            {/* Social share row */}
+            <div className="flex flex-wrap sm:flex-nowrap gap-2.5 mb-6">
+              <a
+                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
+                  `Check out my presentation: "${generatedDeck.topic}" 🎤\n\n${effectiveShareUrl}`
+                )}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1 min-w-[120px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
+                style={{
+                  borderColor: "rgba(37, 211, 102, 0.4)",
+                  background: "rgba(37, 211, 102, 0.08)",
+                  color: "#25D366",
+                }}
+              >
+                <span>💬 WhatsApp</span>
+              </a>
               <a
                 href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
                   `I just presented: "${generatedDeck.topic}" 🎤`
-                )}&url=${encodeURIComponent(shareUrl)}`}
+                )}&url=${encodeURIComponent(effectiveShareUrl)}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 hover:opacity-80 transition-opacity"
+                className="flex-1 min-w-[100px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
                 style={{
                   borderColor: "var(--border-dim)",
                   color: "var(--text-dim)",
@@ -1390,11 +1488,11 @@ export default function PodiumPage() {
               </a>
               <a
                 href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-                  shareUrl
+                  effectiveShareUrl
                 )}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex-1 py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-2 hover:opacity-80 transition-opacity"
+                className="flex-1 min-w-[100px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
                 style={{
                   borderColor: "var(--border-dim)",
                   color: "var(--text-dim)",

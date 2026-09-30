@@ -6,6 +6,8 @@ import { ChevronLeft, ChevronRight, ExternalLink, BookOpen, Share2, Check, Mic, 
 import Link from "next/link";
 import { decodePodiumDeck } from "@/lib/podium-share";
 import { type PodiumDeck } from "@/lib/podium-types";
+import { copyTextToClipboard } from "@/lib/clipboard";
+import { getShortenedUrl } from "@/lib/url-shortener";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import FeyLogo from "@/components/ui/FeyLogo";
 
@@ -19,6 +21,18 @@ export default function SlidesViewerClient({ initialDeck, code }: SlidesViewerCl
   const [error, setError] = useState(false);
   const [currentSlide, setCurrentSlide] = useState(0);
   const [copied, setCopied] = useState(false);
+  const [shortUrl, setShortUrl] = useState<string>("");
+
+  useEffect(() => {
+    if (code) {
+      const publicUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}`;
+      getShortenedUrl(publicUrl).then((res) => {
+        if (res && res !== publicUrl) {
+          setShortUrl(res);
+        }
+      });
+    }
+  }, [code]);
 
   useEffect(() => {
     if (!deck && code) {
@@ -41,17 +55,48 @@ export default function SlidesViewerClient({ initialDeck, code }: SlidesViewerCl
     return () => window.removeEventListener("keydown", handleKey);
   }, [deck]);
 
-  const handleCopyLink = () => {
-    if (typeof window !== "undefined") {
-      navigator.clipboard.writeText(window.location.href);
+  const handleCopyLink = async () => {
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.endsWith(".local"));
+    const fallbackUrl =
+      typeof window !== "undefined" && !isLocalhost
+        ? window.location.href
+        : `https://fey.lokinlabs.com.ng/podium/slides/${code}`;
+    const urlToCopy = shortUrl || fallbackUrl;
+    const ok = await copyTextToClipboard(urlToCopy);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     }
   };
 
+  const handleShareWhatsApp = () => {
+    if (!deck) return;
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.endsWith(".local"));
+    const url = shortUrl || (typeof window !== "undefined" && !isLocalhost ? window.location.href : `https://fey.lokinlabs.com.ng/podium/slides/${code}`);
+    const text = `Check out this presentation on "${deck.topic}" 🎤\n\n— Presented by ${deck.author} on Fey:\n${url}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+  };
+
   const handleShareTwitter = () => {
     if (!deck) return;
-    const url = typeof window !== "undefined" ? window.location.href : "";
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.endsWith(".local"));
+    const url =
+      shortUrl ||
+      (typeof window !== "undefined" && !isLocalhost
+        ? window.location.href
+        : `https://fey.lokinlabs.com.ng/podium/slides/${code}`);
     const text = `Check out this presentation on "${deck.topic}" 🎤\n\n— Presented by ${deck.author} via @FeyPlatform:\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
@@ -107,6 +152,15 @@ export default function SlidesViewerClient({ initialDeck, code }: SlidesViewerCl
         </div>
 
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleShareWhatsApp}
+            className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border cursor-pointer hover:border-[#25D366] transition-colors"
+            style={{ borderColor: "rgba(37, 211, 102, 0.4)", color: "#25D366" }}
+            title="Share on WhatsApp"
+          >
+            <span>💬 WhatsApp</span>
+          </button>
+
           <button
             onClick={handleShareTwitter}
             className="hidden sm:flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border cursor-pointer hover:border-[var(--text)] transition-colors"

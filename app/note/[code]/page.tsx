@@ -39,6 +39,8 @@ export async function generateMetadata({
   const snippet = cleanText.length > 220 ? cleanText.slice(0, 220) + "…" : cleanText;
   const title = `"${note.topicText}" · Scholar Dispatch — Fey`;
   const byline = `By ${note.author} · ${note.category} · ${note.difficulty}`;
+  const canonicalUrl = `https://fey.lokinlabs.com.ng/note/${code}`;
+  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/note?code=${encodeURIComponent(code)}`;
 
   return {
     title,
@@ -48,11 +50,22 @@ export async function generateMetadata({
       description: snippet,
       siteName: "Fey — Think Deeper, Articulate Clearly",
       type: "article",
+      url: canonicalUrl,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: note.topicText,
+          type: "image/png",
+        },
+      ],
     },
     twitter: {
-      card: "summary",
+      card: "summary_large_image",
       title,
       description: snippet,
+      images: [ogImageUrl],
     },
     other: {
       "og:site_name": "Fey",

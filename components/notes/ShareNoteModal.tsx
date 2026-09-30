@@ -17,6 +17,7 @@ import {
 import FeyLogo from "@/components/ui/FeyLogo";
 import { encodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { CATEGORY_COLORS, CATEGORY_ICONS, DIFFICULTY_LABELS, type Difficulty } from "@/lib/topics";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 
@@ -39,8 +40,13 @@ export default function ShareNoteModal({
     if (!note) return "";
     const code = encodeSharedNote(note);
     if (!code) return "";
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.endsWith(".local"));
     const origin =
-      typeof window !== "undefined" && window.location.origin
+      typeof window !== "undefined" && !isLocalhost
         ? window.location.origin
         : "https://fey.lokinlabs.com.ng";
     return `${origin}/note/${code}`;
@@ -73,11 +79,11 @@ export default function ShareNoteModal({
     label: note.difficulty || "Scholar",
   };
 
-  function handleCopy() {
+  async function handleCopy() {
     const urlToCopy = activeUrl || fullShareUrl;
     if (!urlToCopy) return;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(urlToCopy);
+    const ok = await copyTextToClipboard(urlToCopy);
+    if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);
     }
@@ -91,6 +97,13 @@ export default function ShareNoteModal({
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
+  }
+
+  function handleShareWhatsApp() {
+    if (!note) return;
+    const urlToShare = activeUrl || fullShareUrl;
+    const text = `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on @FeyPlatform:\n\n${urlToShare}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
   }
 
   async function handleCopyCardImage() {
@@ -265,6 +278,12 @@ export default function ShareNoteModal({
             >
               {copiedCard ? <Check size={12} className="text-[var(--olive)]" /> : <ImageIcon size={12} className="text-[var(--gold)]" />}
               <span>{copiedCard ? "Card Copied!" : "Copy Card Image"}</span>
+            </button>
+            <button
+              onClick={handleShareWhatsApp}
+              className="btn-ghost px-3 py-1.5 text-xs font-mono rounded-lg border border-[rgba(37,211,102,0.4)] text-[#25D366] hover:bg-[#25D366]/10 transition-colors"
+            >
+              WhatsApp
             </button>
             <button
               onClick={handleShareTwitter}

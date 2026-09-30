@@ -28,6 +28,7 @@ import {
 import { useAppStore } from "@/store/useAppStore";
 import OnboardingModal from "@/components/auth/OnboardingModal";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 
 export default function NoteContent({
@@ -121,18 +122,33 @@ export default function NoteContent({
     }
   }, []);
 
-  function handleCopyLink() {
-    if (typeof window !== "undefined" && navigator.clipboard) {
+  function getCanonicalShareUrl() {
+    const isLocalhost =
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" ||
+        window.location.hostname === "127.0.0.1" ||
+        window.location.hostname.endsWith(".local"));
+    const fallbackUrl =
+      typeof window !== "undefined" && !isLocalhost
+        ? window.location.href
+        : `https://fey.lokinlabs.com.ng/note/${code}`;
+    return shortUrl || fallbackUrl;
+  }
+
+  async function handleCopyLink() {
+    if (typeof window !== "undefined") {
       const urlToCopy = shortUrl || window.location.href;
-      navigator.clipboard.writeText(urlToCopy);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2500);
+      const ok = await copyTextToClipboard(urlToCopy);
+      if (ok) {
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2500);
+      }
     }
   }
 
   function handleShareTwitter() {
     if (!note) return;
-    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
+    const urlToShare = getCanonicalShareUrl();
     const tweet = `Read this synthesis on "${note.topicText}" — written using the Feynman Technique on Fey.\n\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
@@ -141,7 +157,7 @@ export default function NoteContent({
   }
 
   function handleShareLinkedIn() {
-    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
+    const urlToShare = getCanonicalShareUrl();
     window.open(
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlToShare)}`,
       "_blank"
@@ -150,7 +166,7 @@ export default function NoteContent({
 
   function handleShareSelectedQuoteTwitter() {
     if (!note || !selectedText) return;
-    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
+    const urlToShare = getCanonicalShareUrl();
     const tweet = `“${selectedText}”\n\n— from Scholar ${note.author}'s synthesis on "${note.topicText}" on @FeyPlatform:\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
@@ -158,11 +174,11 @@ export default function NoteContent({
     );
   }
 
-  function handleCopySelectedQuote() {
+  async function handleCopySelectedQuote() {
     if (!note || !selectedText) return;
-    const urlToShare = shortUrl || (typeof window !== "undefined" ? window.location.href : "");
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(`“${selectedText}”\n\n— Scholar ${note.author} on "${note.topicText}" via Fey: ${urlToShare}`);
+    const urlToShare = getCanonicalShareUrl();
+    const ok = await copyTextToClipboard(`“${selectedText}”\n\n— Scholar ${note.author} on "${note.topicText}" via Fey: ${urlToShare}`);
+    if (ok) {
       setCopiedQuote(true);
       setTimeout(() => setCopiedQuote(false), 2000);
     }

@@ -21,6 +21,7 @@ import { formatTime, cn } from "@/lib/utils";
 import ShareNoteModal from "@/components/notes/ShareNoteModal";
 import { encodeSharedNote } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { copyTextToClipboard } from "@/lib/clipboard";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 import { analytics } from "@/lib/analytics";
 
@@ -913,9 +914,15 @@ function StageComplete({
   const fullShareUrl = useMemo(() => {
     try {
       const code = encodeSharedNote(sharePayload);
-      const origin = typeof window !== "undefined" && window.location.origin
-        ? window.location.origin
-        : "https://fey.lokinlabs.com.ng";
+      const isLocalhost =
+        typeof window !== "undefined" &&
+        (window.location.hostname === "localhost" ||
+          window.location.hostname === "127.0.0.1" ||
+          window.location.hostname.endsWith(".local"));
+      const origin =
+        typeof window !== "undefined" && !isLocalhost
+          ? window.location.origin
+          : "https://fey.lokinlabs.com.ng";
       return `${origin}/note/${code}`;
     } catch {
       return "";
@@ -938,19 +945,19 @@ function StageComplete({
 
   const activeShareUrl = shortUrl || fullShareUrl;
 
-  function handleCopyShareLink() {
+  async function handleCopyShareLink() {
     if (!activeShareUrl) return;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(activeShareUrl);
+    const ok = await copyTextToClipboard(activeShareUrl);
+    if (ok) {
       setCopiedLink(true);
       setTimeout(() => setCopiedLink(false), 2500);
     }
   }
 
-  function handleShareDispatch() {
+  async function handleShareDispatch() {
     const dispatch = `🏛️ Fey Daily Sprint · "${topicText}"\n🎙️ ${speakingSeconds}s Spoken Synthesis · ${topicCategory}\n✨ Understanding proven through the Feynman Technique.\n${activeShareUrl || "https://fey.lokinlabs.com.ng"}`;
-    if (navigator.clipboard) {
-      navigator.clipboard.writeText(dispatch);
+    const ok = await copyTextToClipboard(dispatch);
+    if (ok) {
       setCopiedDispatch(true);
       setTimeout(() => setCopiedDispatch(false), 2500);
     }
@@ -962,6 +969,11 @@ function StageComplete({
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(activeShareUrl)}`,
       "_blank"
     );
+  }
+
+  function handleShareWhatsApp() {
+    const text = `Read my synthesis on "${topicText}" — written using the Feynman Technique on Fey:\n\n${activeShareUrl || "https://fey.lokinlabs.com.ng"}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
   }
 
   const [copiedCardImage, setCopiedCardImage] = useState(false);
@@ -1146,6 +1158,13 @@ function StageComplete({
           </div>
 
           <div className="flex items-center gap-2">
+            <button
+              onClick={handleShareWhatsApp}
+              className="px-3 py-1.5 rounded-lg text-xs font-mono border border-[rgba(37,211,102,0.4)] hover:bg-[#25D366]/10 text-[#25D366] transition-colors cursor-pointer"
+              title="Share on WhatsApp"
+            >
+              WhatsApp
+            </button>
             <button
               onClick={handleShareTwitter}
               className="px-3 py-1.5 rounded-lg text-xs font-mono border border-[var(--border-dim)] hover:border-[var(--text)] text-[var(--text-dim)] transition-colors cursor-pointer"

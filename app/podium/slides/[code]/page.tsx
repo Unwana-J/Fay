@@ -27,6 +27,8 @@ export async function generateMetadata({
 
   const title = `"${deck.topic}" · The Podium on Fey`;
   const description = `${deck.subtitle || "A Bold Party Presentation"} — Presented by ${deck.author || "Scholar"} · ${deck.slides.length} slides`;
+  const canonicalUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}`;
+  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/podium?code=${encodeURIComponent(code)}`;
 
   return {
     title,
@@ -36,11 +38,22 @@ export async function generateMetadata({
       description,
       siteName: "Fey — Think Deeper, Articulate Clearly",
       type: "article",
+      url: canonicalUrl,
+      images: [
+        {
+          url: ogImageUrl,
+          width: 1200,
+          height: 630,
+          alt: deck.topic,
+          type: "image/png",
+        },
+      ],
     },
     twitter: {
       card: "summary_large_image",
       title,
       description,
+      images: [ogImageUrl],
     },
     other: {
       "og:site_name": "Fey",
