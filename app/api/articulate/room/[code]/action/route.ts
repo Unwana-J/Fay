@@ -259,7 +259,10 @@ export async function POST(
 
         const currentWord = room.deck[room.current_word_index];
         if (currentWord) {
-          room.round_words_scored.push(currentWord);
+          room.round_words_scored.push({
+            ...currentWord,
+            disputeStatus: "none",
+          });
 
           const teamKey =
             room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
@@ -273,6 +276,50 @@ export async function POST(
         }
 
         room.current_word_index += 1;
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 4b. DISPUTE WORD (Maker: Opponent flags a word)
+      // -------------------------------------------------------------
+      case "dispute_word": {
+        const { wordIndex, opponentName } = body;
+        if (typeof wordIndex !== "number" || !room.round_words_scored[wordIndex]) {
+          return NextResponse.json({ error: "Invalid word index" }, { status: 400 });
+        }
+
+        room.round_words_scored[wordIndex].disputeStatus = "disputed";
+        room.round_words_scored[wordIndex].disputedBy = String(opponentName || "Opposing Team");
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 4c. RESOLVE DISPUTE (Checker: Describing team confirms or contests)
+      // -------------------------------------------------------------
+      case "resolve_dispute": {
+        const { wordIndex, resolverName, resolution } = body;
+        if (typeof wordIndex !== "number" || !room.round_words_scored[wordIndex]) {
+          return NextResponse.json({ error: "Invalid word index" }, { status: 400 });
+        }
+
+        const wordEntry = room.round_words_scored[wordIndex];
+        if (resolution === "concede") {
+          // Maker-checker consensus reached: describing team confirms the foul
+          if (wordEntry.disputeStatus !== "conceded") {
+            wordEntry.disputeStatus = "conceded";
+            wordEntry.concededBy = String(resolverName || "Describing Team");
+
+            const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
+            room.teams[turnTeam].score = Math.max(0, room.teams[turnTeam].score - 1);
+          }
+        } else if (resolution === "reject") {
+          // Describing team contests the dispute: point remains intact
+          wordEntry.disputeStatus = "rejected";
+        }
+
         await persistRoom(room);
         return NextResponse.json({ success: true, room });
       }

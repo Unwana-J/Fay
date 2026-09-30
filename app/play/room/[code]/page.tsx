@@ -327,6 +327,25 @@ export default function ArticulateRoomPage({
     }
   };
 
+  const handleDisputeWord = (wordIndex: number) => {
+    dispatchAction({
+      action: "dispute_word",
+      wordIndex,
+      opponentId: myPlayerId,
+      opponentName: myPlayerName,
+    });
+  };
+
+  const handleResolveDispute = (wordIndex: number, resolution: "concede" | "reject") => {
+    dispatchAction({
+      action: "resolve_dispute",
+      wordIndex,
+      resolverId: myPlayerId,
+      resolverName: myPlayerName,
+      resolution,
+    });
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -481,8 +500,12 @@ export default function ArticulateRoomPage({
           >
             <RoomRoundEnd
               room={room}
+              myPlayerId={myPlayerId}
+              myPlayerName={myPlayerName}
               isHost={isHost}
               onStartNextRound={handleStartRound}
+              onDisputeWord={handleDisputeWord}
+              onResolveDispute={handleResolveDispute}
             />
           </motion.div>
         ) : room.status === "game_over" ? (

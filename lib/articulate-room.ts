@@ -34,6 +34,14 @@ export interface CurrentTurn {
   durationSeconds: number;
 }
 
+export type DisputeStatus = "none" | "disputed" | "conceded" | "rejected";
+
+export interface ScoredWordEntry extends GameWord {
+  disputeStatus?: DisputeStatus;
+  disputedBy?: string; // Opponent who flagged it
+  concededBy?: string; // Describing team member who confirmed it
+}
+
 export interface ArticulateRoom {
   id?: string;
   room_code: string;
@@ -49,7 +57,7 @@ export interface ArticulateRoom {
   current_turn: CurrentTurn | null;
   deck: GameWord[];
   current_word_index: number;
-  round_words_scored: GameWord[];
+  round_words_scored: ScoredWordEntry[];
   round_words_passed: GameWord[];
   active_players: string[]; // Player IDs locked in for active round
   spectators: string[]; // Player IDs waiting in spectator lounge
