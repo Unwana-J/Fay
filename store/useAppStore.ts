@@ -82,6 +82,20 @@ export interface TriviaHistoryItem {
   challengerPct?: number;
 }
 
+export interface ArticulateHistoryItem {
+  id: string; // room code
+  roomCode: string;
+  hostName: string;
+  myTeam?: "A" | "B" | null;
+  status: "lobby" | "playing" | "round_end" | "game_over";
+  scoreA: number;
+  scoreB: number;
+  scoreGoal: number;
+  roundNumber: number;
+  date: string;
+  timestamp: number;
+}
+
 export interface AppState {
   // Authentication & Onboarding
   isOnboarded: boolean;
@@ -149,6 +163,11 @@ export interface AppState {
   resetSeenTriviaQuestions: () => void;
   saveTriviaRound: (round: Omit<TriviaHistoryItem, "id" | "timestamp" | "date">) => void;
   clearTriviaHistory: () => void;
+
+  // Articulate online room history
+  articulateHistory: ArticulateHistoryItem[];
+  saveArticulateRoom: (item: ArticulateHistoryItem) => void;
+  removeArticulateRoom: (roomCode: string) => void;
 }
 
 const DEFAULT_ENABLED_CATEGORIES = [
@@ -206,6 +225,7 @@ export const useAppStore = create<AppState>()(
       customTopics: [],
       seenTriviaQuestionIds: [],
       triviaHistory: [],
+      articulateHistory: [],
 
       createAccount: ({ username, avatar, bio, interests }) => {
         const state = get();
@@ -577,10 +597,26 @@ export const useAppStore = create<AppState>()(
 
       clearTriviaHistory: () =>
         set({ triviaHistory: [] }),
+
+      saveArticulateRoom: (item) =>
+        set((s) => {
+          const list = Array.isArray(s.articulateHistory) ? s.articulateHistory : [];
+          const filtered = list.filter((r) => r.roomCode !== item.roomCode);
+          return {
+            articulateHistory: [item, ...filtered].slice(0, 20),
+          };
+        }),
+
+      removeArticulateRoom: (roomCode) =>
+        set((s) => ({
+          articulateHistory: (s.articulateHistory || []).filter(
+            (r) => r.roomCode !== roomCode
+          ),
+        })),
     }),
     {
       name: "fey-app-store",
-      version: 8,
+      version: 9,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       migrate: (persistedState: any, fromVersion: number) => {
         const state = { ...persistedState };
@@ -588,8 +624,9 @@ export const useAppStore = create<AppState>()(
         // to prevent being trapped in a stale session
         state.activeSession = null;
 
-        // Ensure triviaHistory array exists
+        // Ensure triviaHistory & articulateHistory arrays exist
         state.triviaHistory = Array.isArray(state?.triviaHistory) ? state.triviaHistory : [];
+        state.articulateHistory = Array.isArray(state?.articulateHistory) ? state.articulateHistory : [];
 
         // v1/v2 → v3 (or unversioned): auto-add any categories that didn't exist yet
         if (fromVersion === undefined || fromVersion < 3) {

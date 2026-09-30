@@ -5,12 +5,12 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const router = useRouter();
-  const { profile } = useAppStore();
+  const { profile, articulateHistory = [], removeArticulateRoom } = useAppStore();
 
   const [playMode, setPlayMode] = useState<"online" | "local">("online");
   const [isCreatingOnline, setIsCreatingOnline] = useState(false);
@@ -33,6 +33,9 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
   const [inputA, setInputA] = useState("");
   const [inputB, setInputB] = useState("");
+
+  const activeRooms = (articulateHistory || []).filter((r) => r.status !== "game_over");
+  const completedRooms = (articulateHistory || []).filter((r) => r.status === "game_over");
 
   const AVAILABLE_COLORS = [
     { name: "Red", hex: "#EF4444" },
@@ -163,113 +166,277 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
       {/* Online Room Mode Screen (Clean & Instant) */}
       {playMode === "online" ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Host New Room Card */}
-          <div className="surface rounded-3xl p-6 sm:p-8 border border-[var(--border-dim)] space-y-6 shadow-sm flex flex-col justify-between">
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Host New Room Card */}
+            <div className="surface rounded-3xl p-6 sm:p-8 border border-[var(--border-dim)] space-y-6 shadow-sm flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <div className="p-3 rounded-2xl bg-[var(--terra)]/10 text-[var(--terra)]">
+                    <Globe className="w-6 h-6" />
+                  </div>
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full">
+                    Real-time Rooms
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">
+                    Host an Online Match
+                  </h2>
+                  <p className="text-xs text-[var(--text-dim)] leading-relaxed">
+                    Start a room in 1 second. Share the link to WhatsApp or group chat and friends can tap to join immediately.
+                  </p>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[var(--bg)] border border-[var(--border-dim)] text-xs text-[var(--text-dim)] space-y-2">
+                  <div className="flex items-center gap-2 font-bold text-[var(--text)]">
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--gold)]" />
+                    Party Match Defaults:
+                  </div>
+                  <ul className="space-y-1 list-disc list-inside text-[11px] leading-relaxed">
+                    <li>60 seconds per speaking sprint</li>
+                    <li>First team to 20 points wins</li>
+                    <li>Round locks when active; late joiners jump in next round</li>
+                  </ul>
+                </div>
+
+                {onlineJoinError && (
+                  <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-medium">
+                    {onlineJoinError}
+                  </div>
+                )}
+              </div>
+
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleCreateOnlineRoom}
+                disabled={isCreatingOnline}
+                className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+              >
+                {isCreatingOnline ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Generating Room...
+                  </>
+                ) : (
+                  <>
+                    Create Room & Invite Friends
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </motion.button>
+            </div>
+
+            {/* Join Existing Room Card */}
+            <div className="surface rounded-3xl p-6 sm:p-8 border border-[var(--border-dim)] space-y-6 shadow-sm flex flex-col justify-between">
+              <div className="space-y-4">
+                <div className="p-3 rounded-2xl bg-[var(--olive)]/10 text-[var(--olive)] w-fit">
+                  <Users className="w-6 h-6" />
+                </div>
+
+                <div className="space-y-1.5">
+                  <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">
+                    Join Friend&apos;s Match
+                  </h2>
+                  <p className="text-xs text-[var(--text-dim)] leading-relaxed">
+                    Have a 4-letter room code from your host? Enter it below to jump directly into the team lobby.
+                  </p>
+                </div>
+
+                <form onSubmit={handleJoinOnlineRoom} className="space-y-3 pt-2">
+                  <div>
+                    <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)] block mb-1.5">
+                      Room Code
+                    </label>
+                    <input
+                      type="text"
+                      value={onlineJoinCode}
+                      onChange={(e) => setOnlineJoinCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. FEY-9K2P"
+                      maxLength={10}
+                      className="w-full px-4 py-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-lg font-space font-extrabold tracking-wider text-[var(--text)] focus:border-[var(--olive)] focus:outline-none uppercase placeholder:text-xs placeholder:font-normal placeholder:tracking-normal placeholder:text-[var(--text-mute)]"
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={!onlineJoinCode.trim()}
+                    className="w-full bg-[var(--olive)] text-white py-3.5 rounded-xl font-space font-bold text-sm shadow-sm hover:opacity-90 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+                  >
+                    Enter Room <ArrowRight className="w-4 h-4" />
+                  </button>
+                </form>
+              </div>
+
+              <div className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] text-[11px] text-[var(--text-dim)] text-center">
+                💡 Or simply tap the invite link sent to you on WhatsApp or iMessage.
+              </div>
+            </div>
+          </div>
+
+          {/* Active Matches (In Progress) */}
+          {activeRooms.length > 0 && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
-                <div className="p-3 rounded-2xl bg-[var(--terra)]/10 text-[var(--terra)]">
-                  <Globe className="w-6 h-6" />
+                <div className="flex items-center gap-2.5">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500"></span>
+                  </span>
+                  <h3 className="font-space font-extrabold text-lg text-[var(--text)]">
+                    Active Matches (In Progress)
+                  </h3>
+                  <span className="text-[11px] px-2.5 py-0.5 rounded-full font-bold bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                    {activeRooms.length} {activeRooms.length === 1 ? "match" : "matches"}
+                  </span>
                 </div>
-                <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full">
-                  Real-time Rooms
+                <p className="text-xs text-[var(--text-dim)] hidden sm:block">
+                  Pick up right where your match was left off
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {activeRooms.map((room) => {
+                  const statusLabel =
+                    room.status === "lobby"
+                      ? "In Lobby"
+                      : room.status === "round_end"
+                      ? `Round ${room.roundNumber} Intermission`
+                      : `Round ${room.roundNumber} In Progress`;
+
+                  return (
+                    <div
+                      key={room.roomCode}
+                      className="surface rounded-2xl p-5 border border-[var(--border-dim)] hover:border-[var(--terra)]/40 transition shadow-xs flex flex-col justify-between space-y-4 relative group"
+                    >
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          removeArticulateRoom(room.roomCode);
+                        }}
+                        className="absolute top-4 right-4 text-[var(--text-mute)] hover:text-red-500 p-1 rounded-lg hover:bg-[var(--bg)] transition cursor-pointer"
+                        title="Dismiss match"
+                        aria-label="Dismiss match"
+                      >
+                        <X className="w-4 h-4" />
+                      </button>
+
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 pr-6 flex-wrap">
+                          <span className="font-space font-extrabold text-lg tracking-wider text-[var(--text)]">
+                            {room.roomCode}
+                          </span>
+                          <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
+                            {statusLabel}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-3 text-xs text-[var(--text-dim)] flex-wrap">
+                          <span>Host: <strong className="text-[var(--text)]">{room.hostName || "Scholar"}</strong></span>
+                          <span>•</span>
+                          <span>{room.date}</span>
+                          {room.myTeam && (
+                            <>
+                              <span>•</span>
+                              <span className="font-bold text-[var(--terra)]">
+                                Team {room.myTeam === "A" ? "Alpha" : "Omega"}
+                              </span>
+                            </>
+                          )}
+                        </div>
+
+                        <div className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] flex items-center justify-between text-xs font-space">
+                          <div className="flex items-center gap-2">
+                            <span className="w-2.5 h-2.5 rounded-full bg-[var(--terra)]" />
+                            <span className="font-bold text-[var(--text)]">Team Alpha</span>
+                            <span className="font-extrabold text-sm text-[var(--terra)]">{room.scoreA}</span>
+                          </div>
+                          <span className="text-[var(--text-mute)] text-xs font-normal">vs</span>
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-sm text-[var(--olive)]">{room.scoreB}</span>
+                            <span className="font-bold text-[var(--text)]">Team Omega</span>
+                            <span className="w-2.5 h-2.5 rounded-full bg-[var(--olive)]" />
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => router.push(`/play/room/${room.roomCode}`)}
+                        className="w-full bg-[var(--terra)] text-white py-2.5 px-4 rounded-xl font-space font-bold text-xs shadow-sm hover:opacity-95 flex items-center justify-center gap-2 cursor-pointer transition"
+                      >
+                        <Play className="w-3.5 h-3.5 fill-current" />
+                        Resume Match
+                        <ChevronRight className="w-4 h-4 ml-auto" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {/* Match History (Completed Games) */}
+          {completedRooms.length > 0 && (
+            <div className="space-y-4 pt-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-[var(--gold)]" />
+                  <h3 className="font-space font-extrabold text-base text-[var(--text)]">
+                    Recent Completed Matches
+                  </h3>
+                </div>
+                <span className="text-xs text-[var(--text-dim)]">
+                  {completedRooms.length} completed
                 </span>
               </div>
 
-              <div className="space-y-1.5">
-                <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">
-                  Host an Online Match
-                </h2>
-                <p className="text-xs text-[var(--text-dim)] leading-relaxed">
-                  Start a room in 1 second. Share the link to WhatsApp or group chat and friends can tap to join immediately.
-                </p>
-              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {completedRooms.slice(0, 4).map((room) => {
+                  const winner =
+                    room.scoreA > room.scoreB
+                      ? "Team Alpha Won"
+                      : room.scoreB > room.scoreA
+                      ? "Team Omega Won"
+                      : "Tie Game";
 
-              <div className="p-4 rounded-2xl bg-[var(--bg)] border border-[var(--border-dim)] text-xs text-[var(--text-dim)] space-y-2">
-                <div className="flex items-center gap-2 font-bold text-[var(--text)]">
-                  <Sparkles className="w-3.5 h-3.5 text-[var(--gold)]" />
-                  Party Match Defaults:
-                </div>
-                <ul className="space-y-1 list-disc list-inside text-[11px] leading-relaxed">
-                  <li>60 seconds per speaking sprint</li>
-                  <li>First team to 20 points wins</li>
-                  <li>Round locks when active; late joiners jump in next round</li>
-                </ul>
-              </div>
+                  return (
+                    <div
+                      key={room.roomCode}
+                      className="surface rounded-2xl p-4 border border-[var(--border-dim)] flex items-center justify-between relative group"
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-2">
+                          <span className="font-space font-bold text-sm text-[var(--text)]">
+                            {room.roomCode}
+                          </span>
+                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20">
+                            {winner}
+                          </span>
+                        </div>
+                        <div className="text-xs text-[var(--text-dim)] font-space">
+                          Final: <strong className="text-[var(--terra)]">Alpha {room.scoreA}</strong> — <strong className="text-[var(--olive)]">{room.scoreB} Omega</strong> • {room.date}
+                        </div>
+                      </div>
 
-              {onlineJoinError && (
-                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-medium">
-                  {onlineJoinError}
-                </div>
-              )}
+                      <button
+                        type="button"
+                        onClick={() => removeArticulateRoom(room.roomCode)}
+                        className="text-[var(--text-mute)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg)] transition cursor-pointer"
+                        title="Dismiss"
+                        aria-label="Dismiss match from history"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
             </div>
-
-            <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={handleCreateOnlineRoom}
-              disabled={isCreatingOnline}
-              className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
-            >
-              {isCreatingOnline ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Generating Room...
-                </>
-              ) : (
-                <>
-                  Create Room & Invite Friends
-                  <ArrowRight className="w-5 h-5" />
-                </>
-              )}
-            </motion.button>
-          </div>
-
-          {/* Join Existing Room Card */}
-          <div className="surface rounded-3xl p-6 sm:p-8 border border-[var(--border-dim)] space-y-6 shadow-sm flex flex-col justify-between">
-            <div className="space-y-4">
-              <div className="p-3 rounded-2xl bg-[var(--olive)]/10 text-[var(--olive)] w-fit">
-                <Users className="w-6 h-6" />
-              </div>
-
-              <div className="space-y-1.5">
-                <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">
-                  Join Friend&apos;s Match
-                </h2>
-                <p className="text-xs text-[var(--text-dim)] leading-relaxed">
-                  Have a 4-letter room code from your host? Enter it below to jump directly into the team lobby.
-                </p>
-              </div>
-
-              <form onSubmit={handleJoinOnlineRoom} className="space-y-3 pt-2">
-                <div>
-                  <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)] block mb-1.5">
-                    Room Code
-                  </label>
-                  <input
-                    type="text"
-                    value={onlineJoinCode}
-                    onChange={(e) => setOnlineJoinCode(e.target.value.toUpperCase())}
-                    placeholder="e.g. FEY-9K2P"
-                    maxLength={10}
-                    className="w-full px-4 py-3.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-lg font-space font-extrabold tracking-wider text-[var(--text)] focus:border-[var(--olive)] focus:outline-none uppercase placeholder:text-xs placeholder:font-normal placeholder:tracking-normal placeholder:text-[var(--text-mute)]"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={!onlineJoinCode.trim()}
-                  className="w-full bg-[var(--olive)] text-white py-3.5 rounded-xl font-space font-bold text-sm shadow-sm hover:opacity-90 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
-                >
-                  Enter Room <ArrowRight className="w-4 h-4" />
-                </button>
-              </form>
-            </div>
-
-            <div className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] text-[11px] text-[var(--text-dim)] text-center">
-              💡 Or simply tap the invite link sent to you on WhatsApp or iMessage.
-            </div>
-          </div>
+          )}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

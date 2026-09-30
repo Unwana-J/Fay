@@ -28,7 +28,7 @@ export default function ArticulateRoomPage({
   const { code: rawCode } = use(params);
   const roomCode = rawCode.toUpperCase().trim();
 
-  const { profile } = useAppStore();
+  const { profile, saveArticulateRoom } = useAppStore();
   const myPlayerId = profile?.id || "guest-" + Math.random().toString(36).slice(2, 9);
   const myPlayerName = profile?.username || "Scholar";
   const myAvatar = profile?.avatar || "/avatars/avatar-scholar.svg";
@@ -137,6 +137,30 @@ export default function ArticulateRoomPage({
       mounted = false;
     };
   }, [fetchRoomState, myAvatar, myPlayerId, myPlayerName, roomCode]);
+
+  // Sync Room to Persistent Local History so unfinished games can be resumed
+  useEffect(() => {
+    if (!room) return;
+    const myTeam = room.teams.teamA.playerIds.includes(myPlayerId)
+      ? "A"
+      : room.teams.teamB.playerIds.includes(myPlayerId)
+      ? "B"
+      : null;
+
+    saveArticulateRoom({
+      id: room.room_code,
+      roomCode: room.room_code,
+      hostName: room.host_name,
+      myTeam,
+      status: room.status,
+      scoreA: room.teams.teamA.score,
+      scoreB: room.teams.teamB.score,
+      scoreGoal: room.settings.scoreGoal || 20,
+      roundNumber: room.current_turn?.roundNumber || 1,
+      date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      timestamp: Date.now(),
+    });
+  }, [myPlayerId, room, saveArticulateRoom]);
 
   // 4. Supabase Realtime Channel (Presence + Broadcast)
   useEffect(() => {
