@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import {
   getFreshQuestions,
+  getQuestionsByIds,
   QUESTION_COUNTS,
   TRIVIA_QUESTIONS,
   type TriviaQuestion,
@@ -41,6 +42,7 @@ export interface ChallengerInfo {
   pct: number;
   by: string;
   grade?: string;
+  questionIds?: string[];
 }
 
 const DURATION_OPTIONS: DurationOption[] = [
@@ -111,30 +113,30 @@ function SetupScreen({
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl p-4 border mb-6 relative overflow-hidden"
+          className="rounded-2xl p-5 border mb-6 relative overflow-hidden"
           style={{
             borderColor: "rgba(0, 135, 81, 0.4)",
-            background: "linear-gradient(135deg, rgba(0, 135, 81, 0.12) 0%, rgba(166, 124, 30, 0.08) 100%)",
+            background: "linear-gradient(135deg, rgba(0, 135, 81, 0.14) 0%, rgba(166, 124, 30, 0.08) 100%)",
           }}
         >
-          <div className="flex items-center gap-3.5">
+          <div className="flex items-start gap-3.5">
             <div className="w-12 h-12 rounded-xl bg-[#008751]/20 border border-[#008751]/40 flex items-center justify-center shrink-0 text-xl text-[#008751]">
               <Swords size={22} />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-0.5">
+              <div className="flex items-center gap-2 mb-1">
                 <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-[#008751]">
-                  Incoming Challenge
+                  ⚔️ Head-to-Head Challenge
                 </span>
                 <span className="text-[10px] font-mono text-[var(--gold)]">
                   {challenger.grade || "Sharp Sharp! 🎯"}
                 </span>
               </div>
-              <div className="text-sm font-bold truncate" style={{ color: "var(--text)" }}>
-                Scholar {challenger.by} scored {challenger.score}/{challenger.total} ({challenger.pct}%)
+              <div className="text-base font-extrabold truncate" style={{ color: "var(--text)" }}>
+                {challenger.by} got {challenger.pct}% on Naija Trivia!
               </div>
-              <p className="text-xs text-[var(--text-dim)]">
-                Can you beat their record? Start your game below to answer the call!
+              <p className="text-xs text-[var(--text-dim)] mt-1">
+                Can you beat this? You will answer the <strong>exact same {challenger.total || 15} questions</strong>.
               </p>
             </div>
           </div>
@@ -246,7 +248,10 @@ function SetupScreen({
           onClick={() => onStart(duration.minutes, mode)}
           className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg"
         >
-          {challenger ? "Accept Challenge & Start" : "Start Game"} <ChevronRight size={18} />
+          {challenger
+            ? `Accept Challenge · Play Same ${challenger.total || 15} Questions`
+            : "Start Game"}{" "}
+          <ChevronRight size={18} />
         </motion.button>
       </div>
     </div>
@@ -554,7 +559,7 @@ function ResultsScreen({
             )}
           </div>
           <p className="text-xs text-[var(--text-dim)]">
-            You scored {correct}/{total} ({pct}%) vs {challenger?.by}&apos;s {challenger?.score}/{challenger?.total} ({challenger?.pct}%).
+            You got {pct}% ({correct}/{total}) vs {challenger?.by}&apos;s {challenger?.pct}% ({challenger?.score}/{challenger?.total}) on these exact questions!
           </p>
         </motion.div>
       )}
@@ -587,7 +592,7 @@ function ResultsScreen({
               color: "#FFFFFF",
             }}
           >
-            <Share2 size={16} /> Share Score &amp; Challenge Friends
+            <Share2 size={16} /> Challenge Friends with This Deck ({total} Qs)
           </button>
         </div>
       </div>
@@ -699,6 +704,7 @@ function ResultsScreen({
         gradeLabel={grade.label}
         xpEarned={xpEarned}
         byCategory={byCategory}
+        questionIds={questions.map((q) => q.id)}
       />
     </div>
   );
@@ -725,19 +731,33 @@ export default function TriviaGameClient({
   const [xpEarned, setXpEarned] = useState(0);
 
   function handleStart(minutes: number, mode: ReviewMode) {
-    const count = QUESTION_COUNTS[minutes];
-    const { questions: freshQuestions, wasReset } = getFreshQuestions(
-      count,
-      seenTriviaQuestionIds
-    );
+    let selectedQuestions: TriviaQuestion[] = [];
 
-    if (wasReset) {
-      resetSeenTriviaQuestions();
+    // If challenger specified exact question IDs, load those exact questions!
+    if (challenger?.questionIds && challenger.questionIds.length > 0) {
+      const matched = getQuestionsByIds(challenger.questionIds);
+      if (matched.length > 0) {
+        selectedQuestions = matched;
+      }
     }
 
-    markTriviaQuestionsSeen(freshQuestions.map((q) => q.id));
+    if (selectedQuestions.length === 0) {
+      const count = QUESTION_COUNTS[minutes] || 15;
+      const { questions: freshQuestions, wasReset } = getFreshQuestions(
+        count,
+        seenTriviaQuestionIds
+      );
 
-    setQuestions(freshQuestions);
+      if (wasReset) {
+        resetSeenTriviaQuestions();
+      }
+
+      selectedQuestions = freshQuestions;
+    }
+
+    markTriviaQuestionsSeen(selectedQuestions.map((q) => q.id));
+
+    setQuestions(selectedQuestions);
     setTotalSeconds(minutes * 60);
     setReviewMode(mode);
     setPhase("playing");

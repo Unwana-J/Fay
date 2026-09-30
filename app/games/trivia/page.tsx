@@ -20,6 +20,7 @@ export async function generateMetadata({
   const byRaw = typeof sParams.by === "string" ? sParams.by : undefined;
   const gradeRaw = typeof sParams.grade === "string" ? sParams.grade : undefined;
   const pctRaw = typeof sParams.pct === "string" ? sParams.pct : undefined;
+  const qRaw = typeof sParams.q === "string" ? sParams.q : undefined;
 
   const isChallenge = Boolean(scoreRaw && totalRaw);
 
@@ -30,11 +31,11 @@ export async function generateMetadata({
   const grade = gradeRaw || (pct >= 80 ? "Naija Expert! 🏆" : pct >= 60 ? "Sharp Sharp! 🎯" : pct >= 40 ? "Not bad o! 🙌" : "Keep studying! 📚");
 
   const title = isChallenge
-    ? `Can you beat my score? ${score}/${total} on Naija Trivia 🇳🇬 · Fey`
+    ? `${author} got ${pct}% on Naija Trivia! Can you beat this? 🇳🇬 · Fey`
     : "Naija Trivia Arcade · Fey";
 
   const description = isChallenge
-    ? `Scholar ${author} scored ${score}/${total} (${pct}% accuracy) on Naija Trivia (${grade})! Can you beat their score? Tap to test your wits in Nigerian history & culture.`
+    ? `Scholar ${author} scored ${score}/${total} (${pct}% accuracy) on Naija Trivia! Tap to answer the exact same questions and see if you can top their score.`
     : "Test your knowledge of Nigerian history, pop culture, and general knowledge with 1,000+ curated questions. Think deeper on Fey.";
 
   const queryParams = new URLSearchParams();
@@ -44,6 +45,7 @@ export async function generateMetadata({
     queryParams.set("pct", String(pct));
     queryParams.set("by", author);
     queryParams.set("grade", grade);
+    if (qRaw) queryParams.set("q", qRaw);
   }
 
   const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/trivia${
@@ -97,15 +99,21 @@ export default async function TriviaPage({
   const byRaw = typeof sParams.by === "string" ? sParams.by : undefined;
   const gradeRaw = typeof sParams.grade === "string" ? sParams.grade : undefined;
   const pctRaw = typeof sParams.pct === "string" ? parseInt(sParams.pct, 10) : undefined;
+  const qRaw = typeof sParams.q === "string" ? sParams.q : undefined;
 
   let challenger: ChallengerInfo | null = null;
   if (scoreRaw !== undefined && totalRaw !== undefined) {
+    const qIds = qRaw
+      ? qRaw.split(",").map((s) => s.trim()).filter(Boolean)
+      : undefined;
+
     challenger = {
       score: scoreRaw,
       total: totalRaw,
       pct: pctRaw ?? Math.round((scoreRaw / totalRaw) * 100),
       by: byRaw || "Scholar",
       grade: gradeRaw,
+      questionIds: qIds,
     };
   }
 

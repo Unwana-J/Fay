@@ -86,12 +86,12 @@ export async function generateTriviaCardCanvas(data: TriviaCardData): Promise<HT
 
   // ── Main Challenge Heading ──
   ctx.fillStyle = "#FDFBF7";
-  ctx.font = "bold 44px Georgia, serif";
-  ctx.fillText("Can you beat my score?", 72, 215);
+  ctx.font = "bold 42px Georgia, serif";
+  ctx.fillText(`${data.author} got ${data.pct}% on Naija Trivia!`, 72, 215);
 
-  ctx.fillStyle = "rgba(253, 251, 247, 0.7)";
+  ctx.fillStyle = "rgba(253, 251, 247, 0.75)";
   ctx.font = "italic 20px Georgia, serif";
-  ctx.fillText(`Challenged by Scholar ${data.author} in Nigerian history, pop culture & general knowledge.`, 72, 255);
+  ctx.fillText("Can you beat this? 🇳🇬 Answer the exact same questions on Fey.", 72, 255);
 
   // ── Score Showcase Card Box ──
   ctx.fillStyle = "rgba(20, 32, 25, 0.7)";

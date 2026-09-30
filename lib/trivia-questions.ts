@@ -6055,3 +6055,16 @@ export function getFreshQuestions(
   const combined = [...shuffledUnseen, ...seenPool.slice(0, remainingNeeded)];
   return { questions: combined, wasReset: true };
 }
+
+export function getQuestionsByIds(ids: string[]): TriviaQuestion[] {
+  const map = new Map(TRIVIA_QUESTIONS.map((q) => [q.id, q]));
+  const result: TriviaQuestion[] = [];
+  for (const id of ids) {
+    const trimmed = id.trim();
+    if (trimmed) {
+      const found = map.get(trimmed);
+      if (found) result.push(found);
+    }
+  }
+  return result;
+}

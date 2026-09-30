@@ -146,26 +146,38 @@ export async function GET(req: NextRequest) {
 
               <h1
                 style={{
-                  fontSize: "44px",
+                  fontSize: "42px",
                   fontWeight: 900,
                   color: "#FDFBF7",
                   lineHeight: 1.15,
-                  margin: "0 0 12px 0",
+                  margin: "0 0 10px 0",
                   letterSpacing: "-0.03em",
                 }}
               >
-                Can you beat my score?
+                {by} got {pct}% on Naija Trivia!
               </h1>
 
               <p
                 style={{
-                  fontSize: "18px",
+                  fontSize: "22px",
+                  fontWeight: 700,
+                  color: "#FFD166",
+                  margin: "0 0 10px 0",
+                  lineHeight: 1.3,
+                }}
+              >
+                Can you beat this? 🇳🇬
+              </p>
+
+              <p
+                style={{
+                  fontSize: "16px",
                   color: "rgba(253, 251, 247, 0.7)",
                   margin: 0,
                   lineHeight: 1.45,
                 }}
               >
-                Challenged by <span style={{ color: "#FFD166", fontWeight: 700 }}>Scholar {by}</span> in Naija Trivia. Tap the link to test your wits in Nigerian history, music & culture!
+                Tap to answer the exact same questions and see if you can top their score on Fey!
               </p>
             </div>
 

@@ -27,6 +27,7 @@ interface ShareTriviaModalProps {
   gradeLabel: string;
   xpEarned: number;
   byCategory?: { category: string; correct: number; total: number }[];
+  questionIds?: string[];
 }
 
 export default function ShareTriviaModal({
@@ -38,6 +39,7 @@ export default function ShareTriviaModal({
   gradeLabel,
   xpEarned,
   byCategory = [],
+  questionIds = [],
 }: ShareTriviaModalProps) {
   const { profile } = useAppStore();
   const [copied, setCopied] = useState(false);
@@ -66,9 +68,12 @@ export default function ShareTriviaModal({
     params.set("by", authorName);
     params.set("grade", gradeLabel);
     if (xpEarned > 0) params.set("xp", String(xpEarned));
+    if (questionIds && questionIds.length > 0) {
+      params.set("q", questionIds.join(","));
+    }
 
     return `${origin}/games/trivia?${params.toString()}`;
-  }, [score, total, pct, authorName, gradeLabel, xpEarned]);
+  }, [score, total, pct, authorName, gradeLabel, xpEarned, questionIds]);
 
   // Shorten URL for WhatsApp compatibility
   useEffect(() => {
@@ -94,10 +99,10 @@ export default function ShareTriviaModal({
 
   const shareHeadline = customTaunt.trim()
     ? customTaunt.trim()
-    : `Can you beat my score? I just scored ${score}/${total} (${pct}% accuracy) on Fey Naija Trivia! ${gradeLabel}`;
+    : `${authorName} got ${pct}% on Naija Trivia! Can you beat this? 🇳🇬`;
 
-  const whatsappMessage = `🇳🇬 *Naija Trivia Challenge*\n${shareHeadline}\n\nTap the link to test your knowledge:\n${targetUrl}`;
-  const twitterMessage = `I just scored ${score}/${total} on Naija Trivia on @FeyPlatform! 🇳🇬🎯 Can you beat my score?\n\n`;
+  const whatsappMessage = `🇳🇬 *Naija Trivia Challenge*\n*${authorName} got ${pct}% on Naija Trivia! Can you beat this?*\n\nScore: *${score}/${total}* (${gradeLabel})\nAnswer the exact same questions and see if you can top their score:\n${targetUrl}`;
+  const twitterMessage = `${authorName} got ${pct}% on Naija Trivia! Can you beat this? 🇳🇬🎯 Play the exact same questions on @FeyPlatform:\n\n`;
 
   async function handleCopy() {
     if (!targetUrl) return;
@@ -212,10 +217,13 @@ export default function ShareTriviaModal({
                   {gradeLabel}
                 </span>
                 <h3 className="font-space font-extrabold text-lg text-white">
-                  Can you beat my score?
+                  {authorName} got {pct}% on Naija Trivia!
                 </h3>
-                <p className="text-xs text-white/70 font-serif italic">
-                  Challenged by Scholar {authorName}
+                <p className="text-xs text-[#FFD166] font-bold">
+                  Can you beat this? 🇳🇬
+                </p>
+                <p className="text-[11px] text-white/60 font-mono mt-0.5">
+                  Answer the exact same {total} questions
                 </p>
               </div>
 
