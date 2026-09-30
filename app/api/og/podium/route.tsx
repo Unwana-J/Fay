@@ -14,8 +14,42 @@ export async function GET(req: NextRequest) {
     const subtitle = deck?.subtitle || searchParams.get("subtitle") || "A Bold Party Presentation on Fey";
     const author = deck?.author || searchParams.get("author") || "Scholar";
     const slideCount = deck?.slides?.length || 5;
-    const bgColor = deck?.slides?.[0]?.bgColor || "#101D17";
-    const accentColor = deck?.slides?.[0]?.accentColor || "#DDAA55";
+
+    const slideParam = searchParams.get("slide");
+    const highlight = searchParams.get("highlight") || searchParams.get("q") || "";
+    const slideIdx = slideParam ? Math.max(0, Math.min(parseInt(slideParam, 10) - 1, slideCount - 1)) : 0;
+    const featuredSlide = (deck?.slides && deck.slides[slideIdx]) ? deck.slides[slideIdx] : deck?.slides?.[0];
+
+    const bgColor = featuredSlide?.bgColor || deck?.slides?.[0]?.bgColor || "#101D17";
+    const accentColor = featuredSlide?.accentColor || deck?.slides?.[0]?.accentColor || "#DDAA55";
+
+    const isHighlightMode = Boolean(slideIdx > 0 || highlight);
+
+    let displayHeading = topic;
+    let displaySub = subtitle;
+    let countBadge = `${slideCount} Slides Deck`;
+
+    if (isHighlightMode) {
+      countBadge = `Slide ${slideIdx + 1} of ${slideCount}`;
+      if (highlight) {
+        displayHeading = highlight.startsWith("“") || highlight.startsWith('"') ? highlight : `“${highlight}”`;
+        displaySub = `From "${topic}"`;
+      } else if (featuredSlide) {
+        if (featuredSlide.quote) {
+          displayHeading = `“${featuredSlide.quote}”`;
+          displaySub = featuredSlide.attribution ? `${featuredSlide.attribution} · From "${topic}"` : `From "${topic}"`;
+        } else if (featuredSlide.body) {
+          displayHeading = featuredSlide.title;
+          displaySub = featuredSlide.body;
+        } else if (featuredSlide.bullets && featuredSlide.bullets.length > 0) {
+          displayHeading = featuredSlide.title;
+          displaySub = featuredSlide.bullets.slice(0, 2).join(" • ");
+        } else {
+          displayHeading = featuredSlide.title;
+          displaySub = `From "${topic}"`;
+        }
+      }
+    }
 
     return new ImageResponse(
       (
@@ -26,21 +60,21 @@ export async function GET(req: NextRequest) {
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            padding: "60px 70px",
+            padding: "55px 65px",
             backgroundColor: bgColor,
             color: "#FFFFFF",
             fontFamily: "sans-serif",
             position: "relative",
           }}
         >
-          {/* Subtle decorative grid/border */}
+          {/* Subtle decorative border */}
           <div
             style={{
               position: "absolute",
-              top: "24px",
-              left: "24px",
-              right: "24px",
-              bottom: "24px",
+              top: "20px",
+              left: "20px",
+              right: "20px",
+              bottom: "20px",
               border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "28px",
               pointerEvents: "none",
@@ -71,7 +105,7 @@ export async function GET(req: NextRequest) {
               <span style={{ fontSize: "20px" }}>🎤</span>
               <span
                 style={{
-                  fontSize: "16px",
+                  fontSize: "15px",
                   fontWeight: 700,
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
@@ -84,14 +118,18 @@ export async function GET(req: NextRequest) {
 
             <div
               style={{
-                fontSize: "15px",
-                letterSpacing: "0.1em",
+                fontSize: "14px",
+                letterSpacing: "0.12em",
                 textTransform: "uppercase",
-                color: "rgba(255, 255, 255, 0.6)",
-                fontWeight: 600,
+                color: "rgba(255, 255, 255, 0.7)",
+                fontWeight: 700,
+                background: "rgba(255, 255, 255, 0.06)",
+                padding: "8px 16px",
+                borderRadius: "999px",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
               }}
             >
-              {slideCount} Slides Deck
+              {countBadge}
             </div>
           </div>
 
@@ -102,12 +140,17 @@ export async function GET(req: NextRequest) {
               flexDirection: "column",
               gap: "20px",
               zIndex: 2,
-              maxWidth: "1000px",
+              maxWidth: "1050px",
             }}
           >
             <div
               style={{
-                fontSize: topic.length > 60 ? "46px" : topic.length > 35 ? "54px" : "64px",
+                fontSize:
+                  displayHeading.length > 70
+                    ? "40px"
+                    : displayHeading.length > 40
+                    ? "50px"
+                    : "62px",
                 fontWeight: 900,
                 lineHeight: 1.15,
                 color: "#FFFFFF",
@@ -115,19 +158,20 @@ export async function GET(req: NextRequest) {
                 textShadow: "0 2px 20px rgba(0,0,0,0.5)",
               }}
             >
-              &ldquo;{topic}&rdquo;
+              {displayHeading.startsWith("“") ? displayHeading : `“${displayHeading}”`}
             </div>
 
-            {subtitle && (
+            {displaySub && (
               <div
                 style={{
-                  fontSize: "24px",
-                  color: "rgba(255, 255, 255, 0.75)",
+                  fontSize: "23px",
+                  color: "rgba(255, 255, 255, 0.8)",
                   lineHeight: 1.4,
                   fontWeight: 400,
+                  maxWidth: "960px",
                 }}
               >
-                {subtitle}
+                {displaySub}
               </div>
             )}
           </div>
@@ -139,7 +183,7 @@ export async function GET(req: NextRequest) {
               alignItems: "center",
               justifyContent: "space-between",
               zIndex: 2,
-              paddingTop: "24px",
+              paddingTop: "22px",
               borderTop: "1px solid rgba(255, 255, 255, 0.1)",
             }}
           >
@@ -161,12 +205,12 @@ export async function GET(req: NextRequest) {
                   alignItems: "center",
                   justifyContent: "center",
                   fontWeight: 800,
-                  fontSize: "18px",
+                  fontSize: "17px",
                 }}
               >
                 {author.charAt(0).toUpperCase()}
               </div>
-              <div style={{ fontSize: "18px", color: "#FFFFFF", fontWeight: 600 }}>
+              <div style={{ fontSize: "17px", color: "#FFFFFF", fontWeight: 600 }}>
                 Presented by {author}
               </div>
             </div>

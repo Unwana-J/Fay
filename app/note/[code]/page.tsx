@@ -17,10 +17,13 @@ import NoteContent from "./NoteContent";
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }): Promise<Metadata> {
   const { code } = await params;
+  const sParams = searchParams ? await searchParams : {};
   const note = decodeSharedNote(code);
 
   if (!note) {
@@ -31,16 +34,33 @@ export async function generateMetadata({
     };
   }
 
+  const highlight =
+    (typeof sParams.highlight === "string"
+      ? sParams.highlight
+      : typeof sParams.q === "string"
+      ? sParams.q
+      : ""
+    ).trim();
+
   // Strip HTML tags (e.g. <p>, <br>, etc.) and trim note to a clean, compelling preview snippet
   const cleanText = note.notes
     .replace(/<[^>]*>/g, " ")
     .replace(/\s+/g, " ")
     .trim();
-  const snippet = cleanText.length > 220 ? cleanText.slice(0, 220) + "…" : cleanText;
-  const title = `"${note.topicText}" · Scholar Dispatch — Fey`;
+  const defaultSnippet = cleanText.length > 220 ? cleanText.slice(0, 220) + "…" : cleanText;
+  const snippet = highlight ? `“${highlight}”` : defaultSnippet;
+
+  const title = highlight
+    ? `“${highlight.length > 60 ? highlight.slice(0, 60) + "…" : highlight}” · ${note.topicText} — Fey`
+    : `"${note.topicText}" · Scholar Dispatch — Fey`;
+
   const byline = `By ${note.author} · ${note.category} · ${note.difficulty}`;
-  const canonicalUrl = `https://fey.lokinlabs.com.ng/note/${code}`;
-  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/note?code=${encodeURIComponent(code)}`;
+  const canonicalUrl = `https://fey.lokinlabs.com.ng/note/${code}${
+    highlight ? `?q=${encodeURIComponent(highlight)}` : ""
+  }`;
+  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/note?code=${encodeURIComponent(code)}${
+    highlight ? `&highlight=${encodeURIComponent(highlight)}` : ""
+  }`;
 
   return {
     title,
@@ -56,7 +76,7 @@ export async function generateMetadata({
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: note.topicText,
+          alt: title,
           type: "image/png",
         },
       ],
@@ -78,10 +98,19 @@ export async function generateMetadata({
 
 export default async function NotePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { code } = await params;
+  const sParams = searchParams ? await searchParams : {};
   const note = decodeSharedNote(code);
-  return <NoteContent initialNote={note} code={code} />;
+  const highlight =
+    typeof sParams.highlight === "string"
+      ? sParams.highlight
+      : typeof sParams.q === "string"
+      ? sParams.q
+      : undefined;
+  return <NoteContent initialNote={note} code={code} initialHighlight={highlight} />;
 }

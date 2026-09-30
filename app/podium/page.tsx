@@ -120,14 +120,18 @@ export default function PodiumPage() {
   const [timerRunning, setTimerRunning] = useState(false);
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
 
+  // Featured slide & quote for sharing / preview card
+  const [featuredSlideIndex, setFeaturedSlideIndex] = useState<number>(0);
+  const [featuredQuote, setFeaturedQuote] = useState<string>("");
+
   // Deterministic share code derived from generatedDeck
   const shareCode = useMemo(() => {
     if (!generatedDeck) return "";
     return encodePodiumDeck(generatedDeck);
   }, [generatedDeck]);
 
-  // Public-facing canonical URL: ensures social crawlers (X, WhatsApp) and TinyURL can resolve it
-  const publicShareUrl = useMemo(() => {
+  // Target full URL including ?slide= and ?q= query parameters
+  const targetShareUrl = useMemo(() => {
     if (!shareCode) return "";
     const isLocalhost =
       typeof window !== "undefined" &&
@@ -138,45 +142,47 @@ export default function PodiumPage() {
       typeof window !== "undefined" && !isLocalhost
         ? window.location.origin
         : "https://fey.lokinlabs.com.ng";
-    return `${origin}/podium/slides/${shareCode}`;
-  }, [shareCode]);
-
-  // Local URL for copying/testing locally when running on dev machine
-  const localShareUrl = useMemo(() => {
-    if (!shareCode) return "";
-    if (typeof window !== "undefined") {
-      return `${window.location.origin}/podium/slides/${shareCode}`;
+    const baseUrl = `${origin}/podium/slides/${shareCode}`;
+    const params = new URLSearchParams();
+    if (featuredSlideIndex > 0) {
+      params.set("slide", String(featuredSlideIndex + 1));
     }
-    return publicShareUrl;
-  }, [shareCode, publicShareUrl]);
+    if (featuredQuote.trim()) {
+      params.set("q", featuredQuote.trim());
+    }
+    const qStr = params.toString();
+    return qStr ? `${baseUrl}?${qStr}` : baseUrl;
+  }, [shareCode, featuredSlideIndex, featuredQuote]);
 
   // Shortened URL state (prefers compact 28-char link for WhatsApp & Status)
   const [shortUrl, setShortUrl] = useState<string>("");
   const [isShortening, setIsShortening] = useState<boolean>(false);
 
   useEffect(() => {
-    if (!publicShareUrl) {
+    if (!targetShareUrl) {
       setShortUrl("");
       setIsShortening(false);
       return;
     }
     let mounted = true;
     setIsShortening(true);
-    getShortenedUrl(publicShareUrl).then((short) => {
+    getShortenedUrl(targetShareUrl).then((short) => {
       if (mounted) {
         setIsShortening(false);
-        if (short && short !== publicShareUrl) {
+        if (short && short !== targetShareUrl) {
           setShortUrl(short);
+        } else {
+          setShortUrl("");
         }
       }
     });
     return () => {
       mounted = false;
     };
-  }, [publicShareUrl]);
+  }, [targetShareUrl]);
 
   // Effective share URL (prefers compact short link)
-  const effectiveShareUrl = shortUrl || publicShareUrl || localShareUrl;
+  const effectiveShareUrl = shortUrl || targetShareUrl;
 
   // ── Countdown timer for notes phase ──────────────────────────────
   useEffect(() => {
@@ -273,11 +279,11 @@ export default function PodiumPage() {
     if (!urlToCopy) {
       if (isShortening) {
         try {
-          const res = await getShortenedUrl(publicShareUrl);
-          if (res && res !== publicShareUrl) urlToCopy = res;
+          const res = await getShortenedUrl(targetShareUrl);
+          if (res && res !== targetShareUrl) urlToCopy = res;
         } catch {}
       }
-      if (!urlToCopy) urlToCopy = publicShareUrl || localShareUrl;
+      if (!urlToCopy) urlToCopy = targetShareUrl;
     }
     if (!urlToCopy) return;
     const ok = await copyTextToClipboard(urlToCopy);
@@ -1380,153 +1386,254 @@ export default function PodiumPage() {
         {/* ════════════════════════════════════════
             SHARE
             ════════════════════════════════════════ */}
-        {phase === "share" && generatedDeck && (
-          <motion.div
-            key="share"
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="max-w-lg mx-auto px-4 sm:px-8 py-12 text-center"
-          >
-            <div className="text-6xl mb-4">🎤</div>
-            <h2
-              className="font-space font-extrabold text-2xl mb-2"
-              style={{ color: "var(--text)" }}
-            >
-              Your slide deck is ready!
-            </h2>
-            <p className="text-sm mb-8" style={{ color: "var(--text-dim)" }}>
-              Share the link — anyone can view your presentation, no account
-              needed.
-            </p>
+        {phase === "share" && generatedDeck && (() => {
+          const featuredSlide =
+            generatedDeck.slides[featuredSlideIndex] || generatedDeck.slides[0];
+          const hasCustomQuote = featuredQuote.trim().length > 0;
+          const displayQuote = hasCustomQuote
+            ? `“${featuredQuote.trim()}”`
+            : featuredSlideIndex > 0
+            ? (featuredSlide.quote ? `“${featuredSlide.quote}”` : featuredSlide.title)
+            : `“${generatedDeck.subtitle || generatedDeck.topic}”`;
 
-            {/* First slide preview */}
-            {generatedDeck.slides[0] && (
+          const shareHeadline = hasCustomQuote
+            ? `${displayQuote}\n\n— From presentation: "${generatedDeck.topic}" 🎤`
+            : featuredSlideIndex > 0
+            ? `${displayQuote} (Slide ${featuredSlideIndex + 1} of ${generatedDeck.slides.length})\n\nFrom presentation: "${generatedDeck.topic}" 🎤`
+            : `Check out my presentation: "${generatedDeck.topic}" 🎤`;
+
+          const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
+            `${shareHeadline}\n\n${effectiveShareUrl}`
+          )}`;
+          const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
+            shareHeadline
+          )}&url=${encodeURIComponent(effectiveShareUrl)}`;
+          const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+            effectiveShareUrl
+          )}`;
+
+          return (
+            <motion.div
+              key="share"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="max-w-xl mx-auto px-4 sm:px-6 py-10 text-center"
+            >
+              <div className="text-5xl mb-3">🎤</div>
+              <h2
+                className="font-space font-extrabold text-2xl mb-1.5"
+                style={{ color: "var(--text)" }}
+              >
+                Your slide deck is ready!
+              </h2>
+              <p className="text-xs sm:text-sm mb-6" style={{ color: "var(--text-dim)" }}>
+                Share anywhere — recipients see your custom preview card and can browse without an account.
+              </p>
+
+              {/* ── Featured Slide / Highlight Section ── */}
               <div
-                className="rounded-2xl overflow-hidden mb-6 border"
+                className="p-4 rounded-2xl border mb-5 text-left"
+                style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
+              >
+                <div className="flex items-center justify-between mb-2.5">
+                  <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                    <Sparkles size={13} style={{ color: "var(--gold)" }} />
+                    Highlight in Preview Card
+                  </span>
+                  <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>
+                    Slide {featuredSlideIndex + 1} of {generatedDeck.slides.length}
+                  </span>
+                </div>
+
+                <p className="text-[11px] mb-3" style={{ color: "var(--text-mute)" }}>
+                  Choose which slide appears as the main image and punchline when sharing on WhatsApp, X, and LinkedIn:
+                </p>
+
+                {/* Slide Chips */}
+                <div className="flex gap-2 overflow-x-auto pb-2 mb-3 scrollbar-none">
+                  {generatedDeck.slides.map((s, idx) => {
+                    const isSelected = featuredSlideIndex === idx;
+                    return (
+                      <button
+                        key={idx}
+                        type="button"
+                        onClick={() => setFeaturedSlideIndex(idx)}
+                        className={`px-3 py-2 rounded-xl text-xs font-bold shrink-0 border transition-all cursor-pointer flex flex-col items-start gap-0.5 text-left ${
+                          isSelected ? "ring-2 ring-[var(--terra)]" : "opacity-75 hover:opacity-100"
+                        }`}
+                        style={{
+                          borderColor: isSelected ? "var(--terra)" : "var(--border-dim)",
+                          background: isSelected ? "color-mix(in srgb, var(--terra) 12%, var(--bg-card))" : "var(--bg-base)",
+                          color: isSelected ? "var(--terra)" : "var(--text-dim)",
+                          minWidth: 100,
+                        }}
+                      >
+                        <span className="font-mono text-[10px]">
+                          {idx === 0 ? "★ Slide 1 (Cover)" : `Slide ${idx + 1}`}
+                        </span>
+                        <span className="max-w-[130px] truncate text-[11px] font-semibold text-[var(--text)]">
+                          {s.title}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+
+                {/* Custom Highlight Punchline */}
+                <div>
+                  <label className="block text-[11px] font-semibold mb-1" style={{ color: "var(--text-dim)" }}>
+                    Custom Punchline or Takeaway (optional override):
+                  </label>
+                  <input
+                    type="text"
+                    value={featuredQuote}
+                    onChange={(e) => setFeaturedQuote(e.target.value)}
+                    placeholder={
+                      featuredSlideIndex > 0
+                        ? (featuredSlide.quote || featuredSlide.title || "e.g. A punchy takeaway from this slide")
+                        : (generatedDeck.subtitle || generatedDeck.topic || "e.g. A bold opening statement")
+                    }
+                    className="w-full px-3 py-2 rounded-xl border bg-transparent text-xs focus:outline-none"
+                    style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                  />
+                </div>
+              </div>
+
+              {/* Dynamic Live Preview Card */}
+              <div
+                className="rounded-2xl overflow-hidden mb-6 border shadow-sm"
                 style={{ borderColor: "var(--border-dim)" }}
               >
                 <div
-                  className="h-40"
-                  style={{ background: generatedDeck.slides[0].bgColor }}
+                  className="h-44 sm:h-52"
+                  style={{ background: featuredSlide.bgColor }}
                 >
-                  <SlideRenderer slide={generatedDeck.slides[0]} isThumb />
+                  <SlideRenderer slide={featuredSlide} isThumb />
+                </div>
+                <div
+                  className="px-4 py-2.5 border-t flex items-center justify-between text-xs"
+                  style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
+                >
+                  <span className="text-[11px] font-serif italic truncate flex-1 text-left mr-2" style={{ color: "var(--text-dim)" }}>
+                    {displayQuote}
+                  </span>
+                  <span
+                    className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full shrink-0"
+                    style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}
+                  >
+                    Card Preview
+                  </span>
                 </div>
               </div>
-            )}
 
-            {/* Link label and compact status badge */}
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold" style={{ color: "var(--text-dim)" }}>
-                Shareable Link:
-              </span>
-              {isShortening ? (
-                <span className="text-[11px] flex items-center gap-1 font-mono text-[var(--gold)] animate-pulse">
-                  <Sparkles size={11} /> Shortening link for WhatsApp...
+              {/* Link label and compact status badge */}
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs font-semibold" style={{ color: "var(--text-dim)" }}>
+                  Shareable Link:
                 </span>
-              ) : shortUrl ? (
-                <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
-                  <Check size={11} /> WhatsApp & Status Ready
-                </span>
-              ) : null}
-            </div>
+                {isShortening ? (
+                  <span className="text-[11px] flex items-center gap-1 font-mono text-[var(--gold)] animate-pulse">
+                    <Sparkles size={11} /> Shortening link for WhatsApp...
+                  </span>
+                ) : shortUrl ? (
+                  <span className="text-[11px] text-emerald-400 font-medium flex items-center gap-1">
+                    <Check size={11} /> WhatsApp &amp; Status Ready
+                  </span>
+                ) : null}
+              </div>
 
-            {/* Copy link row */}
-            <div className="flex gap-2 mb-4">
-              <input
-                readOnly
-                value={effectiveShareUrl}
-                className="flex-1 px-3 py-2.5 rounded-xl border text-xs font-mono bg-transparent focus:outline-none"
-                style={{
-                  borderColor: "var(--border-dim)",
-                  color: "var(--text-dim)",
-                }}
-              />
-              <button
-                onClick={handleCopyLink}
-                className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer transition-all"
-                style={{
-                  background: copied ? "var(--olive)" : "var(--terra)",
-                  color: "#fff",
-                }}
-              >
-                {copied ? <Check size={14} /> : <Copy size={14} />}
-                {copied ? "Copied!" : "Copy"}
-              </button>
-            </div>
+              {/* Copy link row */}
+              <div className="flex gap-2 mb-4">
+                <input
+                  readOnly
+                  value={effectiveShareUrl}
+                  className="flex-1 px-3 py-2.5 rounded-xl border text-xs font-mono bg-transparent focus:outline-none"
+                  style={{
+                    borderColor: "var(--border-dim)",
+                    color: "var(--text-dim)",
+                  }}
+                />
+                <button
+                  onClick={handleCopyLink}
+                  className="px-4 py-2.5 rounded-xl font-bold text-sm flex items-center gap-2 cursor-pointer transition-all"
+                  style={{
+                    background: copied ? "var(--olive)" : "var(--terra)",
+                    color: "#fff",
+                  }}
+                >
+                  {copied ? <Check size={14} /> : <Copy size={14} />}
+                  {copied ? "Copied!" : "Copy"}
+                </button>
+              </div>
 
-            {/* Social share row */}
-            <div className="flex flex-wrap sm:flex-nowrap gap-2.5 mb-6">
-              <a
-                href={`https://api.whatsapp.com/send?text=${encodeURIComponent(
-                  `Check out my presentation: "${generatedDeck.topic}" 🎤\n\n${effectiveShareUrl}`
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 min-w-[120px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
-                style={{
-                  borderColor: "rgba(37, 211, 102, 0.4)",
-                  background: "rgba(37, 211, 102, 0.08)",
-                  color: "#25D366",
-                }}
-              >
-                <span>💬 WhatsApp</span>
-              </a>
-              <a
-                href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
-                  `I just presented: "${generatedDeck.topic}" 🎤`
-                )}&url=${encodeURIComponent(effectiveShareUrl)}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 min-w-[100px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
-                style={{
-                  borderColor: "var(--border-dim)",
-                  color: "var(--text-dim)",
-                }}
-              >
-                𝕏 Share on X
-              </a>
-              <a
-                href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
-                  effectiveShareUrl
-                )}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex-1 min-w-[100px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
-                style={{
-                  borderColor: "var(--border-dim)",
-                  color: "var(--text-dim)",
-                }}
-              >
-                in LinkedIn
-              </a>
-            </div>
+              {/* Social share row */}
+              <div className="flex flex-wrap sm:flex-nowrap gap-2.5 mb-6">
+                <a
+                  href={whatsappShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-[120px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
+                  style={{
+                    borderColor: "rgba(37, 211, 102, 0.4)",
+                    background: "rgba(37, 211, 102, 0.08)",
+                    color: "#25D366",
+                  }}
+                >
+                  <span>💬 WhatsApp</span>
+                </a>
+                <a
+                  href={twitterShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-[100px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
+                  style={{
+                    borderColor: "var(--border-dim)",
+                    color: "var(--text-dim)",
+                  }}
+                >
+                  𝕏 Share on X
+                </a>
+                <a
+                  href={linkedInShareUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 min-w-[100px] py-2.5 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 hover:opacity-80 transition-opacity"
+                  style={{
+                    borderColor: "var(--border-dim)",
+                    color: "var(--text-dim)",
+                  }}
+                >
+                  in LinkedIn
+                </a>
+              </div>
 
-            {/* Nav buttons */}
-            <div className="flex gap-3">
-              <button
-                onClick={() => setPhase("preview")}
-                className="flex-1 py-3 rounded-2xl border font-bold text-sm cursor-pointer hover:opacity-80 transition-opacity"
-                style={{
-                  borderColor: "var(--border-dim)",
-                  color: "var(--text-dim)",
-                }}
-              >
-                ← Back to Preview
-              </button>
-              <button
-                onClick={() => {
-                  reset();
-                  setPhase("lobby");
-                }}
-                className="flex-1 py-3 rounded-2xl font-bold text-sm cursor-pointer hover:opacity-90 transition-opacity"
-                style={{ background: "var(--terra)", color: "#fff" }}
-              >
-                New Presentation
-              </button>
-            </div>
-          </motion.div>
-        )}
+              {/* Nav buttons */}
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPhase("preview")}
+                  className="flex-1 py-3 rounded-2xl border font-bold text-sm cursor-pointer hover:opacity-80 transition-opacity"
+                  style={{
+                    borderColor: "var(--border-dim)",
+                    color: "var(--text-dim)",
+                  }}
+                >
+                  ← Back to Preview
+                </button>
+                <button
+                  onClick={() => {
+                    reset();
+                    setPhase("lobby");
+                  }}
+                  className="flex-1 py-3 rounded-2xl font-bold text-sm cursor-pointer hover:opacity-90 transition-opacity"
+                  style={{ background: "var(--terra)", color: "#fff" }}
+                >
+                  New Presentation
+                </button>
+              </div>
+            </motion.div>
+          );
+        })()}
 
       </AnimatePresence>
     </div>

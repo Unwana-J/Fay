@@ -34,11 +34,14 @@ import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-c
 export default function NoteContent({
   initialNote,
   code,
+  initialHighlight,
 }: {
   initialNote: SharedNotePayload | null;
   code?: string;
+  initialHighlight?: string;
 }) {
   const [note, setNote] = useState<SharedNotePayload | null>(initialNote);
+  const [highlight, setHighlight] = useState<string>(initialHighlight || "");
   const [copied, setCopied] = useState(false);
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [shortUrl, setShortUrl] = useState<string>("");
@@ -49,6 +52,15 @@ export default function NoteContent({
 
   const router = useRouter();
   const { isOnboarded, startSession } = useAppStore();
+
+  useEffect(() => {
+    if (typeof window !== "undefined" && !highlight) {
+      const q =
+        new URLSearchParams(window.location.search).get("q") ||
+        new URLSearchParams(window.location.search).get("highlight");
+      if (q) setHighlight(q);
+    }
+  }, [highlight]);
 
   // Floating highlight-to-quote listener
   useEffect(() => {
@@ -122,17 +134,22 @@ export default function NoteContent({
     }
   }, []);
 
-  function getCanonicalShareUrl() {
+  function getCanonicalShareUrl(quote?: string) {
     const isLocalhost =
       typeof window !== "undefined" &&
       (window.location.hostname === "localhost" ||
         window.location.hostname === "127.0.0.1" ||
         window.location.hostname.endsWith(".local"));
-    const fallbackUrl =
+    const baseOrigin =
       typeof window !== "undefined" && !isLocalhost
-        ? window.location.href
-        : `https://fey.lokinlabs.com.ng/note/${code}`;
-    return shortUrl || fallbackUrl;
+        ? window.location.origin
+        : "https://fey.lokinlabs.com.ng";
+    const baseUrl = `${baseOrigin}/note/${code}`;
+    const cleanQuote = quote?.trim();
+    if (cleanQuote) {
+      return `${baseUrl}?q=${encodeURIComponent(cleanQuote)}`;
+    }
+    return shortUrl || baseUrl;
   }
 
   async function handleCopyLink() {
@@ -148,8 +165,10 @@ export default function NoteContent({
 
   function handleShareTwitter() {
     if (!note) return;
-    const urlToShare = getCanonicalShareUrl();
-    const tweet = `Read this synthesis on "${note.topicText}" — written using the Feynman Technique on Fey.\n\n`;
+    const urlToShare = getCanonicalShareUrl(highlight);
+    const tweet = highlight
+      ? `“${highlight}”\n\n— From my synthesis on "${note.topicText}" via @FeyPlatform:\n`
+      : `Read this synthesis on "${note.topicText}" — written using the Feynman Technique on Fey.\n\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
@@ -157,7 +176,7 @@ export default function NoteContent({
   }
 
   function handleShareLinkedIn() {
-    const urlToShare = getCanonicalShareUrl();
+    const urlToShare = getCanonicalShareUrl(highlight);
     window.open(
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(urlToShare)}`,
       "_blank"
@@ -166,17 +185,24 @@ export default function NoteContent({
 
   function handleShareSelectedQuoteTwitter() {
     if (!note || !selectedText) return;
-    const urlToShare = getCanonicalShareUrl();
-    const tweet = `“${selectedText}”\n\n— from Scholar ${note.author}'s synthesis on "${note.topicText}" on @FeyPlatform:\n`;
+    const urlToShare = getCanonicalShareUrl(selectedText);
+    const tweet = `“${selectedText}”\n\n— from Scholar ${note.author}'s synthesis on "${note.topicText}" via @FeyPlatform:\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }
 
+  function handleShareSelectedQuoteWhatsApp() {
+    if (!note || !selectedText) return;
+    const urlToShare = getCanonicalShareUrl(selectedText);
+    const text = `“${selectedText}”\n\n— Scholar ${note.author} on "${note.topicText}":\n${urlToShare}`;
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
+  }
+
   async function handleCopySelectedQuote() {
     if (!note || !selectedText) return;
-    const urlToShare = getCanonicalShareUrl();
+    const urlToShare = getCanonicalShareUrl(selectedText);
     const ok = await copyTextToClipboard(`“${selectedText}”\n\n— Scholar ${note.author} on "${note.topicText}" via Fey: ${urlToShare}`);
     if (ok) {
       setCopiedQuote(true);
@@ -393,6 +419,32 @@ export default function NoteContent({
           </div>
         </div>
 
+        {/* Featured Excerpt Callout (When opened via a quote/highlight link) */}
+        {highlight && (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mb-8 p-5 sm:p-6 rounded-2xl border surface relative overflow-hidden"
+            style={{
+              borderColor: "rgba(166, 124, 30, 0.4)",
+              background: "color-mix(in srgb, var(--gold) 7%, var(--bg-card))",
+            }}
+          >
+            <div className="flex items-center justify-between mb-2.5">
+              <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--gold)] flex items-center gap-1.5">
+                <Sparkles size={13} className="text-[var(--gold)]" />
+                <span>Featured Excerpt in Link Preview</span>
+              </span>
+              <span className="text-[10px] font-mono text-[var(--text-mute)]">
+                Highlighted Takeaway
+              </span>
+            </div>
+            <blockquote className="font-serif italic text-base sm:text-lg leading-relaxed text-[var(--text)] border-l-2 pl-4 border-[var(--gold)]">
+              &ldquo;{highlight}&rdquo;
+            </blockquote>
+          </motion.div>
+        )}
+
         {/* ── The Manuscript Body ── */}
         <article className="prose-fey mb-12">
           <div
@@ -511,6 +563,14 @@ export default function NoteContent({
               title="Post this quote to X"
             >
               <span>𝕏 Share Quote</span>
+            </button>
+            <button
+              onClick={handleShareSelectedQuoteWhatsApp}
+              className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer hover:opacity-90 transition-opacity"
+              style={{ background: "#25D366", color: "#fff" }}
+              title="Share this quote to WhatsApp"
+            >
+              <span>💬 WhatsApp</span>
             </button>
             <button
               onClick={handleCopySelectedQuote}

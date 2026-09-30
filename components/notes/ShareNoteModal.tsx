@@ -35,6 +35,21 @@ export default function ShareNoteModal({
   const [copied, setCopied] = useState(false);
   const [copiedCard, setCopiedCard] = useState(false);
   const [activeUrl, setActiveUrl] = useState<string>("");
+  const [highlightExcerpt, setHighlightExcerpt] = useState<string>("");
+
+  // Extract clean sentence candidates from the note for 1-click preview selection
+  const sentenceSuggestions = useMemo(() => {
+    if (!note?.notes) return [];
+    const clean = note.notes
+      .replace(/<[^>]*>/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+    const sentences = clean
+      .split(/(?<=[.!?])\s+/)
+      .map((s) => s.trim())
+      .filter((s) => s.length >= 20 && s.length <= 220);
+    return sentences.slice(0, 3);
+  }, [note]);
 
   const fullShareUrl = useMemo(() => {
     if (!note) return "";
@@ -49,10 +64,14 @@ export default function ShareNoteModal({
       typeof window !== "undefined" && !isLocalhost
         ? window.location.origin
         : "https://fey.lokinlabs.com.ng";
-    return `${origin}/note/${code}`;
-  }, [note]);
+    const baseUrl = `${origin}/note/${code}`;
+    if (highlightExcerpt.trim()) {
+      return `${baseUrl}?q=${encodeURIComponent(highlightExcerpt.trim())}`;
+    }
+    return baseUrl;
+  }, [note, highlightExcerpt]);
 
-  // Attempt to shorten the URL when modal opens or note changes
+  // Attempt to shorten the URL when modal opens or highlight changes
   React.useEffect(() => {
     if (!fullShareUrl) {
       setActiveUrl("");
@@ -61,7 +80,7 @@ export default function ShareNoteModal({
     setActiveUrl(fullShareUrl);
     let mounted = true;
     getShortenedUrl(fullShareUrl).then((short) => {
-      if (mounted && short) {
+      if (mounted && short && short !== fullShareUrl) {
         setActiveUrl(short);
       }
     });
@@ -92,9 +111,11 @@ export default function ShareNoteModal({
   function handleShareTwitter() {
     if (!note) return;
     const urlToShare = activeUrl || fullShareUrl;
-    const text = `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on @FeyPlatform:\n\n`;
+    const quotePrefix = highlightExcerpt.trim()
+      ? `“${highlightExcerpt.trim()}”\n\n— From my synthesis on "${note.topicText}" on @FeyPlatform:\n`
+      : `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on @FeyPlatform:\n\n`;
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(urlToShare)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(quotePrefix)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }
@@ -102,7 +123,10 @@ export default function ShareNoteModal({
   function handleShareWhatsApp() {
     if (!note) return;
     const urlToShare = activeUrl || fullShareUrl;
-    const text = `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on @FeyPlatform:\n\n${urlToShare}`;
+    const quotePrefix = highlightExcerpt.trim()
+      ? `“${highlightExcerpt.trim()}”\n\n— From my synthesis on "${note.topicText}":\n`
+      : `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on Fey:\n\n`;
+    const text = `${quotePrefix}${urlToShare}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
   }
 
@@ -113,7 +137,7 @@ export default function ShareNoteModal({
       category: note.category,
       difficulty: note.difficulty,
       author: note.author,
-      notesSnippet: note.notes,
+      notesSnippet: highlightExcerpt.trim() || note.notes,
       speakingSeconds: note.speakingSeconds,
     };
     const success = await copyFeynmanCardToClipboard(cardData);
@@ -167,17 +191,87 @@ export default function ShareNoteModal({
           </button>
         </div>
 
+        {/* Highlight / Excerpt Selector */}
+        <div
+          className="mb-4 p-3.5 rounded-xl border"
+          style={{ borderColor: "var(--border-dim)", background: "var(--bg-panel)" }}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--text)] flex items-center gap-1.5">
+              <Sparkles size={12} className="text-[var(--gold)]" />
+              <span>Feature Quote / Excerpt in Preview</span>
+            </span>
+            {highlightExcerpt.trim() && (
+              <button
+                type="button"
+                onClick={() => setHighlightExcerpt("")}
+                className="text-[10px] font-mono text-[var(--terra)] hover:underline cursor-pointer"
+              >
+                Reset to Full Note
+              </button>
+            )}
+          </div>
+
+          {sentenceSuggestions.length > 0 && (
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1.5 mb-2 scrollbar-none">
+              <button
+                type="button"
+                onClick={() => setHighlightExcerpt("")}
+                className={`px-2.5 py-1 rounded-lg text-[10px] font-mono shrink-0 border transition-all cursor-pointer ${
+                  !highlightExcerpt.trim()
+                    ? "border-[var(--terra)] text-[var(--terra)] bg-[var(--terra)]/10 font-bold"
+                    : "border-[var(--border-dim)] text-[var(--text-mute)] hover:text-[var(--text)]"
+                }`}
+              >
+                Full Note
+              </button>
+              {sentenceSuggestions.map((sentence, idx) => {
+                const isSelected = highlightExcerpt.trim() === sentence;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setHighlightExcerpt(sentence)}
+                    className={`px-2.5 py-1 rounded-lg text-[10px] font-mono shrink-0 border transition-all cursor-pointer max-w-[200px] truncate ${
+                      isSelected
+                        ? "border-[var(--terra)] text-[var(--terra)] bg-[var(--terra)]/10 font-bold"
+                        : "border-[var(--border-dim)] text-[var(--text-mute)] hover:text-[var(--text)]"
+                    }`}
+                    title={sentence}
+                  >
+                    “{sentence.slice(0, 32)}…”
+                  </button>
+                );
+              })}
+            </div>
+          )}
+
+          <input
+            type="text"
+            value={highlightExcerpt}
+            onChange={(e) => setHighlightExcerpt(e.target.value)}
+            placeholder="Type or edit a punchy quote for WhatsApp & X previews..."
+            className="w-full px-3 py-1.5 rounded-lg border bg-transparent text-xs font-serif italic focus:outline-none"
+            style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+          />
+        </div>
+
         {/* Live Card Preview in Fey Editorial Aesthetic */}
         <div className="mb-5">
-          <div className="text-[10px] uppercase font-mono tracking-widest text-[var(--text-mute)] mb-2 flex items-center gap-1.5">
-            <Sparkles size={11} className="text-[var(--gold)]" />
-            <span>Public Preview</span>
+          <div className="text-[10px] uppercase font-mono tracking-widest text-[var(--text-mute)] mb-2 flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <Sparkles size={11} className="text-[var(--gold)]" />
+              <span>Card Preview (WhatsApp / X / LinkedIn)</span>
+            </div>
+            {highlightExcerpt.trim() ? (
+              <span className="text-[10px] text-[var(--gold)] font-mono">Excerpt Featured</span>
+            ) : null}
           </div>
 
           <div
-            className="rounded-xl p-5 border surface relative overflow-hidden"
+            className="rounded-xl p-5 border surface relative overflow-hidden transition-colors"
             style={{
-              borderColor: "var(--border)",
+              borderColor: highlightExcerpt.trim() ? "var(--terra)" : "var(--border)",
               background: "var(--bg-panel)",
             }}
           >
@@ -211,9 +305,13 @@ export default function ShareNoteModal({
             </h3>
 
             <p
-              className="font-serif italic text-xs line-clamp-3 leading-relaxed text-[var(--text-dim)] mb-3"
+              className={`font-serif italic text-xs leading-relaxed mb-3 ${
+                highlightExcerpt.trim()
+                  ? "line-clamp-4 text-[var(--text)] font-medium p-2 rounded-lg bg-[var(--terra)]/8 border border-[var(--terra)]/20"
+                  : "line-clamp-3 text-[var(--text-dim)]"
+              }`}
             >
-              &ldquo;{note.notes}&rdquo;
+              &ldquo;{highlightExcerpt.trim() || note.notes}&rdquo;
             </p>
 
             <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-mute)] pt-2.5 border-t" style={{ borderColor: "var(--border-dim)" }}>

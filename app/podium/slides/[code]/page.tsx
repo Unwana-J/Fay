@@ -11,10 +11,13 @@ import SlidesViewerClient from "./SlidesViewerClient";
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }): Promise<Metadata> {
   const { code } = await params;
+  const sParams = searchParams ? await searchParams : {};
   const deck = decodePodiumDeck(code);
 
   if (!deck) {
@@ -25,10 +28,51 @@ export async function generateMetadata({
     };
   }
 
-  const title = `"${deck.topic}" · The Podium on Fey`;
-  const description = `${deck.subtitle || "A Bold Party Presentation"} — Presented by ${deck.author || "Scholar"} · ${deck.slides.length} slides`;
-  const canonicalUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}`;
-  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/podium?code=${encodeURIComponent(code)}`;
+  const slideRaw = typeof sParams.slide === "string" ? parseInt(sParams.slide, 10) : undefined;
+  const highlightParam =
+    typeof sParams.q === "string"
+      ? sParams.q
+      : typeof sParams.highlight === "string"
+      ? sParams.highlight
+      : undefined;
+
+  const slideIdx =
+    slideRaw && slideRaw >= 1 && slideRaw <= deck.slides.length ? slideRaw - 1 : 0;
+  const featuredSlide = deck.slides[slideIdx];
+
+  let excerpt = highlightParam;
+  if (!excerpt && featuredSlide) {
+    if (slideIdx > 0) {
+      if (featuredSlide.quote) {
+        excerpt = `“${featuredSlide.quote}” ${featuredSlide.attribution || ""}`.trim();
+      } else if (featuredSlide.body) {
+        excerpt = `${featuredSlide.title} — ${featuredSlide.body}`;
+      } else if (featuredSlide.bullets && featuredSlide.bullets.length > 0) {
+        excerpt = `${featuredSlide.title}: ${featuredSlide.bullets.join(" · ")}`;
+      } else {
+        excerpt = featuredSlide.title;
+      }
+    }
+  }
+
+  const title =
+    slideIdx > 0 && featuredSlide?.title
+      ? `"${featuredSlide.title}" · ${deck.topic}`
+      : `"${deck.topic}" · The Podium on Fey`;
+
+  const description = excerpt
+    ? `${excerpt} — Presented by ${deck.author || "Scholar"} · Slide ${slideIdx + 1} of ${deck.slides.length}`
+    : `${deck.subtitle || "A Bold Party Presentation"} — Presented by ${deck.author || "Scholar"} · ${deck.slides.length} slides`;
+
+  const queryParams = new URLSearchParams();
+  queryParams.set("code", code);
+  if (slideIdx > 0) queryParams.set("slide", String(slideIdx + 1));
+  if (excerpt) queryParams.set("highlight", excerpt);
+
+  const canonicalUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}${
+    slideIdx > 0 ? `?slide=${slideIdx + 1}` : ""
+  }`;
+  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/podium?${queryParams.toString()}`;
 
   return {
     title,
@@ -44,7 +88,7 @@ export async function generateMetadata({
           url: ogImageUrl,
           width: 1200,
           height: 630,
-          alt: deck.topic,
+          alt: title,
           type: "image/png",
         },
       ],
@@ -64,10 +108,16 @@ export async function generateMetadata({
 
 export default async function PodiumSlidesPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }) {
   const { code } = await params;
+  const sParams = searchParams ? await searchParams : {};
   const deck = decodePodiumDeck(code);
-  return <SlidesViewerClient initialDeck={deck} code={code} />;
+  const slideRaw = typeof sParams.slide === "string" ? parseInt(sParams.slide, 10) : undefined;
+  const initialSlideIndex =
+    slideRaw && slideRaw >= 1 && deck && slideRaw <= deck.slides.length ? slideRaw - 1 : 0;
+  return <SlidesViewerClient initialDeck={deck} code={code} initialSlideIndex={initialSlideIndex} />;
 }

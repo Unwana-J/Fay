@@ -14,25 +14,32 @@ import FeyLogo from "@/components/ui/FeyLogo";
 interface SlidesViewerClientProps {
   initialDeck: PodiumDeck | null;
   code: string;
+  initialSlideIndex?: number;
 }
 
-export default function SlidesViewerClient({ initialDeck, code }: SlidesViewerClientProps) {
+export default function SlidesViewerClient({
+  initialDeck,
+  code,
+  initialSlideIndex = 0,
+}: SlidesViewerClientProps) {
   const [deck, setDeck] = useState<PodiumDeck | null>(initialDeck);
   const [error, setError] = useState(false);
-  const [currentSlide, setCurrentSlide] = useState(0);
+  const [currentSlide, setCurrentSlide] = useState(initialSlideIndex);
   const [copied, setCopied] = useState(false);
   const [shortUrl, setShortUrl] = useState<string>("");
 
   useEffect(() => {
     if (code) {
-      const publicUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}`;
+      const publicUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}${
+        currentSlide > 0 ? `?slide=${currentSlide + 1}` : ""
+      }`;
       getShortenedUrl(publicUrl).then((res) => {
         if (res && res !== publicUrl) {
           setShortUrl(res);
         }
       });
     }
-  }, [code]);
+  }, [code, currentSlide]);
 
   useEffect(() => {
     if (!deck && code) {
@@ -55,17 +62,14 @@ export default function SlidesViewerClient({ initialDeck, code }: SlidesViewerCl
     return () => window.removeEventListener("keydown", handleKey);
   }, [deck]);
 
+  const getActiveShareUrl = () => {
+    if (shortUrl) return shortUrl;
+    const baseUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}`;
+    return currentSlide > 0 ? `${baseUrl}?slide=${currentSlide + 1}` : baseUrl;
+  };
+
   const handleCopyLink = async () => {
-    const isLocalhost =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname.endsWith(".local"));
-    const fallbackUrl =
-      typeof window !== "undefined" && !isLocalhost
-        ? window.location.href
-        : `https://fey.lokinlabs.com.ng/podium/slides/${code}`;
-    const urlToCopy = shortUrl || fallbackUrl;
+    const urlToCopy = getActiveShareUrl();
     const ok = await copyTextToClipboard(urlToCopy);
     if (ok) {
       setCopied(true);
@@ -75,29 +79,25 @@ export default function SlidesViewerClient({ initialDeck, code }: SlidesViewerCl
 
   const handleShareWhatsApp = () => {
     if (!deck) return;
-    const isLocalhost =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname.endsWith(".local"));
-    const url = shortUrl || (typeof window !== "undefined" && !isLocalhost ? window.location.href : `https://fey.lokinlabs.com.ng/podium/slides/${code}`);
-    const text = `Check out this presentation on "${deck.topic}" 🎤\n\n— Presented by ${deck.author} on Fey:\n${url}`;
+    const url = getActiveShareUrl();
+    const curSlideObj = deck.slides[currentSlide];
+    const slidePrefix =
+      currentSlide > 0 && curSlideObj?.title
+        ? `"${curSlideObj.title}" · Slide ${currentSlide + 1} of ${deck.slides.length}\nFrom: `
+        : "";
+    const text = `${slidePrefix}Check out this presentation on "${deck.topic}" 🎤\n\n— Presented by ${deck.author} on Fey:\n${url}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(text)}`, "_blank");
   };
 
   const handleShareTwitter = () => {
     if (!deck) return;
-    const isLocalhost =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname.endsWith(".local"));
-    const url =
-      shortUrl ||
-      (typeof window !== "undefined" && !isLocalhost
-        ? window.location.href
-        : `https://fey.lokinlabs.com.ng/podium/slides/${code}`);
-    const text = `Check out this presentation on "${deck.topic}" 🎤\n\n— Presented by ${deck.author} via @FeyPlatform:\n`;
+    const url = getActiveShareUrl();
+    const curSlideObj = deck.slides[currentSlide];
+    const slidePrefix =
+      currentSlide > 0 && curSlideObj?.title
+        ? `"${curSlideObj.title}" (Slide ${currentSlide + 1})\n`
+        : "";
+    const text = `${slidePrefix}Check out this presentation on "${deck.topic}" 🎤\n\n— Presented by ${deck.author} via @FeyPlatform:\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
       "_blank"

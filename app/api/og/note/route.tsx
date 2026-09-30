@@ -18,7 +18,10 @@ export async function GET(req: NextRequest) {
       .replace(/<[^>]*>/g, " ")
       .replace(/\s+/g, " ")
       .trim();
-    const snippet = cleanNotes.length > 180 ? cleanNotes.slice(0, 180) + "…" : cleanNotes;
+
+    const highlight = (searchParams.get("highlight") || searchParams.get("q") || "").trim();
+    const snippet = highlight || (cleanNotes.length > 180 ? cleanNotes.slice(0, 180) + "…" : cleanNotes);
+    const isHighlight = Boolean(highlight);
 
     return new ImageResponse(
       (
@@ -29,7 +32,7 @@ export async function GET(req: NextRequest) {
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            padding: "60px 70px",
+            padding: "55px 65px",
             backgroundColor: "#161D19",
             color: "#FFFFFF",
             fontFamily: "sans-serif",
@@ -40,10 +43,10 @@ export async function GET(req: NextRequest) {
           <div
             style={{
               position: "absolute",
-              top: "24px",
-              left: "24px",
-              right: "24px",
-              bottom: "24px",
+              top: "20px",
+              left: "20px",
+              right: "20px",
+              bottom: "20px",
               border: "1px solid rgba(255, 255, 255, 0.12)",
               borderRadius: "28px",
               pointerEvents: "none",
@@ -74,24 +77,28 @@ export async function GET(req: NextRequest) {
               <span style={{ fontSize: "20px" }}>📜</span>
               <span
                 style={{
-                  fontSize: "16px",
+                  fontSize: "15px",
                   fontWeight: 700,
                   letterSpacing: "0.15em",
                   textTransform: "uppercase",
                   color: "#DDAA55",
                 }}
               >
-                Scholar Dispatch · Fey
+                {isHighlight ? "Featured Quote · Fey" : "Scholar Dispatch · Fey"}
               </span>
             </div>
 
             <div
               style={{
-                fontSize: "15px",
+                fontSize: "14px",
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
-                color: "rgba(255, 255, 255, 0.6)",
+                color: "rgba(255, 255, 255, 0.7)",
                 fontWeight: 600,
+                background: "rgba(255, 255, 255, 0.06)",
+                padding: "8px 16px",
+                borderRadius: "999px",
+                border: "1px solid rgba(255, 255, 255, 0.1)",
               }}
             >
               {category}
@@ -105,32 +112,71 @@ export async function GET(req: NextRequest) {
               flexDirection: "column",
               gap: "20px",
               zIndex: 2,
-              maxWidth: "1020px",
+              maxWidth: "1050px",
             }}
           >
-            <div
-              style={{
-                fontSize: topicText.length > 50 ? "46px" : "56px",
-                fontWeight: 900,
-                lineHeight: 1.15,
-                color: "#FFFFFF",
-                letterSpacing: "-0.02em",
-              }}
-            >
-              &ldquo;{topicText}&rdquo;
-            </div>
-
-            {snippet && (
+            {isHighlight ? (
               <div
                 style={{
-                  fontSize: "24px",
-                  color: "rgba(255, 255, 255, 0.78)",
-                  lineHeight: 1.45,
-                  fontWeight: 400,
-                  fontStyle: "italic",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "14px",
                 }}
               >
-                &ldquo;{snippet}&rdquo;
+                <div
+                  style={{
+                    fontSize: snippet.length > 100 ? "34px" : snippet.length > 50 ? "42px" : "50px",
+                    fontWeight: 800,
+                    lineHeight: 1.25,
+                    color: "#FFFFFF",
+                    fontStyle: "italic",
+                  }}
+                >
+                  &ldquo;{snippet}&rdquo;
+                </div>
+                <div
+                  style={{
+                    fontSize: "20px",
+                    color: "#DDAA55",
+                    fontWeight: 600,
+                  }}
+                >
+                  From synthesis on &ldquo;{topicText}&rdquo;
+                </div>
+              </div>
+            ) : (
+              <div
+                style={{
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "18px",
+                }}
+              >
+                <div
+                  style={{
+                    fontSize: topicText.length > 50 ? "46px" : "56px",
+                    fontWeight: 900,
+                    lineHeight: 1.15,
+                    color: "#FFFFFF",
+                    letterSpacing: "-0.02em",
+                  }}
+                >
+                  &ldquo;{topicText}&rdquo;
+                </div>
+
+                {snippet && (
+                  <div
+                    style={{
+                      fontSize: "24px",
+                      color: "rgba(255, 255, 255, 0.78)",
+                      lineHeight: 1.45,
+                      fontWeight: 400,
+                      fontStyle: "italic",
+                    }}
+                  >
+                    &ldquo;{snippet}&rdquo;
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -142,11 +188,11 @@ export async function GET(req: NextRequest) {
               alignItems: "center",
               justifyContent: "space-between",
               zIndex: 2,
-              paddingTop: "24px",
+              paddingTop: "22px",
               borderTop: "1px solid rgba(255, 255, 255, 0.1)",
             }}
           >
-            <div style={{ fontSize: "18px", color: "#FFFFFF", fontWeight: 600 }}>
+            <div style={{ fontSize: "17px", color: "#FFFFFF", fontWeight: 600 }}>
               Articulated by <span style={{ color: "#DDAA55" }}>{author}</span> via Feynman Technique
             </div>
 
