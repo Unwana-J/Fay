@@ -4,6 +4,7 @@ import React from "react";
 import { ArticulateRoom } from "@/lib/articulate-room";
 import { Check, FastForward, Play, Trophy, Users, ArrowRight, Sparkles, AlertTriangle, ShieldCheck, Flag, ThumbsDown, ThumbsUp } from "lucide-react";
 import { motion } from "framer-motion";
+import BoardMap from "@/app/play/BoardMap";
 
 interface RoomRoundEndProps {
   room: ArticulateRoom;
@@ -224,54 +225,50 @@ export default function RoomRoundEnd({
         )}
       </div>
 
-      {/* Total Scoreboard */}
-      <div className="grid grid-cols-2 gap-4">
-        <div
-          className="p-5 rounded-2xl border text-left"
-          style={{
-            borderColor: `${room.teams.teamA.color}40`,
-            backgroundColor: `${room.teams.teamA.color}0D`,
-          }}
-        >
-          <div className="text-xs font-bold text-[var(--text-mute)] uppercase tracking-wider">
-            {room.teams.teamA.name}
-          </div>
-          <div className="font-space font-extrabold text-4xl mt-1" style={{ color: room.teams.teamA.color }}>
-            {room.teams.teamA.score} <span className="text-xs font-normal text-[var(--text-dim)]">pts</span>
-          </div>
-          <div className="text-[11px] text-[var(--text-dim)] mt-1">
-            Goal: {room.settings.scoreGoal} pts
-          </div>
-        </div>
-
-        <div
-          className="p-5 rounded-2xl border text-left"
-          style={{
-            borderColor: `${room.teams.teamB.color}40`,
-            backgroundColor: `${room.teams.teamB.color}0D`,
-          }}
-        >
-          <div className="text-xs font-bold text-[var(--text-mute)] uppercase tracking-wider">
-            {room.teams.teamB.name}
-          </div>
-          <div className="font-space font-extrabold text-4xl mt-1" style={{ color: room.teams.teamB.color }}>
-            {room.teams.teamB.score} <span className="text-xs font-normal text-[var(--text-dim)]">pts</span>
-          </div>
-          <div className="text-[11px] text-[var(--text-dim)] mt-1">
-            Goal: {room.settings.scoreGoal} pts
-          </div>
-        </div>
+      {/* Articulate Board Map Progression (Roadmap from Start to Finish) */}
+      <div className="space-y-2 text-left">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-mute)] block px-1">
+          Articulate Roadmap Progression
+        </span>
+        <BoardMap
+          scoreA={room.teams.teamA.score}
+          scoreB={room.teams.teamB.score}
+          scoreGoal={room.settings.scoreGoal || 20}
+          colorA={room.teams.teamA.color}
+          colorB={room.teams.teamB.color}
+          activeTeam={nextActiveTeamKey}
+          gameMode="classic"
+        />
       </div>
 
-      {/* Next Round CTA */}
-      <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-3">
-        <div className="text-xs text-[var(--text-dim)]">
-          Next turn belongs to{" "}
-          <strong style={{ color: nextTeamColor }}>{nextTeamName}</strong>
+      {/* Next Round CTA with Team Turn Passing */}
+      <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-xs text-[var(--text-dim)]">
+            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: nextTeamColor }} />
+            <span>Next turn: <strong style={{ color: nextTeamColor }}>{nextTeamName}</strong></span>
+          </div>
+          <span className="text-[11px] font-bold text-[var(--text-mute)]">Round {nextRoundNumber}</span>
         </div>
 
-        {isHost ? (
-          <>
+        {myTeam === nextActiveTeamKey ? (
+          <div className="space-y-2">
+            <motion.button
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={onStartNextRound}
+              className="w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition"
+              style={{ backgroundColor: nextTeamColor }}
+            >
+              <Play className="w-5 h-5 fill-current" />
+              I&apos;m Ready — Start {nextTeamName}&apos;s Turn
+            </motion.button>
+            <p className="text-xs text-[var(--text-dim)]">
+              🔒 When you tap start, the room locks for {nextTeamName}&apos;s sprint.
+            </p>
+          </div>
+        ) : isHost ? (
+          <div className="space-y-2">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
@@ -279,18 +276,21 @@ export default function RoomRoundEnd({
               className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition"
             >
               <Play className="w-5 h-5 fill-current" />
-              Lock Room & Start Round {nextRoundNumber}
+              Start Round {nextRoundNumber} ({nextTeamName})
             </motion.button>
             <p className="text-xs text-[var(--text-dim)]">
-              🔒 Room will lock once Round {nextRoundNumber} begins.
+              👑 You can start as Host, or let {nextTeamName} start when they are ready.
             </p>
-          </>
+          </div>
         ) : (
-          <div className="py-2 space-y-1">
+          <div className="py-3 space-y-1">
             <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
-              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-ping" />
-              Waiting for {room.host_name} to launch Round {nextRoundNumber}...
+              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
+              Waiting for {nextTeamName} to start their turn...
             </div>
+            <p className="text-xs text-[var(--text-dim)]">
+              The round will automatically launch on your screen as soon as they tap Start!
+            </p>
           </div>
         )}
       </div>

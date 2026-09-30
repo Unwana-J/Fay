@@ -78,8 +78,8 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           hostId: profile.id,
           hostName: profile.username || "Scholar Host",
           settings: {
-            timerSeconds,
-            scoreGoal,
+            timerSeconds: 60,
+            scoreGoal: scoreGoal || 20,
             categories: selectedCategories,
             difficulty,
           },

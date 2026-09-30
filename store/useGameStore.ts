@@ -95,7 +95,7 @@ const DEFAULT_CATEGORIES: GameCategory[] = ["Object", "Nature", "Person", "Actio
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
-      timerSeconds: 30,
+      timerSeconds: 60,
       selectedCategories: DEFAULT_CATEGORIES,
       difficulty: "mixed",
       numberOfRounds: 3,
