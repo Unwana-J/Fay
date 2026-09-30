@@ -201,49 +201,56 @@ export default function ShareTriviaModal({
           <div
             className="rounded-2xl p-5 border relative overflow-hidden"
             style={{
-              borderColor: "rgba(0, 135, 81, 0.4)",
-              background: "linear-gradient(145deg, #0e1a13 0%, #09100c 100%)",
+              borderColor: "rgba(166, 124, 30, 0.45)",
+              background: "linear-gradient(145deg, #151814 0%, #0D0F0C 100%)",
               color: "#FDFBF7",
+              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
             }}
           >
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[#52B788] flex items-center gap-1">
+            {/* Subtle inner wine hairline */}
+            <div
+              className="absolute inset-1 rounded-xl pointer-events-none"
+              style={{ border: "1px solid rgba(122, 28, 46, 0.35)" }}
+            />
+
+            <div className="flex items-center justify-between mb-3 relative z-10">
+              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--gold)] flex items-center gap-1">
                 <span>🇳🇬 Fey Trivia Arcade</span>
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#FFD166]/15 border border-[#FFD166]/30 text-[#FFD166]">
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#A67C1E]/15 border border-[#A67C1E]/30 text-[#FFD166]">
                 ⚔️ CHALLENGE
               </span>
             </div>
 
-            <div className="flex items-center justify-between gap-4 mb-3">
+            <div className="flex items-center justify-between gap-4 mb-3 relative z-10">
               <div>
-                <span className="inline-block text-xs font-bold px-2 py-0.5 rounded-md bg-[#008751]/30 text-[#52B788] mb-1.5 border border-[#008751]/50">
+                <span className="inline-block text-xs font-bold px-2.5 py-0.5 rounded-md bg-[rgba(122,28,46,0.35)] text-[#FDFBF7] mb-1.5 border border-[rgba(122,28,46,0.7)]">
                   {gradeLabel}
                 </span>
-                <h3 className="font-space font-extrabold text-lg text-white">
-                  {authorName} got {pct}% on Naija Trivia!
+                <h3 className="font-serif font-extrabold text-lg text-white">
+                  {authorName} scored {pct}% on Naija Trivia
                 </h3>
-                <p className="text-xs text-[#FFD166] font-bold">
+                <p className="text-xs text-[#C8C4B7] italic">
                   Can you beat this? 🇳🇬
                 </p>
-                <p className="text-[11px] text-white/60 font-mono mt-0.5">
-                  Answer the exact same {total} questions
+                <p className="text-[11px] text-white/50 font-mono mt-0.5">
+                  Answer the exact same {total} questions on Fey
                 </p>
               </div>
 
-              <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-white/5 border border-[#008751]/40 min-w-[90px]">
+              <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[rgba(25,30,23,0.85)] border border-[rgba(92,106,54,0.55)] min-w-[96px]">
                 <div className="font-space font-black text-3xl text-white">
-                  {score}<span className="text-sm font-normal text-white/50">/{total}</span>
+                  {score}<span className="text-sm font-normal text-white/45">/{total}</span>
                 </div>
-                <div className="text-[10px] font-mono text-[#52B788] font-bold">
-                  {pct}% ACC
+                <div className="text-[10px] font-mono text-[var(--gold)] font-bold">
+                  {pct}% ACCURACY
                 </div>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-white/50">
-              <span>{total * 15}s total duration</span>
-              <span className="text-[#FFD166]">fey.lokinlabs.com.ng</span>
+            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-white/50 relative z-10">
+              <span className="text-[#A67C1E]">Fey Academic Archive</span>
+              <span className="text-white/70">fey.lokinlabs.com.ng</span>
             </div>
           </div>
         </div>

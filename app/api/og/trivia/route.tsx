@@ -23,14 +23,14 @@ export async function GET(req: NextRequest) {
             flexDirection: "column",
             justifyContent: "space-between",
             padding: "54px 64px",
-            backgroundColor: "#0B110E",
-            backgroundImage: "radial-gradient(circle at 85% 15%, rgba(0, 135, 81, 0.22) 0%, transparent 55%), radial-gradient(circle at 15% 85%, rgba(166, 124, 30, 0.18) 0%, transparent 50%)",
-            border: "12px solid #142019",
+            backgroundColor: "#141712",
+            backgroundImage: "radial-gradient(circle at 85% 15%, rgba(166, 124, 30, 0.20) 0%, transparent 55%), radial-gradient(circle at 15% 85%, rgba(122, 28, 46, 0.18) 0%, transparent 50%)",
+            border: "12px solid #1C201A",
             fontFamily: "sans-serif",
             position: "relative",
           }}
         >
-          {/* Subtle inner framing border */}
+          {/* Subtle inner framing border - Antique Gold & Wine Red */}
           <div
             style={{
               position: "absolute",
@@ -38,7 +38,18 @@ export async function GET(req: NextRequest) {
               left: 18,
               right: 18,
               bottom: 18,
-              border: "1px solid rgba(0, 135, 81, 0.35)",
+              border: "1px solid rgba(166, 124, 30, 0.45)",
+              display: "flex",
+            }}
+          />
+          <div
+            style={{
+              position: "absolute",
+              top: 24,
+              left: 24,
+              right: 24,
+              bottom: 24,
+              border: "1px solid rgba(122, 28, 46, 0.35)",
               display: "flex",
             }}
           />
@@ -53,18 +64,18 @@ export async function GET(req: NextRequest) {
               zIndex: 2,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
               <div
                 style={{
-                  width: "36px",
-                  height: "36px",
-                  borderRadius: "10px",
-                  backgroundColor: "rgba(0, 135, 81, 0.25)",
-                  border: "1px solid rgba(0, 135, 81, 0.6)",
+                  width: "40px",
+                  height: "40px",
+                  borderRadius: "12px",
+                  backgroundColor: "rgba(122, 28, 46, 0.35)",
+                  border: "1px solid rgba(122, 28, 46, 0.7)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "20px",
+                  fontSize: "22px",
                 }}
               >
                 🇳🇬
@@ -73,7 +84,7 @@ export async function GET(req: NextRequest) {
                 <span
                   style={{
                     color: "#FDFBF7",
-                    fontSize: "20px",
+                    fontSize: "22px",
                     fontWeight: 900,
                     letterSpacing: "-0.02em",
                   }}
@@ -82,14 +93,14 @@ export async function GET(req: NextRequest) {
                 </span>
                 <span
                   style={{
-                    color: "rgba(253, 251, 247, 0.55)",
-                    fontSize: "11px",
+                    color: "#A67C1E",
+                    fontSize: "12px",
                     fontWeight: 700,
                     letterSpacing: "0.15em",
                     textTransform: "uppercase",
                   }}
                 >
-                  Think Deeper · Test Your Knowledge
+                  Think Deeper · Articulate Clearly
                 </span>
               </div>
             </div>
@@ -99,13 +110,13 @@ export async function GET(req: NextRequest) {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                backgroundColor: "rgba(166, 124, 30, 0.18)",
-                border: "1px solid rgba(166, 124, 30, 0.45)",
-                padding: "6px 14px",
+                backgroundColor: "rgba(166, 124, 30, 0.2)",
+                border: "1px solid rgba(166, 124, 30, 0.55)",
+                padding: "8px 18px",
                 borderRadius: "20px",
               }}
             >
-              <span style={{ fontSize: "12px", color: "#FFD166", fontWeight: 700, letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: "13px", color: "#FFD166", fontWeight: 800, letterSpacing: "0.05em" }}>
                 ⚔️ SCHOLAR CHALLENGE
               </span>
             </div>
@@ -130,14 +141,14 @@ export async function GET(req: NextRequest) {
                 style={{
                   display: "inline-flex",
                   alignItems: "center",
-                  padding: "6px 16px",
+                  padding: "6px 18px",
                   borderRadius: "24px",
-                  backgroundColor: "rgba(0, 135, 81, 0.2)",
-                  border: "1px solid rgba(0, 135, 81, 0.5)",
-                  color: "#52B788",
+                  backgroundColor: "rgba(122, 28, 46, 0.35)",
+                  border: "1px solid rgba(122, 28, 46, 0.8)",
+                  color: "#FDFBF7",
                   fontSize: "16px",
                   fontWeight: 800,
-                  marginBottom: "14px",
+                  marginBottom: "16px",
                   width: "fit-content",
                 }}
               >
@@ -146,7 +157,7 @@ export async function GET(req: NextRequest) {
 
               <h1
                 style={{
-                  fontSize: "42px",
+                  fontSize: "44px",
                   fontWeight: 900,
                   color: "#FDFBF7",
                   lineHeight: 1.15,
@@ -154,14 +165,15 @@ export async function GET(req: NextRequest) {
                   letterSpacing: "-0.03em",
                 }}
               >
-                {by} got {pct}% on Naija Trivia!
+                {by} scored {pct}% on Naija Trivia
               </h1>
 
               <p
                 style={{
                   fontSize: "22px",
                   fontWeight: 700,
-                  color: "#FFD166",
+                  fontStyle: "italic",
+                  color: "#C8C4B7",
                   margin: "0 0 10px 0",
                   lineHeight: 1.3,
                 }}
@@ -172,7 +184,7 @@ export async function GET(req: NextRequest) {
               <p
                 style={{
                   fontSize: "16px",
-                  color: "rgba(253, 251, 247, 0.7)",
+                  color: "rgba(253, 251, 247, 0.65)",
                   margin: 0,
                   lineHeight: 1.45,
                 }}
@@ -188,8 +200,8 @@ export async function GET(req: NextRequest) {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: "rgba(20, 32, 25, 0.85)",
-                border: "2px solid rgba(0, 135, 81, 0.5)",
+                backgroundColor: "rgba(25, 30, 23, 0.88)",
+                border: "2px solid rgba(92, 106, 54, 0.55)",
                 borderRadius: "28px",
                 padding: "32px 48px",
                 minWidth: "300px",
@@ -198,7 +210,7 @@ export async function GET(req: NextRequest) {
             >
               <div
                 style={{
-                  fontSize: "82px",
+                  fontSize: "86px",
                   fontWeight: 900,
                   color: "#FDFBF7",
                   lineHeight: 1,
@@ -207,7 +219,7 @@ export async function GET(req: NextRequest) {
                 }}
               >
                 <span>{score}</span>
-                <span style={{ fontSize: "40px", color: "rgba(253, 251, 247, 0.4)", fontWeight: 700, marginLeft: "4px" }}>
+                <span style={{ fontSize: "42px", color: "rgba(253, 251, 247, 0.45)", fontWeight: 700, marginLeft: "8px" }}>
                   /{total}
                 </span>
               </div>
@@ -218,50 +230,80 @@ export async function GET(req: NextRequest) {
                   alignItems: "center",
                   gap: "6px",
                   marginTop: "12px",
-                  color: "#52B788",
-                  fontSize: "18px",
-                  fontWeight: 800,
                 }}
               >
-                <span>{pct}% Accuracy</span>
-                {xp ? <span style={{ color: "#FFD166" }}>· +{xp} XP</span> : null}
+                <span
+                  style={{
+                    color: "#A67C1E",
+                    fontSize: "15px",
+                    fontWeight: 800,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {pct}% Accuracy
+                </span>
               </div>
+
+              {xp && parseInt(xp, 10) > 0 && (
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                    marginTop: "8px",
+                    backgroundColor: "rgba(166, 124, 30, 0.2)",
+                    border: "1px solid rgba(166, 124, 30, 0.5)",
+                    padding: "4px 12px",
+                    borderRadius: "12px",
+                  }}
+                >
+                  <span style={{ color: "#FFD166", fontSize: "12px", fontWeight: 700 }}>
+                    ⚡ +{xp} XP Earned
+                  </span>
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Footer Callout */}
+          {/* Bottom Academic Provenance Banner */}
           <div
             style={{
               display: "flex",
               justifyContent: "space-between",
               alignItems: "center",
               width: "100%",
-              paddingTop: "20px",
-              borderTop: "1px solid rgba(253, 251, 247, 0.12)",
+              paddingTop: "18px",
+              borderTop: "1px solid rgba(166, 124, 30, 0.35)",
               zIndex: 2,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-              <span style={{ fontSize: "16px", color: "#FDFBF7", fontWeight: 700 }}>
-                🇳🇬 1,000+ Curated Questions · Free on Fey
+              <span
+                style={{
+                  color: "#A67C1E",
+                  fontSize: "13px",
+                  fontWeight: 800,
+                  letterSpacing: "0.08em",
+                  textTransform: "uppercase",
+                }}
+              >
+                FEY ACADEMIC ARCHIVE · PROOF OF INTELLECT
               </span>
             </div>
 
-            <div
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "8px",
-                backgroundColor: "#008751",
-                color: "#FFFFFF",
-                padding: "10px 22px",
-                borderRadius: "14px",
-                fontSize: "14px",
-                fontWeight: 800,
-                letterSpacing: "0.02em",
-              }}
-            >
-              <span>Accept Challenge →</span>
+            <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
+              <span style={{ color: "rgba(253, 251, 247, 0.5)", fontSize: "13px" }}>Play at:</span>
+              <span
+                style={{
+                  color: "#FDFBF7",
+                  fontSize: "13px",
+                  fontWeight: 700,
+                  fontFamily: "monospace",
+                }}
+              >
+                fey.lokinlabs.com.ng/games/trivia
+              </span>
             </div>
           </div>
         </div>
@@ -271,9 +313,9 @@ export async function GET(req: NextRequest) {
         height: 630,
       }
     );
-  } catch (e: any) {
-    return new Response(`Failed to generate trivia image: ${e.message}`, {
-      status: 500,
-    });
+  } catch (e: unknown) {
+    const message = e instanceof Error ? e.message : "Internal Error";
+    console.error("OG trivia generation error:", message);
+    return new Response("Failed to generate trivia OG image", { status: 500 });
   }
 }
