@@ -180,8 +180,23 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
 
       {/* Global Leaderboard Tab */}
       {tab === "global" && (
-        <div className="surface rounded-2xl border overflow-hidden shadow-sm">
-          <div className="divide-y" style={{ borderColor: "var(--border-dim)" }}>
+        entries.length === 0 || (entries.length === 1 && entries[0].isUser && entries[0].gamesPlayed === 0) ? (
+            <div className="surface rounded-2xl p-8 border text-center space-y-3" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="w-12 h-12 rounded-xl bg-[var(--olive)]/10 text-[var(--olive)] mx-auto flex items-center justify-center text-2xl">
+                🏆
+              </div>
+              <div>
+                <h4 className="font-space font-bold text-sm mb-1" style={{ color: "var(--text)" }}>
+                  Leaderboard Awaits Its First Scholars
+                </h4>
+                <p className="text-xs max-w-sm mx-auto" style={{ color: "var(--text-dim)" }}>
+                  Play a round or challenge your friends! As soon as anyone takes the quiz, their real score appears right here in real time.
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="surface rounded-2xl border overflow-hidden shadow-sm">
+              <div className="divide-y" style={{ borderColor: "var(--border-dim)" }}>
             {entries.map((entry, idx) => {
               const isTopThree = (entry.rank || 0) <= 3;
 
@@ -267,8 +282,9 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                 </motion.div>
               );
             })}
+            </div>
           </div>
-        </div>
+        )
       )}
 
       {/* Personal Bests Tab */}

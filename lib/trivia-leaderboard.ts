@@ -16,87 +16,6 @@ export interface TriviaScholarEntry {
   badgeColor?: string;
 }
 
-// Curated Nigerian scholars reflecting Fey's high-intellectual editorial world
-export const BASE_COMMUNITY_SCHOLARS: Omit<TriviaScholarEntry, "isUser" | "rank" | "rankBadge" | "badgeColor">[] = [
-  {
-    id: "scholar-amina-bello",
-    name: "Amina Bello",
-    avatar: "/avatars/avatar-orator.svg",
-    title: "Grand Historian · Kano",
-    bestScore: 24,
-    bestTotal: 25,
-    bestPct: 96,
-    gamesPlayed: 38,
-    triviaXP: 1840,
-  },
-  {
-    id: "scholar-chidi-nnamdi",
-    name: "Chidi Nnamdi",
-    avatar: "/avatars/avatar-philosopher.svg",
-    title: "Naija Savant · Enugu",
-    bestScore: 19,
-    bestTotal: 20,
-    bestPct: 95,
-    gamesPlayed: 31,
-    triviaXP: 1520,
-  },
-  {
-    id: "scholar-damilola-bakare",
-    name: "Damilola Bakare",
-    avatar: "/avatars/avatar-luminary.svg",
-    title: "Pop Culture Oracle · Lagos",
-    bestScore: 14,
-    bestTotal: 15,
-    bestPct: 93,
-    gamesPlayed: 25,
-    triviaXP: 1260,
-  },
-  {
-    id: "scholar-ngozi-eze",
-    name: "Ngozi Eze",
-    avatar: "/avatars/avatar-scholar.svg",
-    title: "Polymath of General Knowledge · Abuja",
-    bestScore: 13,
-    bestTotal: 15,
-    bestPct: 87,
-    gamesPlayed: 20,
-    triviaXP: 990,
-  },
-  {
-    id: "scholar-tunde-oladipo",
-    name: "Tunde Oladipo",
-    avatar: "/avatars/avatar-alchemist.svg",
-    title: "Benin & Nok Specialist · Ibadan",
-    bestScore: 12,
-    bestTotal: 15,
-    bestPct: 80,
-    gamesPlayed: 16,
-    triviaXP: 810,
-  },
-  {
-    id: "scholar-emeka-okeke",
-    name: "Emeka Okeke",
-    avatar: "/avatars/avatar-pioneer.svg",
-    title: "Nollywood & Highlife Archivist · Asaba",
-    bestScore: 11,
-    bestTotal: 15,
-    bestPct: 73,
-    gamesPlayed: 14,
-    triviaXP: 680,
-  },
-  {
-    id: "scholar-fatima-danjuma",
-    name: "Fatima Danjuma",
-    avatar: "/avatars/avatar-architect.svg",
-    title: "Caliphate & Sahel Scholar · Sokoto",
-    bestScore: 10,
-    bestTotal: 15,
-    bestPct: 67,
-    gamesPlayed: 11,
-    triviaXP: 540,
-  },
-];
-
 export interface CloudTriviaScore {
   id: string;
   username: string;
@@ -110,7 +29,8 @@ export interface CloudTriviaScore {
 }
 
 /**
- * Computes leaderboard entries combining base scholars, live Supabase cloud scores, and the user's local stats.
+ * Computes leaderboard entries combining live Supabase cloud scores and the user's local stats.
+ * Zero dummy data: Only real players who have taken the quiz appear.
  */
 export function getTriviaLeaderboard(
   profile: UserProfile,
@@ -143,11 +63,11 @@ export function getTriviaLeaderboard(
     avatar: profile.avatar || "/avatars/avatar-scholar.svg",
     title: gamesPlayed > 0
       ? bestPct >= 90
-        ? "Naija Grandmaster · Contender"
+        ? "Naija Grandmaster"
         : bestPct >= 70
-        ? "Rising Scholar · Challenger"
-        : "Curious Learner · Aspirant"
-      : "Scholarly Aspirant · New",
+        ? "Rising Scholar"
+        : "Curious Learner"
+      : "New Challenger",
     bestScore,
     bestTotal,
     bestPct,
@@ -163,7 +83,7 @@ export function getTriviaLeaderboard(
       id: `cloud-${c.id || c.username}`,
       name: c.username,
       avatar: c.avatar || "/avatars/avatar-scholar.svg",
-      title: c.pct >= 90 ? "Naija Titan · Peer" : c.pct >= 70 ? "Scholar · Peer" : "Challenger · Peer",
+      title: c.pct >= 90 ? "Naija Titan" : c.pct >= 70 ? "Scholar" : "Challenger",
       bestScore: c.score,
       bestTotal: c.total,
       bestPct: c.pct,
@@ -172,11 +92,13 @@ export function getTriviaLeaderboard(
       isUser: false,
     }));
 
-  const allEntries: TriviaScholarEntry[] = [
-    ...BASE_COMMUNITY_SCHOLARS.map((s) => ({ ...s, isUser: false })),
-    ...cloudEntries,
-    userEntry,
-  ];
+  // Only include user if they have played at least once OR if no cloud scores exist yet
+  const allEntries: TriviaScholarEntry[] = [];
+
+  cloudEntries.forEach((e) => allEntries.push(e));
+
+  // Add the current user
+  allEntries.push(userEntry);
 
   // Sort by Best Accuracy % descending, then by Trivia XP descending, then by Games Played descending
   allEntries.sort((a, b) => {
