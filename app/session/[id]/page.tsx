@@ -22,6 +22,7 @@ import ShareNoteModal from "@/components/notes/ShareNoteModal";
 import { encodeSharedNote } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
+import { analytics } from "@/lib/analytics";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -436,6 +437,7 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
   const [countdown, setCountdown] = useState(3);
   const [secondsLeft, setSecondsLeft] = useState(TOTAL);
   const [actualElapsed, setActualElapsed] = useState(0);
+  const [retryCount, setRetryCount] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [analyser, setAnalyser] = useState<AnalyserNode | null>(null);
@@ -606,18 +608,34 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
 
             <div className="flex gap-3 w-full">
               <button
-                onClick={() => { setPhase("countdown"); setCountdown(3); setSecondsLeft(TOTAL); setActualElapsed(0); setRecordedBlob(null); setAudioUrl(null); }}
+                onClick={() => {
+                  setRetryCount((c) => c + 1);
+                  setPhase("countdown");
+                  setCountdown(3);
+                  setSecondsLeft(TOTAL);
+                  setActualElapsed(0);
+                  setRecordedBlob(null);
+                  setAudioUrl(null);
+                }}
                 className="btn-ghost flex-1"
               >
                 <RefreshCcw size={13} className="mr-1" /> Retry
               </button>
               <button
-                onClick={() => onComplete(actualElapsed, recordedBlob)}
+                onClick={() => {
+                  analytics.trackAudioRecorded({
+                    topicId: topic.id,
+                    durationSeconds: actualElapsed,
+                    retryCount,
+                  });
+                  onComplete(actualElapsed, recordedBlob);
+                }}
                 className="btn-terra flex-1"
               >
                 Continue <ChevronRight size={14} />
               </button>
             </div>
+
           </motion.div>
         )}
       </AnimatePresence>
@@ -959,6 +977,10 @@ function StageComplete({
       xpEarned,
     };
     const success = await copyFeynmanCardToClipboard(cardData);
+    analytics.trackProofCardShared({
+      topicId,
+      method: success ? "clipboard" : "download",
+    });
     if (success) {
       setCopiedCardImage(true);
       setTimeout(() => setCopiedCardImage(false), 2500);
@@ -968,6 +990,10 @@ function StageComplete({
   }
 
   function handleShareLinkedIn() {
+    analytics.track("proof_card_shared", {
+      topicId,
+      method: "linkedin",
+    });
     window.open(
       `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(activeShareUrl)}`,
       "_blank"

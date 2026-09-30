@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
 import OnboardingModal from "./OnboardingModal";
+import PreserveScholarshipModal from "./PreserveScholarshipModal";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
@@ -20,6 +21,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
     <>
       {children}
       {mounted && !isOnboarded && !isPublicNote && <OnboardingModal isOpen={true} />}
+      {mounted && isOnboarded && !isPublicNote && <PreserveScholarshipModal />}
     </>
   );
 }
+

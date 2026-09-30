@@ -3,6 +3,7 @@ import { persist } from "zustand/middleware";
 import { type Topic, type Difficulty, DIFFICULTY_XP } from "@/lib/topics";
 import { checkNewAchievements, type AchievementStats } from "@/lib/achievements";
 import { todayStr, daysBetween, uid } from "@/lib/utils";
+import { analytics } from "@/lib/analytics";
 
 export interface CompletedSession {
   id: string;
@@ -58,6 +59,8 @@ export interface UserProfile {
   xp: number;
   unlockedAchievements: string[];
   createdAt?: number;
+  email?: string;
+  hasClaimedAccount?: boolean;
 }
 
 export interface AppState {
@@ -65,9 +68,13 @@ export interface AppState {
   isOnboarded: boolean;
   createAccount: (data: { username: string; avatar: string; bio?: string; interests: string[] }) => void;
   resetUserData: () => void;
+  claimAccount: (email: string) => void;
+  dismissClaimAccountPrompt: () => void;
+  claimPromptDismissed: boolean;
 
   // Profile
   profile: UserProfile;
+
 
   // Sessions
   sessions: CompletedSession[];
@@ -178,11 +185,13 @@ export const useAppStore = create<AppState>()(
       seenTriviaQuestionIds: [],
 
       createAccount: ({ username, avatar, bio, interests }) => {
+        const state = get();
+        const profileId = state.profile.id || uid();
         set((s) => ({
           isOnboarded: true,
           profile: {
             ...s.profile,
-            id: s.profile.id || uid(),
+            id: profileId,
             username: username.trim(),
             avatar: avatar || "/avatars/avatar-scholar.svg",
             bio: bio?.trim() || "Building knowledge one topic at a time.",
@@ -194,9 +203,19 @@ export const useAppStore = create<AppState>()(
             enabledCategories: interests.length > 0 ? interests : s.settings.enabledCategories,
           },
         }));
+        analytics.identify(profileId, {
+          username: username.trim(),
+          bio: bio?.trim(),
+          interests,
+        });
+        analytics.track("onboarding_completed", {
+          username: username.trim(),
+          interests,
+        });
       },
 
       resetUserData: () => {
+        analytics.reset();
         set({
           isOnboarded: false,
           profile: {
@@ -221,8 +240,43 @@ export const useAppStore = create<AppState>()(
           claimedQuestIds: [],
           seenTriviaQuestionIds: [],
           customTopics: [],
+          claimPromptDismissed: false,
         });
       },
+
+      claimPromptDismissed: false,
+
+      claimAccount: (email: string) => {
+        const trimmed = email.trim().toLowerCase();
+        set((s) => ({
+          profile: {
+            ...s.profile,
+            email: trimmed,
+            hasClaimedAccount: true,
+          },
+          claimPromptDismissed: true,
+        }));
+        const state = get();
+        analytics.identify(state.profile.id, {
+          email: trimmed,
+          username: state.profile.username,
+          hasClaimedAccount: true,
+        });
+        analytics.trackAccountClaimPrompt({
+          streakCount: state.streak.current,
+          action: "submitted",
+          email: trimmed,
+        });
+      },
+
+      dismissClaimAccountPrompt: () => {
+        set({ claimPromptDismissed: true });
+        analytics.trackAccountClaimPrompt({
+          streakCount: get().streak.current,
+          action: "dismissed",
+        });
+      },
+
 
       startSession: (topic, researchMin, initialStage = "research") => {
         const id = uid();
@@ -237,10 +291,24 @@ export const useAppStore = create<AppState>()(
             ...(initialStage === "speaking" ? { researchCompletedAt: Date.now() } : {}),
           },
         });
+        analytics.trackSprintStarted({
+          topicId: topic.id,
+          topicText: topic.text,
+          category: topic.category,
+          difficulty: topic.difficulty,
+          mode: initialStage === "speaking" ? "impromptu" : "standard",
+        });
         return id;
       },
 
       updateActiveSessionStage: (stage) => {
+        const current = get().activeSession;
+        if (current) {
+          analytics.trackSprintStage({
+            topicId: current.topic.id,
+            stage,
+          });
+        }
         set((s) => ({
           activeSession: s.activeSession
             ? {
@@ -357,6 +425,21 @@ export const useAppStore = create<AppState>()(
             xp: newXP + achievementXP,
             unlockedAchievements: [...state.profile.unlockedAchievements, ...newAchievementIds],
           },
+        });
+
+        analytics.trackSprintCompleted({
+          topicId: topic.id,
+          topicText: topic.text,
+          category: topic.category,
+          difficulty: topic.difficulty,
+          xpEarned: xpEarned + achievementXP,
+          durationSeconds: data.speakingSeconds,
+          ratings: data.ratings,
+        });
+
+        analytics.trackStreakUpdated({
+          streakCount: currentStreak,
+          shieldsRemaining: remainingShields,
         });
 
         return { xpEarned: xpEarned + achievementXP, newAchievements: newAchievementIds };

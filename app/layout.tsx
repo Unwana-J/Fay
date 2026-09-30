@@ -29,6 +29,7 @@ export const metadata: Metadata = {
 };
 
 import AppLayout from "@/components/ui/AppLayout";
+import { PostHogProvider } from "@/components/analytics/PostHogProvider";
 
 export default function RootLayout({
   children,
@@ -41,8 +42,11 @@ export default function RootLayout({
         className={`${inter.variable} ${spaceGrotesk.variable} ${lora.variable} font-sans antialiased`}
         style={{ background: "var(--bg-base)", color: "var(--text)" }}
       >
-        <AppLayout>{children}</AppLayout>
+        <PostHogProvider>
+          <AppLayout>{children}</AppLayout>
+        </PostHogProvider>
       </body>
     </html>
   );
 }
+

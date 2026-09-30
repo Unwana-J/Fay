@@ -18,6 +18,7 @@ import FeyLogo from "@/components/ui/FeyLogo";
 import FocusCategoryModal from "@/components/dashboard/FocusCategoryModal";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { getDailyQuests } from "@/lib/quests";
+import { analytics } from "@/lib/analytics";
 
 const DAYS_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -307,6 +308,10 @@ export default function Dashboard() {
 
   function handleSkipTopic() {
     if (spinning) return;
+    analytics.trackRouletteSpun({
+      category: suggestedTopic.category,
+      difficulty: suggestedTopic.difficulty,
+    });
     setSpinning(true);
     setTimeout(() => {
       setSkippedToday((prev) => [...prev, suggestedTopic.id]);
