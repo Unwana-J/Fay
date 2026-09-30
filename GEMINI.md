@@ -36,7 +36,7 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 ### 2.4. Games & The Parlor
 - **The Podium (`/podium`)**: Party slide presentation game. Generates bold 5-slide decks with Gemini 3.8 Flash from 60+ hot-takes or custom topics. Features split-panel inline slide editing, photo/meme uploads with client canvas compression, presenter mode, and zero-database shareable deck links (`/podium/slides/[code]`).
 - **Constellation Graph (`/constellation`)**: Interactive ReactFlow canvas showing topical proximity and recommending adjacent disciplines based on completed sessions.
-- **Trivia Arcade (`/games/trivia`)**: 1,000+ curated questions with countdown timers, scoring multipliers, detailed explanations, and local deduplication.
+- **Trivia Arcade (`/games/trivia`)**: 1,000+ curated questions with countdown timers, scoring multipliers, detailed explanations, and local deduplication. Includes head-to-head challenge links (`?q=...`) with TinyURL shortening, dynamic OG share preview cards, round history archiving with instant challenge resending, replay deck capabilities, and a live competitive Scholar Leaderboard combining Nigerian intellectual titans with real-time user rankings.
 - **Word Description Party Game (`/play`)**: Local multiplayer team game with speech recognition and Google Gemini AI referee (`/api/ai/validate`).
 - **Dashboard Parlor Launcher**: 3-card quick-access parlor section on the dashboard for instant game play.
 
@@ -44,7 +44,7 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 - **Impromptu Articulation (Two-Minute Rule)**: Direct-to-speech sprint option on the daily suggested topic that bypasses research for users who want to prove their existing understanding in 90 seconds.
 - **Daily Vows (3 Daily Quests)**: Deterministic daily micro-quests resetting at midnight (Daily Voice, Sustained Articulation, Conviction & Clarity) with claimable XP bonuses.
 - **Loss Aversion (Scholar's Seal / Streak Freeze)**: Users hold seals (default 1) that automatically protect active streaks if they miss a single day. Additional seals can be acquired for 150 XP.
-- **Store Migration v7**: Seamlessly hydrates user profiles with streak shields, quest tracking, and difficulty mode preferences.
+- **Store Migration v8**: Seamlessly hydrates user profiles with streak shields, quest tracking, difficulty preferences, and persisted trivia round history.
 
 ### 2.6. Viral Growth Loops & Social Proof
 - **Portable URL State**: Notes and slide decks are compressed via `lz-string` directly into the URL (`/note/[code]`, `/podium/slides/[code]`), allowing instant public sharing without database dependencies.
