@@ -12,6 +12,75 @@ export async function GET(req: NextRequest) {
     const by = searchParams.get("by") || "Scholar";
     const grade = searchParams.get("grade") || (parseInt(pct, 10) >= 80 ? "Naija Expert! 🏆" : parseInt(pct, 10) >= 60 ? "Sharp Sharp! 🎯" : parseInt(pct, 10) >= 40 ? "Not bad o! 🙌" : "Keep Studying! 📚");
     const xp = searchParams.get("xp");
+    const theme = searchParams.get("theme") || "parchment";
+    const isParchment = theme === "parchment";
+
+    // ── Editorial Color Palette ──
+    const colors = isParchment
+      ? {
+          bg: "#F4EFE6",
+          bgGradient: "radial-gradient(circle at 90% 10%, rgba(166, 124, 30, 0.08) 0%, transparent 50%), radial-gradient(circle at 10% 90%, rgba(122, 28, 46, 0.06) 0%, transparent 45%)",
+          outerBorder: "#444E2C", // Forest Olive
+          innerBorder: "rgba(166, 124, 30, 0.45)", // Antique Gold
+          cornerPips: "#A67C1E",
+          brandHeader: "#444E2C",
+          brandSub: "#6E7260",
+          headline: "#1E2211", // Deep forest black-brown
+          subtitle: "#525645",
+          bodyText: "#6E7260",
+          cardBg: "#FDFCFA", // Warm Ivory Card
+          cardBorder: "rgba(68, 78, 44, 0.22)",
+          cardShadow: "0 10px 30px rgba(68, 78, 44, 0.08)",
+          heroScore: "#7A1C2E", // Wine Red
+          heroDenominator: "#7D8171",
+          accuracyPillBg: "rgba(68, 78, 44, 0.08)",
+          accuracyPillBorder: "rgba(68, 78, 44, 0.22)",
+          accuracyPillText: "#333C1A",
+          gradeBg: "#7A1C2E", // Burgundy
+          gradeBorder: "#58101E",
+          gradeText: "#FDFBF7",
+          challengePillBg: "rgba(166, 124, 30, 0.12)",
+          challengePillBorder: "rgba(166, 124, 30, 0.35)",
+          challengePillText: "#8C6512",
+          xpBg: "#EDE5D6",
+          xpBorder: "#A67C1E",
+          xpText: "#8C6512",
+          footerBorder: "rgba(68, 78, 44, 0.25)",
+          footerBrand: "#444E2C",
+          footerUrl: "#7A1C2E",
+        }
+      : {
+          bg: "#141712",
+          bgGradient: "radial-gradient(circle at 85% 15%, rgba(166, 124, 30, 0.20) 0%, transparent 55%), radial-gradient(circle at 15% 85%, rgba(122, 28, 46, 0.18) 0%, transparent 50%)",
+          outerBorder: "rgba(197, 160, 89, 0.65)",
+          innerBorder: "rgba(122, 28, 46, 0.55)",
+          cornerPips: "#D4AF37",
+          brandHeader: "#D4AF37",
+          brandSub: "#A5AA9B",
+          headline: "#FDFBF7",
+          subtitle: "#C8C4B7",
+          bodyText: "rgba(253, 251, 247, 0.65)",
+          cardBg: "rgba(25, 33, 26, 0.88)",
+          cardBorder: "rgba(92, 106, 54, 0.55)",
+          cardShadow: "0 20px 50px rgba(0,0,0,0.5)",
+          heroScore: "#FDFBF7",
+          heroDenominator: "rgba(253, 251, 247, 0.45)",
+          accuracyPillBg: "rgba(197, 160, 89, 0.12)",
+          accuracyPillBorder: "rgba(197, 160, 89, 0.35)",
+          accuracyPillText: "#FFD166",
+          gradeBg: "rgba(122, 28, 46, 0.45)",
+          gradeBorder: "rgba(122, 28, 46, 0.9)",
+          gradeText: "#FDFBF7",
+          challengePillBg: "rgba(166, 124, 30, 0.2)",
+          challengePillBorder: "rgba(166, 124, 30, 0.55)",
+          challengePillText: "#FFD166",
+          xpBg: "rgba(166, 124, 30, 0.2)",
+          xpBorder: "rgba(166, 124, 30, 0.5)",
+          xpText: "#FFD166",
+          footerBorder: "rgba(166, 124, 30, 0.35)",
+          footerBrand: "#A67C1E",
+          footerUrl: "#FDFBF7",
+        };
 
     return new ImageResponse(
       (
@@ -22,26 +91,14 @@ export async function GET(req: NextRequest) {
             display: "flex",
             flexDirection: "column",
             justifyContent: "space-between",
-            padding: "54px 64px",
-            backgroundColor: "#141712",
-            backgroundImage: "radial-gradient(circle at 85% 15%, rgba(166, 124, 30, 0.20) 0%, transparent 55%), radial-gradient(circle at 15% 85%, rgba(122, 28, 46, 0.18) 0%, transparent 50%)",
-            border: "12px solid #1C201A",
+            padding: "48px 56px",
+            backgroundColor: colors.bg,
+            backgroundImage: colors.bgGradient,
             fontFamily: "sans-serif",
             position: "relative",
           }}
         >
-          {/* Subtle inner framing border - Antique Gold & Wine Red */}
-          <div
-            style={{
-              position: "absolute",
-              top: 18,
-              left: 18,
-              right: 18,
-              bottom: 18,
-              border: "1px solid rgba(166, 124, 30, 0.45)",
-              display: "flex",
-            }}
-          />
+          {/* Outer Framing Border */}
           <div
             style={{
               position: "absolute",
@@ -49,7 +106,19 @@ export async function GET(req: NextRequest) {
               left: 24,
               right: 24,
               bottom: 24,
-              border: "1px solid rgba(122, 28, 46, 0.35)",
+              border: `2px solid ${colors.outerBorder}`,
+              display: "flex",
+            }}
+          />
+          {/* Inner Hairline Framing */}
+          <div
+            style={{
+              position: "absolute",
+              top: 32,
+              left: 32,
+              right: 32,
+              bottom: 32,
+              border: `1px solid ${colors.innerBorder}`,
               display: "flex",
             }}
           />
@@ -64,18 +133,18 @@ export async function GET(req: NextRequest) {
               zIndex: 2,
             }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: "14px" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
               <div
                 style={{
-                  width: "40px",
-                  height: "40px",
-                  borderRadius: "12px",
-                  backgroundColor: "rgba(122, 28, 46, 0.35)",
-                  border: "1px solid rgba(122, 28, 46, 0.7)",
+                  width: "38px",
+                  height: "38px",
+                  borderRadius: "10px",
+                  backgroundColor: isParchment ? "rgba(68, 78, 44, 0.12)" : "rgba(122, 28, 46, 0.35)",
+                  border: isParchment ? "1px solid rgba(68, 78, 44, 0.25)" : "1px solid rgba(122, 28, 46, 0.7)",
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "center",
-                  fontSize: "22px",
+                  fontSize: "20px",
                 }}
               >
                 🇳🇬
@@ -83,24 +152,24 @@ export async function GET(req: NextRequest) {
               <div style={{ display: "flex", flexDirection: "column" }}>
                 <span
                   style={{
-                    color: "#FDFBF7",
-                    fontSize: "22px",
+                    color: colors.brandHeader,
+                    fontSize: "20px",
                     fontWeight: 900,
-                    letterSpacing: "-0.02em",
+                    letterSpacing: "-0.01em",
                   }}
                 >
-                  Fey Trivia Arcade
+                  Fey Scholar Dispatch
                 </span>
                 <span
                   style={{
-                    color: "#A67C1E",
-                    fontSize: "12px",
+                    color: colors.brandSub,
+                    fontSize: "11px",
                     fontWeight: 700,
-                    letterSpacing: "0.15em",
+                    letterSpacing: "0.14em",
                     textTransform: "uppercase",
                   }}
                 >
-                  Think Deeper · Articulate Clearly
+                  Naija Trivia Arcade · Proof of Intellect
                 </span>
               </div>
             </div>
@@ -110,13 +179,13 @@ export async function GET(req: NextRequest) {
                 display: "flex",
                 alignItems: "center",
                 gap: "8px",
-                backgroundColor: "rgba(166, 124, 30, 0.2)",
-                border: "1px solid rgba(166, 124, 30, 0.55)",
-                padding: "8px 18px",
+                backgroundColor: colors.challengePillBg,
+                border: `1px solid ${colors.challengePillBorder}`,
+                padding: "6px 16px",
                 borderRadius: "20px",
               }}
             >
-              <span style={{ fontSize: "13px", color: "#FFD166", fontWeight: 800, letterSpacing: "0.05em" }}>
+              <span style={{ fontSize: "12px", color: colors.challengePillText, fontWeight: 800, letterSpacing: "0.05em" }}>
                 ⚔️ SCHOLAR CHALLENGE
               </span>
             </div>
@@ -130,39 +199,59 @@ export async function GET(req: NextRequest) {
               alignItems: "center",
               justifyContent: "space-between",
               width: "100%",
-              gap: "40px",
-              margin: "20px 0",
+              gap: "36px",
+              margin: "16px 0",
               zIndex: 2,
             }}
           >
             {/* Left Column: Grade & Challenge Pitch */}
             <div style={{ display: "flex", flexDirection: "column", flex: 1 }}>
-              <div
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  padding: "6px 18px",
-                  borderRadius: "24px",
-                  backgroundColor: "rgba(122, 28, 46, 0.35)",
-                  border: "1px solid rgba(122, 28, 46, 0.8)",
-                  color: "#FDFBF7",
-                  fontSize: "16px",
-                  fontWeight: 800,
-                  marginBottom: "16px",
-                  width: "fit-content",
-                }}
-              >
-                {grade}
+              <div style={{ display: "flex", alignItems: "center", gap: "10px", marginBottom: "14px" }}>
+                <div
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    padding: "6px 18px",
+                    borderRadius: "20px",
+                    backgroundColor: colors.gradeBg,
+                    border: `1px solid ${colors.gradeBorder}`,
+                    color: colors.gradeText,
+                    fontSize: "15px",
+                    fontWeight: 800,
+                    width: "fit-content",
+                  }}
+                >
+                  {grade}
+                </div>
+
+                {xp && parseInt(xp, 10) > 0 && (
+                  <div
+                    style={{
+                      display: "inline-flex",
+                      alignItems: "center",
+                      padding: "6px 14px",
+                      borderRadius: "20px",
+                      backgroundColor: colors.xpBg,
+                      border: `1px solid ${colors.xpBorder}`,
+                      color: colors.xpText,
+                      fontSize: "13px",
+                      fontWeight: 800,
+                    }}
+                  >
+                    ⚡ +{xp} XP Won
+                  </div>
+                )}
               </div>
 
               <h1
                 style={{
                   fontSize: "44px",
                   fontWeight: 900,
-                  color: "#FDFBF7",
+                  color: colors.headline,
                   lineHeight: 1.15,
                   margin: "0 0 10px 0",
                   letterSpacing: "-0.03em",
+                  fontFamily: "Georgia, serif",
                 }}
               >
                 {by} scored {pct}% on Naija Trivia
@@ -170,12 +259,13 @@ export async function GET(req: NextRequest) {
 
               <p
                 style={{
-                  fontSize: "22px",
+                  fontSize: "20px",
                   fontWeight: 700,
                   fontStyle: "italic",
-                  color: "#C8C4B7",
+                  color: colors.subtitle,
                   margin: "0 0 10px 0",
                   lineHeight: 1.3,
+                  fontFamily: "Georgia, serif",
                 }}
               >
                 Can you beat this? 🇳🇬
@@ -183,13 +273,13 @@ export async function GET(req: NextRequest) {
 
               <p
                 style={{
-                  fontSize: "16px",
-                  color: "rgba(253, 251, 247, 0.65)",
+                  fontSize: "15px",
+                  color: colors.bodyText,
                   margin: 0,
                   lineHeight: 1.45,
                 }}
               >
-                Tap to answer the exact same questions and see if you can top their score on Fey!
+                Answer the exact same {total} questions and see if you can top their score on Fey!
               </p>
             </div>
 
@@ -200,26 +290,39 @@ export async function GET(req: NextRequest) {
                 flexDirection: "column",
                 alignItems: "center",
                 justifyContent: "center",
-                backgroundColor: "rgba(25, 30, 23, 0.88)",
-                border: "2px solid rgba(92, 106, 54, 0.55)",
-                borderRadius: "28px",
-                padding: "32px 48px",
-                minWidth: "300px",
-                boxShadow: "0 20px 50px rgba(0,0,0,0.5)",
+                backgroundColor: colors.cardBg,
+                border: `1.5px solid ${colors.cardBorder}`,
+                borderRadius: "24px",
+                padding: "28px 44px",
+                minWidth: "290px",
+                boxShadow: colors.cardShadow,
               }}
             >
+              <span
+                style={{
+                  fontSize: "11px",
+                  fontWeight: 800,
+                  color: isParchment ? "#A67C1E" : "#D4AF37",
+                  letterSpacing: "0.12em",
+                  textTransform: "uppercase",
+                  marginBottom: "8px",
+                }}
+              >
+                ★ Official Score ★
+              </span>
+
               <div
                 style={{
-                  fontSize: "86px",
+                  fontSize: "82px",
                   fontWeight: 900,
-                  color: "#FDFBF7",
+                  color: colors.heroScore,
                   lineHeight: 1,
                   display: "flex",
                   alignItems: "baseline",
                 }}
               >
                 <span>{score}</span>
-                <span style={{ fontSize: "42px", color: "rgba(253, 251, 247, 0.45)", fontWeight: 700, marginLeft: "8px" }}>
+                <span style={{ fontSize: "40px", color: colors.heroDenominator, fontWeight: 700, marginLeft: "6px" }}>
                   /{total}
                 </span>
               </div>
@@ -228,41 +331,25 @@ export async function GET(req: NextRequest) {
                 style={{
                   display: "flex",
                   alignItems: "center",
-                  gap: "6px",
-                  marginTop: "12px",
+                  padding: "5px 16px",
+                  borderRadius: "16px",
+                  backgroundColor: colors.accuracyPillBg,
+                  border: `1px solid ${colors.accuracyPillBorder}`,
+                  marginTop: "14px",
                 }}
               >
                 <span
                   style={{
-                    color: "#A67C1E",
-                    fontSize: "15px",
+                    color: colors.accuracyPillText,
+                    fontSize: "12px",
                     fontWeight: 800,
                     letterSpacing: "0.06em",
                     textTransform: "uppercase",
                   }}
                 >
-                  {pct}% Accuracy
+                  {pct}% ACCURACY · {total} QUESTIONS
                 </span>
               </div>
-
-              {xp && parseInt(xp, 10) > 0 && (
-                <div
-                  style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: "6px",
-                    marginTop: "8px",
-                    backgroundColor: "rgba(166, 124, 30, 0.2)",
-                    border: "1px solid rgba(166, 124, 30, 0.5)",
-                    padding: "4px 12px",
-                    borderRadius: "12px",
-                  }}
-                >
-                  <span style={{ color: "#FFD166", fontSize: "12px", fontWeight: 700 }}>
-                    ⚡ +{xp} XP Earned
-                  </span>
-                </div>
-              )}
             </div>
           </div>
 
@@ -273,32 +360,32 @@ export async function GET(req: NextRequest) {
               justifyContent: "space-between",
               alignItems: "center",
               width: "100%",
-              paddingTop: "18px",
-              borderTop: "1px solid rgba(166, 124, 30, 0.35)",
+              paddingTop: "16px",
+              borderTop: `1px solid ${colors.footerBorder}`,
               zIndex: 2,
             }}
           >
             <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
               <span
                 style={{
-                  color: "#A67C1E",
-                  fontSize: "13px",
+                  color: colors.footerBrand,
+                  fontSize: "12px",
                   fontWeight: 800,
                   letterSpacing: "0.08em",
                   textTransform: "uppercase",
                 }}
               >
-                FEY ACADEMIC ARCHIVE · PROOF OF INTELLECT
+                FEY · THINK DEEPER, ARTICULATE CLEARLY
               </span>
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: "6px" }}>
-              <span style={{ color: "rgba(253, 251, 247, 0.5)", fontSize: "13px" }}>Play at:</span>
+              <span style={{ color: colors.bodyText, fontSize: "12px" }}>Play at:</span>
               <span
                 style={{
-                  color: "#FDFBF7",
-                  fontSize: "13px",
-                  fontWeight: 700,
+                  color: colors.footerUrl,
+                  fontSize: "12px",
+                  fontWeight: 800,
                   fontFamily: "monospace",
                 }}
               >

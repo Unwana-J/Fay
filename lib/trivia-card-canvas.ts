@@ -1,10 +1,12 @@
 /**
  * Trivia Proof Card Generator
  *
- * Renders an editorial 1200x630 broadside social card onto an HTML5 Canvas and exports
- * directly to clipboard or PNG download. Matches Fey's signature Bookish Print Editorial
- * design system (Forest Olive, Terracotta Burgundy, Antique Gold, Sage, Warm Ivory).
+ * Renders an authentic Bookish Print Editorial broadside onto an HTML5 Canvas (1200x630)
+ * matching Fey's classical identity (Forest Olive, Terracotta Burgundy, Antique Gold,
+ * Warm Parchment Canvas, and Editorial Serif typography).
  */
+
+export type TriviaCardTheme = "parchment" | "dark";
 
 export interface TriviaCardData {
   score: number;
@@ -15,6 +17,7 @@ export interface TriviaCardData {
   xpEarned?: number;
   date?: string;
   categories?: { category: string; correct: number; total: number }[];
+  theme?: TriviaCardTheme;
 }
 
 export async function generateTriviaCardCanvas(data: TriviaCardData): Promise<HTMLCanvasElement> {
@@ -24,52 +27,128 @@ export async function generateTriviaCardCanvas(data: TriviaCardData): Promise<HT
   const ctx = canvas.getContext("2d");
   if (!ctx) throw new Error("Could not initialize 2D context");
 
-  // ── Background: Deep Editorial Forest Charcoal with Warm Gold & Wine Vignette ──
+  const theme = data.theme || "parchment";
+  const isParchment = theme === "parchment";
+
+  // ── Palette Definition ──
+  const c = isParchment
+    ? {
+        bgStart: "#F7F2E9",
+        bgMid: "#F4EFE6",
+        bgEnd: "#EDE5D8",
+        outerBorder: "#444E2C", // Forest Olive
+        innerBorder: "rgba(166, 124, 30, 0.45)", // Antique Gold
+        cornerAccent: "#A67C1E",
+        headerBrand: "#444E2C",
+        headerDate: "#6E7260",
+        headline: "#1E2211", // Deep forest black-brown
+        subtitle: "#525645",
+        panelBg: "#FDFCFA", // Warm Ivory card
+        panelBorder: "rgba(68, 78, 44, 0.22)",
+        panelShadow: "rgba(68, 78, 44, 0.06)",
+        badgeTop: "#A67C1E",
+        scoreNumber: "#7A1C2E", // Wine Red hero score
+        scoreTotal: "#7D8171",
+        scorePillBg: "rgba(68, 78, 44, 0.08)",
+        scorePillBorder: "rgba(68, 78, 44, 0.2)",
+        scorePillText: "#333C1A",
+        gradeBg: "#7A1C2E", // Burgundy
+        gradeBorder: "#58101E",
+        gradeText: "#FDFBF7",
+        xpBg: "#EDE5D6",
+        xpBorder: "#A67C1E",
+        xpText: "#8C6512",
+        catText: "#1E2211",
+        catRatio: "#525645",
+        catTrack: "#E8E2D4",
+        divider: "rgba(68, 78, 44, 0.35)",
+        footerBrand: "#333C1A",
+        footerUrl: "#7A1C2E",
+      }
+    : {
+        bgStart: "#151B16",
+        bgMid: "#111612",
+        bgEnd: "#0D110E",
+        outerBorder: "rgba(197, 160, 89, 0.65)", // Antique Gold leaf
+        innerBorder: "rgba(122, 28, 46, 0.55)", // Burgundy
+        cornerAccent: "#D4AF37",
+        headerBrand: "#D4AF37",
+        headerDate: "#9A9E92",
+        headline: "#FDFBF7",
+        subtitle: "#C5C2B6",
+        panelBg: "rgba(25, 33, 26, 0.85)",
+        panelBorder: "rgba(92, 106, 54, 0.45)",
+        panelShadow: "rgba(0, 0, 0, 0.4)",
+        badgeTop: "#D4AF37",
+        scoreNumber: "#FDFBF7",
+        scoreTotal: "#8E9484",
+        scorePillBg: "rgba(197, 160, 89, 0.12)",
+        scorePillBorder: "rgba(197, 160, 89, 0.35)",
+        scorePillText: "#FFD166",
+        gradeBg: "rgba(122, 28, 46, 0.45)",
+        gradeBorder: "rgba(122, 28, 46, 0.9)",
+        gradeText: "#FDFBF7",
+        xpBg: "rgba(197, 160, 89, 0.2)",
+        xpBorder: "rgba(197, 160, 89, 0.65)",
+        xpText: "#FFD166",
+        catText: "#FDFBF7",
+        catRatio: "#A5AA9B",
+        catTrack: "rgba(255, 255, 255, 0.09)",
+        divider: "rgba(197, 160, 89, 0.35)",
+        footerBrand: "#D4AF37",
+        footerUrl: "#FDFBF7",
+      };
+
+  // ── Background Canvas ──
   const bgGrad = ctx.createLinearGradient(0, 0, 1200, 630);
-  bgGrad.addColorStop(0, "#151814");
-  bgGrad.addColorStop(0.5, "#111410");
-  bgGrad.addColorStop(1, "#0D0F0C");
+  bgGrad.addColorStop(0, c.bgStart);
+  bgGrad.addColorStop(0.5, c.bgMid);
+  bgGrad.addColorStop(1, c.bgEnd);
   ctx.fillStyle = bgGrad;
   ctx.fillRect(0, 0, 1200, 630);
 
-  // Warm Antique Gold radial glow (top right)
-  const radGlow1 = ctx.createRadialGradient(1060, 100, 20, 1060, 100, 480);
-  radGlow1.addColorStop(0, "rgba(166, 124, 30, 0.16)");
-  radGlow1.addColorStop(1, "transparent");
-  ctx.fillStyle = radGlow1;
+  // Soft Radial Warmth Vignette
+  const vignette = ctx.createRadialGradient(600, 315, 180, 600, 315, 660);
+  vignette.addColorStop(0, "transparent");
+  vignette.addColorStop(1, isParchment ? "rgba(68, 78, 44, 0.08)" : "rgba(0, 0, 0, 0.5)");
+  ctx.fillStyle = vignette;
   ctx.fillRect(0, 0, 1200, 630);
 
-  // Terracotta Wine radial glow (bottom left)
-  const radGlow2 = ctx.createRadialGradient(140, 530, 20, 140, 530, 440);
-  radGlow2.addColorStop(0, "rgba(122, 28, 46, 0.14)");
-  radGlow2.addColorStop(1, "transparent");
-  ctx.fillStyle = radGlow2;
-  ctx.fillRect(0, 0, 1200, 630);
-
-  // ── Outer & Inner Editorial Double Border (Fey Hallmark) ──
-  // Outer frame: Antique Gold hairline
-  ctx.strokeStyle = "rgba(166, 124, 30, 0.45)";
-  ctx.lineWidth = 2;
+  // ── Ornate Double Hairline Framing ──
+  // Outer frame
+  ctx.strokeStyle = c.outerBorder;
+  ctx.lineWidth = isParchment ? 2.5 : 2;
   ctx.strokeRect(32, 32, 1136, 566);
 
-  // Inner frame: Terracotta Wine hairline
-  ctx.strokeStyle = "rgba(122, 28, 46, 0.55)";
+  // Inner hairline frame
+  ctx.strokeStyle = c.innerBorder;
   ctx.lineWidth = 1;
-  ctx.strokeRect(40, 40, 1120, 550);
+  ctx.strokeRect(42, 42, 1116, 546);
 
-  // Corner accent cornerstones
-  ctx.fillStyle = "#A67C1E";
-  ctx.fillRect(30, 30, 6, 6);
-  ctx.fillRect(1164, 30, 6, 6);
-  ctx.fillRect(30, 594, 6, 6);
-  ctx.fillRect(1164, 594, 6, 6);
+  // 4 Corner Diamond Accent Flourishes
+  const corners = [
+    [32, 32],
+    [1168, 32],
+    [32, 598],
+    [1168, 598],
+  ];
+  ctx.fillStyle = c.cornerAccent;
+  for (const [cx, cy] of corners) {
+    ctx.beginPath();
+    ctx.moveTo(cx, cy - 6);
+    ctx.lineTo(cx + 6, cy);
+    ctx.lineTo(cx, cy + 6);
+    ctx.lineTo(cx - 6, cy);
+    ctx.closePath();
+    ctx.fill();
+  }
 
   // ── Top Header Brand ──
-  ctx.fillStyle = "#A67C1E"; // Antique Bronze Gold
+  ctx.fillStyle = c.headerBrand;
   ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillText("🇳🇬 FEY · NAIJA TRIVIA ARCADE", 72, 85);
+  ctx.fillText("🇳🇬 FEY · SCHOLAR DISPATCH", 72, 85);
 
-  ctx.fillStyle = "#9E9A8E"; // Warm Muted Sage
+  ctx.fillStyle = c.headerDate;
   ctx.font = "12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   const displayDate =
     data.date ||
@@ -78,125 +157,220 @@ export async function generateTriviaCardCanvas(data: TriviaCardData): Promise<HT
       day: "numeric",
       year: "numeric",
     });
-  ctx.fillText(displayDate, 990, 85);
+  ctx.textAlign = "right";
+  ctx.fillText(displayDate, 1128, 85);
+  ctx.textAlign = "left";
 
-  // ── Grade Badge Pill (Terracotta Burgundy) ──
+  // ── Hero Badges (Grade & XP) ──
   ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   const gradeTextWidth = ctx.measureText(data.gradeLabel).width;
-  const gradePillWidth = Math.max(160, gradeTextWidth + 36);
+  const gradePillWidth = Math.max(160, gradeTextWidth + 34);
 
-  ctx.fillStyle = "rgba(122, 28, 46, 0.35)"; // Terracotta Burgundy fill
-  ctx.fillRect(72, 114, gradePillWidth, 34);
-  ctx.strokeStyle = "rgba(122, 28, 46, 0.85)";
+  // Grade Badge
+  ctx.fillStyle = c.gradeBg;
+  drawRoundRect(ctx, 72, 112, gradePillWidth, 34, 17);
+  ctx.fill();
+  ctx.strokeStyle = c.gradeBorder;
   ctx.lineWidth = 1.2;
-  ctx.strokeRect(72, 114, gradePillWidth, 34);
+  ctx.stroke();
 
-  ctx.fillStyle = "#FDFBF7";
-  ctx.fillText(data.gradeLabel, 88, 136);
+  ctx.fillStyle = c.gradeText;
+  ctx.fillText(data.gradeLabel, 88, 134);
 
-  // ── XP Badge Pill (Bronze Gold) ──
+  // XP Badge
   if (data.xpEarned && data.xpEarned > 0) {
     const xpStartX = 72 + gradePillWidth + 14;
-    ctx.fillStyle = "rgba(166, 124, 30, 0.22)"; // Bronze Gold fill
-    ctx.fillRect(xpStartX, 114, 150, 34);
-    ctx.strokeStyle = "rgba(166, 124, 30, 0.65)";
+    ctx.fillStyle = c.xpBg;
+    drawRoundRect(ctx, xpStartX, 112, 150, 34, 17);
+    ctx.fill();
+    ctx.strokeStyle = c.xpBorder;
     ctx.lineWidth = 1.2;
-    ctx.strokeRect(xpStartX, 114, 150, 34);
+    ctx.stroke();
 
-    ctx.fillStyle = "#FFD166";
+    ctx.fillStyle = c.xpText;
     ctx.font = "bold 12px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
-    ctx.fillText(`⚡ +${data.xpEarned} XP EARNED`, xpStartX + 16, 136);
+    ctx.fillText(`⚡ +${data.xpEarned} XP WON`, xpStartX + 16, 134);
   }
 
-  // ── Main Challenge Heading (Classical Serif Editorial) ──
-  ctx.fillStyle = "#FDFBF7";
-  ctx.font = "bold 44px Georgia, 'Times New Roman', serif";
-  ctx.fillText(`${data.author} scored ${data.pct}% on Naija Trivia`, 72, 215);
+  // ── Grand Editorial Headline (Georgia Serif with Auto-Scale) ──
+  ctx.fillStyle = c.headline;
+  const headlineText = `${data.author} scored ${data.pct}% on Naija Trivia`;
+  let headlineFontSize = 44;
+  ctx.font = `bold ${headlineFontSize}px Georgia, 'Times New Roman', serif`;
+  while (ctx.measureText(headlineText).width > 1056 && headlineFontSize > 28) {
+    headlineFontSize -= 2;
+    ctx.font = `bold ${headlineFontSize}px Georgia, 'Times New Roman', serif`;
+  }
+  ctx.fillText(headlineText, 72, 212);
 
-  ctx.fillStyle = "#C8C4B7";
+  ctx.fillStyle = c.subtitle;
   ctx.font = "italic 20px Georgia, 'Times New Roman', serif";
-  ctx.fillText("Can you beat this? 🇳🇬 Answer the exact same questions on Fey.", 72, 255);
+  ctx.fillText("Can you beat this? 🇳🇬 Answer the exact same questions on Fey.", 72, 252);
 
-  // ── Score Showcase Card Box (Forest Olive Surface) ──
-  ctx.fillStyle = "rgba(25, 30, 23, 0.78)";
-  ctx.fillRect(72, 290, 520, 182);
-  ctx.strokeStyle = "rgba(92, 106, 54, 0.55)"; // Forest Olive border
+  // ── Left Card: Score Showcase ──
+  const panelY = 286;
+  const panelH = 194;
+  const leftPanelW = 515;
+
+  ctx.fillStyle = c.panelBg;
+  drawRoundRect(ctx, 72, panelY, leftPanelW, panelH, 18);
+  ctx.fill();
+  ctx.strokeStyle = c.panelBorder;
   ctx.lineWidth = 1.5;
-  ctx.strokeRect(72, 290, 520, 182);
+  ctx.stroke();
 
-  // Giant Score with Precise Measurement to Prevent ANY Overlapping
+  // Score Card Top Label
+  ctx.fillStyle = c.badgeTop;
+  ctx.font = "bold 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
+  ctx.fillText("★ OFFICIAL SCORE ★", 102, panelY + 32);
+
+  // Giant Score Text with PRECISE Measurement
   const scoreStr = `${data.score}`;
-  ctx.font = "bold 86px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+  ctx.font = "bold 88px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
   const scoreWidth = ctx.measureText(scoreStr).width;
 
-  ctx.fillStyle = "#FDFBF7";
-  ctx.fillText(scoreStr, 105, 390);
+  ctx.fillStyle = c.scoreNumber;
+  ctx.fillText(scoreStr, 102, panelY + 115);
 
-  // Total denominator cleanly offset right after the score
+  // Total Denominator offset cleanly
   ctx.font = "bold 44px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-  ctx.fillStyle = "rgba(253, 251, 247, 0.45)";
-  ctx.fillText(`/${data.total}`, 105 + scoreWidth + 12, 390);
+  ctx.fillStyle = c.scoreTotal;
+  ctx.fillText(`/${data.total}`, 102 + scoreWidth + 12, panelY + 115);
 
-  // Subtitle stats in card
-  ctx.fillStyle = "#A67C1E"; // Gold
-  ctx.font = "bold 15px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
-  ctx.fillText(`${data.pct}% ACCURACY · ${data.total} QUESTIONS`, 105, 436);
+  // Accuracy Pill inside left card
+  ctx.fillStyle = c.scorePillBg;
+  drawRoundRect(ctx, 102, panelY + 140, 310, 32, 16);
+  ctx.fill();
+  ctx.strokeStyle = c.scorePillBorder;
+  ctx.lineWidth = 1;
+  ctx.stroke();
 
-  // ── Category Breakdown Right Panel ──
+  ctx.fillStyle = c.scorePillText;
+  ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
+  ctx.fillText(`${data.pct}% ACCURACY · ${data.total} QUESTIONS`, 120, panelY + 161);
+
+  // ── Right Card: Discipline Breakdown ──
+  const rightPanelX = 612;
+  const rightPanelW = 515;
+
+  ctx.fillStyle = c.panelBg;
+  drawRoundRect(ctx, rightPanelX, panelY, rightPanelW, panelH, 18);
+  ctx.fill();
+  ctx.strokeStyle = c.panelBorder;
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = c.badgeTop;
+  ctx.font = "bold 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
+  ctx.fillText("DISCIPLINE PERFORMANCE", rightPanelX + 30, panelY + 32);
+
   if (data.categories && data.categories.length > 0) {
-    ctx.fillStyle = "rgba(25, 30, 23, 0.65)";
-    ctx.fillRect(620, 290, 490, 182);
-    ctx.strokeStyle = "rgba(166, 124, 30, 0.35)"; // Gold border
-    ctx.lineWidth = 1;
-    ctx.strokeRect(620, 290, 490, 182);
+    let catY = panelY + 68;
+    const catFills: Record<string, string> = isParchment
+      ? {
+          History: "#7A1C2E", // Wine Red
+          "Pop Culture": "#7B3FC8", // Royal Purple
+          "General Knowledge": "#444E2C", // Forest Olive
+        }
+      : {
+          History: "#A83246",
+          "Pop Culture": "#9D4EDD",
+          "General Knowledge": "#5C6A36",
+        };
 
-    ctx.fillStyle = "#A67C1E";
-    ctx.font = "bold 11px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
-    ctx.fillText("CATEGORY PERFORMANCE", 645, 320);
-
-    let catY = 355;
-    const catColors: Record<string, string> = {
-      History: "#7A1C2E", // Terracotta Burgundy
-      "Pop Culture": "#7B3FC8", // Purple Accent
-      "General Knowledge": "#5C6A36", // Forest Olive
+    const catIcons: Record<string, string> = {
+      History: "🏛️",
+      "Pop Culture": "🎵",
+      "General Knowledge": "🌍",
     };
 
     for (const cat of data.categories.slice(0, 3)) {
-      ctx.fillStyle = "#FDFBF7";
+      ctx.fillStyle = c.catText;
       ctx.font = "14px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
-      ctx.fillText(cat.category, 645, catY);
+      const icon = catIcons[cat.category] || "•";
+      ctx.fillText(`${icon} ${cat.category}`, rightPanelX + 30, catY);
 
-      ctx.fillStyle = "rgba(253, 251, 247, 0.6)";
+      ctx.fillStyle = c.catRatio;
       ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
-      ctx.fillText(`${cat.correct}/${cat.total}`, 1040, catY);
+      ctx.fillText(`${cat.correct}/${cat.total}`, rightPanelX + rightPanelW - 70, catY);
 
-      // Mini bar background
-      ctx.fillStyle = "rgba(255, 255, 255, 0.08)";
-      ctx.fillRect(645, catY + 8, 430, 5);
+      // Track
+      ctx.fillStyle = c.catTrack;
+      drawRoundRect(ctx, rightPanelX + 30, catY + 8, rightPanelW - 60, 6, 3);
+      ctx.fill();
 
-      // Mini bar progress
+      // Progress
       const p = cat.total > 0 ? cat.correct / cat.total : 0;
-      ctx.fillStyle = catColors[cat.category] || "#5C6A36";
-      ctx.fillRect(645, catY + 8, Math.round(430 * p), 5);
+      if (p > 0) {
+        ctx.fillStyle = catFills[cat.category] || (isParchment ? "#444E2C" : "#5C6A36");
+        drawRoundRect(ctx, rightPanelX + 30, catY + 8, Math.round((rightPanelW - 60) * p), 6, 3);
+        ctx.fill();
+      }
 
-      catY += 38;
+      catY += 40;
     }
+  } else {
+    // Fallback scholarly motto & seal
+    ctx.fillStyle = c.catText;
+    ctx.font = "italic 16px Georgia, 'Times New Roman', serif";
+    ctx.fillText("“Docendo discimus — By teaching, we learn.”", rightPanelX + 30, panelY + 80);
+    ctx.fillStyle = c.subtitle;
+    ctx.font = "13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif";
+    ctx.fillText("Mastered through high-conviction cognitive recall.", rightPanelX + 30, panelY + 110);
+    ctx.fillText("Fey Scholar Archive · Proof of Articulation.", rightPanelX + 30, panelY + 135);
   }
 
-  // ── Divider Bar (Antique Gold Hairline) ──
-  ctx.fillStyle = "rgba(166, 124, 30, 0.35)";
-  ctx.fillRect(72, 510, 1056, 1);
+  // ── Divider Bar (Editorial Hairline with Diamond) ──
+  ctx.fillStyle = c.divider;
+  ctx.fillRect(72, 514, 1056, 1);
+
+  // Center diamond flourish on divider
+  ctx.fillStyle = c.cornerAccent;
+  ctx.beginPath();
+  ctx.moveTo(600, 510);
+  ctx.lineTo(605, 514);
+  ctx.lineTo(600, 518);
+  ctx.lineTo(595, 514);
+  ctx.closePath();
+  ctx.fill();
 
   // ── Footer ──
-  ctx.fillStyle = "#A67C1E"; // Antique Gold
+  ctx.fillStyle = c.footerBrand;
   ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
-  ctx.fillText("FEY · THINK DEEPER, ARTICULATE CLEARLY", 72, 545);
+  ctx.fillText("FEY · THINK DEEPER, ARTICULATE CLEARLY", 72, 548);
 
-  ctx.fillStyle = "#FDFBF7";
+  ctx.fillStyle = c.footerUrl;
   ctx.font = "bold 13px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace";
-  ctx.fillText("PLAY AT: fey.lokinlabs.com.ng/games/trivia", 750, 545);
+  ctx.textAlign = "right";
+  ctx.fillText("PLAY AT: fey.lokinlabs.com.ng/games/trivia", 1128, 548);
+  ctx.textAlign = "left";
 
   return canvas;
+}
+
+/**
+ * Helper to draw crisp rounded rectangles on Canvas
+ */
+function drawRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  const radius = Math.min(r, w / 2, h / 2);
+  ctx.beginPath();
+  ctx.moveTo(x + radius, y);
+  ctx.lineTo(x + w - radius, y);
+  ctx.arcTo(x + w, y, x + w, y + radius, radius);
+  ctx.lineTo(x + w, y + h - radius);
+  ctx.arcTo(x + w, y + h, x + w - radius, y + h, radius);
+  ctx.lineTo(x + radius, y + h);
+  ctx.arcTo(x, y + h, x, y + h - radius, radius);
+  ctx.lineTo(x, y + radius);
+  ctx.arcTo(x, y, x + radius, y, radius);
+  ctx.closePath();
 }
 
 export async function copyTriviaCardToClipboard(data: TriviaCardData): Promise<boolean> {
@@ -218,7 +392,7 @@ export async function copyTriviaCardToClipboard(data: TriviaCardData): Promise<b
   }
 }
 
-export async function downloadTriviaCard(data: TriviaCardData, filename = "fey-trivia-score.png") {
+export async function downloadTriviaCard(data: TriviaCardData, filename = "fey-trivia-broadside.png") {
   const canvas = await generateTriviaCardCanvas(data);
   const url = canvas.toDataURL("image/png");
   const a = document.createElement("a");

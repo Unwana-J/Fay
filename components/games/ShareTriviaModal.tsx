@@ -1,21 +1,23 @@
 "use client";
 
 import React, { useState, useMemo, useEffect } from "react";
-import { motion, AnimatePresence } from "framer-motion";
+import { motion } from "framer-motion";
 import {
   X,
   Share2,
   Check,
-  ExternalLink,
   Sparkles,
   Copy,
-  Zap,
   Image as ImageIcon,
-  Trophy,
+  Download,
 } from "lucide-react";
 import { getShortenedUrl } from "@/lib/url-shortener";
 import { copyTextToClipboard } from "@/lib/clipboard";
-import { copyTriviaCardToClipboard, downloadTriviaCard } from "@/lib/trivia-card-canvas";
+import {
+  copyTriviaCardToClipboard,
+  downloadTriviaCard,
+  type TriviaCardTheme,
+} from "@/lib/trivia-card-canvas";
 import { useAppStore } from "@/store/useAppStore";
 
 interface ShareTriviaModalProps {
@@ -44,8 +46,10 @@ export default function ShareTriviaModal({
   const { profile } = useAppStore();
   const [copied, setCopied] = useState(false);
   const [copiedCard, setCopiedCard] = useState(false);
+  const [downloading, setDownloading] = useState(false);
   const [activeUrl, setActiveUrl] = useState<string>("");
   const [customTaunt, setCustomTaunt] = useState<string>("");
+  const [cardTheme, setCardTheme] = useState<TriviaCardTheme>("parchment");
 
   const authorName = profile?.username || "Scholar";
 
@@ -67,12 +71,15 @@ export default function ShareTriviaModal({
     params.set("pct", String(pct));
     // Clean author name to avoid special characters in query string
     params.set("by", authorName.replace(/[^\w\s-]/g, "").trim() || "Scholar");
+    if (cardTheme !== "parchment") {
+      params.set("theme", cardTheme);
+    }
     if (questionIds && questionIds.length > 0) {
       params.set("q", questionIds.join(","));
     }
 
     return `${origin}/games/trivia?${params.toString()}`;
-  }, [score, total, pct, authorName, questionIds]);
+  }, [score, total, pct, authorName, cardTheme, questionIds]);
 
   // Shorten URL for social sharing & WhatsApp compatibility
   useEffect(() => {
@@ -144,6 +151,7 @@ export default function ShareTriviaModal({
       author: authorName,
       xpEarned,
       categories: byCategory,
+      theme: cardTheme,
     };
     const ok = await copyTriviaCardToClipboard(cardData);
     if (ok) {
@@ -153,6 +161,27 @@ export default function ShareTriviaModal({
       await downloadTriviaCard(cardData);
     }
   }
+
+  async function handleDownloadCardImage() {
+    setDownloading(true);
+    try {
+      const cardData = {
+        score,
+        total,
+        pct,
+        gradeLabel,
+        author: authorName,
+        xpEarned,
+        categories: byCategory,
+        theme: cardTheme,
+      };
+      await downloadTriviaCard(cardData, `fey-trivia-${authorName.toLowerCase()}-${score}of${total}.png`);
+    } finally {
+      setTimeout(() => setDownloading(false), 1200);
+    }
+  }
+
+  const isParchment = cardTheme === "parchment";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm">
@@ -188,74 +217,209 @@ export default function ShareTriviaModal({
           </button>
         </div>
 
-        {/* Live Card Preview (Naija Trivia Theme) */}
+        {/* Live Card Preview Section */}
         <div className="mb-4">
-          <div className="text-[10px] uppercase font-mono tracking-widest text-[var(--text-mute)] mb-2 flex items-center justify-between">
-            <div className="flex items-center gap-1.5">
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-1.5 text-[10px] uppercase font-mono tracking-widest text-[var(--text-mute)]">
               <Sparkles size={11} className="text-[var(--gold)]" />
-              <span>Link Preview Card (WhatsApp / X / LinkedIn)</span>
+              <span>Broadside Proof Card</span>
             </div>
-            <span className="text-[10px] text-[var(--olive)] font-bold">1200 × 630 HD</span>
+
+            {/* Editorial Theme Toggle */}
+            <div className="flex items-center gap-1 p-0.5 rounded-lg bg-black/5 dark:bg-white/5 border border-[var(--border-dim)]">
+              <button
+                type="button"
+                onClick={() => setCardTheme("parchment")}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer ${
+                  isParchment
+                    ? "bg-[var(--bg-card)] text-[var(--text)] font-bold shadow-xs border border-[var(--border)]"
+                    : "text-[var(--text-mute)] hover:text-[var(--text)]"
+                }`}
+              >
+                📜 Parchment
+              </button>
+              <button
+                type="button"
+                onClick={() => setCardTheme("dark")}
+                className={`px-2.5 py-1 rounded-md text-[11px] font-mono transition-all cursor-pointer ${
+                  !isParchment
+                    ? "bg-[var(--bg-card)] text-[var(--text)] font-bold shadow-xs border border-[var(--border)]"
+                    : "text-[var(--text-mute)] hover:text-[var(--text)]"
+                }`}
+              >
+                🌙 Dark
+              </button>
+            </div>
           </div>
 
+          {/* Dynamic Editorial Broadside Preview */}
           <div
-            className="rounded-2xl p-5 border relative overflow-hidden"
+            className="rounded-2xl p-5 border relative overflow-hidden transition-all duration-300"
             style={{
-              borderColor: "rgba(166, 124, 30, 0.45)",
-              background: "linear-gradient(145deg, #151814 0%, #0D0F0C 100%)",
-              color: "#FDFBF7",
-              boxShadow: "0 8px 32px rgba(0, 0, 0, 0.4)",
+              borderColor: isParchment ? "#444E2C" : "rgba(166, 124, 30, 0.45)",
+              borderWidth: "2px",
+              background: isParchment
+                ? "linear-gradient(145deg, #F8F3EA 0%, #EDE4D6 100%)"
+                : "linear-gradient(145deg, #151814 0%, #0D0F0C 100%)",
+              color: isParchment ? "#1E2211" : "#FDFBF7",
+              boxShadow: isParchment
+                ? "0 6px 24px rgba(68, 78, 44, 0.12)"
+                : "0 8px 32px rgba(0, 0, 0, 0.4)",
             }}
           >
-            {/* Subtle inner wine hairline */}
+            {/* Inner hairline framing */}
             <div
-              className="absolute inset-1 rounded-xl pointer-events-none"
-              style={{ border: "1px solid rgba(122, 28, 46, 0.35)" }}
+              className="absolute inset-1.5 rounded-xl pointer-events-none"
+              style={{
+                border: isParchment
+                  ? "1px solid rgba(166, 124, 30, 0.45)"
+                  : "1px solid rgba(122, 28, 46, 0.35)",
+              }}
             />
 
+            {/* Corner diamond flourishes */}
+            <div
+              className="absolute top-1 left-1 text-[8px] pointer-events-none"
+              style={{ color: isParchment ? "#A67C1E" : "#D4AF37" }}
+            >
+              ◆
+            </div>
+            <div
+              className="absolute top-1 right-1 text-[8px] pointer-events-none"
+              style={{ color: isParchment ? "#A67C1E" : "#D4AF37" }}
+            >
+              ◆
+            </div>
+            <div
+              className="absolute bottom-1 left-1 text-[8px] pointer-events-none"
+              style={{ color: isParchment ? "#A67C1E" : "#D4AF37" }}
+            >
+              ◆
+            </div>
+            <div
+              className="absolute bottom-1 right-1 text-[8px] pointer-events-none"
+              style={{ color: isParchment ? "#A67C1E" : "#D4AF37" }}
+            >
+              ◆
+            </div>
+
+            {/* Top Bar */}
             <div className="flex items-center justify-between mb-3 relative z-10">
-              <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--gold)] flex items-center gap-1">
-                <span>🇳🇬 Fey Trivia Arcade</span>
+              <span
+                className="text-xs font-mono font-bold uppercase tracking-wider flex items-center gap-1.5"
+                style={{ color: isParchment ? "#444E2C" : "#D4AF37" }}
+              >
+                <span>🇳🇬</span>
+                <span>Fey Scholar Dispatch</span>
               </span>
-              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[#A67C1E]/15 border border-[#A67C1E]/30 text-[#FFD166]">
+              <span
+                className="px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold"
+                style={{
+                  background: isParchment ? "rgba(166, 124, 30, 0.15)" : "#A67C1E15",
+                  border: isParchment ? "1px solid rgba(166, 124, 30, 0.4)" : "1px solid #A67C1E4D",
+                  color: isParchment ? "#8C6512" : "#FFD166",
+                }}
+              >
                 ⚔️ CHALLENGE
               </span>
             </div>
 
+            {/* Centerpiece Row */}
             <div className="flex items-center justify-between gap-4 mb-3 relative z-10">
-              <div>
-                <span className="inline-block text-xs font-bold px-2.5 py-0.5 rounded-md bg-[rgba(122,28,46,0.35)] text-[#FDFBF7] mb-1.5 border border-[rgba(122,28,46,0.7)]">
-                  {gradeLabel}
-                </span>
-                <h3 className="font-serif font-extrabold text-lg text-white">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1.5">
+                  <span
+                    className="inline-block text-xs font-bold px-2.5 py-0.5 rounded-md"
+                    style={{
+                      background: "#7A1C2E",
+                      color: "#FDFBF7",
+                      border: "1px solid #58101E",
+                    }}
+                  >
+                    {gradeLabel}
+                  </span>
+                  {xpEarned > 0 && (
+                    <span
+                      className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md"
+                      style={{
+                        background: isParchment ? "#EDE5D6" : "rgba(166,124,30,0.25)",
+                        border: "1px solid #A67C1E",
+                        color: isParchment ? "#8C6512" : "#FFD166",
+                      }}
+                    >
+                      +{xpEarned} XP
+                    </span>
+                  )}
+                </div>
+
+                <h3
+                  className="font-serif font-extrabold text-lg truncate leading-tight"
+                  style={{ color: isParchment ? "#1E2211" : "#FFFFFF" }}
+                >
                   {authorName} scored {pct}% on Naija Trivia
                 </h3>
-                <p className="text-xs text-[#C8C4B7] italic">
+                <p
+                  className="text-xs italic font-serif"
+                  style={{ color: isParchment ? "#525645" : "#C8C4B7" }}
+                >
                   Can you beat this? 🇳🇬
                 </p>
-                <p className="text-[11px] text-white/50 font-mono mt-0.5">
+                <p
+                  className="text-[11px] font-mono mt-0.5"
+                  style={{ color: isParchment ? "#6E7260" : "rgba(255,255,255,0.5)" }}
+                >
                   Answer the exact same {total} questions on Fey
                 </p>
               </div>
 
-              <div className="flex flex-col items-center justify-center p-3 rounded-2xl bg-[rgba(25,30,23,0.85)] border border-[rgba(92,106,54,0.55)] min-w-[96px]">
-                <div className="font-space font-black text-3xl text-white">
-                  {score}<span className="text-sm font-normal text-white/45">/{total}</span>
+              {/* Score Plaque */}
+              <div
+                className="flex flex-col items-center justify-center p-3 rounded-2xl min-w-[100px] border shadow-xs"
+                style={{
+                  background: isParchment ? "#FDFCFA" : "rgba(25,30,23,0.85)",
+                  borderColor: isParchment ? "rgba(68, 78, 44, 0.22)" : "rgba(92,106,54,0.55)",
+                }}
+              >
+                <div
+                  className="font-space font-black text-3xl leading-none"
+                  style={{ color: isParchment ? "#7A1C2E" : "#FFFFFF" }}
+                >
+                  {score}
+                  <span
+                    className="text-sm font-normal"
+                    style={{ color: isParchment ? "#7D8171" : "rgba(255,255,255,0.45)" }}
+                  >
+                    /{total}
+                  </span>
                 </div>
-                <div className="text-[10px] font-mono text-[var(--gold)] font-bold">
+                <div
+                  className="text-[10px] font-mono font-bold mt-1"
+                  style={{ color: isParchment ? "#444E2C" : "#A67C1E" }}
+                >
                   {pct}% ACCURACY
                 </div>
               </div>
             </div>
 
-            <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px] font-mono text-white/50 relative z-10">
-              <span className="text-[#A67C1E]">Fey Academic Archive</span>
-              <span className="text-white/70">fey.lokinlabs.com.ng</span>
+            {/* Bottom Colophon */}
+            <div
+              className="pt-2 border-t flex items-center justify-between text-[10px] font-mono relative z-10"
+              style={{
+                borderColor: isParchment ? "rgba(68, 78, 44, 0.18)" : "rgba(255,255,255,0.1)",
+                color: isParchment ? "#6E7260" : "rgba(255,255,255,0.5)",
+              }}
+            >
+              <span style={{ color: isParchment ? "#444E2C" : "#A67C1E" }}>
+                Fey Academic Archive
+              </span>
+              <span style={{ color: isParchment ? "#7A1C2E" : "rgba(255,255,255,0.7)" }}>
+                fey.lokinlabs.com.ng
+              </span>
             </div>
           </div>
         </div>
 
-        {/* Custom Taunt / Invite Headline (Optional) */}
+        {/* Custom Taunt / Invite Headline */}
         <div className="mb-4">
           <label className="block text-[11px] font-semibold mb-1" style={{ color: "var(--text-dim)" }}>
             Custom Challenge Taunt (optional for WhatsApp &amp; X):
@@ -311,17 +475,28 @@ export default function ShareTriviaModal({
           </div>
         </div>
 
-        {/* Social Share Buttons */}
+        {/* Social Share Buttons & Proof Card Actions */}
         <div className="flex items-center justify-between gap-2 pt-3 border-t flex-wrap" style={{ borderColor: "var(--border-dim)" }}>
-          <button
-            onClick={handleCopyCardImage}
-            className="px-3 py-2 text-xs font-mono rounded-xl border flex items-center gap-1.5 cursor-pointer hover:bg-black/5 transition-colors"
-            style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
-            title="Copy an aesthetic 1200x630 proof card image to your clipboard"
-          >
-            {copiedCard ? <Check size={12} className="text-[var(--olive)]" /> : <ImageIcon size={12} className="text-[var(--gold)]" />}
-            <span>{copiedCard ? "Card Copied!" : "Copy Card Image"}</span>
-          </button>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={handleCopyCardImage}
+              className="px-3 py-2 text-xs font-mono rounded-xl border flex items-center gap-1.5 cursor-pointer hover:bg-black/5 transition-colors"
+              style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+              title="Copy an aesthetic 1200x630 proof card image to your clipboard"
+            >
+              {copiedCard ? <Check size={12} className="text-[var(--olive)]" /> : <ImageIcon size={12} className="text-[var(--gold)]" />}
+              <span>{copiedCard ? "Card Copied!" : "Copy Image"}</span>
+            </button>
+            <button
+              onClick={handleDownloadCardImage}
+              disabled={downloading}
+              className="p-2 text-xs rounded-xl border flex items-center justify-center cursor-pointer hover:bg-black/5 transition-colors text-[var(--text-dim)]"
+              style={{ borderColor: "var(--border-dim)" }}
+              title="Download 1200x630 PNG proof card"
+            >
+              {downloading ? <Check size={13} className="text-[var(--olive)]" /> : <Download size={13} />}
+            </button>
+          </div>
 
           <div className="flex items-center gap-2">
             <button
