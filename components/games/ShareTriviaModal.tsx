@@ -101,8 +101,13 @@ export default function ShareTriviaModal({
     ? customTaunt.trim()
     : `${authorName} got ${pct}% on Naija Trivia! Can you beat this? 🇳🇬`;
 
-  const whatsappMessage = `🇳🇬 *Naija Trivia Challenge*\n*${authorName} got ${pct}% on Naija Trivia! Can you beat this?*\n\nScore: *${score}/${total}* (${gradeLabel})\nAnswer the exact same questions and see if you can top their score:\n${targetUrl}`;
-  const twitterMessage = `${authorName} got ${pct}% on Naija Trivia! Can you beat this? 🇳🇬🎯 Play the exact same questions on @FeyPlatform:\n\n`;
+  const whatsappMessage = customTaunt.trim()
+    ? `${customTaunt.trim()}\n\n🇳🇬 *Naija Trivia Challenge*\nScore: *${score}/${total}* (${gradeLabel})\nPlay the exact same questions:\n${targetUrl}`
+    : `🇳🇬 *Naija Trivia Challenge*\n*${authorName} got ${pct}% on Naija Trivia! Can you beat this?*\n\nScore: *${score}/${total}* (${gradeLabel})\nAnswer the exact same questions and see if you can top their score:\n${targetUrl}`;
+
+  const twitterMessage = customTaunt.trim()
+    ? `${customTaunt.trim()} 🇳🇬🎯 Play the exact same questions:`
+    : `${authorName} got ${pct}% on Naija Trivia! Can you beat this? 🇳🇬🎯 Play the exact same questions:`;
 
   async function handleCopy() {
     if (!targetUrl) return;
@@ -118,15 +123,16 @@ export default function ShareTriviaModal({
   }
 
   function handleShareTwitter() {
+    // Twitter has built-in t.co shortening and flags generic shorteners like TinyURL as potential spam
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterMessage)}&url=${encodeURIComponent(targetUrl)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterMessage)}&url=${encodeURIComponent(fullShareUrl)}`,
       "_blank"
     );
   }
 
   function handleShareLinkedIn() {
     window.open(
-      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(targetUrl)}`,
+      `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(fullShareUrl)}`,
       "_blank"
     );
   }
