@@ -97,12 +97,25 @@ export const BASE_COMMUNITY_SCHOLARS: Omit<TriviaScholarEntry, "isUser" | "rank"
   },
 ];
 
+export interface CloudTriviaScore {
+  id: string;
+  username: string;
+  avatar: string;
+  score: number;
+  total: number;
+  pct: number;
+  grade_label?: string;
+  xp_earned?: number;
+  challenge_id?: string;
+}
+
 /**
- * Computes leaderboard entries combining base scholars with the user's live profile and trivia history.
+ * Computes leaderboard entries combining base scholars, live Supabase cloud scores, and the user's local stats.
  */
 export function getTriviaLeaderboard(
   profile: UserProfile,
-  history: TriviaHistoryItem[] = []
+  history: TriviaHistoryItem[] = [],
+  cloudScores: CloudTriviaScore[] = []
 ): {
   entries: TriviaScholarEntry[];
   userEntry: TriviaScholarEntry;
@@ -143,8 +156,25 @@ export function getTriviaLeaderboard(
     isUser: true,
   };
 
+  // Convert cloud scores into scholar entries (excluding current user to avoid duplicate)
+  const cloudEntries: TriviaScholarEntry[] = (cloudScores || [])
+    .filter((c) => c.username?.trim().toLowerCase() !== username.toLowerCase())
+    .map((c) => ({
+      id: `cloud-${c.id || c.username}`,
+      name: c.username,
+      avatar: c.avatar || "/avatars/avatar-scholar.svg",
+      title: c.pct >= 90 ? "Naija Titan · Peer" : c.pct >= 70 ? "Scholar · Peer" : "Challenger · Peer",
+      bestScore: c.score,
+      bestTotal: c.total,
+      bestPct: c.pct,
+      gamesPlayed: 1,
+      triviaXP: c.xp_earned || c.score * 5,
+      isUser: false,
+    }));
+
   const allEntries: TriviaScholarEntry[] = [
     ...BASE_COMMUNITY_SCHOLARS.map((s) => ({ ...s, isUser: false })),
+    ...cloudEntries,
     userEntry,
   ];
 

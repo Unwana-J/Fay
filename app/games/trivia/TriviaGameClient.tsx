@@ -814,6 +814,7 @@ export default function TriviaGameClient({
   challenger?: ChallengerInfo | null;
 }) {
   const {
+    profile,
     addXP,
     seenTriviaQuestionIds = [],
     markTriviaQuestionsSeen,
@@ -918,6 +919,24 @@ export default function TriviaGameClient({
       challengerTotal: challenger?.total,
       challengerPct: challenger?.pct,
     });
+
+    // Also submit score to cloud leaderboard (non-blocking)
+    fetch("/api/trivia/scores", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        username: profile.username?.trim() || "Scholar",
+        avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+        score: correct,
+        total,
+        pct,
+        gradeLabel,
+        xpEarned: totalXP,
+        challengeId: challenger?.questionIds?.join(",") || undefined,
+        questionIds: questions.map((q) => q.id),
+        deviceId: profile.id,
+      }),
+    }).catch(() => {});
 
     setAnswers(finalAnswers);
     setXpEarned(totalXP);

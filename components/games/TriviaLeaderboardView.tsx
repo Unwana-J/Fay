@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
 import {
   Trophy,
@@ -12,9 +12,10 @@ import {
   Swords,
   Crown,
   Sparkles,
+  RefreshCw,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
-import { getTriviaLeaderboard, type TriviaScholarEntry } from "@/lib/trivia-leaderboard";
+import { getTriviaLeaderboard, type TriviaScholarEntry, type CloudTriviaScore } from "@/lib/trivia-leaderboard";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/utils";
 
@@ -25,8 +26,31 @@ interface TriviaLeaderboardViewProps {
 export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewProps) {
   const { profile, triviaHistory = [] } = useAppStore();
   const [tab, setTab] = useState<"global" | "bests">("global");
+  const [cloudScores, setCloudScores] = useState<CloudTriviaScore[]>([]);
+  const [isLiveSync, setIsLiveSync] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const { entries, userEntry, userRank } = getTriviaLeaderboard(profile, triviaHistory);
+  function fetchLeaderboard() {
+    setIsLoading(true);
+    fetch("/api/trivia/leaderboard")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.configured) {
+          setIsLiveSync(true);
+        }
+        if (Array.isArray(data.scores)) {
+          setCloudScores(data.scores);
+        }
+      })
+      .catch((err) => console.warn("Could not load cloud leaderboard:", err))
+      .finally(() => setIsLoading(false));
+  }
+
+  useEffect(() => {
+    fetchLeaderboard();
+  }, []);
+
+  const { entries, userEntry, userRank } = getTriviaLeaderboard(profile, triviaHistory, cloudScores);
 
   // User's personal best runs (top 5 by pct and score)
   const personalBests = [...triviaHistory]
@@ -104,6 +128,28 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Live sync indicator & Refresh */}
+      <div className="flex items-center justify-between text-xs px-1">
+        <div className="flex items-center gap-1.5">
+          <span
+            className={cn(
+              "w-2 h-2 rounded-full",
+              isLiveSync ? "bg-green-500 animate-pulse" : "bg-[var(--gold)]"
+            )}
+          />
+          <span className="text-[11px] font-semibold text-[var(--text-mute)]">
+            {isLiveSync ? "Live Cloud Leaderboard" : "Community Standings"}
+          </span>
+        </div>
+        <button
+          onClick={fetchLeaderboard}
+          disabled={isLoading}
+          className="text-[11px] text-[var(--text-mute)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer transition-colors"
+        >
+          <RefreshCw size={11} className={cn(isLoading && "animate-spin")} /> Refresh
+        </button>
       </div>
 
       {/* Tabs */}
