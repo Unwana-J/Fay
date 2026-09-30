@@ -1,12 +1,22 @@
 "use client";
 
 import React, { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useAppStore } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
+  const router = useRouter();
+  const { profile } = useAppStore();
+
+  const [playMode, setPlayMode] = useState<"online" | "local">("online");
+  const [isCreatingOnline, setIsCreatingOnline] = useState(false);
+  const [onlineJoinCode, setOnlineJoinCode] = useState("");
+  const [onlineJoinError, setOnlineJoinError] = useState<string | null>(null);
+
   const {
     timerSeconds, setTimerSeconds,
     selectedCategories, toggleCategory, setSelectedCategories,
@@ -57,6 +67,48 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
     setPlayers(playersA, updated);
   };
 
+  const handleCreateOnlineRoom = async () => {
+    setIsCreatingOnline(true);
+    setOnlineJoinError(null);
+    try {
+      const res = await fetch("/api/articulate/room", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          hostId: profile.id,
+          hostName: profile.username || "Scholar Host",
+          settings: {
+            timerSeconds,
+            scoreGoal,
+            categories: selectedCategories,
+            difficulty,
+          },
+        }),
+      });
+      const data = await res.json();
+      if (data.room?.room_code) {
+        router.push(`/play/room/${data.room.room_code}`);
+      } else {
+        setOnlineJoinError(data.error || "Failed to create online room");
+      }
+    } catch (err) {
+      console.error("Failed to create room:", err);
+      setOnlineJoinError("Network error creating online room");
+    } finally {
+      setIsCreatingOnline(false);
+    }
+  };
+
+  const handleJoinOnlineRoom = (e: React.FormEvent) => {
+    e.preventDefault();
+    let code = onlineJoinCode.trim().toUpperCase();
+    if (!code) return;
+    if (!code.startsWith("FEY-") && code.length === 4) {
+      code = `FEY-${code}`;
+    }
+    router.push(`/play/room/${code}`);
+  };
+
   const handleLaunch = () => {
     if (playersA.length === 0 || playersB.length === 0) {
       alert("Both teams need at least one player to begin!");
@@ -69,20 +121,235 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   return (
     <div className="max-w-4xl mx-auto space-y-8">
       {/* Header */}
-      <div className="flex items-center gap-3">
-        <div className="p-3 bg-[var(--terra)] text-white rounded-2xl shadow-sm">
-          <Gamepad2 className="w-6 h-6 animate-pulse" />
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="p-3 bg-[var(--terra)] text-white rounded-2xl shadow-sm">
+            <Gamepad2 className="w-6 h-6 animate-pulse" />
+          </div>
+          <div>
+            <h1 className="font-space font-extrabold text-3xl text-[var(--text)]">Fey Articulate</h1>
+            <p className="text-sm text-[var(--text-dim)]">Fast-paced word description party game</p>
+          </div>
         </div>
-        <div>
-          <h1 className="font-space font-extrabold text-3xl text-[var(--text)]">Fey Live</h1>
-          <p className="text-sm text-[var(--text-dim)]">Pass-the-phone multiplayer party game</p>
+
+        {/* Mode Selector Pill */}
+        <div className="flex p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-xs">
+          <button
+            type="button"
+            onClick={() => setPlayMode("online")}
+            className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
+              playMode === "online"
+                ? "bg-[var(--terra)] text-white shadow-sm"
+                : "text-[var(--text-dim)] hover:text-[var(--text)]"
+            }`}
+          >
+            <Globe className="w-4 h-4" />
+            Online Room (Friends)
+          </button>
+          <button
+            type="button"
+            onClick={() => setPlayMode("local")}
+            className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
+              playMode === "local"
+                ? "bg-[var(--olive)] text-white shadow-sm"
+                : "text-[var(--text-dim)] hover:text-[var(--text)]"
+            }`}
+          >
+            <Smartphone className="w-4 h-4" />
+            Pass-the-Phone (Local)
+          </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        {/* Left Column: Game Rules & Settings */}
-        <div className="md:col-span-2 space-y-6">
-          <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] space-y-6">
+      {/* Online Room Mode Screen */}
+      {playMode === "online" ? (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Host New Room Column */}
+          <div className="md:col-span-2 space-y-6">
+            <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] space-y-6 shadow-sm">
+              <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)]">
+                <h2 className="font-space font-bold text-lg text-[var(--text)] flex items-center gap-2">
+                  <Globe className="w-4 h-4 text-[var(--terra)]" /> Host Online Game
+                </h2>
+                <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--olive)] bg-[var(--olive)]/10 px-2.5 py-1 rounded-full">
+                  Real-time Sync
+                </span>
+              </div>
+
+              {/* Timer Seconds */}
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)]">
+                  Round Duration
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[45, 60, 90].map((sec) => (
+                    <button
+                      key={sec}
+                      type="button"
+                      onClick={() => setTimerSeconds(sec)}
+                      className={`py-2.5 rounded-xl font-space font-bold text-xs border transition cursor-pointer ${
+                        timerSeconds === sec
+                          ? "bg-[var(--olive)] text-white border-[var(--olive)] shadow-xs"
+                          : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--olive)]/40"
+                      }`}
+                    >
+                      {sec} seconds
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Score Goal */}
+              <div className="space-y-2">
+                <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)]">
+                  Points to Win
+                </label>
+                <div className="grid grid-cols-3 gap-2">
+                  {[15, 20, 30].map((goal) => (
+                    <button
+                      key={goal}
+                      type="button"
+                      onClick={() => setScoreGoal(goal)}
+                      className={`py-2.5 rounded-xl font-space font-bold text-xs border transition cursor-pointer ${
+                        scoreGoal === goal
+                          ? "bg-[var(--olive)] text-white border-[var(--olive)] shadow-xs"
+                          : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--olive)]/40"
+                      }`}
+                    >
+                      {goal} points
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Categories */}
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)]">
+                    Categories ({selectedCategories.length}/6)
+                  </label>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedCategories([...GAME_CATEGORIES])}
+                    className="text-[11px] font-bold text-[var(--olive)] hover:underline cursor-pointer"
+                  >
+                    Select All
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {GAME_CATEGORIES.map((cat) => {
+                    const isSelected = selectedCategories.includes(cat);
+                    return (
+                      <button
+                        key={cat}
+                        type="button"
+                        onClick={() => toggleCategory(cat)}
+                        className={`p-2.5 rounded-xl border text-xs font-bold flex items-center gap-2 transition cursor-pointer ${
+                          isSelected
+                            ? "bg-[var(--bg-card)] border-[var(--border)] text-[var(--text)] shadow-xs"
+                            : "bg-[var(--bg)] border-[var(--border-dim)] text-[var(--text-mute)] opacity-50"
+                        }`}
+                      >
+                        <span className="text-base">{CATEGORY_ICONS[cat]}</span>
+                        <span>{cat}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Strict Round Lock Callout */}
+              <div className="p-4 rounded-2xl bg-[var(--terra)]/10 border border-[var(--terra)]/20 text-xs text-[var(--text-dim)] flex items-start gap-3">
+                <Lock className="w-4 h-4 text-[var(--terra)] flex-shrink-0 mt-0.5" />
+                <div className="space-y-1">
+                  <span className="font-bold text-[var(--text)] block">
+                    Strict Round Locking Enforced
+                  </span>
+                  <p className="leading-relaxed">
+                    Friends can freely join your lobby until you start Round 1. Once a round begins, the room locks to prevent disruptions; any late joiners will wait in the spectator lounge and automatically join for the next round.
+                  </p>
+                </div>
+              </div>
+
+              {onlineJoinError && (
+                <div className="p-3 rounded-xl bg-red-500/10 border border-red-500/30 text-red-500 text-xs font-medium">
+                  {onlineJoinError}
+                </div>
+              )}
+
+              {/* Create Room Button */}
+              <motion.button
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.98 }}
+                onClick={handleCreateOnlineRoom}
+                disabled={isCreatingOnline}
+                className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+              >
+                {isCreatingOnline ? (
+                  <>
+                    <Loader2 className="w-5 h-5 animate-spin" />
+                    Generating Room...
+                  </>
+                ) : (
+                  <>
+                    Create Online Room & Invite Friends
+                    <ArrowRight className="w-5 h-5" />
+                  </>
+                )}
+              </motion.button>
+            </div>
+          </div>
+
+          {/* Join Existing Room Column */}
+          <div className="space-y-6">
+            <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] space-y-4 shadow-sm">
+              <h2 className="font-space font-bold text-base text-[var(--text)] flex items-center gap-2 pb-3 border-b border-[var(--border-dim)]">
+                <Users className="w-4 h-4 text-[var(--olive)]" /> Join Friend&apos;s Room
+              </h2>
+
+              <form onSubmit={handleJoinOnlineRoom} className="space-y-3">
+                <div>
+                  <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)] block mb-1.5">
+                    Room Code
+                  </label>
+                  <input
+                    type="text"
+                    value={onlineJoinCode}
+                    onChange={(e) => setOnlineJoinCode(e.target.value.toUpperCase())}
+                    placeholder="e.g. FEY-9K2P"
+                    maxLength={10}
+                    className="w-full px-4 py-3 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-base font-space font-extrabold tracking-wider text-[var(--text)] focus:border-[var(--olive)] focus:outline-none uppercase placeholder:text-xs placeholder:font-normal placeholder:tracking-normal placeholder:text-[var(--text-mute)]"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={!onlineJoinCode.trim()}
+                  className="w-full bg-[var(--olive)] text-white py-3 rounded-xl font-space font-bold text-xs shadow-sm hover:opacity-90 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+                >
+                  Enter Room <ArrowRight className="w-4 h-4" />
+                </button>
+              </form>
+
+              <div className="pt-3 border-t border-[var(--border-dim)]/50 text-xs text-[var(--text-dim)] space-y-2">
+                <div className="flex items-center gap-2 font-bold text-[var(--text)]">
+                  <Sparkles className="w-3.5 h-3.5 text-[var(--gold)]" />
+                  How online rooms work:
+                </div>
+                <ul className="space-y-1 list-disc list-inside text-[11px] leading-relaxed">
+                  <li>Active describer sees private word cards.</li>
+                  <li>Teammates shout out guesses in real-time.</li>
+                  <li>Live synchronized timer & cheer reactions.</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          {/* Left Column: Game Rules & Settings */}
+          <div className="md:col-span-2 space-y-6">
+            <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] space-y-6">
             <h2 className="font-space font-bold text-lg text-[var(--text)] flex items-center gap-2 pb-3 border-b border-[var(--border-dim)]">
               <Settings className="w-4 h-4 text-[var(--olive)]" /> Match Setup
             </h2>
@@ -493,6 +760,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           </motion.button>
         </div>
       </div>
+      )}
     </div>
   );
 }
