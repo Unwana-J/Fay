@@ -63,6 +63,25 @@ export interface UserProfile {
   hasClaimedAccount?: boolean;
 }
 
+export interface TriviaHistoryItem {
+  id: string;
+  timestamp: number;
+  date: string;
+  score: number;
+  total: number;
+  pct: number;
+  gradeLabel: string;
+  xpEarned: number;
+  durationMinutes: number;
+  questionIds: string[];
+  categoryBreakdown: { category: string; correct: number; total: number }[];
+  reviewMode?: "instant" | "suspense";
+  challengerName?: string;
+  challengerScore?: number;
+  challengerTotal?: number;
+  challengerPct?: number;
+}
+
 export interface AppState {
   // Authentication & Onboarding
   isOnboarded: boolean;
@@ -103,8 +122,9 @@ export interface AppState {
   // Custom topics
   customTopics: Topic[];
 
-  // Trivia tracking
+  // Trivia tracking & history
   seenTriviaQuestionIds: string[];
+  triviaHistory: TriviaHistoryItem[];
 
   // Actions
   startSession: (topic: Topic, researchMin: number, initialStage?: "research" | "speaking") => string;
@@ -127,6 +147,8 @@ export interface AppState {
   addXP: (amount: number) => void;
   markTriviaQuestionsSeen: (ids: string[]) => void;
   resetSeenTriviaQuestions: () => void;
+  saveTriviaRound: (round: Omit<TriviaHistoryItem, "id" | "timestamp" | "date">) => void;
+  clearTriviaHistory: () => void;
 }
 
 const DEFAULT_ENABLED_CATEGORIES = [
@@ -183,6 +205,7 @@ export const useAppStore = create<AppState>()(
       },
       customTopics: [],
       seenTriviaQuestionIds: [],
+      triviaHistory: [],
 
       createAccount: ({ username, avatar, bio, interests }) => {
         const state = get();
@@ -239,6 +262,7 @@ export const useAppStore = create<AppState>()(
           },
           claimedQuestIds: [],
           seenTriviaQuestionIds: [],
+          triviaHistory: [],
           customTopics: [],
           claimPromptDismissed: false,
         });
@@ -536,16 +560,36 @@ export const useAppStore = create<AppState>()(
 
       resetSeenTriviaQuestions: () =>
         set({ seenTriviaQuestionIds: [] }),
+
+      saveTriviaRound: (round) =>
+        set((s) => {
+          const item: TriviaHistoryItem = {
+            ...round,
+            id: uid(),
+            timestamp: Date.now(),
+            date: todayStr(),
+          };
+          const existing = Array.isArray(s.triviaHistory) ? s.triviaHistory : [];
+          return {
+            triviaHistory: [item, ...existing].slice(0, 100),
+          };
+        }),
+
+      clearTriviaHistory: () =>
+        set({ triviaHistory: [] }),
     }),
     {
       name: "fey-app-store",
-      version: 7,
+      version: 8,
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       migrate: (persistedState: any, fromVersion: number) => {
         const state = { ...persistedState };
         // Always clear activeSession on cold start from persisted state 
         // to prevent being trapped in a stale session
         state.activeSession = null;
+
+        // Ensure triviaHistory array exists
+        state.triviaHistory = Array.isArray(state?.triviaHistory) ? state.triviaHistory : [];
 
         // v1/v2 → v3 (or unversioned): auto-add any categories that didn't exist yet
         if (fromVersion === undefined || fromVersion < 3) {

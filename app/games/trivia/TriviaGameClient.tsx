@@ -17,6 +17,7 @@ import {
   Share2,
   Swords,
   Trophy,
+  History,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -26,14 +27,17 @@ import {
   type TriviaQuestion,
   type TriviaCategory,
 } from "@/lib/trivia-questions";
-import { useAppStore } from "@/store/useAppStore";
+import { useAppStore, type TriviaHistoryItem } from "@/store/useAppStore";
 import { cn } from "@/lib/utils";
 import ShareTriviaModal from "@/components/games/ShareTriviaModal";
+import TriviaHistoryView from "@/components/games/TriviaHistoryView";
+import TriviaLeaderboardView from "@/components/games/TriviaLeaderboardView";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ReviewMode = "instant" | "suspense";
 export type GamePhase = "setup" | "playing" | "results";
+export type SetupTab = "quiz" | "history" | "leaderboard";
 export type DurationOption = { label: string; minutes: number; emoji: string };
 
 export interface ChallengerInfo {
@@ -68,13 +72,21 @@ const OPTION_LABELS = ["A", "B", "C", "D"];
 // ─── Setup Screen ─────────────────────────────────────────────────────────────
 
 function SetupScreen({
+  activeTab,
+  onTabChange,
+  historyCount,
   onStart,
+  onPlayDeck,
   seenCount,
   totalCount,
   onResetSeen,
   challenger,
 }: {
+  activeTab: SetupTab;
+  onTabChange: (tab: SetupTab) => void;
+  historyCount: number;
   onStart: (minutes: number, mode: ReviewMode) => void;
+  onPlayDeck: (questionIds: string[], minutes: number) => void;
   seenCount: number;
   totalCount: number;
   onResetSeen: () => void;
@@ -88,7 +100,7 @@ function SetupScreen({
       {/* Back */}
       <Link
         href="/games"
-        className="flex items-center gap-1.5 text-xs font-semibold mb-8 w-fit hover:text-[var(--text)] transition-colors"
+        className="flex items-center gap-1.5 text-xs font-semibold mb-6 w-fit hover:text-[var(--text)] transition-colors"
         style={{ color: "var(--text-dim)" }}
       >
         <ArrowLeft size={13} /> Back to Games
@@ -96,164 +108,226 @@ function SetupScreen({
 
       {/* Hero */}
       <div className="text-center mb-6">
-        <div className="text-7xl mb-3">🇳🇬</div>
+        <div className="text-6xl mb-2">🇳🇬</div>
         <h1
-          className="font-space text-4xl font-extrabold tracking-tight mb-2"
+          className="font-space text-3xl sm:text-4xl font-extrabold tracking-tight mb-1"
           style={{ color: "var(--text)" }}
         >
           Naija Trivia
         </h1>
-        <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+        <p className="text-xs sm:text-sm" style={{ color: "var(--text-dim)" }}>
           Test your knowledge of Nigerian history, pop culture &amp; general knowledge.
         </p>
       </div>
 
-      {/* Challenger Callout Banner (When arrived via challenge link) */}
-      {challenger && (
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="rounded-2xl p-5 border mb-6 relative overflow-hidden"
-          style={{
-            borderColor: "rgba(0, 135, 81, 0.4)",
-            background: "linear-gradient(135deg, rgba(0, 135, 81, 0.14) 0%, rgba(166, 124, 30, 0.08) 100%)",
-          }}
+      {/* Navigation Tab Bar */}
+      <div
+        className="flex gap-1.5 p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
+        style={{ borderColor: "var(--border-dim)" }}
+      >
+        <button
+          onClick={() => onTabChange("quiz")}
+          className={cn(
+            "flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+            activeTab === "quiz"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border-dim)]"
+              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+          )}
         >
-          <div className="flex items-start gap-3.5">
-            <div className="w-12 h-12 rounded-xl bg-[#008751]/20 border border-[#008751]/40 flex items-center justify-center shrink-0 text-xl text-[#008751]">
-              <Swords size={22} />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-[#008751]">
-                  ⚔️ Head-to-Head Challenge
-                </span>
-                <span className="text-[10px] font-mono text-[var(--gold)]">
-                  {challenger.grade || "Sharp Sharp! 🎯"}
-                </span>
-              </div>
-              <div className="text-base font-extrabold truncate" style={{ color: "var(--text)" }}>
-                {challenger.by} got {challenger.pct}% on Naija Trivia!
-              </div>
-              <p className="text-xs text-[var(--text-dim)] mt-1">
-                Can you beat this? You will answer the <strong>exact same {challenger.total || 15} questions</strong>.
-              </p>
-            </div>
-          </div>
-        </motion.div>
+          <span>🎮</span> Play Quiz
+        </button>
+        <button
+          onClick={() => onTabChange("history")}
+          className={cn(
+            "flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+            activeTab === "history"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border-dim)]"
+              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+          )}
+        >
+          <History size={13} /> History {historyCount > 0 ? `(${historyCount})` : ""}
+        </button>
+        <button
+          onClick={() => onTabChange("leaderboard")}
+          className={cn(
+            "flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+            activeTab === "leaderboard"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border-dim)]"
+              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+          )}
+        >
+          <Trophy size={13} className="text-[var(--gold)]" /> Leaderboard
+        </button>
+      </div>
+
+      {/* Tab: History */}
+      {activeTab === "history" && (
+        <TriviaHistoryView
+          onPlayDeck={onPlayDeck}
+          onNewGame={() => onTabChange("quiz")}
+        />
       )}
 
-      {/* Bank Progress & Deduplication Tracker */}
-      <div className="surface rounded-2xl p-4 border mb-6 flex items-center justify-between gap-4">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-[var(--olive)]/10 text-[var(--olive)] flex items-center justify-center font-space font-bold text-sm">
-            🎯
-          </div>
-          <div>
-            <div className="text-xs font-bold" style={{ color: "var(--text)" }}>
-              {seenCount} of {totalCount} questions explored
+      {/* Tab: Leaderboard */}
+      {activeTab === "leaderboard" && (
+        <TriviaLeaderboardView
+          onPlay={() => onTabChange("quiz")}
+        />
+      )}
+
+      {/* Tab: Quiz Setup */}
+      {activeTab === "quiz" && (
+        <>
+          {/* Challenger Callout Banner (When arrived via challenge link) */}
+          {challenger && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="rounded-2xl p-5 border mb-6 relative overflow-hidden"
+              style={{
+                borderColor: "rgba(0, 135, 81, 0.4)",
+                background:
+                  "linear-gradient(135deg, rgba(0, 135, 81, 0.14) 0%, rgba(166, 124, 30, 0.08) 100%)",
+              }}
+            >
+              <div className="flex items-start gap-3.5">
+                <div className="w-12 h-12 rounded-xl bg-[#008751]/20 border border-[#008751]/40 flex items-center justify-center shrink-0 text-xl text-[#008751]">
+                  <Swords size={22} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-[#008751]">
+                      ⚔️ Head-to-Head Challenge
+                    </span>
+                    <span className="text-[10px] font-mono text-[var(--gold)]">
+                      {challenger.grade || "Sharp Sharp! 🎯"}
+                    </span>
+                  </div>
+                  <div className="text-base font-extrabold truncate" style={{ color: "var(--text)" }}>
+                    {challenger.by} got {challenger.pct}% on Naija Trivia!
+                  </div>
+                  <p className="text-xs text-[var(--text-dim)] mt-1">
+                    Can you beat this? You will answer the{" "}
+                    <strong>exact same {challenger.total || 15} questions</strong>.
+                  </p>
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Bank Progress & Deduplication Tracker */}
+          <div className="surface rounded-2xl p-4 border mb-6 flex items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-[var(--olive)]/10 text-[var(--olive)] flex items-center justify-center font-space font-bold text-sm">
+                🎯
+              </div>
+              <div>
+                <div className="text-xs font-bold" style={{ color: "var(--text)" }}>
+                  {seenCount} of {totalCount} questions explored
+                </div>
+                <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+                  {seenCount >= totalCount
+                    ? "You have explored all questions! Next game will cycle fresh."
+                    : "No repeats — you will only see fresh questions until the bank is exhausted."}
+                </div>
+              </div>
             </div>
-            <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
-              {seenCount >= totalCount
-                ? "You have explored all questions! Next game will cycle fresh."
-                : "No repeats — you will only see fresh questions until the bank is exhausted."}
+            {seenCount > 0 && (
+              <button
+                onClick={onResetSeen}
+                title="Reset question history to allow all questions again"
+                className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border hover:bg-[var(--bg-input)] transition-colors shrink-0 cursor-pointer"
+                style={{ color: "var(--text-mute)", borderColor: "var(--border-dim)" }}
+              >
+                Reset History
+              </button>
+            )}
+          </div>
+
+          <div className="space-y-6">
+            {/* Duration Selector */}
+            <div className="surface rounded-2xl p-5 border">
+              <p
+                className="text-xs font-bold uppercase tracking-wider mb-3"
+                style={{ color: "var(--text-mute)" }}
+              >
+                <Clock size={10} className="inline mr-1.5" /> Game Duration
+              </p>
+              <div className="grid grid-cols-3 gap-3">
+                {DURATION_OPTIONS.map((opt) => (
+                  <button
+                    key={opt.minutes}
+                    onClick={() => setDuration(opt)}
+                    className={cn(
+                      "rounded-xl p-4 text-center border-2 transition-all cursor-pointer",
+                      duration.minutes === opt.minutes
+                        ? "border-[var(--terra)] bg-[var(--terra-bg)]"
+                        : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                    )}
+                  >
+                    <div className="text-3xl mb-2">{opt.emoji}</div>
+                    <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
+                      {opt.label}
+                    </div>
+                    <div
+                      className="text-[10px] font-semibold mt-1"
+                      style={{ color: "var(--text-mute)" }}
+                    >
+                      {opt.minutes} min · {QUESTION_COUNTS[opt.minutes]} Qs
+                    </div>
+                  </button>
+                ))}
+              </div>
             </div>
-          </div>
-        </div>
-        {seenCount > 0 && (
-          <button
-            onClick={onResetSeen}
-            title="Reset question history to allow all questions again"
-            className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border hover:bg-[var(--bg-input)] transition-colors shrink-0 cursor-pointer"
-            style={{ color: "var(--text-mute)", borderColor: "var(--border-dim)" }}
-          >
-            Reset History
-          </button>
-        )}
-      </div>
 
-      <div className="space-y-6">
-        {/* Duration Selector */}
-        <div className="surface rounded-2xl p-5 border">
-          <p
-            className="text-xs font-bold uppercase tracking-wider mb-3"
-            style={{ color: "var(--text-mute)" }}
-          >
-            <Clock size={10} className="inline mr-1.5" /> Game Duration
-          </p>
-          <div className="grid grid-cols-3 gap-3">
-            {DURATION_OPTIONS.map((opt) => (
-              <button
-                key={opt.minutes}
-                onClick={() => setDuration(opt)}
-                className={cn(
-                  "rounded-xl p-4 text-center border-2 transition-all cursor-pointer",
-                  duration.minutes === opt.minutes
-                    ? "border-[var(--terra)] bg-[var(--terra-bg)]"
-                    : "border-[var(--border-dim)] hover:border-[var(--border)]"
-                )}
+            {/* Review Mode Toggle */}
+            <div className="surface rounded-2xl p-5 border">
+              <p
+                className="text-xs font-bold uppercase tracking-wider mb-3"
+                style={{ color: "var(--text-mute)" }}
               >
-                <div className="text-3xl mb-2">{opt.emoji}</div>
-                <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
-                  {opt.label}
-                </div>
-                <div
-                  className="text-[10px] font-semibold mt-1"
-                  style={{ color: "var(--text-mute)" }}
-                >
-                  {opt.minutes} min · {QUESTION_COUNTS[opt.minutes]} Qs
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
+                <BookOpen size={10} className="inline mr-1.5" /> Answer Review Mode
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                {(["instant", "suspense"] as ReviewMode[]).map((m) => (
+                  <button
+                    key={m}
+                    onClick={() => setMode(m)}
+                    className={cn(
+                      "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
+                      mode === m
+                        ? "border-[var(--olive)] bg-[var(--olive)]/5"
+                        : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                    )}
+                  >
+                    <div className="text-2xl mb-2">{m === "instant" ? "⚡" : "🎭"}</div>
+                    <div className="font-space font-bold text-sm mb-1" style={{ color: "var(--text)" }}>
+                      {m === "instant" ? "Instant Feedback" : "Suspense Mode"}
+                    </div>
+                    <p className="text-[10px] leading-snug" style={{ color: "var(--text-mute)" }}>
+                      {m === "instant"
+                        ? "See the correct answer immediately after each question."
+                        : "Answer all questions first, then review at the end."}
+                    </p>
+                  </button>
+                ))}
+              </div>
+            </div>
 
-        {/* Review Mode Toggle */}
-        <div className="surface rounded-2xl p-5 border">
-          <p
-            className="text-xs font-bold uppercase tracking-wider mb-3"
-            style={{ color: "var(--text-mute)" }}
-          >
-            <BookOpen size={10} className="inline mr-1.5" /> Answer Review Mode
-          </p>
-          <div className="grid grid-cols-2 gap-3">
-            {(["instant", "suspense"] as ReviewMode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => setMode(m)}
-                className={cn(
-                  "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
-                  mode === m
-                    ? "border-[var(--olive)] bg-[var(--olive)]/5"
-                    : "border-[var(--border-dim)] hover:border-[var(--border)]"
-                )}
-              >
-                <div className="text-2xl mb-2">{m === "instant" ? "⚡" : "🎭"}</div>
-                <div className="font-space font-bold text-sm mb-1" style={{ color: "var(--text)" }}>
-                  {m === "instant" ? "Instant Feedback" : "Suspense Mode"}
-                </div>
-                <p className="text-[10px] leading-snug" style={{ color: "var(--text-mute)" }}>
-                  {m === "instant"
-                    ? "See the correct answer immediately after each question."
-                    : "Answer all questions first, then review at the end."}
-                </p>
-              </button>
-            ))}
+            {/* Start Button */}
+            <motion.button
+              whileTap={{ scale: 0.97 }}
+              onClick={() => onStart(duration.minutes, mode)}
+              className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+            >
+              {challenger
+                ? `Accept Challenge · Play Same ${challenger.total || 15} Questions`
+                : "Start Game"}{" "}
+              <ChevronRight size={18} />
+            </motion.button>
           </div>
-        </div>
-
-        {/* Start Button */}
-        <motion.button
-          whileTap={{ scale: 0.97 }}
-          onClick={() => onStart(duration.minutes, mode)}
-          className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg"
-        >
-          {challenger
-            ? `Accept Challenge · Play Same ${challenger.total || 15} Questions`
-            : "Start Game"}{" "}
-          <ChevronRight size={18} />
-        </motion.button>
-      </div>
+        </>
+      )}
     </div>
   );
 }
@@ -478,6 +552,8 @@ function ResultsScreen({
   reviewMode,
   xpEarned,
   onRetry,
+  onViewHistory,
+  onViewLeaderboard,
   challenger,
 }: {
   questions: TriviaQuestion[];
@@ -485,6 +561,8 @@ function ResultsScreen({
   reviewMode: ReviewMode;
   xpEarned: number;
   onRetry: () => void;
+  onViewHistory: () => void;
+  onViewLeaderboard: () => void;
   challenger?: ChallengerInfo | null;
 }) {
   const [showShareModal, setShowShareModal] = useState(false);
@@ -678,7 +756,7 @@ function ResultsScreen({
         </div>
       )}
 
-      {/* Actions */}
+      {/* Primary Actions */}
       <div className="flex gap-3">
         <button
           onClick={onRetry}
@@ -692,6 +770,24 @@ function ResultsScreen({
         >
           Back to Games <ChevronRight size={14} />
         </Link>
+      </div>
+
+      {/* Secondary Explorations: History & Leaderboard */}
+      <div className="flex gap-2.5 mt-3">
+        <button
+          onClick={onViewHistory}
+          className="flex-1 py-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+          style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+        >
+          <History size={13} /> View History
+        </button>
+        <button
+          onClick={onViewLeaderboard}
+          className="flex-1 py-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+          style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+        >
+          <Trophy size={13} className="text-[var(--gold)]" /> View Leaderboard
+        </button>
       </div>
 
       {/* Share Score & Invite Modal */}
@@ -722,8 +818,11 @@ export default function TriviaGameClient({
     seenTriviaQuestionIds = [],
     markTriviaQuestionsSeen,
     resetSeenTriviaQuestions,
+    triviaHistory = [],
+    saveTriviaRound,
   } = useAppStore();
   const [phase, setPhase] = useState<GamePhase>("setup");
+  const [setupTab, setSetupTab] = useState<SetupTab>("quiz");
   const [questions, setQuestions] = useState<TriviaQuestion[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("instant");
@@ -763,19 +862,71 @@ export default function TriviaGameClient({
     setPhase("playing");
   }
 
+  function handlePlayDeck(questionIds: string[], minutes: number) {
+    const matched = getQuestionsByIds(questionIds);
+    if (matched.length > 0) {
+      setQuestions(matched);
+      setTotalSeconds(minutes * 60);
+      setReviewMode("instant");
+      setPhase("playing");
+    }
+  }
+
   function handleComplete(finalAnswers: (number | null)[], _timeLeft: number) {
     const correct = finalAnswers.filter((a, i) => a === questions[i].answer).length;
-    const pct = correct / questions.length;
+    const total = questions.length;
+    const pct = Math.round((correct / total) * 100);
     const base = correct * 5;
-    const bonus = pct >= 0.8 ? 50 : 0;
-    const total = base + bonus;
+    const bonus = pct >= 80 ? 50 : 0;
+    const totalXP = base + bonus;
+
+    const byCategory = Object.entries(
+      questions.reduce<Record<string, { correct: number; total: number }>>((acc, q, i) => {
+        if (!acc[q.category]) acc[q.category] = { correct: 0, total: 0 };
+        acc[q.category].total++;
+        if (finalAnswers[i] === q.answer) acc[q.category].correct++;
+        return acc;
+      }, {})
+    ).map(([category, stat]) => ({
+      category,
+      correct: stat.correct,
+      total: stat.total,
+    }));
+
+    const gradeLabel =
+      pct >= 80
+        ? "Naija Expert! 🏆"
+        : pct >= 60
+        ? "Sharp Sharp! 🎯"
+        : pct >= 40
+        ? "Not bad o! 🙌"
+        : "Keep studying! 📚";
+
+    // Persist round in trivia history
+    saveTriviaRound({
+      score: correct,
+      total,
+      pct,
+      gradeLabel,
+      xpEarned: totalXP,
+      durationMinutes: Math.max(1, Math.round(totalSeconds / 60)),
+      questionIds: questions.map((q) => q.id),
+      categoryBreakdown: byCategory,
+      reviewMode,
+      challengerName: challenger?.by,
+      challengerScore: challenger?.score,
+      challengerTotal: challenger?.total,
+      challengerPct: challenger?.pct,
+    });
+
     setAnswers(finalAnswers);
-    setXpEarned(total);
-    if (total > 0) addXP(total);
+    setXpEarned(totalXP);
+    if (totalXP > 0) addXP(totalXP);
     setPhase("results");
   }
 
   function handleRetry() {
+    setSetupTab("quiz");
     setPhase("setup");
     setQuestions([]);
     setAnswers([]);
@@ -787,7 +938,11 @@ export default function TriviaGameClient({
       {phase === "setup" && (
         <motion.div key="setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
           <SetupScreen
+            activeTab={setupTab}
+            onTabChange={setSetupTab}
+            historyCount={triviaHistory.length}
             onStart={handleStart}
+            onPlayDeck={handlePlayDeck}
             seenCount={seenTriviaQuestionIds.length}
             totalCount={TRIVIA_QUESTIONS.length}
             onResetSeen={resetSeenTriviaQuestions}
@@ -813,6 +968,14 @@ export default function TriviaGameClient({
             reviewMode={reviewMode}
             xpEarned={xpEarned}
             onRetry={handleRetry}
+            onViewHistory={() => {
+              setSetupTab("history");
+              setPhase("setup");
+            }}
+            onViewLeaderboard={() => {
+              setSetupTab("leaderboard");
+              setPhase("setup");
+            }}
             challenger={challenger}
           />
         </motion.div>
