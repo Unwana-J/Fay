@@ -6,11 +6,22 @@ export const runtime = "edge";
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
+    const challengeTitle = searchParams.get("challengeTitle") || searchParams.get("title");
+    const difficulty = searchParams.get("difficulty") || "Mixed";
     const score = searchParams.get("score") || "0";
-    const total = searchParams.get("total") || "15";
+    const total = searchParams.get("total") || (challengeTitle ? "10" : "15");
     const pct = searchParams.get("pct") || String(Math.round((parseInt(score, 10) / parseInt(total, 10)) * 100) || 0);
     const by = searchParams.get("by") || "Scholar";
-    const grade = searchParams.get("grade") || (parseInt(pct, 10) >= 80 ? "Naija Expert! 🏆" : parseInt(pct, 10) >= 60 ? "Sharp Sharp! 🎯" : parseInt(pct, 10) >= 40 ? "Not bad o! 🙌" : "Keep Studying! 📚");
+    const defaultGrade = challengeTitle
+      ? `${difficulty.toUpperCase()} MODE`
+      : parseInt(pct, 10) >= 80
+      ? "Naija Expert! 🏆"
+      : parseInt(pct, 10) >= 60
+      ? "Sharp Sharp! 🎯"
+      : parseInt(pct, 10) >= 40
+      ? "Not bad o! 🙌"
+      : "Keep Studying! 📚";
+    const grade = searchParams.get("grade") || defaultGrade;
     const xp = searchParams.get("xp");
     const theme = searchParams.get("theme") || "parchment";
     const isParchment = theme === "parchment";
@@ -245,7 +256,7 @@ export async function GET(req: NextRequest) {
 
               <h1
                 style={{
-                  fontSize: "44px",
+                  fontSize: challengeTitle ? "40px" : "44px",
                   fontWeight: 900,
                   color: colors.headline,
                   lineHeight: 1.15,
@@ -254,7 +265,7 @@ export async function GET(req: NextRequest) {
                   fontFamily: "Georgia, serif",
                 }}
               >
-                {by} scored {pct}% on Naija Trivia
+                {challengeTitle ? challengeTitle : `${by} scored ${pct}% on Naija Trivia`}
               </h1>
 
               <p
@@ -268,7 +279,7 @@ export async function GET(req: NextRequest) {
                   fontFamily: "Georgia, serif",
                 }}
               >
-                Can you beat this? 🇳🇬
+                {challengeTitle ? `Invitational Gauntlet · Hosted by Scholar ${by} 🇳🇬` : "Can you beat this? 🇳🇬"}
               </p>
 
               <p
@@ -279,7 +290,9 @@ export async function GET(req: NextRequest) {
                   lineHeight: 1.45,
                 }}
               >
-                Answer the exact same {total} questions and see if you can top their score on Fey!
+                {challengeTitle
+                  ? `Enter this custom gauntlet of ${total} curated questions. Compete against ${by} and claim the top ranking!`
+                  : `Answer the exact same ${total} questions and see if you can top their score on Fey!`}
               </p>
             </div>
 
@@ -308,12 +321,12 @@ export async function GET(req: NextRequest) {
                   marginBottom: "8px",
                 }}
               >
-                ★ Official Score ★
+                {challengeTitle ? "★ Gauntlet Deck ★" : "★ Official Score ★"}
               </span>
 
               <div
                 style={{
-                  fontSize: "82px",
+                  fontSize: challengeTitle ? "72px" : "82px",
                   fontWeight: 900,
                   color: colors.heroScore,
                   lineHeight: 1,
@@ -321,9 +334,16 @@ export async function GET(req: NextRequest) {
                   alignItems: "baseline",
                 }}
               >
-                <span>{score}</span>
-                <span style={{ fontSize: "40px", color: colors.heroDenominator, fontWeight: 700, marginLeft: "6px" }}>
-                  /{total}
+                <span>{challengeTitle ? total : score}</span>
+                <span
+                  style={{
+                    fontSize: challengeTitle ? "32px" : "40px",
+                    color: colors.heroDenominator,
+                    fontWeight: 700,
+                    marginLeft: "6px",
+                  }}
+                >
+                  {challengeTitle ? "Q's" : `/${total}`}
                 </span>
               </div>
 
@@ -347,7 +367,9 @@ export async function GET(req: NextRequest) {
                     textTransform: "uppercase",
                   }}
                 >
-                  {pct}% ACCURACY · {total} QUESTIONS
+                  {challengeTitle
+                    ? `${difficulty.toUpperCase()} · 24H CHALLENGE`
+                    : `${pct}% ACCURACY · ${total} QUESTIONS`}
                 </span>
               </div>
             </div>

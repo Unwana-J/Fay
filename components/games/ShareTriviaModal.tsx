@@ -11,7 +11,6 @@ import {
   Image as ImageIcon,
   Download,
 } from "lucide-react";
-import { getShortenedUrl } from "@/lib/url-shortener";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import {
   copyTriviaCardToClipboard,
@@ -47,7 +46,6 @@ export default function ShareTriviaModal({
   const [copied, setCopied] = useState(false);
   const [copiedCard, setCopiedCard] = useState(false);
   const [downloading, setDownloading] = useState(false);
-  const [activeUrl, setActiveUrl] = useState<string>("");
   const [customTaunt, setCustomTaunt] = useState<string>("");
   const [cardTheme, setCardTheme] = useState<TriviaCardTheme>("parchment");
 
@@ -76,27 +74,11 @@ export default function ShareTriviaModal({
     return `${origin}/games/trivia?${params.toString()}`;
   }, [score, total, pct, authorName, cardTheme, questionIds]);
 
-  // Shorten URL for social sharing & WhatsApp compatibility
-  useEffect(() => {
-    if (!fullShareUrl) {
-      setActiveUrl("");
-      return;
-    }
-    setActiveUrl(fullShareUrl);
-    let mounted = true;
-    getShortenedUrl(fullShareUrl).then((short) => {
-      if (mounted && short && short !== fullShareUrl) {
-        setActiveUrl(short);
-      }
-    });
-    return () => {
-      mounted = false;
-    };
-  }, [fullShareUrl]);
+  // Always use the canonical branded URL for WhatsApp and social links
+  // This guarantees WhatsApp/iMessage scrapers hit Fey's SSR metadata with 200 OK
+  const targetUrl = fullShareUrl.trim();
 
   if (!isOpen) return null;
-
-  const targetUrl = (activeUrl || fullShareUrl).trim();
 
   const shareHeadline = customTaunt.trim()
     ? customTaunt.trim()
@@ -435,9 +417,7 @@ export default function ShareTriviaModal({
             <span className="text-[11px] font-mono" style={{ color: "var(--text-dim)" }}>
               Shareable Challenge Link:
             </span>
-            {activeUrl && activeUrl !== fullShareUrl && (
-              <span className="text-[10px] text-[var(--olive)] font-medium">✓ WhatsApp Ready</span>
-            )}
+            <span className="text-[10px] text-[var(--olive)] font-medium">✓ Official Fey Dispatch</span>
           </div>
           <div className="flex items-center gap-2">
             <input

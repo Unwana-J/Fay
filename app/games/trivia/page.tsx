@@ -24,6 +24,13 @@ export async function generateMetadata({
       const description = `Competed on Fey: ${challenge.questionCount} questions hosted by Scholar ${challenge.creatorName}. Join and beat the leaderboard!`;
       const canonicalUrl = `https://fey.lokinlabs.com.ng/games/trivia?challenge=${challengeCode}`;
 
+      const ogParams = new URLSearchParams();
+      ogParams.set("challengeTitle", challenge.title);
+      ogParams.set("by", challenge.creatorName || "Scholar");
+      ogParams.set("total", String(challenge.questionCount || 10));
+      ogParams.set("difficulty", challenge.difficulty || "Mixed");
+      const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/trivia?${ogParams.toString()}`;
+
       return {
         title,
         description,
@@ -33,11 +40,21 @@ export async function generateMetadata({
           siteName: "Fey — Think Deeper, Articulate Clearly",
           type: "website",
           url: canonicalUrl,
+          images: [
+            {
+              url: ogImageUrl,
+              width: 1200,
+              height: 630,
+              alt: title,
+              type: "image/png",
+            },
+          ],
         },
         twitter: {
           card: "summary_large_image",
           title,
           description,
+          images: [ogImageUrl],
         },
       };
     }
