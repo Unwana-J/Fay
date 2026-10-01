@@ -546,7 +546,7 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
   },
   {
     id: "p019", question: "Genevieve Nnaji is one of Nollywood's biggest stars. She is from which state?",
-    options: ["Anambra", "Imo", "Imo", "Lagos"],
+    options: ["Anambra", "Imo", "Enugu", "Lagos"],
     answer: 1, category: "Pop Culture", difficulty: "hard",
     explanation: "Genevieve Nnaji was born in Mbaise, Imo State."
   },

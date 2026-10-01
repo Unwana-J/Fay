@@ -10,14 +10,14 @@ import {
   CheckCircle2,
   XCircle,
   RefreshCcw,
-  BarChart3,
-  Star,
   Zap,
+  Target,
+  Trophy,
+  Swords,
+  History,
+  Sparkles,
   BookOpen,
   Share2,
-  Swords,
-  Trophy,
-  History,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -28,17 +28,24 @@ import {
   type TriviaCategory,
   type TriviaDifficultyFilter,
 } from "@/lib/trivia-questions";
-import { useAppStore, type TriviaHistoryItem } from "@/store/useAppStore";
+import { useAppStore } from "@/store/useAppStore";
 import { cn } from "@/lib/utils";
 import ShareTriviaModal from "@/components/games/ShareTriviaModal";
 import TriviaHistoryView from "@/components/games/TriviaHistoryView";
 import TriviaLeaderboardView from "@/components/games/TriviaLeaderboardView";
+import TriviaChallengeLounge from "@/components/games/TriviaChallengeLounge";
+import {
+  type TriviaChallenge,
+  decodeChallengeFromUrl,
+  getLocalChallenge,
+  recordLocalChallengeScore,
+} from "@/lib/trivia-challenge";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export type ReviewMode = "instant" | "suspense";
 export type GamePhase = "setup" | "playing" | "results";
-export type SetupTab = "quiz" | "history" | "leaderboard";
+export type SetupTab = "solo" | "challenge" | "leaderboard" | "history";
 export type DurationOption = { label: string; minutes: number; emoji: string };
 
 export interface DifficultyOption {
@@ -70,12 +77,6 @@ export const DIFFICULTY_OPTIONS: DifficultyOption[] = [
   { id: "hard", label: "Hard", emoji: "🔥", desc: "Scholar lore" },
 ];
 
-const CATEGORY_ICONS: Record<TriviaCategory, string> = {
-  "History": "🏛️",
-  "Pop Culture": "🎵",
-  "General Knowledge": "🌍",
-};
-
 const CATEGORY_COLORS: Record<TriviaCategory, string> = {
   "History": "var(--terra)",
   "Pop Culture": "#7B3FC8",
@@ -90,20 +91,26 @@ function SetupScreen({
   activeTab,
   onTabChange,
   historyCount,
-  onStart,
+  onStartSolo,
   onPlayDeck,
   seenQuestionIds,
   onResetSeen,
   challenger,
+  activeChallenge,
+  onSelectChallenge,
+  onStartChallenge,
 }: {
   activeTab: SetupTab;
   onTabChange: (tab: SetupTab) => void;
   historyCount: number;
-  onStart: (minutes: number, mode: ReviewMode, difficulty: TriviaDifficultyFilter) => void;
+  onStartSolo: (minutes: number, mode: ReviewMode, difficulty: TriviaDifficultyFilter) => void;
   onPlayDeck: (questionIds: string[], minutes: number) => void;
   seenQuestionIds: string[];
   onResetSeen: () => void;
   challenger?: ChallengerInfo | null;
+  activeChallenge: TriviaChallenge | null;
+  onSelectChallenge: (challenge: TriviaChallenge | null) => void;
+  onStartChallenge: (challenge: TriviaChallenge) => void;
 }) {
   const [duration, setDuration] = useState<DurationOption>(DURATION_OPTIONS[1]);
   const [mode, setMode] = useState<ReviewMode>("instant");
@@ -119,8 +126,8 @@ function SetupScreen({
   const currentTotalCount = filteredPool.length;
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-center">
-      {/* Back */}
+    <div className="min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-center">
+      {/* Back Link */}
       <Link
         href="/games"
         className="flex items-center gap-1.5 text-xs font-semibold mb-6 w-fit hover:text-[var(--text)] transition-colors"
@@ -129,9 +136,9 @@ function SetupScreen({
         <ArrowLeft size={13} /> Back to Games
       </Link>
 
-      {/* Hero */}
+      {/* Hero Header */}
       <div className="text-center mb-6">
-        <div className="text-6xl mb-2">🇳🇬</div>
+        <div className="text-5xl mb-2">🇳🇬</div>
         <h1
           className="font-space text-3xl sm:text-4xl font-extrabold tracking-tight mb-1"
           style={{ color: "var(--text)" }}
@@ -145,63 +152,95 @@ function SetupScreen({
 
       {/* Navigation Tab Bar */}
       <div
-        className="flex gap-1.5 p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
+        className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
         style={{ borderColor: "var(--border-dim)" }}
       >
         <button
-          onClick={() => onTabChange("quiz")}
+          onClick={() => onTabChange("solo")}
           className={cn(
-            "flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-            activeTab === "quiz"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border-dim)]"
+            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer truncate",
+            activeTab === "solo"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>🎮</span> Play Quiz
+          <span>🎮</span>
+          <span className="hidden sm:inline">Play </span>
+          <span>Quiz</span>
         </button>
+
         <button
-          onClick={() => onTabChange("history")}
+          onClick={() => onTabChange("challenge")}
           className={cn(
-            "flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
-            activeTab === "history"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border-dim)]"
+            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer relative truncate",
+            activeTab === "challenge"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <History size={13} /> History {historyCount > 0 ? `(${historyCount})` : ""}
+          <span>⚔️</span>
+          <span>Clash</span>
+          {activeChallenge && (
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--terra)] animate-pulse shrink-0" />
+          )}
         </button>
+
         <button
           onClick={() => onTabChange("leaderboard")}
           className={cn(
-            "flex-1 py-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer truncate",
             activeTab === "leaderboard"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border-dim)]"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <Trophy size={13} className="text-[var(--gold)]" /> Leaderboard
+          <Trophy size={12} className="text-[var(--gold)] shrink-0" />
+          <span className="hidden sm:inline">Leader</span>
+          <span>board</span>
+        </button>
+
+        <button
+          onClick={() => onTabChange("history")}
+          className={cn(
+            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer truncate",
+            activeTab === "history"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+          )}
+        >
+          <History size={12} className="shrink-0" />
+          <span>History{historyCount > 0 ? ` (${historyCount})` : ""}</span>
         </button>
       </div>
+
+      {/* Tab: Group Challenge Lounge */}
+      {activeTab === "challenge" && (
+        <TriviaChallengeLounge
+          activeChallenge={activeChallenge}
+          onSelectChallenge={onSelectChallenge}
+          onPlayChallenge={onStartChallenge}
+        />
+      )}
 
       {/* Tab: History */}
       {activeTab === "history" && (
         <TriviaHistoryView
           onPlayDeck={onPlayDeck}
-          onNewGame={() => onTabChange("quiz")}
+          onNewGame={() => onTabChange("solo")}
         />
       )}
 
       {/* Tab: Leaderboard */}
       {activeTab === "leaderboard" && (
         <TriviaLeaderboardView
-          onPlay={() => onTabChange("quiz")}
+          onPlay={() => onTabChange("solo")}
         />
       )}
 
-      {/* Tab: Quiz Setup */}
-      {activeTab === "quiz" && (
-        <>
-          {/* Challenger Callout Banner (When arrived via challenge link) */}
+      {/* Tab: Solo Quiz Setup */}
+      {activeTab === "solo" && (
+        <div>
+          {/* Challenger Benchmark Banner */}
           {challenger && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -227,7 +266,7 @@ function SetupScreen({
                     </span>
                   </div>
                   <div className="text-base font-extrabold truncate" style={{ color: "var(--text)" }}>
-                    {challenger.by} got {challenger.pct}% on Naija Trivia!
+                    {challenger.by} scored {challenger.pct}% on Naija Trivia!
                   </div>
                   <p className="text-xs text-[var(--text-dim)] mt-1">
                     Can you beat this? You will answer the{" "}
@@ -292,7 +331,7 @@ function SetupScreen({
                     className={cn(
                       "rounded-xl p-4 text-center border-2 transition-all cursor-pointer",
                       duration.minutes === opt.minutes
-                        ? "border-[var(--terra)] bg-[var(--terra-bg)]"
+                        ? "border-[var(--terra)] bg-[var(--terra-bg)] shadow-xs"
                         : "border-[var(--border-dim)] hover:border-[var(--border)]"
                     )}
                   >
@@ -352,54 +391,85 @@ function SetupScreen({
               </div>
             </div>
 
-            {/* Review Mode Toggle */}
+            {/* Review Cadence Selector */}
             <div className="surface rounded-2xl p-5 border">
               <p
                 className="text-xs font-bold uppercase tracking-wider mb-3"
                 style={{ color: "var(--text-mute)" }}
               >
-                <BookOpen size={10} className="inline mr-1.5" /> Answer Review Mode
+                <BookOpen size={10} className="inline mr-1.5" /> Review Cadence
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                {(["instant", "suspense"] as ReviewMode[]).map((m) => (
-                  <button
-                    key={m}
-                    type="button"
-                    onClick={() => setMode(m)}
-                    className={cn(
-                      "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
-                      mode === m
-                        ? "border-[var(--olive)] bg-[var(--olive)]/5"
-                        : "border-[var(--border-dim)] hover:border-[var(--border)]"
-                    )}
-                  >
-                    <div className="text-2xl mb-2">{m === "instant" ? "⚡" : "🎭"}</div>
-                    <div className="font-space font-bold text-sm mb-1" style={{ color: "var(--text)" }}>
-                      {m === "instant" ? "Instant Feedback" : "Suspense Mode"}
-                    </div>
-                    <p className="text-[10px] leading-snug" style={{ color: "var(--text-mute)" }}>
-                      {m === "instant"
-                        ? "See the correct answer immediately after each question."
-                        : "Answer all questions first, then review at the end."}
-                    </p>
-                  </button>
-                ))}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setMode("instant")}
+                  className={cn(
+                    "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
+                    mode === "instant"
+                      ? "border-[var(--olive)] bg-[var(--olive)]/5 shadow-xs"
+                      : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                  )}
+                >
+                  <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                    <span>⚡ Instant Feedback</span>
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                    Reveal explanation immediately after each question.
+                  </div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setMode("suspense")}
+                  className={cn(
+                    "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
+                    mode === "suspense"
+                      ? "border-[var(--olive)] bg-[var(--olive)]/5 shadow-xs"
+                      : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                  )}
+                >
+                  <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                    <span>⏳ Suspense Mode</span>
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                    Answer continuously; review full breakdown at the end.
+                  </div>
+                </button>
               </div>
             </div>
 
-            {/* Start Button */}
-            <motion.button
-              whileTap={{ scale: 0.97 }}
-              onClick={() => onStart(duration.minutes, mode, difficulty)}
-              className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-lg"
+            {/* Start Solo Button */}
+            <button
+              onClick={() => onStartSolo(duration.minutes, mode, difficulty)}
+              className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md hover:opacity-95 transition-opacity"
             >
-              {challenger
-                ? `Accept Challenge · Play Same ${challenger.total || 15} Questions`
-                : "Start Game"}{" "}
+              <span>{challenger ? `Accept Challenge · Play Same ${challenger.total || 15} Questions` : "Start Solo Sprint"}</span>
               <ChevronRight size={18} />
-            </motion.button>
+            </button>
+
+            {/* Squad tournament callout */}
+            <div
+              className="p-4 rounded-2xl border surface flex items-center justify-between gap-3 text-xs"
+              style={{ borderColor: "var(--border-dim)" }}
+            >
+              <div>
+                <span className="font-space font-bold text-[var(--text)] block">
+                  Want to challenge your friends?
+                </span>
+                <span className="text-[11px] text-[var(--text-dim)]">
+                  Convene a timed challenge and share the link to see who tops the board.
+                </span>
+              </div>
+              <button
+                onClick={() => onTabChange("challenge")}
+                className="px-3.5 py-2 rounded-xl border font-space font-bold text-xs hover:bg-[var(--bg-input)] transition-colors cursor-pointer shrink-0"
+                style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+              >
+                Start Challenge →
+              </button>
+            </div>
           </div>
-        </>
+        </div>
       )}
     </div>
   );
@@ -445,7 +515,6 @@ function GameScreen({
   }, []);
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
-  const timerPct = (timeLeft / totalSeconds) * 100;
 
   const handleSelect = useCallback(
     (idx: number) => {
@@ -485,22 +554,21 @@ function GameScreen({
       if (selected === idx) return "border-[var(--terra)] bg-[var(--terra-bg)]";
       return "border-[var(--border-dim)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]";
     }
-    if (idx === q.answer) return "border-green-500 bg-green-500/10 text-green-700";
+    if (idx === q.answer) return "border-green-600 bg-green-500/10 text-green-700 dark:text-green-400";
     if (selected === idx && idx !== q.answer) return "border-red-500 bg-red-500/10 text-red-600";
     return "border-[var(--border-dim)] opacity-40";
   };
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-between">
+    <div className="min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-between">
       {/* Top Bar */}
       <div>
         <div className="flex items-center justify-between mb-3 text-xs font-semibold">
-          <span className="flex items-center gap-1.5" style={{ color: "var(--text-dim)" }}>
-            <span>{CATEGORY_ICONS[q.category]}</span>
-            <span>{q.category}</span>
+          <span className="flex items-center gap-2" style={{ color: "var(--text-dim)" }}>
+            <span className="font-space font-bold uppercase tracking-wider text-xs">{q.category}</span>
             <span
               className={cn(
-                "text-[10px] font-bold px-1.5 py-0.5 rounded capitalize",
+                "text-[10px] font-mono font-bold px-2 py-0.5 rounded capitalize",
                 q.difficulty === "easy"
                   ? "bg-emerald-500/10 text-emerald-600 border border-emerald-500/20"
                   : q.difficulty === "hard"
@@ -516,17 +584,17 @@ function GameScreen({
             <span className="text-[var(--text-mute)] font-normal text-xs">/{questions.length}</span>
           </span>
           <span
-            className={cn("font-mono font-bold text-xs flex items-center gap-1", {
+            className={cn("font-mono font-bold text-xs flex items-center gap-1.5", {
               "text-red-500 animate-pulse": timeLeft <= 30,
               "text-[var(--text-dim)]": timeLeft > 30,
             })}
           >
-            <Clock size={11} /> {formatTime(timeLeft)}
+            <Clock size={12} /> {formatTime(timeLeft)}
           </span>
         </div>
 
         {/* Progress Bar */}
-        <div className="h-1 rounded-full overflow-hidden mb-6" style={{ background: "var(--bg-input)" }}>
+        <div className="h-1.5 rounded-full overflow-hidden mb-8" style={{ background: "var(--bg-input)" }}>
           <motion.div
             className="h-full rounded-full"
             style={{ background: CATEGORY_COLORS[q.category] }}
@@ -536,7 +604,7 @@ function GameScreen({
         </div>
       </div>
 
-      {/* Question + Options */}
+      {/* Question & Options */}
       <AnimatePresence mode="wait">
         <motion.div
           key={current}
@@ -548,7 +616,7 @@ function GameScreen({
         >
           {/* Question Text */}
           <h2
-            className="font-space font-bold text-xl sm:text-2xl leading-snug mb-8"
+            className="font-space font-bold text-2xl sm:text-3xl leading-snug mb-8 tracking-tight"
             style={{ color: "var(--text)" }}
           >
             {q.question}
@@ -562,23 +630,23 @@ function GameScreen({
                 disabled={revealed || (reviewMode === "suspense" && selected !== null)}
                 onClick={() => handleSelect(idx)}
                 className={cn(
-                  "w-full text-left p-4 rounded-xl border-2 transition-all flex items-center gap-3 font-semibold text-sm cursor-pointer",
+                  "w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-center gap-3.5 font-semibold text-sm cursor-pointer shadow-xs",
                   getOptionStyle(idx)
                 )}
                 style={{ color: "var(--text)" }}
               >
                 <span
-                  className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-mono font-bold shrink-0 border"
+                  className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-mono font-bold shrink-0 border"
                   style={{ borderColor: "var(--border-dim)", background: "var(--bg-card)" }}
                 >
                   {OPTION_LABELS[idx]}
                 </span>
-                <span className="flex-1">{opt}</span>
+                <span className="flex-1 leading-snug">{opt}</span>
                 {revealed && idx === q.answer && (
-                  <CheckCircle2 size={16} className="text-green-500 shrink-0" />
+                  <CheckCircle2 size={18} className="text-green-600 shrink-0" />
                 )}
                 {revealed && selected === idx && idx !== q.answer && (
-                  <XCircle size={16} className="text-red-500 shrink-0" />
+                  <XCircle size={18} className="text-red-500 shrink-0" />
                 )}
               </button>
             ))}
@@ -589,14 +657,16 @@ function GameScreen({
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-4 rounded-xl border text-xs leading-relaxed mb-4"
+              className="p-5 rounded-2xl border text-xs leading-relaxed mb-5 shadow-xs"
               style={{
                 background: "var(--bg-card)",
                 borderColor: "var(--border-dim)",
                 color: "var(--text-dim)",
               }}
             >
-              <span className="font-bold text-[var(--text)] block mb-1">💡 Did you know?</span>
+              <span className="font-space font-bold text-[var(--olive)] block mb-1">
+                Context &amp; Analysis
+              </span>
               {q.explanation}
             </motion.div>
           )}
@@ -607,9 +677,10 @@ function GameScreen({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               onClick={() => advance()}
-              className="w-full py-3.5 rounded-xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer"
+              className="w-full py-4 rounded-2xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
             >
-              {isLast ? "See Results" : "Next Question"} <ChevronRight size={16} />
+              <span>{isLast ? "Complete & View Results" : "Next Question"}</span>
+              <ChevronRight size={16} />
             </motion.button>
           )}
 
@@ -617,10 +688,10 @@ function GameScreen({
           {!revealed && reviewMode === "suspense" && (
             <button
               onClick={() => advance()}
-              className="text-xs font-semibold hover:text-[var(--text)] transition-colors mt-2 text-right block ml-auto cursor-pointer"
+              className="text-xs font-mono font-bold hover:text-[var(--text)] transition-colors mt-2 text-right block ml-auto cursor-pointer"
               style={{ color: "var(--text-mute)" }}
             >
-              Skip →
+              Skip Question →
             </button>
           )}
         </motion.div>
@@ -641,6 +712,8 @@ function ResultsScreen({
   onViewHistory,
   onViewLeaderboard,
   challenger,
+  activeChallenge,
+  onViewChallengeBoard,
 }: {
   questions: TriviaQuestion[];
   answers: (number | null)[];
@@ -651,6 +724,8 @@ function ResultsScreen({
   onViewHistory: () => void;
   onViewLeaderboard: () => void;
   challenger?: ChallengerInfo | null;
+  activeChallenge: TriviaChallenge | null;
+  onViewChallengeBoard: () => void;
 }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const correct = answers.filter((a, i) => a === questions[i].answer).length;
@@ -672,127 +747,140 @@ function ResultsScreen({
 
   const grade =
     pct >= 80
-      ? { label: "Naija Expert! 🏆", color: "var(--gold)" }
+      ? { label: "Naija Expert", color: "var(--gold)" }
       : pct >= 60
-      ? { label: "Sharp Sharp! 🎯", color: "var(--olive)" }
+      ? { label: "Sharp Sharp", color: "var(--olive)" }
       : pct >= 40
-      ? { label: "Not bad o! 🙌", color: "var(--terra)" }
-      : { label: "Keep studying! 📚", color: "var(--text-mute)" };
+      ? { label: "Not bad o", color: "var(--terra)" }
+      : { label: "Keep studying", color: "var(--text-mute)" };
 
   const isVersus = Boolean(challenger && challenger.total > 0);
   const userWon = isVersus && correct > (challenger?.score || 0);
   const userTied = isVersus && correct === (challenger?.score || 0);
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 max-w-2xl mx-auto">
+    <div className="min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto">
+      {/* Header */}
       <div className="text-center mb-8">
-        <div className="text-6xl mb-3">🇳🇬</div>
-        <h1 className="font-space text-3xl font-extrabold mb-1" style={{ color: "var(--text)" }}>
-          Results
+        <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--olive)] mb-1 block">
+          Official Assessment
+        </span>
+        <h1 className="font-space text-3xl sm:text-4xl font-extrabold mb-1" style={{ color: "var(--text)" }}>
+          Results &amp; Analysis
         </h1>
-        <p className="text-sm font-bold" style={{ color: grade.color }}>
+        <p className="text-sm font-space font-bold uppercase tracking-wider" style={{ color: grade.color }}>
           {grade.label}
         </p>
       </div>
 
-      {/* Head-to-Head Challenger Comparison Banner */}
+      {/* Group Challenge Standings Notification */}
+      {activeChallenge && (
+        <div
+          className="rounded-3xl p-5 border mb-6 flex items-center justify-between gap-4 shadow-sm"
+          style={{ borderColor: "rgba(68, 78, 44, 0.25)", background: "rgba(68, 78, 44, 0.08)" }}
+        >
+          <div>
+            <div className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)] mb-0.5">
+              Challenge Standings Recorded
+            </div>
+            <div className="text-base font-space font-bold text-[var(--text)]">
+              {activeChallenge.title}
+            </div>
+          </div>
+          <button
+            onClick={onViewChallengeBoard}
+            className="px-4 py-2.5 rounded-xl btn-terra text-xs font-space font-bold cursor-pointer shadow-xs"
+          >
+            View Challenge Board →
+          </button>
+        </div>
+      )}
+
+      {/* Head-to-Head Challenger Comparison */}
       {isVersus && (
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="rounded-2xl p-4 border mb-5 text-center relative overflow-hidden"
+        <div
+          className="rounded-3xl p-5 border mb-6 text-center relative overflow-hidden shadow-xs"
           style={{
-            borderColor: userWon ? "rgba(0, 135, 81, 0.5)" : userTied ? "rgba(166, 124, 30, 0.5)" : "var(--border-dim)",
-            background: userWon
-              ? "linear-gradient(135deg, rgba(0, 135, 81, 0.15) 0%, rgba(82, 183, 136, 0.08) 100%)"
-              : userTied
-              ? "rgba(166, 124, 30, 0.1)"
-              : "var(--bg-card)",
+            borderColor: userWon ? "rgba(68, 78, 44, 0.4)" : "var(--border-dim)",
+            background: userWon ? "rgba(68, 78, 44, 0.08)" : "var(--bg-card)",
           }}
         >
-          <div className="text-xs font-mono font-bold uppercase tracking-wider mb-1 flex items-center justify-center gap-1.5">
+          <div className="text-xs font-space font-bold uppercase tracking-wider mb-1">
             {userWon ? (
-              <span className="text-[#008751] flex items-center gap-1">
-                <Trophy size={14} /> Victory! You beat Scholar {challenger?.by}!
-              </span>
+              <span className="text-[var(--olive)]">Victory over Scholar {challenger?.by}</span>
             ) : userTied ? (
-              <span className="text-[var(--gold)]">🤝 Honorable Stalemate with Scholar {challenger?.by}!</span>
+              <span className="text-[var(--gold)]">Honorable Stalemate with Scholar {challenger?.by}</span>
             ) : (
               <span style={{ color: "var(--text-mute)" }}>
-                🎯 Scholar {challenger?.by} still leads ({challenger?.score}/{challenger?.total})
+                Scholar {challenger?.by} leads ({challenger?.score}/{challenger?.total})
               </span>
             )}
           </div>
           <p className="text-xs text-[var(--text-dim)]">
-            You got {pct}% ({correct}/{total}) vs {challenger?.by}&apos;s {challenger?.pct}% ({challenger?.score}/{challenger?.total}) on these exact questions!
+            You scored {pct}% ({correct}/{total}) vs {challenger?.by}&apos;s {challenger?.pct}% ({challenger?.score}/{challenger?.total}) on this deck.
           </p>
-        </motion.div>
+        </div>
       )}
 
       {/* Score Box */}
-      <div className="surface rounded-2xl border p-6 mb-5 text-center shadow-sm">
-        <div className="font-space font-black text-6xl mb-2" style={{ color: "var(--text)" }}>
+      <div className="surface rounded-3xl border p-7 mb-6 text-center shadow-sm">
+        <div className="font-space font-black text-6xl sm:text-7xl mb-2" style={{ color: "var(--text)" }}>
           {correct}
-          <span className="text-3xl font-bold text-[var(--text-mute)]">/{total}</span>
+          <span className="text-3xl sm:text-4xl font-bold text-[var(--text-mute)]">/{total}</span>
         </div>
-        <div className="text-sm font-semibold flex items-center justify-center gap-2" style={{ color: "var(--text-dim)" }}>
+        <div
+          className="text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+          style={{ color: "var(--text-dim)" }}
+        >
           <span>{pct}% accuracy</span>
           {difficultyMode && (
             <>
               <span>•</span>
-              <span className="capitalize px-2 py-0.5 rounded-full text-xs font-bold bg-[var(--bg-input)] border border-[var(--border-dim)]">
-                {difficultyMode === "random" ? "Random (Mixed)" : `${difficultyMode} Mode`}
-              </span>
+              <span className="capitalize">{difficultyMode} mode</span>
             </>
           )}
         </div>
         {xpEarned > 0 && (
           <div
-            className="mt-3 inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm font-bold"
+            className="mt-3 inline-block px-3.5 py-1.5 rounded-full text-xs font-space font-bold"
             style={{ background: "var(--gold-bg)", color: "var(--gold)" }}
           >
-            <Zap size={14} /> +{xpEarned} XP earned
+            +{xpEarned} XP Earned
           </div>
         )}
 
-        {/* Share & Challenge Primary CTA Button */}
-        <div className="mt-5 pt-4 border-t" style={{ borderColor: "var(--border-dim)" }}>
+        {/* Share Proof Card Action */}
+        <div className="mt-6 pt-5 border-t" style={{ borderColor: "var(--border-dim)" }}>
           <button
             onClick={() => setShowShareModal(true)}
-            className="w-full py-3.5 px-4 rounded-xl font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer transition-all hover:scale-[1.01] active:scale-[0.99] shadow-md"
-            style={{
-              background: "linear-gradient(135deg, #008751 0%, #10663f 100%)",
-              color: "#FFFFFF",
-            }}
+            className="w-full py-3.5 px-4 rounded-xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
           >
-            <Share2 size={16} /> Challenge Friends with This Deck ({total} Qs)
+            <Share2 size={16} /> Share Broadside Proof Card
           </button>
         </div>
       </div>
 
       {/* Category Breakdown */}
-      <div className="surface rounded-2xl border p-5 mb-5">
+      <div className="surface rounded-3xl border p-6 mb-6 shadow-xs">
         <p
-          className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5"
+          className="text-xs font-space font-bold uppercase tracking-wider mb-4"
           style={{ color: "var(--text-mute)" }}
         >
-          <BarChart3 size={11} /> Category Breakdown
+          Category Performance
         </p>
-        <div className="space-y-3">
+        <div className="space-y-3.5">
           {byCategory.map((stat) => {
             const catPct = Math.round((stat.correct / stat.total) * 100);
             return (
               <div key={stat.category}>
                 <div className="flex justify-between text-xs font-semibold mb-1.5">
-                  <span style={{ color: "var(--text)" }}>
-                    {CATEGORY_ICONS[stat.category as TriviaCategory]} {stat.category}
-                  </span>
-                  <span style={{ color: "var(--text-mute)" }}>
+                  <span style={{ color: "var(--text)" }}>{stat.category}</span>
+                  <span className="font-mono" style={{ color: "var(--text-mute)" }}>
                     {stat.correct}/{stat.total}
                   </span>
                 </div>
                 <div
-                  className="h-1.5 rounded-full overflow-hidden"
+                  className="h-2 rounded-full overflow-hidden"
                   style={{ background: "var(--bg-input)" }}
                 >
                   <motion.div
@@ -809,37 +897,37 @@ function ResultsScreen({
         </div>
       </div>
 
-      {/* Review Log (Suspense Mode) */}
+      {/* Suspense Mode Answer Review */}
       {reviewMode === "suspense" && (
-        <div className="surface rounded-2xl border p-5 mb-5">
+        <div className="surface rounded-3xl border p-6 mb-6 shadow-xs">
           <p
-            className="text-xs font-bold uppercase tracking-wider mb-4 flex items-center gap-1.5"
+            className="text-xs font-space font-bold uppercase tracking-wider mb-4"
             style={{ color: "var(--text-mute)" }}
           >
-            <Star size={11} /> Answer Review
+            Answer Review
           </p>
           <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
             {questions.map((q, i) => {
               const isCorrect = answers[i] === q.answer;
               return (
-                <div key={q.id} className="text-xs">
-                  <div className="flex items-start gap-2 mb-1">
+                <div key={q.id} className="text-xs border-b pb-3.5" style={{ borderColor: "var(--border-dim)" }}>
+                  <div className="flex items-start gap-2 mb-1.5">
                     {isCorrect ? (
-                      <CheckCircle2 size={13} className="text-green-500 mt-0.5 shrink-0" />
+                      <CheckCircle2 size={15} className="text-green-600 mt-0.5 shrink-0" />
                     ) : (
-                      <XCircle size={13} className="text-red-500 mt-0.5 shrink-0" />
+                      <XCircle size={15} className="text-red-500 mt-0.5 shrink-0" />
                     )}
-                    <span className="font-semibold" style={{ color: "var(--text)" }}>
+                    <span className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
                       {q.question}
                     </span>
                   </div>
-                  <div className="ml-5 space-y-0.5">
-                    <div className="text-green-600">✓ {q.options[q.answer]}</div>
+                  <div className="ml-6 space-y-1 text-xs">
+                    <div className="text-green-700 font-semibold">Correct: {q.options[q.answer]}</div>
                     {!isCorrect && answers[i] !== null && (
-                      <div className="text-red-500">✗ You chose: {q.options[answers[i]!]}</div>
+                      <div className="text-red-600">Your answer: {q.options[answers[i]!]}</div>
                     )}
                     {q.explanation && (
-                      <div className="italic mt-1" style={{ color: "var(--text-mute)" }}>
+                      <div className="text-xs mt-1 text-[var(--text-dim)] leading-relaxed">
                         {q.explanation}
                       </div>
                     )}
@@ -855,37 +943,39 @@ function ResultsScreen({
       <div className="flex gap-3">
         <button
           onClick={onRetry}
-          className="flex-1 py-3.5 rounded-xl btn-ghost flex items-center justify-center gap-2 font-space font-bold text-sm cursor-pointer"
+          className="flex-1 py-3.5 rounded-2xl border flex items-center justify-center gap-2 font-space font-bold text-sm cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+          style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
         >
-          <RefreshCcw size={14} /> Play Again
+          <RefreshCcw size={15} /> Play Again
         </button>
         <Link
           href="/games"
-          className="flex-1 py-3.5 rounded-xl btn-terra flex items-center justify-center gap-2 font-space font-bold text-sm cursor-pointer"
+          className="flex-1 py-3.5 rounded-2xl btn-terra flex items-center justify-center gap-2 font-space font-bold text-sm cursor-pointer"
         >
-          Back to Games <ChevronRight size={14} />
+          <span>Back to Games</span>
+          <ChevronRight size={16} />
         </Link>
       </div>
 
-      {/* Secondary Explorations: History & Leaderboard */}
-      <div className="flex gap-2.5 mt-3">
+      {/* Secondary Explorations */}
+      <div className="flex gap-3 mt-3">
         <button
           onClick={onViewHistory}
-          className="flex-1 py-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+          className="flex-1 py-2.5 rounded-xl border text-xs font-space font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
           style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
         >
-          <History size={13} /> View History
+          <History size={13} /> Match Archive
         </button>
         <button
           onClick={onViewLeaderboard}
-          className="flex-1 py-3 rounded-xl border text-xs font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
+          className="flex-1 py-2.5 rounded-xl border text-xs font-space font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors"
           style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
         >
-          <Trophy size={13} className="text-[var(--gold)]" /> View Leaderboard
+          <Trophy size={13} className="text-[var(--gold)]" /> Titan Leaderboard
         </button>
       </div>
 
-      {/* Share Score & Invite Modal */}
+      {/* Share Score Modal */}
       <ShareTriviaModal
         isOpen={showShareModal}
         onClose={() => setShowShareModal(false)}
@@ -905,8 +995,10 @@ function ResultsScreen({
 
 export default function TriviaGameClient({
   challenger,
+  initialChallenge = null,
 }: {
   challenger?: ChallengerInfo | null;
+  initialChallenge?: TriviaChallenge | null;
 }) {
   const {
     profile,
@@ -917,8 +1009,11 @@ export default function TriviaGameClient({
     triviaHistory = [],
     saveTriviaRound,
   } = useAppStore();
+
   const [phase, setPhase] = useState<GamePhase>("setup");
-  const [setupTab, setSetupTab] = useState<SetupTab>("quiz");
+  const [setupTab, setSetupTab] = useState<SetupTab>(initialChallenge ? "challenge" : "solo");
+  const [activeChallenge, setActiveChallenge] = useState<TriviaChallenge | null>(initialChallenge || null);
+
   const [questions, setQuestions] = useState<TriviaQuestion[]>([]);
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("instant");
@@ -926,14 +1021,37 @@ export default function TriviaGameClient({
   const [xpEarned, setXpEarned] = useState(0);
   const [currentDifficulty, setCurrentDifficulty] = useState<TriviaDifficultyFilter>("random");
 
-  function handleStart(
+  // Read URL search params on client for challenge codes
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get("challenge");
+    if (code) {
+      const decoded = decodeChallengeFromUrl(code);
+      if (decoded) {
+        setActiveChallenge(decoded);
+        setSetupTab("challenge");
+      }
+    } else {
+      const challengeId = params.get("challengeId");
+      if (challengeId) {
+        const local = getLocalChallenge(challengeId);
+        if (local) {
+          setActiveChallenge(local);
+          setSetupTab("challenge");
+        }
+      }
+    }
+  }, []);
+
+  function handleStartSolo(
     minutes: number,
     mode: ReviewMode,
     difficulty: TriviaDifficultyFilter = "random"
   ) {
     let selectedQuestions: TriviaQuestion[] = [];
 
-    // If challenger specified exact question IDs, load those exact questions!
+    // If challenger specified exact question IDs, load those exact questions
     if (challenger?.questionIds && challenger.questionIds.length > 0) {
       const matched = getQuestionsByIds(challenger.questionIds);
       if (matched.length > 0) {
@@ -965,6 +1083,19 @@ export default function TriviaGameClient({
     setPhase("playing");
   }
 
+  function handleStartChallenge(challenge: TriviaChallenge) {
+    setActiveChallenge(challenge);
+    const matched = getQuestionsByIds(challenge.questionIds);
+    const finalQuestions =
+      matched.length > 0 ? matched : TRIVIA_QUESTIONS.slice(0, challenge.questionCount);
+
+    setCurrentDifficulty(challenge.difficulty);
+    setQuestions(finalQuestions);
+    setTotalSeconds(Math.max(10, challenge.questionCount) * 45); // 45s per question
+    setReviewMode("instant");
+    setPhase("playing");
+  }
+
   function handlePlayDeck(questionIds: string[], minutes: number) {
     const matched = getQuestionsByIds(questionIds);
     if (matched.length > 0) {
@@ -976,7 +1107,7 @@ export default function TriviaGameClient({
     }
   }
 
-  function handleComplete(finalAnswers: (number | null)[], _timeLeft: number) {
+  function handleComplete(finalAnswers: (number | null)[], timeLeft: number) {
     const correct = finalAnswers.filter((a, i) => a === questions[i].answer).length;
     const total = questions.length;
     const pct = Math.round((correct / total) * 100);
@@ -999,14 +1130,29 @@ export default function TriviaGameClient({
 
     const gradeLabel =
       pct >= 80
-        ? "Naija Expert! 🏆"
+        ? "Naija Expert"
         : pct >= 60
-        ? "Sharp Sharp! 🎯"
+        ? "Sharp Sharp"
         : pct >= 40
-        ? "Not bad o! 🙌"
-        : "Keep studying! 📚";
+        ? "Not bad o"
+        : "Keep studying";
 
-    // Persist round in trivia history
+    // 1. Record in local challenge scores if playing a group challenge
+    if (activeChallenge) {
+      recordLocalChallengeScore(activeChallenge.id, {
+        id: `score_${Date.now()}`,
+        username: profile?.username?.trim() || "Scholar",
+        avatar: profile?.avatar || "/avatars/avatar-scholar.svg",
+        score: correct,
+        total,
+        pct,
+        gradeLabel,
+        completedAt: Date.now(),
+        timeSpentSeconds: totalSeconds - timeLeft,
+      });
+    }
+
+    // 2. Persist round in trivia history
     saveTriviaRound({
       score: correct,
       total,
@@ -1024,21 +1170,21 @@ export default function TriviaGameClient({
       challengerPct: challenger?.pct,
     });
 
-    // Also submit score to cloud leaderboard (non-blocking)
+    // 3. Submit score to cloud leaderboard (non-blocking)
     fetch("/api/trivia/scores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: profile.username?.trim() || "Scholar",
-        avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+        username: profile?.username?.trim() || "Scholar",
+        avatar: profile?.avatar || "/avatars/avatar-scholar.svg",
         score: correct,
         total,
         pct,
         gradeLabel,
         xpEarned: totalXP,
-        challengeId: challenger?.questionIds?.join(",") || undefined,
+        challengeId: activeChallenge ? activeChallenge.id : (challenger?.questionIds?.join(",") || undefined),
         questionIds: questions.map((q) => q.id),
-        deviceId: profile.id,
+        deviceId: profile?.id,
       }),
     }).catch(() => {});
 
@@ -1048,61 +1194,57 @@ export default function TriviaGameClient({
     setPhase("results");
   }
 
-  function handleRetry() {
-    setSetupTab("quiz");
-    setPhase("setup");
-    setQuestions([]);
-    setAnswers([]);
-    setXpEarned(0);
+  if (phase === "playing") {
+    return (
+      <GameScreen
+        questions={questions}
+        reviewMode={reviewMode}
+        totalSeconds={totalSeconds}
+        onComplete={handleComplete}
+      />
+    );
+  }
+
+  if (phase === "results") {
+    return (
+      <ResultsScreen
+        questions={questions}
+        answers={answers}
+        reviewMode={reviewMode}
+        xpEarned={xpEarned}
+        difficultyMode={currentDifficulty}
+        onRetry={() => setPhase("setup")}
+        onViewHistory={() => {
+          setSetupTab("history");
+          setPhase("setup");
+        }}
+        onViewLeaderboard={() => {
+          setSetupTab("leaderboard");
+          setPhase("setup");
+        }}
+        challenger={challenger}
+        activeChallenge={activeChallenge}
+        onViewChallengeBoard={() => {
+          setSetupTab("challenge");
+          setPhase("setup");
+        }}
+      />
+    );
   }
 
   return (
-    <AnimatePresence mode="wait">
-      {phase === "setup" && (
-        <motion.div key="setup" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <SetupScreen
-            activeTab={setupTab}
-            onTabChange={setSetupTab}
-            historyCount={triviaHistory.length}
-            onStart={handleStart}
-            onPlayDeck={handlePlayDeck}
-            seenQuestionIds={seenTriviaQuestionIds}
-            onResetSeen={resetSeenTriviaQuestions}
-            challenger={challenger}
-          />
-        </motion.div>
-      )}
-      {phase === "playing" && (
-        <motion.div key="playing" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <GameScreen
-            questions={questions}
-            reviewMode={reviewMode}
-            totalSeconds={totalSeconds}
-            onComplete={handleComplete}
-          />
-        </motion.div>
-      )}
-      {phase === "results" && (
-        <motion.div key="results" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
-          <ResultsScreen
-            questions={questions}
-            answers={answers}
-            reviewMode={reviewMode}
-            xpEarned={xpEarned}
-            difficultyMode={currentDifficulty}
-            onRetry={handleRetry}
-            onViewHistory={() => {
-              setSetupTab("history");
-              setPhase("setup");
-            }}
-            onViewLeaderboard={() => {
-              setSetupTab("leaderboard");
-              setPhase("setup");
-            }}
-            challenger={challenger}
-          />
-        </motion.div>
-      )}
-    </AnimatePresence>
+    <SetupScreen
+      activeTab={setupTab}
+      onTabChange={setSetupTab}
+      historyCount={triviaHistory.length}
+      onStartSolo={handleStartSolo}
+      onPlayDeck={handlePlayDeck}
+      seenQuestionIds={seenTriviaQuestionIds}
+      onResetSeen={resetSeenTriviaQuestions}
+      challenger={challenger}
+      activeChallenge={activeChallenge}
+      onSelectChallenge={setActiveChallenge}
+      onStartChallenge={handleStartChallenge}
+    />
   );
 }

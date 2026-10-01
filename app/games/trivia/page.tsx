@@ -7,6 +7,7 @@
 
 import type { Metadata } from "next";
 import TriviaGameClient, { type ChallengerInfo } from "./TriviaGameClient";
+import { decodeChallengeFromUrl, type TriviaChallenge } from "@/lib/trivia-challenge";
 
 export async function generateMetadata({
   searchParams,
@@ -14,6 +15,33 @@ export async function generateMetadata({
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }): Promise<Metadata> {
   const sParams = searchParams ? await searchParams : {};
+
+  const challengeCode = typeof sParams.challenge === "string" ? sParams.challenge : undefined;
+  if (challengeCode) {
+    const challenge = decodeChallengeFromUrl(challengeCode);
+    if (challenge) {
+      const title = `${challenge.title} · Timed Trivia Challenge · Fey`;
+      const description = `Competed on Fey: ${challenge.questionCount} questions hosted by Scholar ${challenge.creatorName}. Join and beat the leaderboard!`;
+      const canonicalUrl = `https://fey.lokinlabs.com.ng/games/trivia?challenge=${challengeCode}`;
+
+      return {
+        title,
+        description,
+        openGraph: {
+          title,
+          description,
+          siteName: "Fey — Think Deeper, Articulate Clearly",
+          type: "website",
+          url: canonicalUrl,
+        },
+        twitter: {
+          card: "summary_large_image",
+          title,
+          description,
+        },
+      };
+    }
+  }
 
   const scoreRaw = typeof sParams.score === "string" ? sParams.score : undefined;
   const totalRaw = typeof sParams.total === "string" ? sParams.total : undefined;
@@ -28,14 +56,14 @@ export async function generateMetadata({
   const total = totalRaw ? parseInt(totalRaw, 10) : 15;
   const pct = pctRaw ? parseInt(pctRaw, 10) : Math.round((score / total) * 100) || 0;
   const author = byRaw || "Scholar";
-  const grade = gradeRaw || (pct >= 80 ? "Naija Expert! 🏆" : pct >= 60 ? "Sharp Sharp! 🎯" : pct >= 40 ? "Not bad o! 🙌" : "Keep studying! 📚");
+  const grade = gradeRaw || (pct >= 80 ? "Naija Expert" : pct >= 60 ? "Sharp Sharp" : pct >= 40 ? "Not bad o" : "Keep studying");
 
   const title = isChallenge
-    ? `${author} got ${pct}% on Naija Trivia! Can you beat this? 🇳🇬 · Fey`
+    ? `${author} scored ${pct}% on Naija Trivia · Can you beat this? · Fey`
     : "Naija Trivia Arcade · Fey";
 
   const description = isChallenge
-    ? `Scholar ${author} scored ${score}/${total} (${pct}% accuracy) on Naija Trivia! Tap to answer the exact same questions and see if you can top their score.`
+    ? `Scholar ${author} scored ${score}/${total} (${pct}% accuracy) on Naija Trivia. Answer the exact same questions and see if you can top their score.`
     : "Test your knowledge of Nigerian history, pop culture, and general knowledge with 1,000+ curated questions. Think deeper on Fey.";
 
   const queryParams = new URLSearchParams();
@@ -94,6 +122,13 @@ export default async function TriviaPage({
 }) {
   const sParams = searchParams ? await searchParams : {};
 
+  // Check if opening an invitational group challenge
+  const challengeCode = typeof sParams.challenge === "string" ? sParams.challenge : undefined;
+  let initialChallenge: TriviaChallenge | null = null;
+  if (challengeCode) {
+    initialChallenge = decodeChallengeFromUrl(challengeCode);
+  }
+
   const scoreRaw = typeof sParams.score === "string" ? parseInt(sParams.score, 10) : undefined;
   const totalRaw = typeof sParams.total === "string" ? parseInt(sParams.total, 10) : undefined;
   const byRaw = typeof sParams.by === "string" ? sParams.by : undefined;
@@ -117,5 +152,5 @@ export default async function TriviaPage({
     };
   }
 
-  return <TriviaGameClient challenger={challenger} />;
+  return <TriviaGameClient challenger={challenger} initialChallenge={initialChallenge} />;
 }
