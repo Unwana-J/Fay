@@ -29,28 +29,32 @@ export default function RoomSpeakerView({
   const [feedback, setFeedback] = useState<"correct" | "pass" | null>(null);
 
   const handleGotIt = () => {
+    // 1. Fire instantly with zero delay
+    onScoreWord();
     setFeedback("correct");
-    // Trigger celebratory micro-confetti
+
+    // 2. Ultra-lightweight micro confetti
     try {
       canvasConfetti({
-        particleCount: 25,
-        spread: 60,
+        particleCount: 14,
+        spread: 45,
         origin: { y: 0.8 },
+        disableForReducedMotion: true,
       });
     } catch {}
 
     setTimeout(() => {
       setFeedback(null);
-      onScoreWord();
-    }, 180);
+    }, 120);
   };
 
   const handlePass = () => {
+    // 1. Fire instantly with zero delay
+    onPassWord();
     setFeedback("pass");
     setTimeout(() => {
       setFeedback(null);
-      onPassWord();
-    }, 180);
+    }, 120);
   };
 
   const activeTeamColor =
@@ -93,14 +97,14 @@ export default function RoomSpeakerView({
       </div>
 
       {/* Main Word Flashcard */}
-      <AnimatePresence mode="wait">
+      <AnimatePresence mode="popLayout">
         {currentWord ? (
           <motion.div
             key={currentWord.word}
-            initial={{ opacity: 0, y: 15, scale: 0.96 }}
+            initial={{ opacity: 0, y: 10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: -15, scale: 0.96 }}
-            transition={{ duration: 0.18 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 0.1 }}
             className={`surface rounded-3xl p-8 sm:p-12 border shadow-lg relative overflow-hidden transition-colors ${
               feedback === "correct"
                 ? "border-emerald-500 bg-emerald-500/10"

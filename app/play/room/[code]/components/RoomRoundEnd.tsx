@@ -202,16 +202,33 @@ export default function RoomRoundEnd({
     };
   };
 
-  // Compute next round speaker
+  // Compute next round speaker using sequential roster scan
   const nextTeam = nextActiveTeamKey === "A" ? room.teams?.teamA : room.teams?.teamB;
-  const nextTeamActiveIds = (nextTeam?.playerIds || []).filter((id) => !isPlayerInactive(id));
-  const nextTeamEligibleIds =
-    nextTeamActiveIds.length > 0 ? nextTeamActiveIds : nextTeam?.playerIds || [];
-  const nextTurnIndex = Math.floor((nextRoundNumber - 1) / 2);
-  const nextSpeakerId =
-    nextTeamEligibleIds.length > 0
-      ? nextTeamEligibleIds[nextTurnIndex % nextTeamEligibleIds.length]
-      : null;
+  const rawNextIds = nextTeam?.playerIds || [];
+  const nextTeamActiveIds = rawNextIds.filter((id) => !isPlayerInactive(id));
+  const lastIdx =
+    nextActiveTeamKey === "A"
+      ? room.last_speaker_indices?.teamA ?? -1
+      : room.last_speaker_indices?.teamB ?? -1;
+
+  let nextSpeakerId: string | null = null;
+  if (rawNextIds.length > 0) {
+    const n = rawNextIds.length;
+    for (let step = 1; step <= n; step++) {
+      const candidateIdx = (lastIdx + step) % n;
+      const candidateId = rawNextIds[candidateIdx];
+      if (!isPlayerInactive(candidateId)) {
+        nextSpeakerId = candidateId;
+        break;
+      }
+    }
+    if (!nextSpeakerId) {
+      nextSpeakerId = rawNextIds[0];
+    }
+  }
+
+  const nextSpeakerDisplay = nextSpeakerId ? getPlayerDisplay(nextSpeakerId) : null;
+  const isMeNextSpeaker = nextSpeakerId === myPlayerId;
 
   // Counts for each team
   const teamAPlayers = room.teams?.teamA?.playerIds || [];
@@ -835,20 +852,20 @@ export default function RoomRoundEnd({
           </div>
         )}
 
-        {myTeam === nextActiveTeamKey ? (
+        {isMeNextSpeaker ? (
           <div className="space-y-2">
             <motion.button
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={onStartNextRound}
-              className="w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition"
+              className="w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition animate-pulse"
               style={{ backgroundColor: nextTeamColor }}
             >
-              <Play className="w-5 h-5 fill-current" />
-              I&apos;m Ready — Start {nextTeamName}&apos;s Turn
+              <Mic className="w-5 h-5 fill-current" />
+              I&apos;m the Speaker — Start My Turn
             </motion.button>
             <p className="text-xs text-[var(--text-dim)]">
-              🔒 When you tap start, the room locks for {nextTeamName}&apos;s sprint.
+              🎤 You are describing this round! When you tap start, the 3s countdown begins for everyone.
             </p>
           </div>
         ) : isHost ? (
@@ -860,20 +877,30 @@ export default function RoomRoundEnd({
               className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition"
             >
               <Play className="w-5 h-5 fill-current" />
-              Start Round {nextRoundNumber} ({nextTeamName})
+              Start Round {nextRoundNumber} as Host ({nextSpeakerDisplay?.name || nextTeamName})
             </motion.button>
             <p className="text-xs text-[var(--text-dim)]">
-              👑 You can start as Host, or let {nextTeamName} start when they are ready.
+              👑 You can launch as Host, or wait for {nextSpeakerDisplay?.name || nextTeamName} to start when ready.
+            </p>
+          </div>
+        ) : myTeam === nextActiveTeamKey ? (
+          <div className="py-3 space-y-1">
+            <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
+              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
+              Waiting for <strong>{nextSpeakerDisplay?.name || "your speaker"}</strong> to start the sprint...
+            </div>
+            <p className="text-xs text-[var(--text-dim)]">
+              Your teammate will describe words. The round will launch on your screen as soon as they tap Start!
             </p>
           </div>
         ) : (
           <div className="py-3 space-y-1">
             <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
               <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
-              Waiting for {nextTeamName} to start their turn...
+              Waiting for {nextSpeakerDisplay?.name ? `${nextSpeakerDisplay.name} (${nextTeamName})` : nextTeamName} to start...
             </div>
             <p className="text-xs text-[var(--text-dim)]">
-              The round will automatically launch on your screen as soon as they tap Start!
+              The round will automatically launch on your screen as soon as they start!
             </p>
           </div>
         )}

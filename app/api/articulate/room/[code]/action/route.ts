@@ -357,15 +357,51 @@ export async function POST(
             ? room.teams.teamA.playerIds
             : room.teams.teamB.playerIds;
 
-        // Filter out inactive/AFK players so speaking turn is given to an available player
-        const activeAvailableIds = rawTeamPlayerIds.filter(
-          (pId) => !(room.inactive_players || []).includes(pId)
-        );
-        const teamPlayerIds = activeAvailableIds.length > 0 ? activeAvailableIds : rawTeamPlayerIds;
+        if (!room.last_speaker_indices) {
+          room.last_speaker_indices = { teamA: -1, teamB: -1 };
+        }
 
-        // Pick speaker by cycling
-        const teamTurnIndex = Math.floor((roundNumber - 1) / 2);
-        const speakerId = teamPlayerIds[teamTurnIndex % teamPlayerIds.length] || teamPlayerIds[0];
+        let speakerId = "";
+
+        // If client specifically passed the intended speaker
+        if (body.speakerId && rawTeamPlayerIds.includes(body.speakerId)) {
+          speakerId = body.speakerId;
+          const foundIdx = rawTeamPlayerIds.indexOf(speakerId);
+          if (foundIdx !== -1) {
+            if (activeTeam === "A") room.last_speaker_indices.teamA = foundIdx;
+            else room.last_speaker_indices.teamB = foundIdx;
+          }
+        } else {
+          // Advance pointer sequentially through active available roster
+          const lastIdx =
+            activeTeam === "A"
+              ? room.last_speaker_indices.teamA ?? -1
+              : room.last_speaker_indices.teamB ?? -1;
+
+          let chosenId = "";
+          let nextIdx = lastIdx;
+          const n = rawTeamPlayerIds.length;
+
+          for (let step = 1; step <= n; step++) {
+            const candidateIdx = (lastIdx + step) % n;
+            const candidateId = rawTeamPlayerIds[candidateIdx];
+            if (!(room.inactive_players || []).includes(candidateId)) {
+              chosenId = candidateId;
+              nextIdx = candidateIdx;
+              break;
+            }
+          }
+
+          if (!chosenId) {
+            chosenId = rawTeamPlayerIds[0];
+            nextIdx = 0;
+          }
+
+          speakerId = chosenId;
+          if (activeTeam === "A") room.last_speaker_indices.teamA = nextIdx;
+          else room.last_speaker_indices.teamB = nextIdx;
+        }
+
         const speakerDetails = room.player_details?.[speakerId];
         const speakerName =
           speakerDetails?.name &&

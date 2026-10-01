@@ -73,6 +73,7 @@ export interface ArticulateRoom {
   spectators: string[]; // Player IDs waiting in spectator lounge
   inactive_players?: string[]; // Player IDs toggled AFK / Inactive
   player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean }>; // Persisted identity map
+  last_speaker_indices?: { teamA: number; teamB: number }; // Track strict round-robin index per team
   created_at?: string;
   updated_at?: string;
 }
@@ -152,6 +153,10 @@ export function createInitialRoom(
         avatar: "/avatars/avatar-scholar.svg",
         isHost: true,
       },
+    },
+    last_speaker_indices: {
+      teamA: -1,
+      teamB: -1,
     },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),

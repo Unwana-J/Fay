@@ -144,7 +144,30 @@ export default function ArticulateRoomPage({
       }
       const data = await res.json();
       if (data.room) {
-        setRoom(data.room);
+        setRoom((prev) => {
+          if (!prev) return data.room;
+          // If we are currently in an active round, don't let a stale lower word index revert optimistic progress
+          if (
+            prev.status === "playing" &&
+            data.room.status === "playing" &&
+            prev.current_turn?.roundNumber === data.room.current_turn?.roundNumber &&
+            (data.room.current_word_index || 0) < (prev.current_word_index || 0)
+          ) {
+            return {
+              ...data.room,
+              current_word_index: prev.current_word_index,
+              round_words_scored:
+                (data.room.round_words_scored?.length || 0) >= (prev.round_words_scored?.length || 0)
+                  ? data.room.round_words_scored
+                  : prev.round_words_scored,
+              round_words_passed:
+                (data.room.round_words_passed?.length || 0) >= (prev.round_words_passed?.length || 0)
+                  ? data.room.round_words_passed
+                  : prev.round_words_passed,
+            };
+          }
+          return data.room;
+        });
         setError(null);
         return data.room as ArticulateRoom;
       }
@@ -170,7 +193,29 @@ export default function ArticulateRoomPage({
         });
         const data = await res.json();
         if (data.room) {
-          setRoom(data.room);
+          setRoom((prev) => {
+            if (!prev) return data.room;
+            if (
+              prev.status === "playing" &&
+              data.room.status === "playing" &&
+              prev.current_turn?.roundNumber === data.room.current_turn?.roundNumber &&
+              (data.room.current_word_index || 0) < (prev.current_word_index || 0)
+            ) {
+              return {
+                ...data.room,
+                current_word_index: prev.current_word_index,
+                round_words_scored:
+                  (data.room.round_words_scored?.length || 0) >= (prev.round_words_scored?.length || 0)
+                    ? data.room.round_words_scored
+                    : prev.round_words_scored,
+                round_words_passed:
+                  (data.room.round_words_passed?.length || 0) >= (prev.round_words_passed?.length || 0)
+                    ? data.room.round_words_passed
+                    : prev.round_words_passed,
+              };
+            }
+            return data.room;
+          });
           if (typeof data.isSpectator === "boolean") {
             setIsSpectator(data.isSpectator);
           }
@@ -358,9 +403,9 @@ export default function ArticulateRoomPage({
     }
   };
 
-  // Sync Room to Persistent Local History so unfinished games can be resumed
+  // Sync Room to Persistent Local History so unfinished games can be resumed (only on phase transitions)
   useEffect(() => {
-    if (!room) return;
+    if (!room || room.status === "playing") return;
     const myTeam = (room.teams?.teamA?.playerIds || []).includes(myPlayerId)
       ? "A"
       : (room.teams?.teamB?.playerIds || []).includes(myPlayerId)
@@ -380,7 +425,17 @@ export default function ArticulateRoomPage({
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       timestamp: Date.now(),
     });
-  }, [myPlayerId, room, saveArticulateRoom]);
+  }, [
+    myPlayerId,
+    room?.room_code,
+    room?.host_name,
+    room?.status,
+    room?.teams?.teamA?.score,
+    room?.teams?.teamB?.score,
+    room?.settings?.scoreGoal,
+    room?.current_turn?.roundNumber,
+    saveArticulateRoom,
+  ]);
 
   // 4. Supabase Realtime Channel (Presence + Broadcast)
   useEffect(() => {
@@ -416,7 +471,30 @@ export default function ArticulateRoomPage({
       })
       .on("broadcast", { event: "room_action" }, (event) => {
         if (event.payload?.room) {
-          setRoom(event.payload.room);
+          const incomingRoom = event.payload.room as ArticulateRoom;
+          setRoom((prev) => {
+            if (!prev) return incomingRoom;
+            if (
+              prev.status === "playing" &&
+              incomingRoom.status === "playing" &&
+              prev.current_turn?.roundNumber === incomingRoom.current_turn?.roundNumber &&
+              (incomingRoom.current_word_index || 0) < (prev.current_word_index || 0)
+            ) {
+              return {
+                ...incomingRoom,
+                current_word_index: prev.current_word_index,
+                round_words_scored:
+                  (incomingRoom.round_words_scored?.length || 0) >= (prev.round_words_scored?.length || 0)
+                    ? incomingRoom.round_words_scored
+                    : prev.round_words_scored,
+                round_words_passed:
+                  (incomingRoom.round_words_passed?.length || 0) >= (prev.round_words_passed?.length || 0)
+                    ? incomingRoom.round_words_passed
+                    : prev.round_words_passed,
+              };
+            }
+            return incomingRoom;
+          });
           // If room transitioned to round_end or lobby, update spectator state
           if (event.payload.room.status === "round_end" || event.payload.room.status === "lobby") {
             setIsSpectator(false);
@@ -454,25 +532,32 @@ export default function ArticulateRoomPage({
     };
   }, [effectivePlayerName, fetchRoomState, myAvatar, myPlayerId, room?.host_id, roomCode]);
 
-  // 5. Polling Fallback (sync every 2.5s for seamless multi-device updates)
+  // 5. Polling Fallback (sync every 3s for seamless multi-device updates)
   useEffect(() => {
     const interval = setInterval(() => {
       fetchRoomState();
-    }, 2500);
+    }, 3000);
 
     return () => clearInterval(interval);
   }, [fetchRoomState]);
 
-  // 6. Synchronized Countdown & Round Timer
+  const currentTurnStartedAt = room?.current_turn?.startedAt;
+  const currentTurnRound = room?.current_turn?.roundNumber;
+  const currentRoomStatus = room?.status;
+  const currentDuration = room?.current_turn?.durationSeconds || room?.settings?.timerSeconds || 30;
+  const currentCountdownEndsAt = room?.current_turn?.countdownEndsAt || currentTurnStartedAt || 0;
+  const currentSpeakerId = room?.current_turn?.speakerId;
+  const currentHostId = room?.host_id;
+
+  // 6. Synchronized Countdown & Round Timer (State-deduplicated to prevent unnecessary re-renders)
   useEffect(() => {
-    if (!room || room.status !== "playing" || !room.current_turn) {
+    if (currentRoomStatus !== "playing" || !currentTurnStartedAt) {
       setCountdownRemaining(null);
       return;
     }
 
-    const turn = room.current_turn;
-    const duration = turn.durationSeconds || room.settings?.timerSeconds || 30;
-    const countdownEndsAt = turn.countdownEndsAt || turn.startedAt || Date.now();
+    const duration = currentDuration;
+    const countdownEndsAt = currentCountdownEndsAt || currentTurnStartedAt;
 
     const updateTimer = () => {
       const now = Date.now();
@@ -484,28 +569,28 @@ export default function ArticulateRoomPage({
         if (remainingCountdown > 4) {
           setCountdownRemaining(null);
         } else {
-          setCountdownRemaining(remainingCountdown);
-          setSecondsRemaining(duration);
+          setCountdownRemaining((prev) => (prev !== remainingCountdown ? remainingCountdown : prev));
+          setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
           return;
         }
       }
 
       // Flash "GO!" for 450ms after countdown finishes
       if (now >= countdownEndsAt && now < countdownEndsAt + 450) {
-        setCountdownRemaining(0);
-        setSecondsRemaining(duration);
+        setCountdownRemaining((prev) => (prev !== 0 ? 0 : prev));
+        setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
         return;
       }
 
-      setCountdownRemaining(null);
+      setCountdownRemaining((prev) => (prev !== null ? null : prev));
       const elapsed = Math.floor((now - countdownEndsAt) / 1000);
       const remaining = Math.max(0, duration - elapsed);
-      setSecondsRemaining(remaining);
+      setSecondsRemaining((prev) => (prev !== remaining ? remaining : prev));
 
       // Time's up: only the active speaker or host triggers end_round to avoid race conditions
       if (remaining === 0) {
         const isSpeakerOrHost =
-          myPlayerId === turn.speakerId || myPlayerId === room.host_id;
+          myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
         if (isSpeakerOrHost) {
           dispatchAction({
             action: "end_round",
@@ -516,12 +601,22 @@ export default function ArticulateRoomPage({
     };
 
     updateTimer();
-    timerRef.current = setInterval(updateTimer, 200);
+    const timer = setInterval(updateTimer, 250);
 
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
+      clearInterval(timer);
     };
-  }, [dispatchAction, myPlayerId, room]);
+  }, [
+    currentRoomStatus,
+    currentTurnStartedAt,
+    currentTurnRound,
+    currentDuration,
+    currentCountdownEndsAt,
+    currentSpeakerId,
+    currentHostId,
+    dispatchAction,
+    myPlayerId,
+  ]);
 
   // Remove old floating reactions after animation
   useEffect(() => {
@@ -542,6 +637,23 @@ export default function ArticulateRoomPage({
   };
 
   const handleScoreWord = () => {
+    if (room) {
+      const currentWord = room.deck?.[room.current_word_index];
+      if (currentWord) {
+        setRoom((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            current_word_index: prev.current_word_index + 1,
+            round_words_scored: [
+              ...(prev.round_words_scored || []),
+              { ...currentWord, disputeStatus: "none" },
+            ],
+          };
+        });
+      }
+    }
+
     dispatchAction({
       action: "score_word",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
@@ -549,6 +661,23 @@ export default function ArticulateRoomPage({
   };
 
   const handlePassWord = () => {
+    if (room) {
+      const currentWord = room.deck?.[room.current_word_index];
+      if (currentWord) {
+        setRoom((prev) => {
+          if (!prev) return prev;
+          return {
+            ...prev,
+            current_word_index: prev.current_word_index + 1,
+            round_words_passed: [
+              ...(prev.round_words_passed || []),
+              { ...currentWord, claimStatus: "none" },
+            ],
+          };
+        });
+      }
+    }
+
     dispatchAction({
       action: "pass_word",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
