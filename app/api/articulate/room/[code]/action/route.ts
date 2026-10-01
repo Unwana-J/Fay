@@ -43,54 +43,62 @@ async function persistRoom(room: ArticulateRoom) {
 
 async function getRoom(code: string): Promise<ArticulateRoom | null> {
   const normalized = code.toUpperCase().trim();
-  let room = memoryRooms.get(normalized);
+  let room: ArticulateRoom | null = null;
 
-  if (!room && isSupabaseConfigured && supabase) {
-    const { data } = await supabase
-      .from("articulate_rooms")
-      .select("*")
-      .eq("room_code", normalized)
-      .single();
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const { data, error } = await supabase
+        .from("articulate_rooms")
+        .select("*")
+        .eq("room_code", normalized)
+        .single();
 
-    if (data) {
-      const rawTeams = data.teams || {};
-      room = {
-        id: data.id,
-        room_code: data.room_code,
-        host_id: data.host_id,
-        host_name: data.host_name,
-        status: data.status,
-        locked: data.locked,
-        settings: data.settings,
-        teams: {
-          teamA: rawTeams.teamA || { name: "Team Alpha", color: "#EF4444", score: 0, playerIds: [] },
-          teamB: rawTeams.teamB || { name: "Team Omega", color: "#3B82F6", score: 0, playerIds: [] },
-        },
-        current_turn: data.current_turn,
-        deck: data.deck || [],
-        current_word_index: data.current_word_index || 0,
-        round_words_scored: data.round_words_scored || [],
-        round_words_passed: data.round_words_passed || [],
-        active_players: data.active_players || [],
-        spectators: data.spectators || [],
-        inactive_players: rawTeams.inactive_players || [],
-        player_details: rawTeams.player_details || {},
-        created_at: data.created_at,
-        updated_at: data.updated_at,
-      };
-
-      if (!room.player_details) room.player_details = {};
-      if (room.host_id && !room.player_details[room.host_id]) {
-        room.player_details[room.host_id] = {
-          id: room.host_id,
-          name: room.host_name,
-          avatar: "/avatars/avatar-scholar.svg",
-          isHost: true,
+      if (!error && data) {
+        const rawTeams = data.teams || {};
+        room = {
+          id: data.id,
+          room_code: data.room_code,
+          host_id: data.host_id,
+          host_name: data.host_name,
+          status: data.status,
+          locked: data.locked,
+          settings: data.settings,
+          teams: {
+            teamA: rawTeams.teamA || { name: "Team Alpha", color: "#EF4444", score: 0, playerIds: [] },
+            teamB: rawTeams.teamB || { name: "Team Omega", color: "#3B82F6", score: 0, playerIds: [] },
+          },
+          current_turn: data.current_turn,
+          deck: data.deck || [],
+          current_word_index: data.current_word_index || 0,
+          round_words_scored: data.round_words_scored || [],
+          round_words_passed: data.round_words_passed || [],
+          active_players: data.active_players || [],
+          spectators: data.spectators || [],
+          inactive_players: rawTeams.inactive_players || [],
+          player_details: rawTeams.player_details || {},
+          created_at: data.created_at,
+          updated_at: data.updated_at,
         };
-      }
 
-      memoryRooms.set(normalized, room);
+        if (!room.player_details) room.player_details = {};
+        if (room.host_id && !room.player_details[room.host_id]) {
+          room.player_details[room.host_id] = {
+            id: room.host_id,
+            name: room.host_name,
+            avatar: "/avatars/avatar-scholar.svg",
+            isHost: true,
+          };
+        }
+
+        memoryRooms.set(normalized, room);
+      }
+    } catch (err) {
+      console.warn("Could not query Supabase in action getRoom:", err);
     }
+  }
+
+  if (!room) {
+    room = memoryRooms.get(normalized) || null;
   }
 
   if (room) {
@@ -98,7 +106,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
     if (!room.player_details) room.player_details = {};
   }
 
-  return room || null;
+  return room;
 }
 
 export async function POST(

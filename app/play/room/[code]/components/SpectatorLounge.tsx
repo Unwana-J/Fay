@@ -25,6 +25,7 @@ interface SpectatorLoungeProps {
   myPlayerId: string;
   onSendReaction: (emoji: string) => void;
   presencePlayers?: RoomPlayer[];
+  knownNames?: Record<string, { name: string; avatar: string }>;
 }
 
 export default function SpectatorLounge({
@@ -33,6 +34,7 @@ export default function SpectatorLounge({
   myPlayerId,
   onSendReaction,
   presencePlayers = [],
+  knownNames = {},
 }: SpectatorLoungeProps) {
   const [showRoster, setShowRoster] = useState(false);
   const [showBoardDetails, setShowBoardDetails] = useState(true);
@@ -82,11 +84,18 @@ export default function SpectatorLounge({
     if (pres?.name && pres.name !== "Scholar" && pres.name !== "Learner") {
       return pres;
     }
+    const known = knownNames[pId];
+    if (known?.name && known.name !== "Scholar" && known.name !== "Learner") {
+      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+    }
     if (pId === room.host_id) {
       return { id: pId, name: room.host_name || "Host", avatar: "/avatars/avatar-scholar.svg", isHost: true };
     }
     if (detail?.name) return detail;
     if (pres) return pres;
+    if (known?.name) {
+      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+    }
     const clean = pId.replace(/^guest-/, "");
     return { id: pId, name: `Scholar (${clean.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false };
   };

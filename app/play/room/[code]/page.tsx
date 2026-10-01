@@ -78,10 +78,57 @@ export default function ArticulateRoomPage({
   const [identityModalMode, setIdentityModalMode] = useState<"join" | "edit">("join");
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [knownNames, setKnownNames] = useState<Record<string, { name: string; avatar: string }>>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem(`fey_articulate_names_${roomCode}`);
+        if (saved) return JSON.parse(saved);
+      } catch {}
+    }
+    return {};
+  });
 
   const channelRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hasJoinedRef = useRef(false);
+
+  // Synchronize known player names to persistent local cache
+  useEffect(() => {
+    const updates: Record<string, { name: string; avatar: string }> = {};
+    let changed = false;
+
+    if (room?.player_details) {
+      Object.entries(room.player_details).forEach(([id, detail]) => {
+        if (detail?.name && detail.name !== "Scholar" && detail.name !== "Learner") {
+          if (!knownNames[id] || knownNames[id].name !== detail.name) {
+            updates[id] = { name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg" };
+            changed = true;
+          }
+        }
+      });
+    }
+
+    presencePlayers.forEach((p) => {
+      if (p.id && p.name && p.name !== "Scholar" && p.name !== "Learner") {
+        if (!knownNames[p.id] || knownNames[p.id].name !== p.name) {
+          updates[p.id] = { name: p.name, avatar: p.avatar || "/avatars/avatar-scholar.svg" };
+          changed = true;
+        }
+      }
+    });
+
+    if (changed) {
+      setKnownNames((prev) => {
+        const next = { ...prev, ...updates };
+        if (typeof window !== "undefined") {
+          try {
+            localStorage.setItem(`fey_articulate_names_${roomCode}`, JSON.stringify(next));
+          } catch {}
+        }
+        return next;
+      });
+    }
+  }, [presencePlayers, room?.player_details, roomCode, knownNames]);
 
   // 1. Fetch Room State (Safe from transient serverless 404s)
   const fetchRoomState = useCallback(async (isInitial = false) => {
@@ -782,6 +829,7 @@ export default function ArticulateRoomPage({
               myPlayerId={myPlayerId}
               onSendReaction={handleSendReaction}
               presencePlayers={presencePlayers}
+              knownNames={knownNames}
             />
           </motion.div>
         ) : room.status === "lobby" ? (
@@ -796,6 +844,7 @@ export default function ArticulateRoomPage({
               myPlayerId={myPlayerId}
               isHost={isHost}
               presencePlayers={presencePlayers}
+              knownNames={knownNames}
               onStartRound={handleStartRound}
               onSwitchTeam={handleSwitchTeam}
               onShuffleTeams={handleShuffleTeams}
@@ -853,6 +902,7 @@ export default function ArticulateRoomPage({
               myPlayerName={effectivePlayerName}
               isHost={isHost}
               presencePlayers={presencePlayers}
+              knownNames={knownNames}
               onStartNextRound={handleStartRound}
               onDisputeWord={handleDisputeWord}
               onResolveDispute={handleResolveDispute}

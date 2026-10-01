@@ -10,6 +10,7 @@ interface RoomLobbyProps {
   myPlayerId: string;
   isHost: boolean;
   presencePlayers: RoomPlayer[];
+  knownNames?: Record<string, { name: string; avatar: string }>;
   onStartRound: () => void;
   onSwitchTeam: (targetTeam: "A" | "B") => void;
   onShuffleTeams?: () => void;
@@ -24,6 +25,7 @@ export default function RoomLobby({
   myPlayerId,
   isHost,
   presencePlayers,
+  knownNames = {},
   onStartRound,
   onSwitchTeam,
   onShuffleTeams,
@@ -72,7 +74,7 @@ export default function RoomLobby({
   const teamBActiveCount = teamBPlayers.filter((id) => !isPlayerInactive(id)).length;
   const teamBInactiveCount = teamBPlayers.length - teamBActiveCount;
 
-  // Resolve player details from presence map or persisted details
+  // Resolve player details from presence map, knownNames cache, or persisted details
   const getPlayerDisplay = (pId: string) => {
     // 1. If it's me and I have a valid name, prefer local name
     if (pId === myPlayerId && room.player_details?.[pId]?.name) {
@@ -89,18 +91,27 @@ export default function RoomLobby({
     if (found && found.name && found.name !== "Scholar" && found.name !== "Learner") {
       return found;
     }
-    // 4. Host fallback
+    // 4. Check knownNames persistent cache
+    const known = knownNames[pId];
+    if (known && known.name && known.name !== "Scholar" && known.name !== "Learner") {
+      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+    }
+    // 5. Host fallback
     if (pId === room.host_id) {
       return { id: pId, name: room.host_name || "Host", avatar: "/avatars/avatar-scholar.svg", isHost: true };
     }
-    // 5. If detail or presence has any name
+    // 6. If detail, presence, or known has any name
     if (detail?.name) {
       return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
     }
     if (found?.name) {
       return found;
     }
-    return { id: pId, name: "Scholar", avatar: "/avatars/avatar-scholar.svg", isHost: false };
+    if (known?.name) {
+      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+    }
+    const cleanId = pId.replace(/^guest-/, "");
+    return { id: pId, name: `Scholar (${cleanId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false };
   };
 
   return (

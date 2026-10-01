@@ -31,6 +31,7 @@ interface RoomRoundEndProps {
   myPlayerName: string;
   isHost: boolean;
   presencePlayers?: RoomPlayer[];
+  knownNames?: Record<string, { name: string; avatar: string }>;
   onStartNextRound: () => void;
   onDisputeWord: (wordIndex: number) => void;
   onResolveDispute: (wordIndex: number, resolution: "concede" | "reject") => void;
@@ -44,6 +45,7 @@ export default function RoomRoundEnd({
   myPlayerName,
   isHost,
   presencePlayers = [],
+  knownNames = {},
   onStartNextRound,
   onDisputeWord,
   onResolveDispute,
@@ -122,7 +124,24 @@ export default function RoomRoundEnd({
       return presenceMatch;
     }
 
-    // 4. Host fallback
+    // 4. Known names cache
+    const known = knownNames[pId];
+    if (known && known.name && known.name !== "Scholar" && known.name !== "Learner") {
+      return {
+        id: pId,
+        name: known.name,
+        avatar: known.avatar || "/avatars/avatar-scholar.svg",
+        team: room.teams.teamA.playerIds.includes(pId)
+          ? ("A" as const)
+          : room.teams.teamB.playerIds.includes(pId)
+          ? ("B" as const)
+          : null,
+        isHost: pId === room.host_id,
+        joinedAt: 0,
+      };
+    }
+
+    // 5. Host fallback
     if (pId === room.host_id) {
       return {
         id: pId,
@@ -150,6 +169,21 @@ export default function RoomRoundEnd({
     }
 
     if (presenceMatch) return presenceMatch;
+
+    if (known?.name) {
+      return {
+        id: pId,
+        name: known.name,
+        avatar: known.avatar || "/avatars/avatar-scholar.svg",
+        team: room.teams.teamA.playerIds.includes(pId)
+          ? ("A" as const)
+          : room.teams.teamB.playerIds.includes(pId)
+          ? ("B" as const)
+          : null,
+        isHost: pId === room.host_id,
+        joinedAt: 0,
+      };
+    }
 
     const cleanId = pId.replace(/^guest-/, "");
     return {
