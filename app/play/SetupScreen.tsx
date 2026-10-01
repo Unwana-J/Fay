@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore, ArticulateHistoryItem } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
@@ -11,7 +11,7 @@ import BoardMap from "./BoardMap";
 
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const router = useRouter();
-  const { profile, updateProfile, articulateHistory = [], removeArticulateRoom } = useAppStore();
+  const { profile, updateProfile, articulateHistory = [], removeArticulateRoom, saveArticulateRoom } = useAppStore();
 
   const [playMode, setPlayMode] = useState<"online" | "local">("online");
   const [isCreatingOnline, setIsCreatingOnline] = useState(false);
@@ -20,6 +20,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const [onlineTimerSeconds, setOnlineTimerSeconds] = useState<30 | 45 | 60>(45);
   const [onlineScoreGoal, setOnlineScoreGoal] = useState<number>(20);
   const [selectedCompletedMatch, setSelectedCompletedMatch] = useState<ArticulateHistoryItem | null>(null);
+  const [isLoadingMatchDetails, setIsLoadingMatchDetails] = useState(false);
 
   const formatMatchDuration = (seconds?: number): string => {
     if (!seconds || seconds <= 0) return "15 mins";
@@ -29,6 +30,109 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
     if (secs === 0) return `${mins} min${mins === 1 ? "" : "s"}`;
     return `${mins}m ${secs}s`;
   };
+
+  // Helper to fetch server room state and backfill participants & duration
+  const enrichMatchDetails = useCallback(
+    async (match: ArticulateHistoryItem): Promise<ArticulateHistoryItem> => {
+      try {
+        const res = await fetch(`/api/articulate/room?code=${match.roomCode}`);
+        const data = await res.json();
+        if (data.room) {
+          const roomData = data.room;
+          const allIds = Array.from(
+            new Set([
+              ...(roomData.teams?.teamA?.playerIds || []),
+              ...(roomData.teams?.teamB?.playerIds || []),
+              ...(roomData.spectators || []),
+              ...Object.keys(roomData.player_details || {}),
+            ])
+          );
+
+          const realParticipants = allIds.map((id) => {
+            const detail = roomData.player_details?.[id];
+            const team = (roomData.teams?.teamA?.playerIds || []).includes(id)
+              ? ("A" as const)
+              : (roomData.teams?.teamB?.playerIds || []).includes(id)
+              ? ("B" as const)
+              : null;
+            return {
+              id,
+              name:
+                detail?.name && detail.name !== "Scholar" && detail.name !== "Learner"
+                  ? detail.name
+                  : id === roomData.host_id
+                  ? roomData.host_name
+                  : `Scholar (${id.replace(/^guest-/, "").slice(0, 5)})`,
+              avatar: detail?.avatar || "/avatars/avatar-scholar.svg",
+              team,
+              isHost: id === roomData.host_id,
+            };
+          });
+
+          let realDuration = match.durationSeconds || 0;
+          if (roomData.created_at && roomData.updated_at) {
+            const start = new Date(roomData.created_at).getTime();
+            const end = new Date(roomData.updated_at).getTime();
+            const diff = Math.round((end - start) / 1000);
+            if (diff > 20) {
+              realDuration = diff;
+            }
+          }
+
+          if (!realDuration || realDuration <= 0) {
+            const totalScore = (match.scoreA || 0) + (match.scoreB || 0);
+            const rounds = roomData.current_turn?.roundNumber || Math.max(1, Math.ceil(totalScore / 3.5));
+            const timer = roomData.settings?.timerSeconds || 45;
+            realDuration = rounds * timer + Math.round(rounds * 20);
+          }
+
+          const enriched: ArticulateHistoryItem = {
+            ...match,
+            scoreA: roomData.teams?.teamA?.score ?? match.scoreA,
+            scoreB: roomData.teams?.teamB?.score ?? match.scoreB,
+            scoreGoal: roomData.settings?.scoreGoal || match.scoreGoal || 20,
+            teamAColor: roomData.teams?.teamA?.color || match.teamAColor || "#EF4444",
+            teamBColor: roomData.teams?.teamB?.color || match.teamBColor || "#3B82F6",
+            teamAName: roomData.teams?.teamA?.name || match.teamAName || "Team Alpha",
+            teamBName: roomData.teams?.teamB?.name || match.teamBName || "Team Omega",
+            gameMode: roomData.settings?.gameMode || match.gameMode || "classic",
+            durationSeconds: realDuration,
+            totalParticipants: realParticipants.length > 0 ? realParticipants.length : match.totalParticipants || 2,
+            participants: realParticipants.length > 0 ? realParticipants : match.participants,
+          };
+
+          saveArticulateRoom(enriched);
+          return enriched;
+        }
+      } catch (err) {
+        console.warn("Could not enrich completed match:", err);
+      }
+      return match;
+    },
+    [saveArticulateRoom]
+  );
+
+  // When opening a completed match, enrich it immediately
+  const handleOpenCompletedMatch = async (match: ArticulateHistoryItem) => {
+    setSelectedCompletedMatch(match);
+    setIsLoadingMatchDetails(true);
+    try {
+      const enriched = await enrichMatchDetails(match);
+      setSelectedCompletedMatch(enriched);
+    } finally {
+      setIsLoadingMatchDetails(false);
+    }
+  };
+
+  // Auto-enrich any legacy completed match missing participant lists or duration on mount
+  useEffect(() => {
+    const legacyRooms = (articulateHistory || []).filter(
+      (r) => r.status === "game_over" && (!r.participants || r.participants.length === 0 || !r.durationSeconds)
+    );
+    legacyRooms.forEach((r) => {
+      enrichMatchDetails(r);
+    });
+  }, [articulateHistory, enrichMatchDetails]);
 
   const {
     timerSeconds, setTimerSeconds,
@@ -557,7 +661,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
                       <button
                         type="button"
-                        onClick={() => setSelectedCompletedMatch(room)}
+                        onClick={() => handleOpenCompletedMatch(room)}
                         className="w-full mt-3 bg-[var(--olive)]/10 hover:bg-[var(--olive)]/20 text-[var(--olive)] py-2 px-3 rounded-xl font-space font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                       >
                         <Eye className="w-3.5 h-3.5" />
@@ -1071,8 +1175,12 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                   <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
                     <Users className="w-3.5 h-3.5 text-[var(--olive)]" /> Total Scholars
                   </div>
-                  <div className="text-base font-space font-extrabold text-[var(--text)]">
-                    {selectedCompletedMatch.totalParticipants || selectedCompletedMatch.participants?.length || 2}
+                  <div className="text-base font-space font-extrabold text-[var(--text)] flex items-center gap-1.5">
+                    {isLoadingMatchDetails ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--olive)]" />
+                    ) : (
+                      selectedCompletedMatch.totalParticipants || selectedCompletedMatch.participants?.length || 2
+                    )}
                   </div>
                 </div>
 
@@ -1080,8 +1188,12 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                   <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
                     <Clock className="w-3.5 h-3.5 text-[var(--gold)]" /> Time Spent
                   </div>
-                  <div className="text-base font-space font-extrabold text-[var(--text)]">
-                    {formatMatchDuration(selectedCompletedMatch.durationSeconds)}
+                  <div className="text-base font-space font-extrabold text-[var(--text)] flex items-center gap-1.5">
+                    {isLoadingMatchDetails ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-[var(--gold)]" />
+                    ) : (
+                      formatMatchDuration(selectedCompletedMatch.durationSeconds)
+                    )}
                   </div>
                 </div>
 
@@ -1130,7 +1242,14 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
               </div>
 
               {/* Participants Roster Breakdown */}
-              {selectedCompletedMatch.participants && selectedCompletedMatch.participants.length > 0 && (
+              {isLoadingMatchDetails ? (
+                <div className="surface rounded-2xl p-6 border border-[var(--border-dim)] text-center space-y-2">
+                  <Loader2 className="w-5 h-5 animate-spin text-[var(--olive)] mx-auto" />
+                  <p className="text-xs font-space font-bold text-[var(--text-dim)]">
+                    Retrieving scholar roster and match duration from server archive...
+                  </p>
+                </div>
+              ) : selectedCompletedMatch.participants && selectedCompletedMatch.participants.length > 0 ? (
                 <div className="space-y-3">
                   <h3 className="font-space font-bold text-sm text-[var(--text)] flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-[var(--olive)]" />
@@ -1201,7 +1320,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     </div>
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {/* Modal Actions */}
               <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
