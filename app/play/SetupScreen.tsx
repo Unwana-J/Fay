@@ -16,7 +16,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const [isCreatingOnline, setIsCreatingOnline] = useState(false);
   const [onlineJoinCode, setOnlineJoinCode] = useState("");
   const [onlineJoinError, setOnlineJoinError] = useState<string | null>(null);
-  const [onlineTimerSeconds, setOnlineTimerSeconds] = useState<30 | 60>(30);
+  const [onlineTimerSeconds, setOnlineTimerSeconds] = useState<30 | 45 | 60>(45);
   const [onlineScoreGoal, setOnlineScoreGoal] = useState<number>(20);
 
   const {
@@ -214,7 +214,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     </span>
                   </div>
 
-                  {/* Sprint Duration Selector: 30s vs 60s */}
+                  {/* Sprint Duration Selector: 30s vs 45s vs 60s */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
@@ -225,28 +225,39 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         {onlineTimerSeconds}s
                       </span>
                     </div>
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => setOnlineTimerSeconds(30)}
-                        className={`py-2 px-3 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
+                        className={`py-2 px-2 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
                           onlineTimerSeconds === 30
                             ? "bg-[var(--terra)] border-[var(--terra)] text-white shadow-xs"
                             : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
                         }`}
                       >
-                        ⚡ 30s (Blitz)
+                        ⚡ 30s
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOnlineTimerSeconds(45)}
+                        className={`py-2 px-2 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
+                          onlineTimerSeconds === 45
+                            ? "bg-[var(--terra)] border-[var(--terra)] text-white shadow-xs"
+                            : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
+                        }`}
+                      >
+                        🎯 45s
                       </button>
                       <button
                         type="button"
                         onClick={() => setOnlineTimerSeconds(60)}
-                        className={`py-2 px-3 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
+                        className={`py-2 px-2 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
                           onlineTimerSeconds === 60
                             ? "bg-[var(--terra)] border-[var(--terra)] text-white shadow-xs"
                             : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
                         }`}
                       >
-                        ⏱️ 60s (Standard)
+                        ⏱️ 60s
                       </button>
                     </div>
                   </div>

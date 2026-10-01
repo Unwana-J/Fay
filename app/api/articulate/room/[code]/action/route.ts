@@ -562,7 +562,7 @@ export async function POST(
         }
 
         if (settings) {
-          if (settings.timerSeconds && (settings.timerSeconds === 30 || settings.timerSeconds === 60)) {
+          if (settings.timerSeconds && (settings.timerSeconds === 30 || settings.timerSeconds === 45 || settings.timerSeconds === 60)) {
             room.settings.timerSeconds = settings.timerSeconds;
           }
           if (settings.scoreGoal && typeof settings.scoreGoal === "number") {

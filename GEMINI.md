@@ -76,3 +76,11 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 | **Audio Storage** | Base64 in LocalStorage | Cloudflare R2 / AWS S3 pre-signed storage |
 | **Room Real-time** | URL Payload + Poll/Refresh | WebSockets / LiveKit live synchronized salons |
 | **Speech Review** | Self-rating (1–5) | Whisper transcription + Gemini Socratic critique |
+
+---
+
+## 5. Development Workflow & Git Push Protocol
+
+- **Summary Before Push (Mandatory)**: Whenever modifications, bug fixes, or new features are implemented and verified (e.g., via `npm run build`), **always present a clear, comprehensive summary of the changes to the user first**.
+- **User Review Gate**: Do **not** commit and push directly to GitHub (`origin/main`) without user review. Wait for the user to review the summary and approve the changes or request adjustments.
+- **Push on Confirmation**: Once the user reviews and confirms or asks to proceed, stage, commit, and push with `BypassSandbox: true`.

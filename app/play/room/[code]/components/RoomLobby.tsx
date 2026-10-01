@@ -148,9 +148,21 @@ export default function RoomLobby({
                       ? "bg-[var(--terra)] text-white shadow-xs"
                       : "text-[var(--text-dim)] hover:text-[var(--text)]"
                   }`}
-                  title="Switch to 30 seconds"
+                  title="Switch to 30 seconds (Blitz)"
                 >
                   ⚡ 30s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateSettings({ timerSeconds: 45 })}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold font-mono transition cursor-pointer ${
+                    room.settings.timerSeconds === 45
+                      ? "bg-[var(--terra)] text-white shadow-xs"
+                      : "text-[var(--text-dim)] hover:text-[var(--text)]"
+                  }`}
+                  title="Switch to 45 seconds (Classic)"
+                >
+                  🎯 45s
                 </button>
                 <button
                   type="button"
@@ -160,7 +172,7 @@ export default function RoomLobby({
                       ? "bg-[var(--terra)] text-white shadow-xs"
                       : "text-[var(--text-dim)] hover:text-[var(--text)]"
                   }`}
-                  title="Switch to 60 seconds"
+                  title="Switch to 60 seconds (Relaxed)"
                 >
                   ⏱️ 60s
                 </button>

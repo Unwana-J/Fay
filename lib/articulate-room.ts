@@ -95,7 +95,7 @@ export function createInitialRoom(
   settings: Partial<RoomSettings> = {}
 ): ArticulateRoom {
   const mergedSettings: RoomSettings = {
-    timerSeconds: settings.timerSeconds || 30,
+    timerSeconds: settings.timerSeconds || 45,
     scoreGoal: settings.scoreGoal || 20,
     categories: settings.categories || ["Object", "Nature", "Person", "Action", "World", "Random"],
     difficulty: settings.difficulty || "mixed",
