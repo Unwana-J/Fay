@@ -913,11 +913,23 @@ function ResultsScreen({
           )}
         </div>
         {xpEarned > 0 && (
-          <div
-            className="mt-3 inline-block px-3.5 py-1.5 rounded-full text-xs font-space font-bold"
-            style={{ background: "var(--gold-bg)", color: "var(--gold)" }}
-          >
-            +{xpEarned} XP Earned
+          <div className="mt-3 flex flex-col items-center gap-1.5">
+            <div
+              className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-space font-extrabold shadow-xs"
+              style={{ background: "var(--gold-bg)", color: "var(--gold)" }}
+            >
+              <span>⚡ +{xpEarned} XP Earned</span>
+              {Boolean(activeChallenge || challenger) && (
+                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--gold)] text-black uppercase font-mono tracking-wider font-extrabold">
+                  High-Stakes Challenge
+                </span>
+              )}
+            </div>
+            {Boolean(activeChallenge || challenger) && (
+              <span className="text-[11px] text-[var(--gold)] font-medium">
+                🔒 One-Trial Locked Multiplier &amp; Conviction Bonus applied!
+              </span>
+            )}
           </div>
         )}
 
@@ -1198,9 +1210,33 @@ export default function TriviaGameClient({
     const correct = finalAnswers.filter((a, i) => a === questions[i].answer).length;
     const total = questions.length;
     const pct = Math.round((correct / total) * 100);
-    const base = correct * 5;
-    const bonus = pct >= 80 ? 50 : 0;
-    const totalXP = base + bonus;
+
+    // High-Stakes XP Model:
+    // Challenges are locked to a single attempt and carry real reputation stakes,
+    // so they yield significantly higher XP than casual replayable solo rounds.
+    const isChallengeGame = Boolean(activeChallenge || challenger);
+    let totalXP = 0;
+
+    if (isChallengeGame) {
+      // 12 XP per correct question (2.4x the standard solo rate)
+      const baseXP = correct * 12;
+      // Conviction Bonus: awarded for taking on a locked, official single-trial challenge
+      const convictionBonus = 30;
+      // High-Stakes Accuracy Distinction
+      const accuracyBonus =
+        pct === 100 ? 100 : pct >= 80 ? 60 : pct >= 60 ? 30 : 0;
+      // Victor Bounty: extra bonus for beating or matching the opponent/host
+      const victorBonus =
+        challenger?.score !== undefined && correct >= challenger.score ? 40 : 0;
+
+      totalXP = baseXP + convictionBonus + accuracyBonus + victorBonus;
+    } else {
+      // Solo / Practice / Random game (unlimited re-attempts)
+      const baseXP = correct * 5;
+      const accuracyBonus =
+        pct === 100 ? 40 : pct >= 80 ? 25 : pct >= 60 ? 10 : 0;
+      totalXP = baseXP + accuracyBonus;
+    }
 
     const byCategory = Object.entries(
       questions.reduce<Record<string, { correct: number; total: number }>>((acc, q, i) => {

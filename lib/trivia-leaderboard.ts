@@ -1,4 +1,5 @@
 import type { UserProfile, TriviaHistoryItem } from "@/store/useAppStore";
+import { sanitizeScholarName, isBlockedHateSpeech } from "@/lib/name-moderation";
 
 export interface TriviaScholarEntry {
   id: string;
@@ -26,11 +27,18 @@ export interface CloudTriviaScore {
   grade_label?: string;
   xp_earned?: number;
   challenge_id?: string;
+  total_xp?: number;
+  games_played?: number;
 }
 
 /**
  * Computes leaderboard entries combining live Supabase cloud scores and the user's local stats.
- * Zero dummy data: Only real players who have taken the quiz appear.
+ *
+ * Ranking criteria:
+ * 1. Total Accumulated Trivia XP (Points grinded from games & high-stakes challenges)
+ * 2. Number of unique games played (rewards consistency and active dedication)
+ * 3. Best Accuracy % (Tie-breaker)
+ * 4. Best raw score (Tie-breaker)
  */
 export function getTriviaLeaderboard(
   profile: UserProfile,
@@ -56,18 +64,21 @@ export function getTriviaLeaderboard(
     }
   });
 
-  const username = profile.username?.trim() || "You";
+  const username = sanitizeScholarName(profile.username?.trim() || "You");
   const userEntry: TriviaScholarEntry = {
     id: "user-current",
     name: username,
     avatar: profile.avatar || "/avatars/avatar-scholar.svg",
-    title: gamesPlayed > 0
-      ? bestPct >= 90
+    title:
+      totalTriviaXP >= 500
         ? "Naija Grandmaster"
-        : bestPct >= 70
+        : totalTriviaXP >= 250
+        ? "Naija Titan"
+        : totalTriviaXP >= 120
         ? "Rising Scholar"
-        : "Curious Learner"
-      : "New Challenger",
+        : gamesPlayed > 0
+        ? "Curious Learner"
+        : "New Challenger",
     bestScore,
     bestTotal,
     bestPct,
@@ -78,33 +89,51 @@ export function getTriviaLeaderboard(
 
   // Convert cloud scores into scholar entries (excluding current user to avoid duplicate)
   const cloudEntries: TriviaScholarEntry[] = (cloudScores || [])
-    .filter((c) => c.username?.trim().toLowerCase() !== username.toLowerCase())
-    .map((c) => ({
-      id: `cloud-${c.id || c.username}`,
-      name: c.username,
-      avatar: c.avatar || "/avatars/avatar-scholar.svg",
-      title: c.pct >= 90 ? "Naija Titan" : c.pct >= 70 ? "Scholar" : "Challenger",
-      bestScore: c.score,
-      bestTotal: c.total,
-      bestPct: c.pct,
-      gamesPlayed: 1,
-      triviaXP: c.xp_earned || c.score * 5,
-      isUser: false,
-    }));
+    .filter((c) => {
+      if (!c.username) return false;
+      if (isBlockedHateSpeech(c.username)) return false;
+      return c.username.trim().toLowerCase() !== username.toLowerCase();
+    })
+    .map((c) => {
+      const cleanName = sanitizeScholarName(c.username);
+      const earnedXP = c.total_xp ?? c.xp_earned ?? (c.score || 0) * 5;
+      const games = c.games_played ?? 1;
 
-  // Only include user if they have played at least once OR if no cloud scores exist yet
-  const allEntries: TriviaScholarEntry[] = [];
+      return {
+        id: `cloud-${c.id || cleanName}`,
+        name: cleanName,
+        avatar: c.avatar || "/avatars/avatar-scholar.svg",
+        title:
+          earnedXP >= 500
+            ? "Naija Grandmaster"
+            : earnedXP >= 250
+            ? "Naija Titan"
+            : earnedXP >= 120
+            ? "Honor Scholar"
+            : c.pct >= 90
+            ? "Scholar"
+            : "Challenger",
+        bestScore: c.score,
+        bestTotal: c.total,
+        bestPct: c.pct,
+        gamesPlayed: games,
+        triviaXP: earnedXP,
+        isUser: false,
+      };
+    });
 
-  cloudEntries.forEach((e) => allEntries.push(e));
+  // Combine user entry and cloud entries
+  const allEntries: TriviaScholarEntry[] = [...cloudEntries, userEntry];
 
-  // Add the current user
-  allEntries.push(userEntry);
-
-  // Sort by Best Accuracy % descending, then by Trivia XP descending, then by Games Played descending
+  // Sort by Total Trivia XP descending (primary metric),
+  // then by Games Played descending (rewards persistence & unique games),
+  // then by Best Accuracy % descending,
+  // then by Best Score descending
   allEntries.sort((a, b) => {
-    if (b.bestPct !== a.bestPct) return b.bestPct - a.bestPct;
     if (b.triviaXP !== a.triviaXP) return b.triviaXP - a.triviaXP;
-    return b.gamesPlayed - a.gamesPlayed;
+    if (b.gamesPlayed !== a.gamesPlayed) return b.gamesPlayed - a.gamesPlayed;
+    if (b.bestPct !== a.bestPct) return b.bestPct - a.bestPct;
+    return b.bestScore - a.bestScore;
   });
 
   let userRank = 1;

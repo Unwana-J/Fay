@@ -146,10 +146,10 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
           <div className="flex items-center gap-4 text-left sm:text-right">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)] block">
-                High Score
+                Trivia XP
               </span>
-              <span className="font-space font-extrabold text-lg text-[var(--gold)]">
-                {userEntry.bestPct > 0 ? `${userEntry.bestPct}%` : "—"}
+              <span className="font-space font-extrabold text-lg text-[#008751] flex items-center gap-0.5">
+                ⚡ {userEntry.triviaXP}
               </span>
             </div>
             <div>
@@ -162,10 +162,10 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
             </div>
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)] block">
-                Trivia XP
+                High Run
               </span>
-              <span className="font-space font-extrabold text-lg text-[#008751] flex items-center gap-0.5">
-                ⚡ {userEntry.triviaXP}
+              <span className="font-space font-extrabold text-lg text-[var(--gold)]">
+                {userEntry.bestPct > 0 ? `${userEntry.bestPct}%` : "—"}
               </span>
             </div>
           </div>
@@ -237,6 +237,16 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
         </button>
       </div>
 
+      {/* Ranking rule banner */}
+      {tab === "global" && (
+        <div className="p-3 rounded-xl bg-[var(--olive)]/10 border border-[var(--olive)]/20 text-xs flex items-center gap-2 text-[var(--text-dim)]">
+          <span className="text-base">🏆</span>
+          <span>
+            <strong>Global Standing:</strong> Ranked primarily by <strong>Total Trivia XP</strong> accumulated across games and unique rounds completed. Single-trial group challenges award <strong>2.5x XP multipliers</strong>!
+          </span>
+        </div>
+      )}
+
       {/* Tab 1: Global Leaderboard */}
       {tab === "global" && (
         entries.length === 0 || (entries.length === 1 && entries[0].isUser && entries[0].gamesPlayed === 0) ? (
@@ -253,6 +263,15 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
           </div>
         ) : (
           <div className="surface rounded-2xl border overflow-hidden divide-y shadow-xs" style={{ borderColor: "var(--border-dim)" }}>
+            {/* Table Column Headers */}
+            <div className="px-4 py-2 bg-[var(--bg-input)]/40 flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--text-mute)]">
+              <span>Scholar &amp; Title</span>
+              <div className="flex items-center gap-4 sm:gap-6 text-right">
+                <span className="w-20">Accumulated XP</span>
+                <span className="w-16">High Run</span>
+              </div>
+            </div>
+
             {entries.map((entry, idx) => (
               <motion.div
                 key={entry.id}
@@ -306,22 +325,22 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                   </div>
                 </div>
 
-                {/* Right: Scores */}
-                <div className="flex items-center gap-4 text-right shrink-0">
-                  <div>
-                    <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
-                      {entry.bestPct}%
-                    </div>
-                    <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                      {entry.bestScore}/{entry.bestTotal} high
-                    </div>
-                  </div>
-                  <div className="w-16">
-                    <div className="font-mono text-xs font-bold text-[#008751] flex items-center justify-end gap-0.5">
+                {/* Right: Scores (XP First, Accuracy Second) */}
+                <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
+                  <div className="w-20">
+                    <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-0.5">
                       ⚡ {entry.triviaXP}
                     </div>
                     <div className="text-[10px] font-semibold text-[var(--text-mute)]">
                       {entry.gamesPlayed} {entry.gamesPlayed === 1 ? "game" : "games"}
+                    </div>
+                  </div>
+                  <div className="w-16">
+                    <div className="font-space font-extrabold text-sm sm:text-base" style={{ color: "var(--text)" }}>
+                      {entry.bestPct}%
+                    </div>
+                    <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                      {entry.bestScore}/{entry.bestTotal} high
                     </div>
                   </div>
                 </div>

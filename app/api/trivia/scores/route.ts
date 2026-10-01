@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { sanitizeScholarName } from "@/lib/name-moderation";
 
 export async function POST(req: NextRequest) {
   try {
@@ -21,6 +22,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid payload" }, { status: 400 });
     }
 
+    const cleanUsername = sanitizeScholarName(username);
+
     if (!isSupabaseConfigured || !supabase) {
       // Graceful fallback if user hasn't added Supabase env vars yet
       return NextResponse.json({
@@ -32,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     const { data, error } = await supabase.from("trivia_scores").insert([
       {
-        username: username.trim(),
+        username: cleanUsername,
         avatar: avatar || "/avatars/avatar-scholar.svg",
         score,
         total,

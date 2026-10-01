@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { sanitizeScholarName, isBlockedHateSpeech } from "@/lib/name-moderation";
 
 export async function GET(req: NextRequest) {
   try {
@@ -14,14 +15,6 @@ export async function GET(req: NextRequest) {
       });
     }
 
-    let query = supabase
-      .from("trivia_scores")
-      .select("id, created_at, username, avatar, score, total, pct, grade_label, xp_earned, challenge_id")
-      .order("pct", { ascending: false })
-      .order("score", { ascending: false })
-      .order("created_at", { ascending: false })
-      .limit(100);
-
     // If query specifies challengeId and/or questionIds deck signature, match either
     const candidateIds = Array.from(
       new Set(
@@ -30,6 +23,12 @@ export async function GET(req: NextRequest) {
           .map((s) => s!.trim())
       )
     );
+
+    let query = supabase
+      .from("trivia_scores")
+      .select("id, created_at, username, avatar, score, total, pct, grade_label, xp_earned, challenge_id")
+      .order("created_at", { ascending: false })
+      .limit(300);
 
     if (candidateIds.length === 1) {
       query = query.eq("challenge_id", candidateIds[0]);
@@ -44,39 +43,120 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Deduplicate: If candidateIds is set (challenge query), lock strictly to the FIRST attempt (earliest created_at).
-    // For global leaderboards, keep the best run.
-    const selectedByPlayer = new Map<string, (typeof data)[0]>();
-
+    // ── CASE 1: SPECIFIC CHALLENGE BOARD (Locked strictly to FIRST attempt per player) ──
     if (candidateIds.length > 0) {
-      // Sort chronologically ascending to capture the first attempt
+      const selectedByPlayer = new Map<string, (typeof data)[0]>();
       const chrono = [...(data || [])].sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
       );
+
       chrono.forEach((row) => {
-        const key = row.username.trim().toLowerCase();
+        if (!row.username || isBlockedHateSpeech(row.username)) return;
+        const cleanName = sanitizeScholarName(row.username);
+        const key = cleanName.trim().toLowerCase();
         if (!selectedByPlayer.has(key)) {
-          selectedByPlayer.set(key, row);
+          selectedByPlayer.set(key, {
+            ...row,
+            username: cleanName,
+          });
         }
       });
-    } else {
-      (data || []).forEach((row) => {
-        const key = row.username.trim().toLowerCase();
-        const existing = selectedByPlayer.get(key);
-        if (!existing || row.pct > existing.pct || (row.pct === existing.pct && row.score > existing.score)) {
-          selectedByPlayer.set(key, row);
-        }
+
+      const challengeRanked = Array.from(selectedByPlayer.values()).sort((a, b) => {
+        if (b.pct !== a.pct) return b.pct - a.pct;
+        return b.score - a.score;
+      });
+
+      return NextResponse.json({
+        configured: true,
+        scores: challengeRanked,
       });
     }
 
-    const uniqueScores = Array.from(selectedByPlayer.values()).sort((a, b) => {
+    // ── CASE 2: GLOBAL SCHOLARS LEADERBOARD ───────────────────────────────────────
+    // Aggregates ALL games played by each scholar:
+    // - Total XP accumulated across games
+    // - Count of unique games played
+    // - Best high-score run (pct & score)
+    const playerAggregates = new Map<
+      string,
+      {
+        id: string;
+        username: string;
+        avatar: string;
+        score: number;
+        total: number;
+        pct: number;
+        grade_label?: string;
+        xp_earned: number;
+        total_xp: number;
+        games_played: number;
+        created_at: string;
+      }
+    >();
+
+    (data || []).forEach((row) => {
+      if (!row.username || isBlockedHateSpeech(row.username)) return;
+      const cleanName = sanitizeScholarName(row.username);
+      const key = cleanName.trim().toLowerCase();
+      const rowXp =
+        typeof row.xp_earned === "number" && row.xp_earned > 0
+          ? row.xp_earned
+          : (row.score || 0) * 5;
+
+      const existing = playerAggregates.get(key);
+
+      if (!existing) {
+        playerAggregates.set(key, {
+          id: row.id || `scholar-${key}`,
+          username: cleanName,
+          avatar: row.avatar || "/avatars/avatar-scholar.svg",
+          score: row.score,
+          total: row.total,
+          pct: row.pct,
+          grade_label: row.grade_label,
+          xp_earned: rowXp,
+          total_xp: rowXp,
+          games_played: 1,
+          created_at: row.created_at,
+        });
+      } else {
+        existing.games_played += 1;
+        existing.total_xp += rowXp;
+        existing.xp_earned = existing.total_xp;
+
+        // Keep best high-water mark for accuracy display
+        if (
+          row.pct > existing.pct ||
+          (row.pct === existing.pct && row.score > existing.score)
+        ) {
+          existing.score = row.score;
+          existing.total = row.total;
+          existing.pct = row.pct;
+          existing.grade_label = row.grade_label;
+        }
+
+        // Keep latest avatar if not default
+        if (row.avatar && !row.avatar.includes("default")) {
+          existing.avatar = row.avatar;
+        }
+      }
+    });
+
+    // Rank primary: Total XP accumulated
+    // Secondary: Games played (reward consistency and unique games)
+    // Tertiary: Best Accuracy %
+    // Quaternary: Best raw score
+    const globalRanked = Array.from(playerAggregates.values()).sort((a, b) => {
+      if (b.total_xp !== a.total_xp) return b.total_xp - a.total_xp;
+      if (b.games_played !== a.games_played) return b.games_played - a.games_played;
       if (b.pct !== a.pct) return b.pct - a.pct;
       return b.score - a.score;
     });
 
     return NextResponse.json({
       configured: true,
-      scores: uniqueScores,
+      scores: globalRanked,
     });
   } catch (err) {
     console.error("Error fetching leaderboard:", err);
