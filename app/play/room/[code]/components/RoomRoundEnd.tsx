@@ -35,7 +35,9 @@ interface RoomRoundEndProps {
   onStartNextRound: () => void;
   onDisputeWord: (wordIndex: number) => void;
   onResolveDispute: (wordIndex: number, resolution: "concede" | "reject") => void;
-  onToggleInactive?: () => void;
+  onClaimPassedWord?: (wordIndex: number) => void;
+  onResolvePassedClaim?: (wordIndex: number, resolution: "award" | "reject") => void;
+  onToggleInactive?: (targetPlayerId?: string) => void;
   onLeaveRoom?: () => void;
 }
 
@@ -49,6 +51,8 @@ export default function RoomRoundEnd({
   onStartNextRound,
   onDisputeWord,
   onResolveDispute,
+  onClaimPassedWord,
+  onResolvePassedClaim,
   onToggleInactive,
   onLeaveRoom,
 }: RoomRoundEndProps) {
@@ -79,7 +83,9 @@ export default function RoomRoundEnd({
   const nextTeamColor =
     nextActiveTeamKey === "A" ? room.teams?.teamA?.color || "#EF4444" : room.teams?.teamB?.color || "#3B82F6";
 
-  const netPoints = scoredWords.filter((w) => w.disputeStatus !== "conceded").length;
+  const netPoints =
+    scoredWords.filter((w) => w.disputeStatus !== "conceded").length +
+    passedWords.filter((w) => w.claimStatus === "awarded").length;
 
   const isPlayerInactive = (pId: string) => {
     return Boolean(room.inactive_players?.includes(pId));
@@ -368,20 +374,115 @@ export default function RoomRoundEnd({
         )}
 
         {passedWords.length > 0 && (
-          <div className="space-y-1.5 pt-2">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)]">
-              Words Passed:
-            </span>
-            <div className="flex flex-wrap gap-2">
-              {passedWords.map((w, idx) => (
-                <span
-                  key={idx}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-medium bg-[var(--bg)] text-[var(--text-dim)] border border-[var(--border-dim)]"
-                >
-                  <FastForward className="w-3 h-3 text-[var(--text-mute)]" />
-                  {w.word}
-                </span>
-              ))}
+          <div className="space-y-2 pt-3 border-t border-[var(--border-dim)]">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)]">
+                Words Passed ({passedWords.length})
+              </span>
+              <span className="text-[10px] text-[var(--text-dim)] italic">
+                Did your team guess one before time? Claim it for opposing team confirmation.
+              </span>
+            </div>
+            <div className="space-y-2">
+              {passedWords.map((w, idx) => {
+                const isClaimPending = w.claimStatus === "claimed";
+                const isAwarded = w.claimStatus === "awarded";
+                const isClaimRejected = w.claimStatus === "rejected";
+
+                return (
+                  <div
+                    key={idx}
+                    className={`p-3 rounded-2xl border transition-all ${
+                      isAwarded
+                        ? "bg-emerald-500/10 border-emerald-500/40 shadow-xs"
+                        : isClaimPending
+                        ? "bg-amber-500/10 border-amber-500/50 shadow-xs"
+                        : "bg-[var(--bg)] border-[var(--border-dim)]"
+                    }`}
+                  >
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                      <div className="flex items-center gap-2">
+                        {isAwarded ? (
+                          <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-600 flex items-center justify-center text-xs font-bold">
+                            ✓
+                          </span>
+                        ) : (
+                          <FastForward className="w-4 h-4 text-[var(--text-mute)] flex-shrink-0" />
+                        )}
+                        <span className={`text-sm font-bold ${isAwarded ? "text-emerald-700 dark:text-emerald-300" : "text-[var(--text)]"}`}>
+                          {w.word}
+                        </span>
+                        <span className="text-[10px] text-[var(--text-mute)] uppercase tracking-wider">
+                          ({w.category})
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        {!w.claimStatus || w.claimStatus === "none" ? (
+                          isDescribingTeam ? (
+                            <button
+                              type="button"
+                              onClick={() => onClaimPassedWord?.(idx)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border border-[var(--olive)]/40 bg-[var(--olive)]/10 hover:bg-[var(--olive)]/20 text-[var(--olive)] cursor-pointer transition shadow-2xs"
+                            >
+                              <Sparkles className="w-3 h-3" /> We Got This (+1)
+                            </button>
+                          ) : (
+                            <span className="text-[10px] text-[var(--text-mute)] italic">Passed</span>
+                          )
+                        ) : isClaimPending ? (
+                          <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-500/15 px-2 py-0.5 rounded-md">
+                            <AlertTriangle className="w-3 h-3" /> Claimed by {w.claimedBy}
+                          </span>
+                        ) : isAwarded ? (
+                          <span className="text-[11px] font-bold text-emerald-600">
+                            +1 Point Awarded (Confirmed by {w.awardedBy})
+                          </span>
+                        ) : isClaimRejected ? (
+                          <span className="text-[11px] font-bold text-[var(--text-mute)] line-through">
+                            Claim Declined
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Opposing team confirmation buttons for pending claims */}
+                    {isClaimPending && isOpposingTeam && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: "auto" }}
+                        className="mt-2.5 pt-2.5 border-t border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                      >
+                        <span className="text-xs text-[var(--text-dim)]">
+                          {turnTeamName} claims they articulated &amp; guessed this. Confirm point?
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <button
+                            type="button"
+                            onClick={() => onResolvePassedClaim?.(idx, "reject")}
+                            className="px-2.5 py-1 rounded-xl text-xs font-bold bg-zinc-600/20 text-[var(--text-dim)] hover:bg-zinc-600/30 transition cursor-pointer"
+                          >
+                            Decline
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => onResolvePassedClaim?.(idx, "award")}
+                            className="px-3 py-1 rounded-xl text-xs font-bold bg-emerald-600 text-white hover:bg-emerald-500 transition cursor-pointer flex items-center gap-1 shadow-xs"
+                          >
+                            <Check className="w-3 h-3" /> Confirm (+1)
+                          </button>
+                        </div>
+                      </motion.div>
+                    )}
+
+                    {isClaimPending && isDescribingTeam && (
+                      <div className="mt-2 pt-2 border-t border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 italic">
+                        ⏳ Claim submitted. Waiting for opposing team confirmation.
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
@@ -478,6 +579,30 @@ export default function RoomRoundEnd({
                             <Mic className="w-2.5 h-2.5" /> Speaker
                           </span>
                         )}
+                        {isHost && onToggleInactive && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleInactive(pId)}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer inline-flex items-center gap-1 shadow-2xs ${
+                              inactive
+                                ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                                : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                            }`}
+                            title={inactive ? "Host Control: Mark scholar as Active" : "Host Control: Mark scholar as Away (skips speaking turn if having connection issues)"}
+                          >
+                            {inactive ? (
+                              <>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>Set Active</span>
+                              </>
+                            ) : (
+                              <>
+                                <Moon className="w-2 h-2 text-amber-500" />
+                                <span>Set Away</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                         {inactive ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/30">
                             <Moon className="w-2.5 h-2.5" /> Away
@@ -569,6 +694,30 @@ export default function RoomRoundEnd({
                             <Mic className="w-2.5 h-2.5" /> Speaker
                           </span>
                         )}
+                        {isHost && onToggleInactive && (
+                          <button
+                            type="button"
+                            onClick={() => onToggleInactive(pId)}
+                            className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer inline-flex items-center gap-1 shadow-2xs ${
+                              inactive
+                                ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                                : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                            }`}
+                            title={inactive ? "Host Control: Mark scholar as Active" : "Host Control: Mark scholar as Away (skips speaking turn if having connection issues)"}
+                          >
+                            {inactive ? (
+                              <>
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                <span>Set Active</span>
+                              </>
+                            ) : (
+                              <>
+                                <Moon className="w-2 h-2 text-amber-500" />
+                                <span>Set Away</span>
+                              </>
+                            )}
+                          </button>
+                        )}
                         {inactive ? (
                           <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/30">
                             <Moon className="w-2.5 h-2.5" /> Away
@@ -618,7 +767,7 @@ export default function RoomRoundEnd({
             {onToggleInactive && (
               <button
                 type="button"
-                onClick={onToggleInactive}
+                onClick={() => onToggleInactive()}
                 className={`px-3.5 py-2 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs ${
                   isMeInactive
                     ? "bg-emerald-600 hover:bg-emerald-500 text-white"

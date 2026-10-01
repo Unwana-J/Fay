@@ -103,6 +103,32 @@ export default function SpectatorLounge({
   const teamAPlayers = room.teams?.teamA?.playerIds || [];
   const teamBPlayers = room.teams?.teamB?.playerIds || [];
 
+  const speakerId = currentTurn?.speakerId;
+  const rawSpeakerName = currentTurn?.speakerName;
+  const resolvedSpeakerName =
+    rawSpeakerName &&
+    rawSpeakerName !== "Scholar" &&
+    rawSpeakerName !== "Learner" &&
+    !rawSpeakerName.startsWith("Scholar (")
+      ? rawSpeakerName
+      : speakerId
+      ? room.player_details?.[speakerId]?.name &&
+        room.player_details[speakerId].name !== "Scholar" &&
+        !room.player_details[speakerId].name.startsWith("Scholar (")
+        ? room.player_details[speakerId].name
+        : presencePlayers.find((p) => p.id === speakerId)?.name &&
+          presencePlayers.find((p) => p.id === speakerId)!.name !== "Scholar" &&
+          !presencePlayers.find((p) => p.id === speakerId)!.name.startsWith("Scholar (")
+        ? presencePlayers.find((p) => p.id === speakerId)!.name
+        : knownNames[speakerId]?.name &&
+          knownNames[speakerId].name !== "Scholar" &&
+          !knownNames[speakerId].name.startsWith("Scholar (")
+        ? knownNames[speakerId].name
+        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar"
+        ? room.host_name
+        : rawSpeakerName || "Active Scholar"
+      : rawSpeakerName || "Active Scholar";
+
   return (
     <div className="max-w-3xl mx-auto space-y-6 text-center py-6 px-3 sm:px-4">
       {/* ── 1. Spectator Header Strip ── */}
@@ -132,7 +158,7 @@ export default function SpectatorLounge({
               style={{ backgroundColor: activeTeamColor }}
             />
             <span className="text-xs sm:text-sm font-bold text-[var(--text)]">
-              <strong className="text-[var(--text)]">{currentTurn?.speakerName || "Active Scholar"}</strong> is articulating for{" "}
+              <strong className="text-[var(--text)]">{resolvedSpeakerName}</strong> is articulating for{" "}
               <span className="font-extrabold" style={{ color: activeTeamColor }}>
                 {activeTeamName}
               </span>

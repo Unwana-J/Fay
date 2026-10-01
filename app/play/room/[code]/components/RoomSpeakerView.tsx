@@ -22,7 +22,7 @@ export default function RoomSpeakerView({
   onPassWord,
   onEndRound,
 }: RoomSpeakerViewProps) {
-  const currentWord = room.deck[room.current_word_index];
+  const currentWord = room.deck?.[room.current_word_index];
   const currentTurn = room.current_turn;
   const isUrgent = secondsRemaining <= 15;
 

@@ -314,6 +314,23 @@ export async function POST(
       // 3. START ROUND (LOCKS ROOM)
       // -------------------------------------------------------------
       case "start_round": {
+        // Sync any knownNames sent from host's client cache into room.player_details
+        if (body.knownNames && typeof body.knownNames === "object") {
+          if (!room.player_details) room.player_details = {};
+          Object.entries(body.knownNames).forEach(([pId, info]: [string, any]) => {
+            if (info?.name && info.name !== "Scholar" && info.name !== "Learner" && !info.name.startsWith("Scholar (")) {
+              if (!room.player_details![pId] || room.player_details![pId].name === "Scholar" || room.player_details![pId].name.startsWith("Scholar (")) {
+                room.player_details![pId] = {
+                  id: pId,
+                  name: info.name,
+                  avatar: info.avatar || "/avatars/avatar-scholar.svg",
+                  isHost: pId === room.host_id,
+                };
+              }
+            }
+          });
+        }
+
         // Must have at least 1 player on both teams (or at least 1 total if solo testing)
         const totalPlayers =
           room.teams.teamA.playerIds.length + room.teams.teamB.playerIds.length;
@@ -351,11 +368,16 @@ export async function POST(
         const speakerId = teamPlayerIds[teamTurnIndex % teamPlayerIds.length] || teamPlayerIds[0];
         const speakerDetails = room.player_details?.[speakerId];
         const speakerName =
-          speakerDetails?.name && speakerDetails.name !== "Scholar" && speakerDetails.name !== "Learner"
+          speakerDetails?.name &&
+          speakerDetails.name !== "Scholar" &&
+          speakerDetails.name !== "Learner" &&
+          !speakerDetails.name.startsWith("Scholar (")
             ? speakerDetails.name
-            : speakerId === room.host_id
+            : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host"
             ? room.host_name
-            : speakerDetails?.name || `Scholar (${speakerId.replace(/^guest-/, "").slice(0, 5)})`;
+            : speakerDetails?.name && speakerDetails.name !== "Scholar"
+            ? speakerDetails.name
+            : `Scholar (${speakerId.replace(/^guest-/, "").slice(0, 5)})`;
 
         // Ensure deck has enough words with deduplication
         if (room.current_word_index >= room.deck.length - 15) {
@@ -464,6 +486,55 @@ export async function POST(
         } else if (resolution === "reject") {
           // Describing team contests the dispute: point remains intact
           wordEntry.disputeStatus = "rejected";
+        }
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 4d. CLAIM PASSED WORD (Maker: Describing team claims an unmarked passed word)
+      // -------------------------------------------------------------
+      case "claim_passed_word": {
+        const { wordIndex, claimantName } = body;
+        if (typeof wordIndex !== "number" || !room.round_words_passed[wordIndex]) {
+          return NextResponse.json({ error: "Invalid passed word index" }, { status: 400 });
+        }
+
+        const passedEntry = room.round_words_passed[wordIndex];
+        passedEntry.claimStatus = "claimed";
+        passedEntry.claimedBy = String(claimantName || "Describing Team");
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 4e. RESOLVE PASSED CLAIM (Checker: Opponent confirms or declines)
+      // -------------------------------------------------------------
+      case "resolve_passed_claim": {
+        const { wordIndex, resolverName, resolution } = body;
+        if (typeof wordIndex !== "number" || !room.round_words_passed[wordIndex]) {
+          return NextResponse.json({ error: "Invalid passed word index" }, { status: 400 });
+        }
+
+        const passedEntry = room.round_words_passed[wordIndex];
+        if (resolution === "award") {
+          if (passedEntry.claimStatus !== "awarded") {
+            passedEntry.claimStatus = "awarded";
+            passedEntry.awardedBy = String(resolverName || "Opposing Team");
+
+            const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
+            room.teams[turnTeam].score += 1;
+
+            if (room.teams[turnTeam].score >= room.settings.scoreGoal) {
+              room.status = "game_over";
+              room.locked = false;
+            }
+          }
+        } else if (resolution === "reject") {
+          passedEntry.claimStatus = "rejected";
+          passedEntry.rejectedBy = String(resolverName || "Opposing Team");
         }
 
         await persistRoom(room);
@@ -595,17 +666,27 @@ export async function POST(
       }
 
       // -------------------------------------------------------------
-      // 9. TOGGLE INACTIVE / AFK
+      // 9. TOGGLE INACTIVE / AFK (Host or Self)
       // -------------------------------------------------------------
       case "toggle_inactive": {
-        const id = String(playerId);
+        const actingHostId = body.hostId ? String(body.hostId) : null;
+        const targetId = String(body.targetPlayerId || playerId);
+
+        // If someone other than the player themselves is toggling, verify they are the host
+        if (actingHostId && actingHostId !== targetId && room.host_id !== actingHostId) {
+          return NextResponse.json(
+            { error: "Only the host or the player can toggle away status" },
+            { status: 403 }
+          );
+        }
+
         if (!room.inactive_players) room.inactive_players = [];
 
-        const isCurrentlyInactive = room.inactive_players.includes(id);
+        const isCurrentlyInactive = room.inactive_players.includes(targetId);
         if (isCurrentlyInactive) {
-          room.inactive_players = room.inactive_players.filter((p) => p !== id);
+          room.inactive_players = room.inactive_players.filter((p) => p !== targetId);
         } else {
-          room.inactive_players.push(id);
+          room.inactive_players.push(targetId);
         }
 
         await persistRoom(room);
@@ -679,6 +760,10 @@ export async function POST(
 
         if (room.host_id === id) {
           room.host_name = newName;
+        }
+
+        if (room.current_turn && room.current_turn.speakerId === id) {
+          room.current_turn.speakerName = newName;
         }
 
         await persistRoom(room);

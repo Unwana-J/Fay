@@ -43,6 +43,15 @@ export interface ScoredWordEntry extends GameWord {
   concededBy?: string; // Describing team member who confirmed it
 }
 
+export type PassedWordClaimStatus = "none" | "claimed" | "awarded" | "rejected";
+
+export interface PassedWordEntry extends GameWord {
+  claimStatus?: PassedWordClaimStatus;
+  claimedBy?: string; // Describing team member who claimed it
+  awardedBy?: string; // Opponent who confirmed and awarded it
+  rejectedBy?: string; // Opponent who rejected it
+}
+
 export interface ArticulateRoom {
   id?: string;
   room_code: string;
@@ -59,7 +68,7 @@ export interface ArticulateRoom {
   deck: GameWord[];
   current_word_index: number;
   round_words_scored: ScoredWordEntry[];
-  round_words_passed: GameWord[];
+  round_words_passed: PassedWordEntry[];
   active_players: string[]; // Player IDs locked in for active round
   spectators: string[]; // Player IDs waiting in spectator lounge
   inactive_players?: string[]; // Player IDs toggled AFK / Inactive

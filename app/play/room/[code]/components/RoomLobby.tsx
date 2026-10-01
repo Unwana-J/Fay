@@ -15,7 +15,7 @@ interface RoomLobbyProps {
   onSwitchTeam: (targetTeam: "A" | "B") => void;
   onShuffleTeams?: () => void;
   onUpdateSettings?: (settings: { timerSeconds?: number; scoreGoal?: number }) => void;
-  onToggleInactive?: () => void;
+  onToggleInactive?: (targetPlayerId?: string) => void;
   onLeaveRoom?: () => void;
   onEditName?: () => void;
 }
@@ -325,6 +325,30 @@ export default function RoomLobby({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {isHost && onToggleInactive && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleInactive(pId)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition cursor-pointer flex items-center gap-1 shadow-2xs ${
+                            inactive
+                              ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                              : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                          }`}
+                          title={inactive ? "Host Control: Mark scholar as Active" : "Host Control: Mark scholar as Away (skips speaking turn if having connection issues)"}
+                        >
+                          {inactive ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span>Set Active</span>
+                            </>
+                          ) : (
+                            <>
+                              <Moon className="w-2.5 h-2.5 text-amber-500" />
+                              <span>Mark Away</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                       {inactive ? (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 font-medium border border-amber-500/30">
                           <Moon className="w-2.5 h-2.5" /> Away
@@ -419,6 +443,30 @@ export default function RoomLobby({
                       )}
                     </div>
                     <div className="flex items-center gap-1.5">
+                      {isHost && onToggleInactive && (
+                        <button
+                          type="button"
+                          onClick={() => onToggleInactive(pId)}
+                          className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition cursor-pointer flex items-center gap-1 shadow-2xs ${
+                            inactive
+                              ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
+                              : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30"
+                          }`}
+                          title={inactive ? "Host Control: Mark scholar as Active" : "Host Control: Mark scholar as Away (skips speaking turn if having connection issues)"}
+                        >
+                          {inactive ? (
+                            <>
+                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              <span>Set Active</span>
+                            </>
+                          ) : (
+                            <>
+                              <Moon className="w-2.5 h-2.5 text-amber-500" />
+                              <span>Mark Away</span>
+                            </>
+                          )}
+                        </button>
+                      )}
                       {inactive ? (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 font-medium border border-amber-500/30">
                           <Moon className="w-2.5 h-2.5" /> Away

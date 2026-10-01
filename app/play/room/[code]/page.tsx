@@ -12,6 +12,7 @@ import RoomRoundEnd from "./components/RoomRoundEnd";
 import RoomGameOver from "./components/RoomGameOver";
 import PlayerIdentityModal from "./components/PlayerIdentityModal";
 import RoundCountdownOverlay from "./components/RoundCountdownOverlay";
+import RoomErrorBoundary from "./components/RoomErrorBoundary";
 import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2, Edit2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -479,13 +480,18 @@ export default function ArticulateRoomPage({
       // Check pre-round 3-second countdown
       if (now < countdownEndsAt) {
         const remainingCountdown = Math.max(1, Math.ceil((countdownEndsAt - now) / 1000));
-        setCountdownRemaining(remainingCountdown);
-        setSecondsRemaining(duration);
-        return;
+        // If countdown duration exceeds 4s due to client-server clock drift, force start round immediately
+        if (remainingCountdown > 4) {
+          setCountdownRemaining(null);
+        } else {
+          setCountdownRemaining(remainingCountdown);
+          setSecondsRemaining(duration);
+          return;
+        }
       }
 
       // Flash "GO!" for 450ms after countdown finishes
-      if (now < countdownEndsAt + 450) {
+      if (now >= countdownEndsAt && now < countdownEndsAt + 450) {
         setCountdownRemaining(0);
         setSecondsRemaining(duration);
         return;
@@ -531,6 +537,7 @@ export default function ArticulateRoomPage({
     dispatchAction({
       action: "start_round",
       hostId: myPlayerId,
+      knownNames,
     });
   };
 
@@ -609,7 +616,7 @@ export default function ArticulateRoomPage({
       action: "dispute_word",
       wordIndex,
       opponentId: myPlayerId,
-      opponentName: myPlayerName,
+      opponentName: effectivePlayerName,
     });
   };
 
@@ -618,15 +625,36 @@ export default function ArticulateRoomPage({
       action: "resolve_dispute",
       wordIndex,
       resolverId: myPlayerId,
-      resolverName: myPlayerName,
+      resolverName: effectivePlayerName,
       resolution,
     });
   };
 
-  const handleToggleInactive = () => {
+  const handleClaimPassedWord = (wordIndex: number) => {
+    dispatchAction({
+      action: "claim_passed_word",
+      wordIndex,
+      claimantId: myPlayerId,
+      claimantName: effectivePlayerName,
+    });
+  };
+
+  const handleResolvePassedClaim = (wordIndex: number, resolution: "award" | "reject") => {
+    dispatchAction({
+      action: "resolve_passed_claim",
+      wordIndex,
+      resolverId: myPlayerId,
+      resolverName: effectivePlayerName,
+      resolution,
+    });
+  };
+
+  const handleToggleInactive = (targetPlayerId?: string) => {
     dispatchAction({
       action: "toggle_inactive",
-      playerId: myPlayerId,
+      playerId: targetPlayerId || myPlayerId,
+      targetPlayerId: targetPlayerId || myPlayerId,
+      hostId: myPlayerId,
     });
   };
 
@@ -725,6 +753,32 @@ export default function ArticulateRoomPage({
   const showSpectatorLounge =
     isPlaying && !isSpeaker && !isInMatch && (isSpectator || room.locked);
 
+  const speakerId = room.current_turn?.speakerId;
+  const rawSpeakerName = room.current_turn?.speakerName;
+  const activeSpeakerName =
+    rawSpeakerName &&
+    rawSpeakerName !== "Scholar" &&
+    rawSpeakerName !== "Learner" &&
+    !rawSpeakerName.startsWith("Scholar (")
+      ? rawSpeakerName
+      : speakerId
+      ? room.player_details?.[speakerId]?.name &&
+        room.player_details[speakerId].name !== "Scholar" &&
+        !room.player_details[speakerId].name.startsWith("Scholar (")
+        ? room.player_details[speakerId].name
+        : presencePlayers?.find((p) => p.id === speakerId)?.name &&
+          presencePlayers.find((p) => p.id === speakerId)!.name !== "Scholar" &&
+          !presencePlayers.find((p) => p.id === speakerId)!.name.startsWith("Scholar (")
+        ? presencePlayers.find((p) => p.id === speakerId)!.name
+        : knownNames?.[speakerId]?.name &&
+          knownNames[speakerId].name !== "Scholar" &&
+          !knownNames[speakerId].name.startsWith("Scholar (")
+        ? knownNames[speakerId].name
+        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar"
+        ? room.host_name
+        : rawSpeakerName || "Scholar"
+      : rawSpeakerName || "Scholar";
+
   return (
     <div className="min-h-screen p-4 sm:p-8 max-w-4xl mx-auto flex flex-col justify-center relative overflow-hidden">
       {/* Floating Animated Reactions */}
@@ -760,7 +814,7 @@ export default function ArticulateRoomPage({
             <>
               <button
                 type="button"
-                onClick={handleToggleInactive}
+                onClick={() => handleToggleInactive()}
                 className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border ${
                   isMeInactive
                     ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
@@ -815,123 +869,130 @@ export default function ArticulateRoomPage({
       </div>
 
       {/* Dynamic View Router */}
-      <AnimatePresence mode="wait">
-        {showSpectatorLounge ? (
-          <motion.div
-            key="spectator"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-          >
-            <SpectatorLounge
-              room={room}
-              secondsRemaining={secondsRemaining}
-              myPlayerId={myPlayerId}
-              onSendReaction={handleSendReaction}
-              presencePlayers={presencePlayers}
-              knownNames={knownNames}
-            />
-          </motion.div>
-        ) : room.status === "lobby" ? (
-          <motion.div
-            key="lobby"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-          >
-            <RoomLobby
-              room={room}
-              myPlayerId={myPlayerId}
-              isHost={isHost}
-              presencePlayers={presencePlayers}
-              knownNames={knownNames}
-              onStartRound={handleStartRound}
-              onSwitchTeam={handleSwitchTeam}
-              onShuffleTeams={handleShuffleTeams}
-              onUpdateSettings={handleUpdateSettings}
-              onToggleInactive={handleToggleInactive}
-              onLeaveRoom={handleLeaveRoom}
-              onEditName={() => {
-                setIdentityModalMode("edit");
-                setShowIdentityModal(true);
-              }}
-            />
-          </motion.div>
-        ) : room.status === "playing" ? (
-          isSpeaker ? (
+      <RoomErrorBoundary onReset={() => fetchRoomState()}>
+        <AnimatePresence mode="popLayout">
+          {showSpectatorLounge ? (
             <motion.div
-              key="speaker"
+              key="spectator"
               initial={{ opacity: 0, y: 15 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -15 }}
             >
-              <RoomSpeakerView
-                room={room}
-                secondsRemaining={secondsRemaining}
-                onScoreWord={handleScoreWord}
-                onPassWord={handlePassWord}
-                onEndRound={handleEndRound}
-              />
-            </motion.div>
-          ) : (
-            <motion.div
-              key="guesser"
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -15 }}
-            >
-              <RoomGuesserView
+              <SpectatorLounge
                 room={room}
                 secondsRemaining={secondsRemaining}
                 myPlayerId={myPlayerId}
-                myTeam={myTeam}
                 onSendReaction={handleSendReaction}
+                presencePlayers={presencePlayers}
+                knownNames={knownNames}
               />
             </motion.div>
-          )
-        ) : room.status === "round_end" ? (
-          <motion.div
-            key="round_end"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-          >
-            <RoomRoundEnd
-              room={room}
-              myPlayerId={myPlayerId}
-              myPlayerName={effectivePlayerName}
-              isHost={isHost}
-              presencePlayers={presencePlayers}
-              knownNames={knownNames}
-              onStartNextRound={handleStartRound}
-              onDisputeWord={handleDisputeWord}
-              onResolveDispute={handleResolveDispute}
-              onToggleInactive={handleToggleInactive}
-              onLeaveRoom={handleLeaveRoom}
-            />
-          </motion.div>
-        ) : room.status === "game_over" ? (
-          <motion.div
-            key="game_over"
-            initial={{ opacity: 0, y: 15 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -15 }}
-          >
-            <RoomGameOver
-              room={room}
-              isHost={isHost}
-              onResetGame={handleResetGame}
-            />
-          </motion.div>
-        ) : (
-          <div className="surface rounded-3xl p-8 border border-[var(--border-dim)] text-center space-y-3 my-auto">
-            <Loader2 className="w-6 h-6 animate-spin text-[var(--olive)] mx-auto" />
-            <p className="text-sm font-space font-bold text-[var(--text-dim)]">
-              Synchronizing game room...
-            </p>
-          </div>
-        )}
-      </AnimatePresence>
+          ) : room.status === "lobby" ? (
+            <motion.div
+              key="lobby"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <RoomLobby
+                room={room}
+                myPlayerId={myPlayerId}
+                isHost={isHost}
+                presencePlayers={presencePlayers}
+                knownNames={knownNames}
+                onStartRound={handleStartRound}
+                onSwitchTeam={handleSwitchTeam}
+                onShuffleTeams={handleShuffleTeams}
+                onUpdateSettings={handleUpdateSettings}
+                onToggleInactive={handleToggleInactive}
+                onLeaveRoom={handleLeaveRoom}
+                onEditName={() => {
+                  setIdentityModalMode("edit");
+                  setShowIdentityModal(true);
+                }}
+              />
+            </motion.div>
+          ) : room.status === "playing" ? (
+            isSpeaker ? (
+              <motion.div
+                key="speaker"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+              >
+                <RoomSpeakerView
+                  room={room}
+                  secondsRemaining={secondsRemaining}
+                  onScoreWord={handleScoreWord}
+                  onPassWord={handlePassWord}
+                  onEndRound={handleEndRound}
+                />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="guesser"
+                initial={{ opacity: 0, y: 15 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -15 }}
+              >
+                <RoomGuesserView
+                  room={room}
+                  secondsRemaining={secondsRemaining}
+                  myPlayerId={myPlayerId}
+                  myTeam={myTeam}
+                  onSendReaction={handleSendReaction}
+                  speakerName={activeSpeakerName}
+                  presencePlayers={presencePlayers}
+                  knownNames={knownNames}
+                />
+              </motion.div>
+            )
+          ) : room.status === "round_end" ? (
+            <motion.div
+              key="round_end"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <RoomRoundEnd
+                room={room}
+                myPlayerId={myPlayerId}
+                myPlayerName={effectivePlayerName}
+                isHost={isHost}
+                presencePlayers={presencePlayers}
+                knownNames={knownNames}
+                onStartNextRound={handleStartRound}
+                onDisputeWord={handleDisputeWord}
+                onResolveDispute={handleResolveDispute}
+                onClaimPassedWord={handleClaimPassedWord}
+                onResolvePassedClaim={handleResolvePassedClaim}
+                onToggleInactive={handleToggleInactive}
+                onLeaveRoom={handleLeaveRoom}
+              />
+            </motion.div>
+          ) : room.status === "game_over" ? (
+            <motion.div
+              key="game_over"
+              initial={{ opacity: 0, y: 15 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -15 }}
+            >
+              <RoomGameOver
+                room={room}
+                isHost={isHost}
+                onResetGame={handleResetGame}
+              />
+            </motion.div>
+          ) : (
+            <div className="surface rounded-3xl p-8 border border-[var(--border-dim)] text-center space-y-3 my-auto">
+              <Loader2 className="w-6 h-6 animate-spin text-[var(--olive)] mx-auto" />
+              <p className="text-sm font-space font-bold text-[var(--text-dim)]">
+                Synchronizing game room...
+              </p>
+            </div>
+          )}
+        </AnimatePresence>
+      </RoomErrorBoundary>
 
       {/* Player Identity Name Gate & In-Match Rename Modal */}
       <PlayerIdentityModal
@@ -955,7 +1016,7 @@ export default function ArticulateRoomPage({
           <RoundCountdownOverlay
             count={countdownRemaining}
             roundNumber={room.current_turn.roundNumber}
-            speakerName={room.current_turn.speakerName}
+            speakerName={activeSpeakerName}
             activeTeamName={
               room.current_turn.activeTeam === "B"
                 ? room.teams.teamB.name
@@ -969,6 +1030,7 @@ export default function ArticulateRoomPage({
             isSpeaker={isSpeaker}
             myTeam={myTeam}
             activeTeam={room.current_turn.activeTeam}
+            onDismiss={() => setCountdownRemaining(null)}
           />
         )}
       </AnimatePresence>

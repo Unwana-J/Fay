@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArticulateRoom } from "@/lib/articulate-room";
+import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
 import { CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
 import BoardMap from "@/app/play/BoardMap";
 import { Clock, ChevronDown, ChevronUp } from "lucide-react";
@@ -13,6 +13,9 @@ interface RoomGuesserViewProps {
   myPlayerId: string;
   myTeam?: "A" | "B" | null;
   onSendReaction: (emoji: string) => void;
+  speakerName?: string;
+  presencePlayers?: RoomPlayer[];
+  knownNames?: Record<string, { name: string; avatar: string }>;
 }
 
 export default function RoomGuesserView({
@@ -21,11 +24,40 @@ export default function RoomGuesserView({
   myPlayerId,
   myTeam,
   onSendReaction,
+  speakerName,
+  presencePlayers = [],
+  knownNames = {},
 }: RoomGuesserViewProps) {
   const [showBoard, setShowBoard] = useState(false);
   const currentTurn = room.current_turn;
-  const currentWord = room.deck[room.current_word_index];
+  const currentWord = room.deck?.[room.current_word_index];
   const isUrgent = secondsRemaining <= 15;
+
+  const speakerId = currentTurn?.speakerId;
+  const rawSpeakerName = speakerName || currentTurn?.speakerName;
+  const resolvedSpeakerName =
+    rawSpeakerName &&
+    rawSpeakerName !== "Scholar" &&
+    rawSpeakerName !== "Learner" &&
+    !rawSpeakerName.startsWith("Scholar (")
+      ? rawSpeakerName
+      : speakerId
+      ? room.player_details?.[speakerId]?.name &&
+        room.player_details[speakerId].name !== "Scholar" &&
+        !room.player_details[speakerId].name.startsWith("Scholar (")
+        ? room.player_details[speakerId].name
+        : presencePlayers?.find((p) => p.id === speakerId)?.name &&
+          presencePlayers.find((p) => p.id === speakerId)!.name !== "Scholar" &&
+          !presencePlayers.find((p) => p.id === speakerId)!.name.startsWith("Scholar (")
+        ? presencePlayers.find((p) => p.id === speakerId)!.name
+        : knownNames?.[speakerId]?.name &&
+          knownNames[speakerId].name !== "Scholar" &&
+          !knownNames[speakerId].name.startsWith("Scholar (")
+        ? knownNames[speakerId].name
+        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar"
+        ? room.host_name
+        : rawSpeakerName || "Scholar"
+      : rawSpeakerName || "Scholar";
 
   const isMyTeam =
     myTeam
@@ -50,7 +82,7 @@ export default function RoomGuesserView({
       <div className="flex items-center justify-between px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-bold">
         <div className="flex items-center gap-2">
           <span className="w-2.5 h-2.5 rounded-full animate-ping" style={{ backgroundColor: activeTeamColor }} />
-          <span>{currentTurn?.speakerName} describing for <strong style={{ color: activeTeamColor }}>{activeTeamName}</strong></span>
+          <span>{resolvedSpeakerName} describing for <strong style={{ color: activeTeamColor }}>{activeTeamName}</strong></span>
         </div>
         <span className="text-[11px] text-[var(--olive)] uppercase tracking-wider font-extrabold">
           {isMyTeam ? "🎯 Guess!" : "👀 Watch"}

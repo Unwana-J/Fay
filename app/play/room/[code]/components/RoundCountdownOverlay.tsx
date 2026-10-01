@@ -13,6 +13,7 @@ interface RoundCountdownOverlayProps {
   isSpeaker: boolean;
   myTeam?: "A" | "B" | null;
   activeTeam: "A" | "B";
+  onDismiss?: () => void;
 }
 
 function playBeep(frequency: number, duration = 0.12) {
@@ -48,6 +49,7 @@ export default function RoundCountdownOverlay({
   isSpeaker,
   myTeam,
   activeTeam,
+  onDismiss,
 }: RoundCountdownOverlayProps) {
   const lastSoundCountRef = useRef<number | null>(null);
   const isTeammate = myTeam === activeTeam && !isSpeaker;
@@ -63,6 +65,14 @@ export default function RoundCountdownOverlay({
     else if (count <= 0) playBeep(880, 0.22);
   }, [count]);
 
+  // Safety: Guarantee overlay never stays stuck on screen for more than 4s under any circumstance
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      onDismiss?.();
+    }, 3800);
+    return () => clearTimeout(timer);
+  }, [onDismiss]);
+
   const displayCount = count > 0 ? count : "GO!";
 
   return (
@@ -70,8 +80,10 @@ export default function RoundCountdownOverlay({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.25 }}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black/75 backdrop-blur-md select-none"
+      transition={{ duration: 0.2 }}
+      onClick={() => onDismiss?.()}
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none cursor-pointer"
+      title="Tap anywhere to skip countdown"
     >
       <div className="max-w-md w-full mx-auto flex flex-col items-center text-center space-y-6">
         {/* Round & Team Header */}
@@ -168,9 +180,9 @@ export default function RoundCountdownOverlay({
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.15 }}
-          className="text-[11px] text-white/50 tracking-wider font-semibold uppercase"
+          className="text-[11px] text-white/60 tracking-wider font-semibold uppercase flex items-center justify-center gap-1.5"
         >
-          Round begins in seconds
+          <span>Tap anywhere to jump straight into round</span>
         </motion.div>
       </div>
     </motion.div>
