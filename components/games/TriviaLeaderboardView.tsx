@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowLeft } from "lucide-react";
+import { ChevronRight, ArrowLeft, ChevronDown, ChevronUp, User } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { getTriviaLeaderboard, type CloudTriviaScore } from "@/lib/trivia-leaderboard";
 import {
@@ -30,6 +30,36 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
   const [challenges, setChallenges] = useState<TriviaChallenge[]>([]);
   const [selectedChallenge, setSelectedChallenge] = useState<TriviaChallenge | null>(null);
   const [challengeScores, setChallengeScores] = useState<ChallengeParticipantScore[]>([]);
+
+  const INITIAL_LIMIT = 10;
+  const [isExpandedGlobal, setIsExpandedGlobal] = useState(false);
+  const [isExpandedChallenge, setIsExpandedChallenge] = useState(false);
+  const [highlightGlobalUserId, setHighlightGlobalUserId] = useState<string | null>(null);
+  const [highlightChallengeId, setHighlightChallengeId] = useState<string | null>(null);
+
+  function handleJumpToUserGlobal() {
+    setIsExpandedGlobal(true);
+    setTimeout(() => {
+      const el = document.getElementById("global-user-row");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightGlobalUserId("user-current");
+        setTimeout(() => setHighlightGlobalUserId(null), 2500);
+      }
+    }, 120);
+  }
+
+  function handleJumpToUserChallenge() {
+    setIsExpandedChallenge(true);
+    setTimeout(() => {
+      const el = document.getElementById("challenge-board-user-row");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightChallengeId(profile?.username || "current-user");
+        setTimeout(() => setHighlightChallengeId(null), 2500);
+      }
+    }, 120);
+  }
 
   function fetchLeaderboard() {
     setIsLoading(true);
@@ -265,88 +295,203 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
         ) : (
           <div className="surface rounded-2xl border overflow-hidden divide-y shadow-xs" style={{ borderColor: "var(--border-dim)" }}>
             {/* Table Column Headers */}
-            <div className="px-4 py-2 bg-[var(--bg-input)]/40 flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--text-mute)]">
-              <span>Scholar &amp; Title</span>
-              <div className="flex items-center gap-4 sm:gap-6 text-right">
-                <span className="w-20">Accumulated XP</span>
-                <span className="w-16">High Run</span>
+            <div className="px-4 py-2.5 bg-[var(--bg-input)]/40 flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--text-mute)] border-b border-[var(--border-dim)]">
+              <div className="flex items-center gap-2">
+                <span>Scholar &amp; Title</span>
+                {entries.length > INITIAL_LIMIT && (
+                  <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] font-mono font-normal">
+                    {isExpandedGlobal ? `All ${entries.length}` : `Top 10 of ${entries.length}`}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-3">
+                {userRank > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleJumpToUserGlobal}
+                    className="text-[10px] normal-case font-space font-bold px-2.5 py-0.5 rounded-full bg-[var(--olive)]/15 text-[#008751] hover:bg-[var(--olive)]/25 transition-colors cursor-pointer flex items-center gap-1 border border-[var(--olive)]/30"
+                    title="Jump directly to your rank"
+                  >
+                    <User size={10} />
+                    <span>View You (#{userRank})</span>
+                  </button>
+                )}
+                <div className="flex items-center gap-4 sm:gap-6 text-right">
+                  <span className="w-20">Accumulated XP</span>
+                  <span className="w-16">High Run</span>
+                </div>
               </div>
             </div>
 
-            {entries.map((entry, idx) => (
-              <motion.div
-                key={entry.id}
-                initial={{ opacity: 0, x: -6 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: idx * 0.03 }}
-                className={cn(
-                  "p-4 flex items-center justify-between gap-3 transition-colors",
-                  entry.isUser
-                    ? "bg-[var(--olive)]/5"
-                    : "hover:bg-[var(--bg-input)]/50"
-                )}
-                style={{
-                  borderLeft: entry.isUser
-                    ? "4px solid var(--olive)"
-                    : "4px solid transparent",
-                }}
-              >
-                {/* Left: Rank & Avatar & Identity */}
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="w-8 text-center shrink-0">
-                    {entry.rank === 1 ? (
-                      <span className="text-xl">🥇</span>
-                    ) : entry.rank === 2 ? (
-                      <span className="text-xl">🥈</span>
-                    ) : entry.rank === 3 ? (
-                      <span className="text-xl">🥉</span>
-                    ) : (
-                      <span className="font-space font-bold text-xs text-[var(--text-mute)]">
-                        #{entry.rank}
-                      </span>
-                    )}
-                  </div>
+            {/* Render Top 10 (or all when expanded) */}
+            {(isExpandedGlobal ? entries : entries.slice(0, INITIAL_LIMIT)).map((entry, idx) => {
+              const isHighlighted = highlightGlobalUserId === "user-current" && entry.isUser;
 
-                  <UserAvatar avatar={entry.avatar} size="md" />
-
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                        {entry.name}
-                      </span>
-                      {entry.isUser && (
-                        <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
-                          You
+              return (
+                <motion.div
+                  key={entry.id}
+                  id={entry.isUser ? "global-user-row" : undefined}
+                  initial={{ opacity: 0, x: -6 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: Math.min(idx * 0.02, 0.3) }}
+                  className={cn(
+                    "p-4 flex items-center justify-between gap-3 transition-all",
+                    entry.isUser
+                      ? "bg-[var(--olive)]/5"
+                      : "hover:bg-[var(--bg-input)]/50",
+                    isHighlighted && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
+                  )}
+                  style={{
+                    borderLeft: entry.isUser
+                      ? "4px solid var(--olive)"
+                      : "4px solid transparent",
+                  }}
+                >
+                  {/* Left: Rank & Avatar & Identity */}
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 text-center shrink-0">
+                      {entry.rank === 1 ? (
+                        <span className="text-xl">🥇</span>
+                      ) : entry.rank === 2 ? (
+                        <span className="text-xl">🥈</span>
+                      ) : entry.rank === 3 ? (
+                        <span className="text-xl">🥉</span>
+                      ) : (
+                        <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+                          #{entry.rank}
                         </span>
                       )}
                     </div>
-                    <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
-                      {entry.title}
+
+                    <UserAvatar avatar={entry.avatar} size="md" />
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
+                          {entry.name}
+                        </span>
+                        {entry.isUser && (
+                          <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
+                            You
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
+                        {entry.title}
+                      </div>
                     </div>
                   </div>
+
+                  {/* Right: Scores (XP First, Accuracy Second) */}
+                  <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
+                    <div className="w-20">
+                      <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-0.5">
+                        ⚡ {entry.triviaXP}
+                      </div>
+                      <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                        {entry.gamesPlayed} {entry.gamesPlayed === 1 ? "game" : "games"}
+                      </div>
+                    </div>
+                    <div className="w-16">
+                      <div className="font-space font-extrabold text-sm sm:text-base" style={{ color: "var(--text)" }}>
+                        {entry.bestPct}%
+                      </div>
+                      <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                        {entry.bestScore}/{entry.bestTotal} high
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+
+            {/* If collapsed and user is outside Top 10, pin user standing preview */}
+            {!isExpandedGlobal && userRank > INITIAL_LIMIT && (
+              <>
+                <div className="px-4 py-2 bg-[var(--bg-input)]/40 text-center text-[10px] font-mono text-[var(--text-dim)] flex items-center justify-center gap-3">
+                  <div className="h-px bg-[var(--border-dim)] flex-1" />
+                  <span>
+                    ··· {userRank - INITIAL_LIMIT - 1 > 0 ? `${userRank - INITIAL_LIMIT - 1} more scholars · ` : ""}your rank (#{userRank}) ···
+                  </span>
+                  <div className="h-px bg-[var(--border-dim)] flex-1" />
                 </div>
 
-                {/* Right: Scores (XP First, Accuracy Second) */}
-                <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
-                  <div className="w-20">
-                    <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-0.5">
-                      ⚡ {entry.triviaXP}
+                <div
+                  id="global-user-row"
+                  className={cn(
+                    "p-4 flex items-center justify-between gap-3 bg-[var(--olive)]/5 transition-all",
+                    highlightGlobalUserId === "user-current" && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
+                  )}
+                  style={{
+                    borderLeft: "4px solid var(--olive)",
+                  }}
+                >
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="w-8 text-center shrink-0">
+                      <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+                        #{userRank}
+                      </span>
                     </div>
-                    <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                      {entry.gamesPlayed} {entry.gamesPlayed === 1 ? "game" : "games"}
+
+                    <UserAvatar avatar={userEntry.avatar} size="md" />
+
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
+                          {userEntry.name}
+                        </span>
+                        <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
+                          You
+                        </span>
+                      </div>
+                      <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
+                        {userEntry.title}
+                      </div>
                     </div>
                   </div>
-                  <div className="w-16">
-                    <div className="font-space font-extrabold text-sm sm:text-base" style={{ color: "var(--text)" }}>
-                      {entry.bestPct}%
+
+                  <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
+                    <div className="w-20">
+                      <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-0.5">
+                        ⚡ {userEntry.triviaXP}
+                      </div>
+                      <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                        {userEntry.gamesPlayed} {userEntry.gamesPlayed === 1 ? "game" : "games"}
+                      </div>
                     </div>
-                    <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                      {entry.bestScore}/{entry.bestTotal} high
+                    <div className="w-16">
+                      <div className="font-space font-extrabold text-sm sm:text-base" style={{ color: "var(--text)" }}>
+                        {userEntry.bestPct}%
+                      </div>
+                      <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                        {userEntry.bestScore}/{userEntry.bestTotal} high
+                      </div>
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            ))}
+              </>
+            )}
+
+            {/* View More / Show Top 10 Toggle */}
+            {entries.length > INITIAL_LIMIT && (
+              <button
+                type="button"
+                onClick={() => setIsExpandedGlobal((prev) => !prev)}
+                className="w-full py-3 px-4 bg-[var(--bg-card)]/40 hover:bg-[var(--bg-input)] text-xs font-space font-bold text-[var(--text)] flex items-center justify-center gap-2 cursor-pointer transition-colors border-t border-[var(--border-dim)]"
+              >
+                {isExpandedGlobal ? (
+                  <>
+                    <ChevronUp size={14} />
+                    <span>Show Top 10 Only</span>
+                  </>
+                ) : (
+                  <>
+                    <ChevronDown size={14} />
+                    <span>View More ({entries.length - INITIAL_LIMIT} more scholars)</span>
+                  </>
+                )}
+              </button>
+            )}
           </div>
         )
       )}
@@ -407,81 +552,205 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
             </div>
 
             {/* Standings Table Styled exactly like Global Leaderboard */}
-            <div className="surface rounded-2xl border overflow-hidden divide-y shadow-xs" style={{ borderColor: "var(--border-dim)" }}>
-              {challengeScores.length === 0 ? (
-                <div className="p-8 text-center space-y-2">
-                  <p className="text-xs font-serif italic text-[var(--text-dim)]">
-                    No scholars have completed this challenge yet.
-                  </p>
-                </div>
-              ) : (
-                challengeScores.map((s, idx) => {
-                  const isUser = Boolean(
-                    (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
-                    (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
-                  );
-                  const displayName = isUser && profile?.username ? profile.username : s.username;
+            {(() => {
+              const challengeUserIdx = challengeScores.findIndex((s) =>
+                Boolean(
+                  (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
+                  (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
+                )
+              );
+              const visibleChallengeScores = isExpandedChallenge ? challengeScores : challengeScores.slice(0, INITIAL_LIMIT);
+              const showChallengeUserSeparately = !isExpandedChallenge && challengeUserIdx >= INITIAL_LIMIT;
+              const userChallengeScore = challengeUserIdx >= 0 ? challengeScores[challengeUserIdx] : null;
 
-                  return (
-                    <div
-                      key={s.id || s.username || idx}
-                      className={cn(
-                        "p-4 flex items-center justify-between gap-3 transition-colors",
-                        isUser ? "bg-[var(--olive)]/5" : "hover:bg-[var(--bg-input)]/50"
-                      )}
-                      style={{
-                        borderLeft: isUser ? "4px solid var(--olive)" : "4px solid transparent",
-                      }}
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-8 text-center shrink-0">
-                          {idx === 0 ? (
-                            <span className="text-xl">🥇</span>
-                          ) : idx === 1 ? (
-                            <span className="text-xl">🥈</span>
-                          ) : idx === 2 ? (
-                            <span className="text-xl">🥉</span>
-                          ) : (
-                            <span className="font-space font-bold text-xs text-[var(--text-mute)]">
-                              #{idx + 1}
-                            </span>
+              return (
+                <div className="surface rounded-2xl border overflow-hidden divide-y shadow-xs" style={{ borderColor: "var(--border-dim)" }}>
+                  {challengeScores.length > 0 && (
+                    <div className="px-4 py-2.5 bg-[var(--bg-input)]/40 flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--text-mute)] border-b border-[var(--border-dim)]">
+                      <div className="flex items-center gap-2">
+                        <span>Contender &amp; Rank</span>
+                        {challengeScores.length > INITIAL_LIMIT && (
+                          <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] font-mono font-normal">
+                            {isExpandedChallenge ? `All ${challengeScores.length}` : `Top 10 of ${challengeScores.length}`}
+                          </span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {challengeUserIdx >= 0 && (
+                          <button
+                            type="button"
+                            onClick={handleJumpToUserChallenge}
+                            className="text-[10px] normal-case font-space font-bold px-2.5 py-0.5 rounded-full bg-[var(--olive)]/15 text-[#008751] hover:bg-[var(--olive)]/25 transition-colors cursor-pointer flex items-center gap-1 border border-[var(--olive)]/30"
+                            title="Jump directly to your score"
+                          >
+                            <User size={10} />
+                            <span>View You (#{challengeUserIdx + 1})</span>
+                          </button>
+                        )}
+                        <span className="text-right">Accuracy &amp; Score</span>
+                      </div>
+                    </div>
+                  )}
+
+                  {challengeScores.length === 0 ? (
+                    <div className="p-8 text-center space-y-2">
+                      <p className="text-xs font-serif italic text-[var(--text-dim)]">
+                        No scholars have completed this challenge yet.
+                      </p>
+                    </div>
+                  ) : (
+                    visibleChallengeScores.map((s, idx) => {
+                      const isUser = Boolean(
+                        (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
+                        (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
+                      );
+                      const displayName = isUser && profile?.username ? profile.username : s.username;
+                      const isHighlighted = isUser && highlightChallengeId !== null;
+
+                      return (
+                        <div
+                          key={s.id || s.username || idx}
+                          id={isUser ? "challenge-board-user-row" : undefined}
+                          className={cn(
+                            "p-4 flex items-center justify-between gap-3 transition-all",
+                            isUser ? "bg-[var(--olive)]/5" : "hover:bg-[var(--bg-input)]/50",
+                            isHighlighted && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
                           )}
+                          style={{
+                            borderLeft: isUser ? "4px solid var(--olive)" : "4px solid transparent",
+                          }}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="w-8 text-center shrink-0">
+                              {idx === 0 ? (
+                                <span className="text-xl">🥇</span>
+                              ) : idx === 1 ? (
+                                <span className="text-xl">🥈</span>
+                              ) : idx === 2 ? (
+                                <span className="text-xl">🥉</span>
+                              ) : (
+                                <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+                                  #{idx + 1}
+                                </span>
+                              )}
+                            </div>
+
+                            <UserAvatar avatar={s.avatar} size="md" />
+
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
+                                  {displayName}
+                                </span>
+                                {isUser && (
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
+                                {s.gradeLabel || "Scholar"}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-right shrink-0">
+                            <div>
+                              <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
+                                {s.pct}%
+                              </div>
+                              <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                                {s.score}/{s.total} score
+                              </div>
+                            </div>
+                          </div>
                         </div>
+                      );
+                    })
+                  )}
 
-                        <UserAvatar avatar={s.avatar} size="md" />
+                  {/* Pinned User Standing if outside Top 10 */}
+                  {showChallengeUserSeparately && userChallengeScore && (
+                    <>
+                      <div className="px-4 py-2 bg-[var(--bg-input)]/40 text-center text-[10px] font-mono text-[var(--text-dim)] flex items-center justify-center gap-3">
+                        <div className="h-px bg-[var(--border-dim)] flex-1" />
+                        <span>
+                          ··· {challengeUserIdx - INITIAL_LIMIT > 0 ? `${challengeUserIdx - INITIAL_LIMIT} more scholars · ` : ""}your rank (#{challengeUserIdx + 1}) ···
+                        </span>
+                        <div className="h-px bg-[var(--border-dim)] flex-1" />
+                      </div>
 
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5">
-                            <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                              {displayName}
+                      <div
+                        id="challenge-board-user-row"
+                        className={cn(
+                          "p-4 flex items-center justify-between gap-3 bg-[var(--olive)]/5 transition-all",
+                          highlightChallengeId !== null && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
+                        )}
+                        style={{
+                          borderLeft: "4px solid var(--olive)",
+                        }}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 text-center shrink-0">
+                            <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+                              #{challengeUserIdx + 1}
                             </span>
-                            {isUser && (
+                          </div>
+
+                          <UserAvatar avatar={userChallengeScore.avatar} size="md" />
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
+                                {profile?.username || userChallengeScore.username}
+                              </span>
                               <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
                                 You
                               </span>
-                            )}
-                          </div>
-                          <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
-                            {s.gradeLabel || "Scholar"}
+                            </div>
+                            <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
+                              {userChallengeScore.gradeLabel || "Scholar"}
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-4 text-right shrink-0">
-                        <div>
-                          <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
-                            {s.pct}%
-                          </div>
-                          <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                            {s.score}/{s.total} score
+                        <div className="flex items-center gap-4 text-right shrink-0">
+                          <div>
+                            <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
+                              {userChallengeScore.pct}%
+                            </div>
+                            <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                              {userChallengeScore.score}/{userChallengeScore.total} score
+                            </div>
                           </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+                    </>
+                  )}
+
+                  {/* View More / Show Top 10 Toggle */}
+                  {challengeScores.length > INITIAL_LIMIT && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExpandedChallenge((prev) => !prev)}
+                      className="w-full py-3 px-4 bg-[var(--bg-card)]/40 hover:bg-[var(--bg-input)] text-xs font-space font-bold text-[var(--text)] flex items-center justify-center gap-2 cursor-pointer transition-colors border-t border-[var(--border-dim)]"
+                    >
+                      {isExpandedChallenge ? (
+                        <>
+                          <ChevronUp size={14} />
+                          <span>Show Top 10 Only</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown size={14} />
+                          <span>View More ({challengeScores.length - INITIAL_LIMIT} more scholars)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              );
+            })()}
           </div>
         ) : (
           /* List of all user's group challenges */

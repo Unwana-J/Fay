@@ -18,6 +18,9 @@ import {
   RefreshCw,
   Zap,
   Pencil,
+  ChevronDown,
+  ChevronUp,
+  User,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import {
@@ -235,6 +238,22 @@ export default function TriviaChallengeLounge({
 
   const [scores, setScores] = useState<ChallengeParticipantScore[]>([]);
   const [isLoadingScores, setIsLoadingScores] = useState(false);
+
+  const INITIAL_LIMIT = 10;
+  const [isExpandedScores, setIsExpandedScores] = useState(false);
+  const [highlightScoreId, setHighlightScoreId] = useState<string | null>(null);
+
+  function handleJumpToUserInChallenge() {
+    setIsExpandedScores(true);
+    setTimeout(() => {
+      const el = document.getElementById("lounge-challenge-user-row");
+      if (el) {
+        el.scrollIntoView({ behavior: "smooth", block: "center" });
+        setHighlightScoreId("user-current");
+        setTimeout(() => setHighlightScoreId(null), 2500);
+      }
+    }, 120);
+  }
 
   useEffect(() => {
     if (!currentChallenge) return;
@@ -622,121 +641,239 @@ export default function TriviaChallengeLounge({
         </div>
 
         {/* Contenders Standings Table */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--text-mute)] flex items-center gap-1.5">
-              <Trophy size={13} />
-              <span>Scholar Standings ({scores.length})</span>
-            </span>
-            <span className="text-[11px] font-mono text-[var(--text-dim)] flex items-center gap-1">
-              <span>🔒 1st Attempt Locked</span>
-            </span>
-          </div>
+        {(() => {
+          const challengeUserIndex = scores.findIndex((s) =>
+            Boolean(
+              (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
+              (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
+            )
+          );
+          const visibleScores = isExpandedScores ? scores : scores.slice(0, INITIAL_LIMIT);
+          const showScoreUserSeparately = !isExpandedScores && challengeUserIndex >= INITIAL_LIMIT;
+          const userScoreItem = challengeUserIndex >= 0 ? scores[challengeUserIndex] : null;
 
-          {scores.length === 0 ? (
-            <div className="surface rounded-2xl p-8 border text-center space-y-3" style={{ borderColor: "var(--border-dim)" }}>
-              <p className="font-space font-bold text-base text-[var(--text)]">
-                The Board Awaits Its First Champion
-              </p>
-              <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
-                No scholars have submitted runs for this challenge yet. Be the first to establish the baseline. Only your first attempt is posted to the tournament board.
-              </p>
-              <button
-                onClick={() => onPlayChallenge(currentChallenge)}
-                className="px-4 py-2 rounded-xl btn-terra font-space font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
-              >
-                <span>Play First Run</span>
-                <ArrowRight size={13} />
-              </button>
-            </div>
-          ) : (
-            <div className="surface rounded-2xl border overflow-hidden shadow-xs divide-y" style={{ borderColor: "var(--border-dim)" }}>
-              {scores.map((s, idx) => {
-                const isCurrentUser = Boolean(
-                  (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
-                  (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
-                );
-                const displayName = isCurrentUser && profile?.username ? profile.username : s.username;
+          return (
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--text-mute)] flex items-center gap-1.5">
+                    <Trophy size={13} />
+                    <span>Scholar Standings ({scores.length})</span>
+                  </span>
+                  {scores.length > INITIAL_LIMIT && (
+                    <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] font-mono">
+                      {isExpandedScores ? `All ${scores.length}` : `Top 10 of ${scores.length}`}
+                    </span>
+                  )}
+                </div>
 
-                return (
-                  <div
-                    key={s.id || s.username}
-                    className={cn(
-                      "p-4 flex items-center justify-between gap-3 transition-colors",
-                      isCurrentUser ? "bg-[var(--olive)]/5" : "hover:bg-[var(--bg-input)]/50"
-                    )}
-                    style={{
-                      borderLeft: isCurrentUser ? "4px solid var(--olive)" : "4px solid transparent",
-                    }}
+                <div className="flex items-center gap-2.5">
+                  {challengeUserIndex >= 0 && (
+                    <button
+                      type="button"
+                      onClick={handleJumpToUserInChallenge}
+                      className="text-[10px] font-space font-bold px-2.5 py-0.5 rounded-full bg-[var(--olive)]/15 text-[#008751] hover:bg-[var(--olive)]/25 transition-colors cursor-pointer flex items-center gap-1 border border-[var(--olive)]/30"
+                      title="Jump directly to your score"
+                    >
+                      <User size={10} />
+                      <span>View You (#{challengeUserIndex + 1})</span>
+                    </button>
+                  )}
+                  <span className="text-[11px] font-mono text-[var(--text-dim)] flex items-center gap-1">
+                    <span>🔒 1st Attempt Locked</span>
+                  </span>
+                </div>
+              </div>
+
+              {scores.length === 0 ? (
+                <div className="surface rounded-2xl p-8 border text-center space-y-3" style={{ borderColor: "var(--border-dim)" }}>
+                  <p className="font-space font-bold text-base text-[var(--text)]">
+                    The Board Awaits Its First Champion
+                  </p>
+                  <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
+                    No scholars have submitted runs for this challenge yet. Be the first to establish the baseline. Only your first attempt is posted to the tournament board.
+                  </p>
+                  <button
+                    onClick={() => onPlayChallenge(currentChallenge)}
+                    className="px-4 py-2 rounded-xl btn-terra font-space font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
                   >
-                    {/* Rank & Identity */}
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="w-8 text-center shrink-0">
-                        {idx === 0 ? (
-                          <span className="text-xl">🥇</span>
-                        ) : idx === 1 ? (
-                          <span className="text-xl">🥈</span>
-                        ) : idx === 2 ? (
-                          <span className="text-xl">🥉</span>
-                        ) : (
-                          <span className="font-space font-bold text-xs text-[var(--text-mute)]">
-                            #{idx + 1}
-                          </span>
+                    <span>Play First Run</span>
+                    <ArrowRight size={13} />
+                  </button>
+                </div>
+              ) : (
+                <div className="surface rounded-2xl border overflow-hidden shadow-xs divide-y" style={{ borderColor: "var(--border-dim)" }}>
+                  {visibleScores.map((s, idx) => {
+                    const isCurrentUser = Boolean(
+                      (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
+                      (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
+                    );
+                    const displayName = isCurrentUser && profile?.username ? profile.username : s.username;
+                    const isHighlighted = isCurrentUser && highlightScoreId !== null;
+
+                    return (
+                      <div
+                        key={s.id || s.username}
+                        id={isCurrentUser ? "lounge-challenge-user-row" : undefined}
+                        className={cn(
+                          "p-4 flex items-center justify-between gap-3 transition-all",
+                          isCurrentUser ? "bg-[var(--olive)]/5" : "hover:bg-[var(--bg-input)]/50",
+                          isHighlighted && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
                         )}
+                        style={{
+                          borderLeft: isCurrentUser ? "4px solid var(--olive)" : "4px solid transparent",
+                        }}
+                      >
+                        {/* Rank & Identity */}
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 text-center shrink-0">
+                            {idx === 0 ? (
+                              <span className="text-xl">🥇</span>
+                            ) : idx === 1 ? (
+                              <span className="text-xl">🥈</span>
+                            ) : idx === 2 ? (
+                              <span className="text-xl">🥉</span>
+                            ) : (
+                              <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+                                #{idx + 1}
+                              </span>
+                            )}
+                          </div>
+
+                          <UserAvatar avatar={s.avatar} size="md" />
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
+                                {displayName}
+                              </span>
+                              {isCurrentUser && (
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
+                                    You
+                                  </span>
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setRenameDraft(profile?.username || displayName);
+                                      setShowRenameModal(true);
+                                    }}
+                                    className="text-[10px] text-[var(--olive)] hover:underline font-bold inline-flex items-center gap-0.5 cursor-pointer"
+                                    title="Click to rename yourself"
+                                  >
+                                    <Pencil size={9} />
+                                    <span>edit</span>
+                                  </button>
+                                </div>
+                              )}
+                            </div>
+                            <div className="text-xs truncate flex items-center gap-1.5" style={{ color: "var(--text-mute)" }}>
+                              <span className="font-semibold">{s.gradeLabel || "Scholar"}</span>
+                              <span>•</span>
+                              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">1st run locked</span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Score & Accuracy */}
+                        <div className="flex items-center gap-4 text-right shrink-0">
+                          <div>
+                            <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
+                              {s.pct}%
+                            </div>
+                            <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                              {s.score}/{s.total} score
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  {/* Pinned user standing if outside Top 10 */}
+                  {showScoreUserSeparately && userScoreItem && (
+                    <>
+                      <div className="px-4 py-2 bg-[var(--bg-input)]/40 text-center text-[10px] font-mono text-[var(--text-dim)] flex items-center justify-center gap-3">
+                        <div className="h-px bg-[var(--border-dim)] flex-1" />
+                        <span>
+                          ··· {challengeUserIndex - INITIAL_LIMIT > 0 ? `${challengeUserIndex - INITIAL_LIMIT} more scholars · ` : ""}your rank (#{challengeUserIndex + 1}) ···
+                        </span>
+                        <div className="h-px bg-[var(--border-dim)] flex-1" />
                       </div>
 
-                      <UserAvatar avatar={s.avatar} size="md" />
+                      <div
+                        id="lounge-challenge-user-row"
+                        className={cn(
+                          "p-4 flex items-center justify-between gap-3 bg-[var(--olive)]/5 transition-all",
+                          highlightScoreId !== null && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
+                        )}
+                        style={{
+                          borderLeft: "4px solid var(--olive)",
+                        }}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <div className="w-8 text-center shrink-0">
+                            <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+                              #{challengeUserIndex + 1}
+                            </span>
+                          </div>
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                            {displayName}
-                          </span>
-                          {isCurrentUser && (
-                            <div className="flex items-center gap-1">
+                          <UserAvatar avatar={userScoreItem.avatar} size="md" />
+
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5">
+                              <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
+                                {profile?.username || userScoreItem.username}
+                              </span>
                               <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
                                 You
                               </span>
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  setRenameDraft(profile?.username || displayName);
-                                  setShowRenameModal(true);
-                                }}
-                                className="text-[10px] text-[var(--olive)] hover:underline font-bold inline-flex items-center gap-0.5 cursor-pointer"
-                                title="Click to rename yourself"
-                              >
-                                <Pencil size={9} />
-                                <span>edit</span>
-                              </button>
                             </div>
-                          )}
+                            <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
+                              {userScoreItem.gradeLabel || "Scholar"}
+                            </div>
+                          </div>
                         </div>
-                        <div className="text-xs truncate flex items-center gap-1.5" style={{ color: "var(--text-mute)" }}>
-                          <span className="font-semibold">{s.gradeLabel || "Scholar"}</span>
-                          <span>•</span>
-                          <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">1st run locked</span>
-                        </div>
-                      </div>
-                    </div>
 
-                    {/* Score & Accuracy */}
-                    <div className="flex items-center gap-4 text-right shrink-0">
-                      <div>
-                        <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
-                          {s.pct}%
-                        </div>
-                        <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                          {s.score}/{s.total} score
+                        <div className="flex items-center gap-4 text-right shrink-0">
+                          <div>
+                            <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
+                              {userScoreItem.pct}%
+                            </div>
+                            <div className="text-[10px] font-semibold text-[var(--text-mute)]">
+                              {userScoreItem.score}/{userScoreItem.total} score
+                            </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </div>
-                );
-              })}
+                    </>
+                  )}
+
+                  {/* View More / Show Top 10 Toggle */}
+                  {scores.length > INITIAL_LIMIT && (
+                    <button
+                      type="button"
+                      onClick={() => setIsExpandedScores((prev) => !prev)}
+                      className="w-full py-3 px-4 bg-[var(--bg-card)]/40 hover:bg-[var(--bg-input)] text-xs font-space font-bold text-[var(--text)] flex items-center justify-center gap-2 cursor-pointer transition-colors border-t border-[var(--border-dim)]"
+                    >
+                      {isExpandedScores ? (
+                        <>
+                          <ChevronUp size={14} />
+                          <span>Show Top 10 Only</span>
+                        </>
+                      ) : (
+                        <>
+                          <ChevronDown size={14} />
+                          <span>View More ({scores.length - INITIAL_LIMIT} more scholars)</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
-          )}
-        </div>
+          );
+        })()}
 
         {/* Share & Invite Strip */}
         <div className="surface rounded-2xl p-4 border space-y-2.5" style={{ borderColor: "var(--border-dim)" }}>
