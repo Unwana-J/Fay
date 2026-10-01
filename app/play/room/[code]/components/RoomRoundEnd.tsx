@@ -21,6 +21,7 @@ import {
   Crown,
   Mic,
   Clock,
+  Loader2,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import BoardMap from "@/app/play/BoardMap";
@@ -30,9 +31,10 @@ interface RoomRoundEndProps {
   myPlayerId: string;
   myPlayerName: string;
   isHost: boolean;
+  isStartingRound?: boolean;
   presencePlayers?: RoomPlayer[];
   knownNames?: Record<string, { name: string; avatar: string }>;
-  onStartNextRound: () => void;
+  onStartNextRound: (speakerId?: string) => void;
   onDisputeWord: (wordIndex: number) => void;
   onResolveDispute: (wordIndex: number, resolution: "concede" | "reject") => void;
   onClaimPassedWord?: (wordIndex: number) => void;
@@ -46,6 +48,7 @@ export default function RoomRoundEnd({
   myPlayerId,
   myPlayerName,
   isHost,
+  isStartingRound = false,
   presencePlayers = [],
   knownNames = {},
   onStartNextRound,
@@ -202,30 +205,16 @@ export default function RoomRoundEnd({
     };
   };
 
-  // Compute next round speaker using sequential roster scan
+  // Compute next round speaker
   const nextTeam = nextActiveTeamKey === "A" ? room.teams?.teamA : room.teams?.teamB;
   const rawNextIds = nextTeam?.playerIds || [];
   const nextTeamActiveIds = rawNextIds.filter((id) => !isPlayerInactive(id));
-  const lastIdx =
-    nextActiveTeamKey === "A"
-      ? room.last_speaker_indices?.teamA ?? -1
-      : room.last_speaker_indices?.teamB ?? -1;
-
-  let nextSpeakerId: string | null = null;
-  if (rawNextIds.length > 0) {
-    const n = rawNextIds.length;
-    for (let step = 1; step <= n; step++) {
-      const candidateIdx = (lastIdx + step) % n;
-      const candidateId = rawNextIds[candidateIdx];
-      if (!isPlayerInactive(candidateId)) {
-        nextSpeakerId = candidateId;
-        break;
-      }
-    }
-    if (!nextSpeakerId) {
-      nextSpeakerId = rawNextIds[0];
-    }
-  }
+  const eligibleNextIds = nextTeamActiveIds.length > 0 ? nextTeamActiveIds : rawNextIds;
+  const nextTeamTurnCount = Math.floor((nextRoundNumber - 1) / 2);
+  const nextSpeakerId =
+    eligibleNextIds.length > 0
+      ? eligibleNextIds[nextTeamTurnCount % eligibleNextIds.length]
+      : null;
 
   const nextSpeakerDisplay = nextSpeakerId ? getPlayerDisplay(nextSpeakerId) : null;
   const isMeNextSpeaker = nextSpeakerId === myPlayerId;
@@ -855,14 +844,28 @@ export default function RoomRoundEnd({
         {isMeNextSpeaker ? (
           <div className="space-y-2">
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onStartNextRound}
-              className="w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition animate-pulse"
+              whileHover={!isStartingRound ? { scale: 1.02 } : {}}
+              whileTap={!isStartingRound ? { scale: 0.98 } : {}}
+              onClick={() => {
+                if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
+              }}
+              disabled={isStartingRound}
+              className={`w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
+                isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer animate-pulse"
+              }`}
               style={{ backgroundColor: nextTeamColor }}
             >
-              <Mic className="w-5 h-5 fill-current" />
-              I&apos;m the Speaker — Start My Turn
+              {isStartingRound ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Starting Sprint...
+                </>
+              ) : (
+                <>
+                  <Mic className="w-5 h-5 fill-current" />
+                  I&apos;m the Speaker — Start My Turn
+                </>
+              )}
             </motion.button>
             <p className="text-xs text-[var(--text-dim)]">
               🎤 You are describing this round! When you tap start, the 3s countdown begins for everyone.
@@ -871,13 +874,27 @@ export default function RoomRoundEnd({
         ) : isHost ? (
           <div className="space-y-2">
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
-              onClick={onStartNextRound}
-              className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition"
+              whileHover={!isStartingRound ? { scale: 1.02 } : {}}
+              whileTap={!isStartingRound ? { scale: 0.98 } : {}}
+              onClick={() => {
+                if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
+              }}
+              disabled={isStartingRound}
+              className={`w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
+                isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer"
+              }`}
             >
-              <Play className="w-5 h-5 fill-current" />
-              Start Round {nextRoundNumber} as Host ({nextSpeakerDisplay?.name || nextTeamName})
+              {isStartingRound ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  Launching Round {nextRoundNumber}...
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 fill-current" />
+                  Start Round {nextRoundNumber} as Host ({nextSpeakerDisplay?.name || nextTeamName})
+                </>
+              )}
             </motion.button>
             <p className="text-xs text-[var(--text-dim)]">
               👑 You can launch as Host, or wait for {nextSpeakerDisplay?.name || nextTeamName} to start when ready.

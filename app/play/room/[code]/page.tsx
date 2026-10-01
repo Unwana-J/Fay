@@ -79,6 +79,7 @@ export default function ArticulateRoomPage({
   const [identityModalMode, setIdentityModalMode] = useState<"join" | "edit">("join");
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [isStartingRound, setIsStartingRound] = useState(false);
   const [knownNames, setKnownNames] = useState<Record<string, { name: string; avatar: string }>>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -92,6 +93,7 @@ export default function ArticulateRoomPage({
   const channelRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hasJoinedRef = useRef(false);
+  const hasDispatchedEndRoundRef = useRef<number | null>(null);
 
   // Synchronize known player names to persistent local cache
   useEffect(() => {
@@ -589,13 +591,16 @@ export default function ArticulateRoomPage({
 
       // Time's up: only the active speaker or host triggers end_round to avoid race conditions
       if (remaining === 0) {
-        const isSpeakerOrHost =
-          myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
-        if (isSpeakerOrHost) {
-          dispatchAction({
-            action: "end_round",
-            speakerId: myPlayerId,
-          });
+        if (hasDispatchedEndRoundRef.current !== currentTurnRound) {
+          hasDispatchedEndRoundRef.current = currentTurnRound ?? null;
+          const isSpeakerOrHost =
+            myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
+          if (isSpeakerOrHost) {
+            dispatchAction({
+              action: "end_round",
+              speakerId: myPlayerId,
+            });
+          }
         }
       }
     };
@@ -628,12 +633,19 @@ export default function ArticulateRoomPage({
   }, [reactions]);
 
   // Handlers
-  const handleStartRound = () => {
-    dispatchAction({
-      action: "start_round",
-      hostId: myPlayerId,
-      knownNames,
-    });
+  const handleStartRound = async (speakerId?: string) => {
+    if (isStartingRound) return;
+    setIsStartingRound(true);
+    try {
+      await dispatchAction({
+        action: "start_round",
+        hostId: myPlayerId,
+        speakerId,
+        knownNames,
+      });
+    } finally {
+      setTimeout(() => setIsStartingRound(false), 1500);
+    }
   };
 
   const handleScoreWord = () => {
@@ -1088,6 +1100,7 @@ export default function ArticulateRoomPage({
                 myPlayerId={myPlayerId}
                 myPlayerName={effectivePlayerName}
                 isHost={isHost}
+                isStartingRound={isStartingRound}
                 presencePlayers={presencePlayers}
                 knownNames={knownNames}
                 onStartNextRound={handleStartRound}

@@ -16,6 +16,7 @@ async function persistRoom(room: ArticulateRoom) {
         teamB: room.teams.teamB,
         player_details: room.player_details,
         inactive_players: room.inactive_players,
+        last_speaker_indices: room.last_speaker_indices,
       };
 
       await supabase
@@ -76,6 +77,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           spectators: data.spectators || [],
           inactive_players: rawTeams.inactive_players || [],
           player_details: rawTeams.player_details || {},
+          last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
           created_at: data.created_at,
           updated_at: data.updated_at,
         };
@@ -232,10 +234,6 @@ export async function POST(
           isHost: id === room.host_id,
         };
 
-        if (room.inactive_players) {
-          room.inactive_players = room.inactive_players.filter((p) => p !== id);
-        }
-
         if (!room.active_players.includes(id)) {
           room.active_players.push(id);
         }
@@ -314,6 +312,10 @@ export async function POST(
       // 3. START ROUND (LOCKS ROOM)
       // -------------------------------------------------------------
       case "start_round": {
+        if (room.status === "playing") {
+          return NextResponse.json({ success: true, room });
+        }
+
         // Sync any knownNames sent from host's client cache into room.player_details
         if (body.knownNames && typeof body.knownNames === "object") {
           if (!room.player_details) room.player_details = {};
@@ -357,49 +359,19 @@ export async function POST(
             ? room.teams.teamA.playerIds
             : room.teams.teamB.playerIds;
 
-        if (!room.last_speaker_indices) {
-          room.last_speaker_indices = { teamA: -1, teamB: -1 };
-        }
+        const activeAvailableIds = rawTeamPlayerIds.filter(
+          (pId) => !(room.inactive_players || []).includes(pId)
+        );
+        const eligiblePlayerIds = activeAvailableIds.length > 0 ? activeAvailableIds : rawTeamPlayerIds;
+
+        // Team turn count (Turn 0 for Round 1/2, Turn 1 for Round 3/4, Turn 2 for Round 5/6, etc.)
+        const teamTurnCount = Math.floor((roundNumber - 1) / 2);
 
         let speakerId = "";
-
-        // If client specifically passed the intended speaker
-        if (body.speakerId && rawTeamPlayerIds.includes(body.speakerId)) {
+        if (body.speakerId && eligiblePlayerIds.includes(body.speakerId)) {
           speakerId = body.speakerId;
-          const foundIdx = rawTeamPlayerIds.indexOf(speakerId);
-          if (foundIdx !== -1) {
-            if (activeTeam === "A") room.last_speaker_indices.teamA = foundIdx;
-            else room.last_speaker_indices.teamB = foundIdx;
-          }
         } else {
-          // Advance pointer sequentially through active available roster
-          const lastIdx =
-            activeTeam === "A"
-              ? room.last_speaker_indices.teamA ?? -1
-              : room.last_speaker_indices.teamB ?? -1;
-
-          let chosenId = "";
-          let nextIdx = lastIdx;
-          const n = rawTeamPlayerIds.length;
-
-          for (let step = 1; step <= n; step++) {
-            const candidateIdx = (lastIdx + step) % n;
-            const candidateId = rawTeamPlayerIds[candidateIdx];
-            if (!(room.inactive_players || []).includes(candidateId)) {
-              chosenId = candidateId;
-              nextIdx = candidateIdx;
-              break;
-            }
-          }
-
-          if (!chosenId) {
-            chosenId = rawTeamPlayerIds[0];
-            nextIdx = 0;
-          }
-
-          speakerId = chosenId;
-          if (activeTeam === "A") room.last_speaker_indices.teamA = nextIdx;
-          else room.last_speaker_indices.teamB = nextIdx;
+          speakerId = eligiblePlayerIds[teamTurnCount % eligiblePlayerIds.length] || eligiblePlayerIds[0];
         }
 
         const speakerDetails = room.player_details?.[speakerId];
@@ -599,7 +571,7 @@ export async function POST(
       // 6. END ROUND (UNLOCKS ROOM & ADMITS SPECTATORS)
       // -------------------------------------------------------------
       case "end_round": {
-        if (room.status === "game_over") {
+        if (room.status !== "playing") {
           return NextResponse.json({ success: true, room });
         }
 
