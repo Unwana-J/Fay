@@ -95,7 +95,7 @@ const DEFAULT_CATEGORIES: GameCategory[] = ["Object", "Nature", "Person", "Actio
 export const useGameStore = create<GameState>()(
   persist(
     (set, get) => ({
-      timerSeconds: 60,
+      timerSeconds: 30,
       selectedCategories: DEFAULT_CATEGORIES,
       difficulty: "mixed",
       numberOfRounds: 3,
@@ -444,6 +444,17 @@ export const useGameStore = create<GameState>()(
         spinnerModifier: "none"
       })
     }),
-    { name: "fey-multiplayer-game" }
+    {
+      name: "fey-multiplayer-game",
+      version: 2,
+      migrate: (persistedState: any, version: number) => {
+        if (version < 2 && persistedState) {
+          if (persistedState.timerSeconds === 60) {
+            persistedState.timerSeconds = 30;
+          }
+        }
+        return persistedState;
+      },
+    }
   )
 );

@@ -92,13 +92,17 @@ export function createInitialRoom(
   settings: Partial<RoomSettings> = {}
 ): ArticulateRoom {
   const mergedSettings: RoomSettings = {
-    timerSeconds: settings.timerSeconds || 60,
+    timerSeconds: settings.timerSeconds || 30,
     scoreGoal: settings.scoreGoal || 20,
     categories: settings.categories || ["Object", "Nature", "Person", "Action", "World", "Random"],
     difficulty: settings.difficulty || "mixed",
   };
 
-  const deck = buildDeck(mergedSettings.categories, mergedSettings.difficulty, 80);
+  const deck = buildDeck(
+    mergedSettings.categories,
+    mergedSettings.difficulty,
+    Math.max(120, mergedSettings.scoreGoal * 3)
+  );
 
   return {
     room_code: code.toUpperCase().trim(),

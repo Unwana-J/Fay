@@ -32,18 +32,32 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Deduplicate so each player shows their best run
-    const bestByPlayer = new Map<string, (typeof data)[0]>();
+    // Deduplicate: If challengeId is set, lock strictly to the FIRST attempt (earliest created_at).
+    // For global leaderboards, keep the best run.
+    const selectedByPlayer = new Map<string, (typeof data)[0]>();
 
-    (data || []).forEach((row) => {
-      const key = row.username.trim().toLowerCase();
-      const existing = bestByPlayer.get(key);
-      if (!existing || row.pct > existing.pct || (row.pct === existing.pct && row.score > existing.score)) {
-        bestByPlayer.set(key, row);
-      }
-    });
+    if (challengeId) {
+      // Sort chronologically ascending to capture the first attempt
+      const chrono = [...(data || [])].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+      );
+      chrono.forEach((row) => {
+        const key = row.username.trim().toLowerCase();
+        if (!selectedByPlayer.has(key)) {
+          selectedByPlayer.set(key, row);
+        }
+      });
+    } else {
+      (data || []).forEach((row) => {
+        const key = row.username.trim().toLowerCase();
+        const existing = selectedByPlayer.get(key);
+        if (!existing || row.pct > existing.pct || (row.pct === existing.pct && row.score > existing.score)) {
+          selectedByPlayer.set(key, row);
+        }
+      });
+    }
 
-    const uniqueScores = Array.from(bestByPlayer.values()).sort((a, b) => {
+    const uniqueScores = Array.from(selectedByPlayer.values()).sort((a, b) => {
       if (b.pct !== a.pct) return b.pct - a.pct;
       return b.score - a.score;
     });

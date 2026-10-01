@@ -13,6 +13,7 @@ interface RoomLobbyProps {
   onStartRound: () => void;
   onSwitchTeam: (targetTeam: "A" | "B") => void;
   onShuffleTeams?: () => void;
+  onUpdateSettings?: (settings: { timerSeconds?: number; scoreGoal?: number }) => void;
 }
 
 export default function RoomLobby({
@@ -23,6 +24,7 @@ export default function RoomLobby({
   onStartRound,
   onSwitchTeam,
   onShuffleTeams,
+  onUpdateSettings,
 }: RoomLobbyProps) {
   const [copied, setCopied] = useState(false);
 
@@ -92,19 +94,74 @@ export default function RoomLobby({
         </div>
 
         {/* Match Settings Strip */}
-        <div className="flex flex-wrap items-center gap-4 text-xs text-[var(--text-dim)] pt-1">
+        <div className="flex flex-wrap items-center gap-3 text-xs text-[var(--text-dim)] pt-2 border-t border-[var(--border-dim)]/60">
+          {/* Duration Selector */}
           <div className="flex items-center gap-1.5">
             <Clock className="w-3.5 h-3.5 text-[var(--text-mute)]" />
-            <span>{room.settings.timerSeconds}s per round</span>
+            {isHost && onUpdateSettings ? (
+              <div className="flex items-center gap-1 bg-[var(--bg-input)]/60 p-0.5 rounded-lg border border-[var(--border-dim)]">
+                <button
+                  type="button"
+                  onClick={() => onUpdateSettings({ timerSeconds: 30 })}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold font-mono transition cursor-pointer ${
+                    room.settings.timerSeconds === 30
+                      ? "bg-[var(--terra)] text-white shadow-xs"
+                      : "text-[var(--text-dim)] hover:text-[var(--text)]"
+                  }`}
+                  title="Switch to 30 seconds"
+                >
+                  ⚡ 30s
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onUpdateSettings({ timerSeconds: 60 })}
+                  className={`px-2 py-0.5 rounded-md text-[11px] font-bold font-mono transition cursor-pointer ${
+                    room.settings.timerSeconds === 60
+                      ? "bg-[var(--terra)] text-white shadow-xs"
+                      : "text-[var(--text-dim)] hover:text-[var(--text)]"
+                  }`}
+                  title="Switch to 60 seconds"
+                >
+                  ⏱️ 60s
+                </button>
+              </div>
+            ) : (
+              <span className="font-medium font-mono">{room.settings.timerSeconds}s per sprint</span>
+            )}
           </div>
+
+          {/* Points Goal Selector */}
           <div className="flex items-center gap-1.5">
             <Target className="w-3.5 h-3.5 text-[var(--text-mute)]" />
-            <span>First to {room.settings.scoreGoal} points</span>
+            {isHost && onUpdateSettings ? (
+              <div className="flex items-center gap-1 bg-[var(--bg-input)]/60 p-0.5 rounded-lg border border-[var(--border-dim)]">
+                <span className="text-[10px] text-[var(--text-mute)] pl-1 pr-0.5 hidden sm:inline">First to:</span>
+                {[20, 30, 50, 75, 100].map((pts) => (
+                  <button
+                    key={pts}
+                    type="button"
+                    onClick={() => onUpdateSettings({ scoreGoal: pts })}
+                    className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold font-mono transition cursor-pointer ${
+                      room.settings.scoreGoal === pts
+                        ? "bg-[var(--olive)] text-white shadow-xs"
+                        : "text-[var(--text-dim)] hover:text-[var(--text)]"
+                    }`}
+                    title={`First to ${pts} points`}
+                  >
+                    {pts}pts
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <span className="font-medium">First to {room.settings.scoreGoal} points</span>
+            )}
           </div>
+
           <div className="flex items-center gap-1.5">
             <Layers className="w-3.5 h-3.5 text-[var(--text-mute)]" />
             <span>{room.settings.categories.length} categories</span>
           </div>
+
           <div className="flex items-center gap-1.5 ml-auto text-[var(--olive)] font-medium">
             <Users className="w-3.5 h-3.5" />
             <span>{room.teams.teamA.playerIds.length + room.teams.teamB.playerIds.length} players joined</span>

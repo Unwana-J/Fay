@@ -55,13 +55,8 @@ export default function ShareTriviaModal({
 
   // Public canonical challenge link with score & author metadata
   const fullShareUrl = useMemo(() => {
-    const isLocalhost =
-      typeof window !== "undefined" &&
-      (window.location.hostname === "localhost" ||
-        window.location.hostname === "127.0.0.1" ||
-        window.location.hostname.endsWith(".local"));
     const origin =
-      typeof window !== "undefined" && !isLocalhost
+      typeof window !== "undefined"
         ? window.location.origin
         : "https://fey.lokinlabs.com.ng";
 
@@ -101,7 +96,7 @@ export default function ShareTriviaModal({
 
   if (!isOpen) return null;
 
-  const targetUrl = activeUrl || fullShareUrl;
+  const targetUrl = (activeUrl || fullShareUrl).trim();
 
   const shareHeadline = customTaunt.trim()
     ? customTaunt.trim()
@@ -117,7 +112,7 @@ export default function ShareTriviaModal({
 
   async function handleCopy() {
     if (!targetUrl) return;
-    const ok = await copyTextToClipboard(`${shareHeadline}\n\n${targetUrl}`);
+    const ok = await copyTextToClipboard(targetUrl);
     if (ok) {
       setCopied(true);
       setTimeout(() => setCopied(false), 2500);

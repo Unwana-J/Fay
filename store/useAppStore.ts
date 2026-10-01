@@ -692,6 +692,14 @@ export const useAppStore = create<AppState>()(
           }
         }
 
+        // Ensure profile has an id
+        if (!state?.profile?.id) {
+          state.profile = {
+            ...(state?.profile ?? {}),
+            id: uid(),
+          };
+        }
+
         return state;
       },
     }

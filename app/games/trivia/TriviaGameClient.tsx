@@ -39,7 +39,11 @@ import {
   decodeChallengeFromUrl,
   getLocalChallenge,
   recordLocalChallengeScore,
+  getUserChallengeAttempt,
+  type RecordScoreResult,
 } from "@/lib/trivia-challenge";
+import { getTriviaPerformanceRemark, type TriviaRemark } from "@/lib/trivia-remarks";
+
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -179,7 +183,7 @@ function SetupScreen({
           )}
         >
           <span>⚔️</span>
-          <span>Clash</span>
+          <span>Challenges</span>
           {activeChallenge && (
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--terra)] animate-pulse shrink-0" />
           )}
@@ -714,6 +718,7 @@ function ResultsScreen({
   challenger,
   activeChallenge,
   onViewChallengeBoard,
+  challengeRecordResult,
 }: {
   questions: TriviaQuestion[];
   answers: (number | null)[];
@@ -726,6 +731,7 @@ function ResultsScreen({
   challenger?: ChallengerInfo | null;
   activeChallenge: TriviaChallenge | null;
   onViewChallengeBoard: () => void;
+  challengeRecordResult?: RecordScoreResult | null;
 }) {
   const [showShareModal, setShowShareModal] = useState(false);
   const correct = answers.filter((a, i) => a === questions[i].answer).length;
@@ -745,14 +751,7 @@ function ResultsScreen({
     total: stat.total,
   }));
 
-  const grade =
-    pct >= 80
-      ? { label: "Naija Expert", color: "var(--gold)" }
-      : pct >= 60
-      ? { label: "Sharp Sharp", color: "var(--olive)" }
-      : pct >= 40
-      ? { label: "Not bad o", color: "var(--terra)" }
-      : { label: "Keep studying", color: "var(--text-mute)" };
+  const remark = getTriviaPerformanceRemark(pct, questions.map((q) => q.id).join(""));
 
   const isVersus = Boolean(challenger && challenger.total > 0);
   const userWon = isVersus && correct > (challenger?.score || 0);
@@ -761,35 +760,108 @@ function ResultsScreen({
   return (
     <div className="min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto">
       {/* Header */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-6">
         <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--olive)] mb-1 block">
           Official Assessment
         </span>
-        <h1 className="font-space text-3xl sm:text-4xl font-extrabold mb-1" style={{ color: "var(--text)" }}>
+        <h1 className="font-space text-3xl sm:text-4xl font-extrabold mb-1.5" style={{ color: "var(--text)" }}>
           Results &amp; Analysis
         </h1>
-        <p className="text-sm font-space font-bold uppercase tracking-wider" style={{ color: grade.color }}>
-          {grade.label}
+        <p className="text-sm sm:text-base font-space font-black uppercase tracking-wider" style={{ color: remark.color }}>
+          {remark.gradeTitle}
+        </p>
+      </div>
+
+      {/* Cultural Examiner Commentary Verdict */}
+      <div
+        className="p-4 sm:p-5 rounded-2xl sm:rounded-3xl border surface text-center space-y-1.5 mb-6 relative overflow-hidden shadow-xs"
+        style={{ borderColor: "var(--border-dim)" }}
+      >
+        <div className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--text-mute)] flex items-center justify-center gap-1.5">
+          <span>🇳🇬</span>
+          <span>Examiner's Verdict</span>
+        </div>
+        <p className="font-space font-extrabold text-base sm:text-lg italic" style={{ color: "var(--text)" }}>
+          “{remark.funMessage}”
         </p>
       </div>
 
       {/* Group Challenge Standings Notification */}
       {activeChallenge && (
         <div
-          className="rounded-3xl p-5 border mb-6 flex items-center justify-between gap-4 shadow-sm"
-          style={{ borderColor: "rgba(68, 78, 44, 0.25)", background: "rgba(68, 78, 44, 0.08)" }}
+          className="rounded-3xl p-5 border mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm"
+          style={{
+            borderColor:
+              challengeRecordResult && !challengeRecordResult.isFirstAttempt
+                ? "rgba(166, 124, 30, 0.35)"
+                : "rgba(0, 135, 81, 0.35)",
+            background:
+              challengeRecordResult && !challengeRecordResult.isFirstAttempt
+                ? "rgba(166, 124, 30, 0.08)"
+                : "rgba(0, 135, 81, 0.08)",
+          }}
         >
-          <div>
-            <div className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)] mb-0.5">
-              Challenge Standings Recorded
+          <div className="space-y-1">
+            <div
+              className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-bold"
+              style={{
+                color:
+                  challengeRecordResult && !challengeRecordResult.isFirstAttempt
+                    ? "var(--gold)"
+                    : "#008751",
+              }}
+            >
+              {challengeRecordResult && !challengeRecordResult.isFirstAttempt ? (
+                <>
+                  <span>🔒</span>
+                  <span>Leaderboard Locked · First Attempt Preserved</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                  <span>Official 1st Attempt Logged to Leaderboard</span>
+                </>
+              )}
             </div>
+
             <div className="text-base font-space font-bold text-[var(--text)]">
               {activeChallenge.title}
             </div>
+
+            <div className="text-xs text-[var(--text-dim)]">
+              {challengeRecordResult && !challengeRecordResult.isFirstAttempt ? (
+                <span>
+                  Practice run complete ({pct}%). Your official tournament score remains locked at{" "}
+                  <strong className="text-[var(--text)]">
+                    {challengeRecordResult.officialScore.pct}% ({challengeRecordResult.officialScore.score}/{challengeRecordResult.officialScore.total})
+                  </strong>{" "}
+                  from your first attempt.
+                </span>
+              ) : (
+                <span>
+                  Your official tournament run is locked at{" "}
+                  <strong className="text-[var(--text)]">
+                    {pct}% ({correct}/{total})
+                  </strong>
+                  . Replays will not alter your position on the board.
+                </span>
+              )}
+            </div>
           </div>
+
           <button
             onClick={onViewChallengeBoard}
-            className="px-4 py-2.5 rounded-xl btn-terra text-xs font-space font-bold cursor-pointer shadow-xs"
+            className={cn(
+              "px-4 py-2.5 rounded-xl font-space font-bold text-xs cursor-pointer shadow-xs whitespace-nowrap self-start sm:self-auto shrink-0",
+              challengeRecordResult && !challengeRecordResult.isFirstAttempt
+                ? "border hover:bg-[var(--bg-card)] transition-colors text-[var(--text)]"
+                : "btn-terra"
+            )}
+            style={
+              challengeRecordResult && !challengeRecordResult.isFirstAttempt
+                ? { borderColor: "var(--border-dim)" }
+                : undefined
+            }
           >
             View Challenge Board →
           </button>
@@ -982,7 +1054,7 @@ function ResultsScreen({
         score={correct}
         total={total}
         pct={pct}
-        gradeLabel={grade.label}
+        gradeLabel={remark.gradeTitle}
         xpEarned={xpEarned}
         byCategory={byCategory}
         questionIds={questions.map((q) => q.id)}
@@ -1020,6 +1092,7 @@ export default function TriviaGameClient({
   const [totalSeconds, setTotalSeconds] = useState(600);
   const [xpEarned, setXpEarned] = useState(0);
   const [currentDifficulty, setCurrentDifficulty] = useState<TriviaDifficultyFilter>("random");
+  const [lastChallengeResult, setLastChallengeResult] = useState<RecordScoreResult | null>(null);
 
   // Read URL search params on client for challenge codes
   useEffect(() => {
@@ -1080,11 +1153,23 @@ export default function TriviaGameClient({
     setQuestions(selectedQuestions);
     setTotalSeconds(minutes * 60);
     setReviewMode(mode);
+    setLastChallengeResult(null);
     setPhase("playing");
   }
 
   function handleStartChallenge(challenge: TriviaChallenge) {
     setActiveChallenge(challenge);
+    const existingAttempt = getUserChallengeAttempt(challenge.id, profile?.username || "");
+    if (existingAttempt) {
+      setLastChallengeResult({
+        recorded: false,
+        isFirstAttempt: false,
+        officialScore: existingAttempt,
+      });
+    } else {
+      setLastChallengeResult(null);
+    }
+
     const matched = getQuestionsByIds(challenge.questionIds);
     const finalQuestions =
       matched.length > 0 ? matched : TRIVIA_QUESTIONS.slice(0, challenge.questionCount);
@@ -1097,6 +1182,8 @@ export default function TriviaGameClient({
   }
 
   function handlePlayDeck(questionIds: string[], minutes: number) {
+    setActiveChallenge(null);
+    setLastChallengeResult(null);
     const matched = getQuestionsByIds(questionIds);
     if (matched.length > 0) {
       setQuestions(matched);
@@ -1128,18 +1215,13 @@ export default function TriviaGameClient({
       total: stat.total,
     }));
 
-    const gradeLabel =
-      pct >= 80
-        ? "Naija Expert"
-        : pct >= 60
-        ? "Sharp Sharp"
-        : pct >= 40
-        ? "Not bad o"
-        : "Keep studying";
+    const remark = getTriviaPerformanceRemark(pct, questions.map((q) => q.id).join(""));
+    const gradeLabel = remark.gradeTitle;
 
-    // 1. Record in local challenge scores if playing a group challenge
+    // 1. Record in local challenge scores if playing a group challenge (locks to 1st attempt)
+    let challengeRecordResult: RecordScoreResult | null = null;
     if (activeChallenge) {
-      recordLocalChallengeScore(activeChallenge.id, {
+      challengeRecordResult = recordLocalChallengeScore(activeChallenge.id, {
         id: `score_${Date.now()}`,
         username: profile?.username?.trim() || "Scholar",
         avatar: profile?.avatar || "/avatars/avatar-scholar.svg",
@@ -1150,6 +1232,9 @@ export default function TriviaGameClient({
         completedAt: Date.now(),
         timeSpentSeconds: totalSeconds - timeLeft,
       });
+      setLastChallengeResult(challengeRecordResult);
+    } else {
+      setLastChallengeResult(null);
     }
 
     // 2. Persist round in trivia history
@@ -1170,7 +1255,11 @@ export default function TriviaGameClient({
       challengerPct: challenger?.pct,
     });
 
-    // 3. Submit score to cloud leaderboard (non-blocking)
+    // 3. Submit score to cloud leaderboard (non-blocking) - only for first attempts if it's a challenge!
+    const shouldSubmitChallengeScore = activeChallenge
+      ? challengeRecordResult?.isFirstAttempt !== false
+      : false;
+
     fetch("/api/trivia/scores", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -1182,7 +1271,9 @@ export default function TriviaGameClient({
         pct,
         gradeLabel,
         xpEarned: totalXP,
-        challengeId: activeChallenge ? activeChallenge.id : (challenger?.questionIds?.join(",") || undefined),
+        challengeId: shouldSubmitChallengeScore
+          ? activeChallenge!.id
+          : (challenger?.questionIds?.join(",") || undefined),
         questionIds: questions.map((q) => q.id),
         deviceId: profile?.id,
       }),
@@ -1224,6 +1315,7 @@ export default function TriviaGameClient({
         }}
         challenger={challenger}
         activeChallenge={activeChallenge}
+        challengeRecordResult={lastChallengeResult}
         onViewChallengeBoard={() => {
           setSetupTab("challenge");
           setPhase("setup");

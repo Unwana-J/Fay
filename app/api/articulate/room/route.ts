@@ -12,12 +12,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}));
     const { hostId, hostName, settings } = body;
 
-    if (!hostId || !hostName) {
-      return NextResponse.json(
-        { error: "Host ID and Host Name are required" },
-        { status: 400 }
-      );
-    }
+    const effectiveHostId = (hostId && String(hostId).trim()) || `host-${Math.random().toString(36).slice(2, 9)}`;
+    const effectiveHostName = (hostName && String(hostName).trim()) || "Scholar Host";
 
     // Generate unique code
     let code = generateRoomCode();
@@ -30,7 +26,7 @@ export async function POST(req: NextRequest) {
 
     const newRoom: ArticulateRoom = createInitialRoom(
       code,
-      { id: String(hostId), name: String(hostName).trim() },
+      { id: effectiveHostId, name: effectiveHostName },
       settings
     );
 

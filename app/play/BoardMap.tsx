@@ -106,8 +106,8 @@ export default function BoardMap({
   // Game board tile count matches the scoreGoal exactly (1 space = 1 point)
   const tileCount = scoreGoal;
 
-  // Columns: 6 for 30-tile board, 10 for 50/100-tile boards
-  const cols = scoreGoal === 30 ? 6 : 10;
+  // Responsive column count based on score goal
+  const cols = scoreGoal <= 20 ? (scoreGoal % 5 === 0 ? 5 : 10) : scoreGoal === 30 ? 6 : 10;
 
   const safeScoreA = Math.max(0, scoreA);
   const safeScoreB = Math.max(0, scoreB);
@@ -125,14 +125,17 @@ export default function BoardMap({
     return { row, col };
   };
 
+  const isVeryLargeBoard = tileCount > 50;
+  const isLargeBoard = tileCount > 30;
+
   return (
-    <div className="w-full flex flex-col gap-4 max-w-4xl mx-auto p-4 surface rounded-3xl border border-[var(--border-dim)] shadow-sm">
+    <div className="w-full flex flex-col gap-3.5 max-w-4xl mx-auto p-3 sm:p-4 surface rounded-3xl border border-[var(--border-dim)] shadow-sm">
       {/* Mini Score Panel */}
-      <div className="flex justify-between items-center px-2 py-1 text-xs font-space border-b border-[var(--border-dim)]/40 pb-3">
+      <div className="flex justify-between items-center px-2 py-1 text-xs font-space border-b border-[var(--border-dim)]/40 pb-2.5">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colorA }} />
           <span className="font-bold text-[var(--text)]">Alpha:</span>
-          <span className="text-[var(--text-dim)]">{safeScoreA} / {scoreGoal} pts</span>
+          <span className="text-[var(--text-dim)] font-mono font-bold">{safeScoreA} / {scoreGoal} pts</span>
           {(isMasterchef || activeTeam === "A") && (
             <span className="text-[9px] uppercase bg-terra/10 px-1.5 py-0.5 rounded text-[var(--terra)] font-black">
               {isMasterchef ? "Active" : "Playing"}
@@ -147,16 +150,57 @@ export default function BoardMap({
           )}
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: colorB }} />
           <span className="font-bold text-[var(--text)]">Omega:</span>
-          <span className="text-[var(--text-dim)]">{safeScoreB} / {scoreGoal} pts</span>
+          <span className="text-[var(--text-dim)] font-mono font-bold">{safeScoreB} / {scoreGoal} pts</span>
+        </div>
+      </div>
+
+      {/* Dual Progress Fill Bars */}
+      <div className="grid grid-cols-2 gap-3 px-2">
+        <div className="space-y-1">
+          <div className="flex justify-between items-center text-[10px] font-mono">
+            <span className="font-bold flex items-center gap-1.5" style={{ color: colorA }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorA }} />
+              Team Alpha
+            </span>
+            <span className="text-[var(--text-dim)] font-bold">{Math.round((safeScoreA / scoreGoal) * 100)}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--bg-input)] overflow-hidden">
+            <motion.div 
+              className="h-full rounded-full" 
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(100, (safeScoreA / scoreGoal) * 100)}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              style={{ backgroundColor: colorA }} 
+            />
+          </div>
+        </div>
+        <div className="space-y-1">
+          <div className="flex justify-between items-center text-[10px] font-mono">
+            <span className="font-bold flex items-center gap-1.5" style={{ color: colorB }}>
+              <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: colorB }} />
+              Team Omega
+            </span>
+            <span className="text-[var(--text-dim)] font-bold">{Math.round((safeScoreB / scoreGoal) * 100)}%</span>
+          </div>
+          <div className="h-1.5 rounded-full bg-[var(--bg-input)] overflow-hidden">
+            <motion.div 
+              className="h-full rounded-full" 
+              initial={{ width: 0 }}
+              animate={{ width: `${Math.min(100, (safeScoreB / scoreGoal) * 100)}%` }}
+              transition={{ duration: 0.5, ease: "easeOut" }}
+              style={{ backgroundColor: colorB }} 
+            />
+          </div>
         </div>
       </div>
 
       {/* Grid Board Container */}
       <div 
-        className="gap-1.5 p-1 select-none relative"
+        className="p-1 select-none relative"
         style={{
           display: "grid",
           gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+          gap: isVeryLargeBoard ? "0.25rem" : "0.375rem",
         }}
       >
         {tiles.map((tile) => {
@@ -166,41 +210,72 @@ export default function BoardMap({
           const isSpecial = tile.type !== "normal" && tile.type !== "start" && tile.type !== "finish";
           const tileCategoryColor = CATEGORY_COLORS[tile.category];
 
-          // Both teams have moved past this tile
-          const passedByBoth = tile.index < tileIndexA && tile.index < tileIndexB;
-          // At least one team has moved past this tile
-          const passedByAny = tile.index < tileIndexA || tile.index < tileIndexB;
+          const passedByA = tile.index < tileIndexA;
+          const passedByB = tile.index < tileIndexB;
+          const passedByBoth = passedByA && passedByB;
+          const passedByAny = passedByA || passedByB;
+          const isCurrent = hasA || hasB;
 
-          // Background color determination
+          // Background & Shading determination
           let currentBgColor = tile.bgColor;
           let currentTextColor = tile.textColor;
+          let currentBorderColor = "var(--border-dim)";
+          let currentBorderStyle: "solid" | "dashed" = "solid";
+          let currentBorderWidth = "1.5px";
+          let currentOpacity = 1;
+          let currentBoxShadow: string | undefined = undefined;
 
-          if (passedByBoth) {
-            currentBgColor = tileCategoryColor; // Solid 100% opacity
-            currentTextColor = "#ffffff"; // White text
-          } else if (passedByAny) {
-            currentBgColor = `${tileCategoryColor}80`; // 50% opacity
-            currentTextColor = "var(--text)"; // High contrast text
+          if (isCurrent) {
+            // Team is currently on this tile: elevated and highlighted
+            currentOpacity = 1;
+            currentBorderStyle = "solid";
+            currentBorderWidth = "2.5px";
+            currentBorderColor = hasA && hasB ? "var(--text)" : hasA ? colorA : colorB;
+            currentBgColor = `${tileCategoryColor}35`;
+            currentTextColor = "var(--text)";
+            currentBoxShadow = `0 0 0 2px ${hasA ? colorA : colorB}, 0 4px 12px ${hasA ? colorA : colorB}40`;
+          } else if (passedByBoth) {
+            // Fully conquered by both teams: deeply shaded and darker
+            currentOpacity = 1;
+            currentBorderStyle = "solid";
+            currentBorderWidth = "2px";
+            currentBorderColor = "var(--text)";
+            currentBgColor = `${tileCategoryColor}60`;
+            currentTextColor = "var(--text)";
+            currentBoxShadow = "inset 0 0 0 100px rgba(0, 0, 0, 0.18)";
+          } else if (passedByA) {
+            // Traversed by Team Alpha: clearly darker/shaded with Alpha's tone
+            currentOpacity = 1;
+            currentBorderStyle = "solid";
+            currentBorderWidth = "2px";
+            currentBorderColor = colorA;
+            currentBgColor = `${colorA}30`;
+            currentTextColor = "var(--text)";
+            currentBoxShadow = "inset 0 0 0 100px rgba(0, 0, 0, 0.12)";
+          } else if (passedByB) {
+            // Traversed by Team Omega: clearly darker/shaded with Omega's tone
+            currentOpacity = 1;
+            currentBorderStyle = "solid";
+            currentBorderWidth = "2px";
+            currentBorderColor = colorB;
+            currentBgColor = `${colorB}30`;
+            currentTextColor = "var(--text)";
+            currentBoxShadow = "inset 0 0 0 100px rgba(0, 0, 0, 0.12)";
           } else {
-            currentBgColor = `${tileCategoryColor}20`; // 12.5% opacity
+            // Upcoming / uncompleted tile: softly muted and semi-transparent
+            currentOpacity = 0.38;
+            currentBorderStyle = "dashed";
+            currentBorderWidth = "1px";
+            currentBorderColor = `${tileCategoryColor}60`;
+            currentBgColor = `${tileCategoryColor}12`;
             currentTextColor = tileCategoryColor;
+            currentBoxShadow = undefined;
           }
 
-          // Border color determination
-          let currentBorderColor = hasA || hasB 
-            ? "var(--text)" 
-            : passedByBoth 
-            ? "var(--text)" // Bold black/white border when fully conquered
-            : passedByAny 
-            ? `${tileCategoryColor}` // Solid category color border
-            : `${tileCategoryColor}90`; // 56% opacity category border
-
-          let currentBorderWidth = hasA || hasB ? "2.5px" : passedByBoth || passedByAny ? "2px" : "1.5px";
-
-          // Dynamically scale tile padding and fonts based on board size
-          const isLargeBoard = tileCount > 30;
-          const tileClass = isLargeBoard 
-            ? "aspect-square rounded-lg border flex flex-col items-center justify-between p-0.5 sm:p-1 transition-all relative overflow-hidden text-[7px]" 
+          const tileClass = isVeryLargeBoard 
+            ? "aspect-square rounded-md border flex flex-col items-center justify-between p-0.5 transition-all relative overflow-hidden" 
+            : isLargeBoard 
+            ? "aspect-square rounded-lg border flex flex-col items-center justify-between p-0.5 sm:p-1 transition-all relative overflow-hidden" 
             : "aspect-square rounded-2xl border flex flex-col items-center justify-between p-1.5 sm:p-2 transition-all relative overflow-hidden";
 
           return (
@@ -210,10 +285,12 @@ export default function BoardMap({
               style={{
                 backgroundColor: currentBgColor,
                 borderColor: currentBorderColor,
+                borderStyle: currentBorderStyle,
                 borderWidth: currentBorderWidth,
+                opacity: currentOpacity,
+                boxShadow: currentBoxShadow,
                 gridColumnStart: col + 1,
                 gridRowStart: row + 1,
-                boxShadow: hasA || hasB ? `0 0 12px ${tileCategoryColor}40` : undefined
               }}
             >
               {/* Tile label / icon */}
@@ -222,27 +299,42 @@ export default function BoardMap({
                   className="font-space font-black"
                   style={{ 
                     color: currentTextColor, 
-                    fontSize: isLargeBoard ? "7px" : "9px" 
+                    fontSize: isVeryLargeBoard ? "6.5px" : isLargeBoard ? "7.5px" : "9px" 
                   }}
                 >
-                  {tile.type === "start" ? "START" : tile.type === "finish" ? "FINISH" : tile.index}
+                  {tile.type === "start" ? (isVeryLargeBoard ? "S" : "START") : tile.type === "finish" ? (isVeryLargeBoard ? "F" : "FINISH") : tile.index}
                 </span>
-                {tile.icon && (
-                  <span className={isLargeBoard ? "text-[8px] sm:text-xs" : "text-xs sm:text-sm"}>
+
+                {/* Traversed indicator or tile icon */}
+                {passedByAny && !isCurrent ? (
+                  <span
+                    className="rounded-full inline-block shrink-0 shadow-xs"
+                    style={{
+                      width: isVeryLargeBoard ? "4px" : "6px",
+                      height: isVeryLargeBoard ? "4px" : "6px",
+                      backgroundColor: passedByBoth ? "var(--text)" : passedByA ? colorA : colorB,
+                    }}
+                    title={passedByBoth ? "Traversed by both" : passedByA ? "Traversed by Alpha" : "Traversed by Omega"}
+                  />
+                ) : tile.icon ? (
+                  <span className={isVeryLargeBoard ? "text-[6px]" : isLargeBoard ? "text-[8px] sm:text-xs" : "text-xs sm:text-sm"}>
                     {tile.icon}
                   </span>
-                )}
+                ) : null}
               </div>
 
               {/* Tokens overlay container */}
-              <div className="flex justify-center items-center gap-0.5 w-full relative" style={{ height: isLargeBoard ? "14px" : "32px" }}>
+              <div 
+                className="flex justify-center items-center gap-0.5 w-full relative" 
+                style={{ height: isVeryLargeBoard ? "11px" : isLargeBoard ? "14px" : "32px" }}
+              >
                 {hasA && (
                   <motion.div
                     layoutId="token-A"
                     transition={{ type: "spring", stiffness: 180, damping: 15 }}
                     className="z-10 filter drop-shadow-xs"
                   >
-                    <FeyLogo size={isLargeBoard ? 14 : 26} color={colorA} />
+                    <FeyLogo size={isVeryLargeBoard ? 12 : isLargeBoard ? 14 : 26} color={colorA} />
                   </motion.div>
                 )}
                 {hasB && (
@@ -251,7 +343,7 @@ export default function BoardMap({
                     transition={{ type: "spring", stiffness: 180, damping: 15 }}
                     className="z-10 filter drop-shadow-xs"
                   >
-                    <FeyLogo size={isLargeBoard ? 14 : 26} color={colorB} />
+                    <FeyLogo size={isVeryLargeBoard ? 12 : isLargeBoard ? 14 : 26} color={colorB} />
                   </motion.div>
                 )}
               </div>

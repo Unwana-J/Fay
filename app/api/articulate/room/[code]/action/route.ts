@@ -83,7 +83,7 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}));
-    const { action, playerId, playerName, preferredTeam, targetTeam } = body;
+    const { action, playerId, playerName, preferredTeam, targetTeam, settings, hostId } = body;
 
     switch (action) {
       // -------------------------------------------------------------
@@ -272,7 +272,7 @@ export async function POST(
           speakerId,
           speakerName,
           startedAt: Date.now(),
-          durationSeconds: room.settings.timerSeconds || 60,
+          durationSeconds: room.settings.timerSeconds || 30,
         };
 
         await persistRoom(room);
@@ -427,8 +427,39 @@ export async function POST(
         room.deck = buildDeck(
           room.settings.categories,
           room.settings.difficulty,
-          80
+          Math.max(120, (room.settings.scoreGoal || 20) * 3)
         );
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 8. UPDATE SETTINGS (Host adjusts duration 30s/60s or score goal)
+      // -------------------------------------------------------------
+      case "update_settings": {
+        const actingHostId = String(hostId || playerId);
+        if (room.host_id !== actingHostId) {
+          return NextResponse.json(
+            { error: "Only the host can modify match settings" },
+            { status: 403 }
+          );
+        }
+        if (room.status === "playing") {
+          return NextResponse.json(
+            { error: "Cannot modify settings while a round is in progress" },
+            { status: 400 }
+          );
+        }
+
+        if (settings) {
+          if (settings.timerSeconds && (settings.timerSeconds === 30 || settings.timerSeconds === 60)) {
+            room.settings.timerSeconds = settings.timerSeconds;
+          }
+          if (settings.scoreGoal && typeof settings.scoreGoal === "number") {
+            room.settings.scoreGoal = Math.max(5, Math.min(100, Math.round(settings.scoreGoal)));
+          }
+        }
 
         await persistRoom(room);
         return NextResponse.json({ success: true, room });

@@ -5,17 +5,19 @@ import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight, Clock, Target } from "lucide-react";
 import { motion } from "framer-motion";
 
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const router = useRouter();
-  const { profile, articulateHistory = [], removeArticulateRoom } = useAppStore();
+  const { profile, updateProfile, articulateHistory = [], removeArticulateRoom } = useAppStore();
 
   const [playMode, setPlayMode] = useState<"online" | "local">("online");
   const [isCreatingOnline, setIsCreatingOnline] = useState(false);
   const [onlineJoinCode, setOnlineJoinCode] = useState("");
   const [onlineJoinError, setOnlineJoinError] = useState<string | null>(null);
+  const [onlineTimerSeconds, setOnlineTimerSeconds] = useState<30 | 60>(30);
+  const [onlineScoreGoal, setOnlineScoreGoal] = useState<number>(20);
 
   const {
     timerSeconds, setTimerSeconds,
@@ -74,15 +76,26 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
     setIsCreatingOnline(true);
     setOnlineJoinError(null);
     try {
+      const effectiveHostId =
+        profile?.id ||
+        (typeof crypto !== "undefined" && crypto.randomUUID
+          ? crypto.randomUUID()
+          : `scholar-${Math.random().toString(36).slice(2, 9)}`);
+      const effectiveHostName = profile?.username?.trim() || "Scholar Host";
+
+      if (!profile?.id) {
+        updateProfile({ id: effectiveHostId, username: effectiveHostName });
+      }
+
       const res = await fetch("/api/articulate/room", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          hostId: profile.id,
-          hostName: profile.username || "Scholar Host",
+          hostId: effectiveHostId,
+          hostName: effectiveHostName,
           settings: {
-            timerSeconds: 60,
-            scoreGoal: scoreGoal || 20,
+            timerSeconds: onlineTimerSeconds,
+            scoreGoal: onlineScoreGoal,
             categories: selectedCategories,
             difficulty,
           },
@@ -189,16 +202,88 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                   </p>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[var(--bg)] border border-[var(--border-dim)] text-xs text-[var(--text-dim)] space-y-2">
-                  <div className="flex items-center gap-2 font-bold text-[var(--text)]">
-                    <Sparkles className="w-3.5 h-3.5 text-[var(--gold)]" />
-                    Party Match Defaults:
+                {/* Host Match Configuration */}
+                <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg)] border border-[var(--border-dim)] space-y-4">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold font-space text-[var(--text)] flex items-center gap-1.5">
+                      <Sparkles className="w-3.5 h-3.5 text-[var(--gold)]" />
+                      Host Match Settings
+                    </span>
+                    <span className="text-[10px] text-[var(--text-mute)] font-medium">
+                      Host picks rules
+                    </span>
                   </div>
-                  <ul className="space-y-1 list-disc list-inside text-[11px] leading-relaxed">
-                    <li>60 seconds per speaking sprint</li>
-                    <li>First team to 20 points wins</li>
-                    <li>Round locks when active; late joiners jump in next round</li>
-                  </ul>
+
+                  {/* Sprint Duration Selector: 30s vs 60s */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-[var(--text-mute)]" />
+                        Speaking Sprint Duration
+                      </span>
+                      <span className="font-mono font-bold text-[var(--terra)]">
+                        {onlineTimerSeconds}s
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setOnlineTimerSeconds(30)}
+                        className={`py-2 px-3 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
+                          onlineTimerSeconds === 30
+                            ? "bg-[var(--terra)] border-[var(--terra)] text-white shadow-xs"
+                            : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
+                        }`}
+                      >
+                        ⚡ 30s (Blitz)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setOnlineTimerSeconds(60)}
+                        className={`py-2 px-3 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
+                          onlineTimerSeconds === 60
+                            ? "bg-[var(--terra)] border-[var(--terra)] text-white shadow-xs"
+                            : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
+                        }`}
+                      >
+                        ⏱️ 60s (Standard)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Target Score Selector */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
+                        <Target className="w-3 h-3 text-[var(--text-mute)]" />
+                        Winning Target Score
+                      </span>
+                      <span className="font-mono font-bold text-[var(--olive)]">
+                        First to {onlineScoreGoal} pts
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-5 gap-1.5">
+                      {[20, 30, 50, 75, 100].map((pts) => (
+                        <button
+                          key={pts}
+                          type="button"
+                          onClick={() => setOnlineScoreGoal(pts)}
+                          className={`py-1.5 px-1.5 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
+                            onlineScoreGoal === pts
+                              ? "bg-[var(--olive)] border-[var(--olive)] text-white shadow-xs"
+                              : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
+                          }`}
+                        >
+                          {pts} pts
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="pt-2 border-t border-[var(--border-dim)]/60 text-[10px] text-[var(--text-mute)] flex items-center gap-1.5">
+                    <Lock className="w-3 h-3 shrink-0" />
+                    <span>Round locks when active; late joiners enter in next round.</span>
+                  </div>
                 </div>
 
                 {onlineJoinError && (

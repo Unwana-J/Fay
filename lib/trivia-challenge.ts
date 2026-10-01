@@ -48,6 +48,24 @@ export interface ChallengeTimeStatus {
   fullStatusText: string;
 }
 
+export interface DetailedCountdown {
+  isExpired: boolean;
+  isIndefinite: boolean;
+  totalRemainingMs: number;
+  totalDurationMs: number;
+  elapsedMs: number;
+  percentRemaining: number;
+  days: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+  formattedClock: string;
+  elapsedText: string;
+  remainingText: string;
+  fullStatusText: string;
+}
+
+
 export const DURATION_CHOICES = [
   { hours: 2, label: "2 Hours", desc: "Fast sprint" },
   { hours: 6, label: "6 Hours", desc: "Evening window" },
@@ -80,7 +98,7 @@ export function createTriviaChallenge(options: {
 
   return {
     id,
-    title: options.title.trim() || `${options.creatorName}'s Trivia Clash`,
+    title: options.title.trim() || `${options.creatorName}'s Trivia Challenge`,
     creatorName: options.creatorName.trim() || "Scholar",
     createdAt: Date.now(),
     durationHours: options.durationHours,
@@ -150,6 +168,98 @@ export function getChallengeTimeStatus(challenge: TriviaChallenge): ChallengeTim
 }
 
 /**
+ * Calculates a live-ticking digital countdown object with days, hours,
+ * minutes, seconds, progress percentages, and status flags.
+ */
+export function getDetailedChallengeCountdown(challenge: TriviaChallenge): DetailedCountdown {
+  const now = Date.now();
+  const elapsedMs = Math.max(0, now - challenge.createdAt);
+
+  let elapsedText: string;
+  if (elapsedMs < 60_000) {
+    elapsedText = "Active for < 1m";
+  } else if (elapsedMs < 3600_000) {
+    const mins = Math.floor(elapsedMs / 60_000);
+    elapsedText = `Active for ${mins}m`;
+  } else {
+    const hrs = Math.floor(elapsedMs / 3600_000);
+    const mins = Math.floor((elapsedMs % 3600_000) / 60_000);
+    elapsedText = mins > 0 ? `Active for ${hrs}h ${mins}m` : `Active for ${hrs}h`;
+  }
+
+  if (!challenge.durationHours || challenge.durationHours <= 0) {
+    return {
+      isExpired: false,
+      isIndefinite: true,
+      totalRemainingMs: Infinity,
+      totalDurationMs: Infinity,
+      elapsedMs,
+      percentRemaining: 100,
+      days: 0,
+      hours: 0,
+      minutes: 0,
+      seconds: 0,
+      formattedClock: "∞",
+      elapsedText,
+      remainingText: "Open indefinitely",
+      fullStatusText: `${elapsedText} · Open indefinitely`,
+    };
+  }
+
+  const totalDurationMs = challenge.durationHours * 3600 * 1000;
+  const expiresAt = challenge.createdAt + totalDurationMs;
+  const remainingMs = Math.max(0, expiresAt - now);
+  const isExpired = remainingMs <= 0;
+
+  const percentRemaining = Math.max(0, Math.min(100, (remainingMs / totalDurationMs) * 100));
+
+  const totalSeconds = Math.floor(remainingMs / 1000);
+  const days = Math.floor(totalSeconds / 86400);
+  const hours = Math.floor((totalSeconds % 86400) / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  const formattedClock =
+    days > 0
+      ? `${days}d ${pad(hours)}:${pad(minutes)}:${pad(seconds)}`
+      : `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+
+  let remainingText: string;
+  if (isExpired) {
+    remainingText = "Concluded";
+  } else if (remainingMs < 60_000) {
+    remainingText = `Closes in ${seconds}s`;
+  } else if (remainingMs < 3600_000) {
+    remainingText = `Closes in ${minutes}m ${seconds}s`;
+  } else if (days > 0) {
+    remainingText = `Closes in ${days}d ${hours}h`;
+  } else {
+    remainingText = `Closes in ${hours}h ${minutes}m`;
+  }
+
+  return {
+    isExpired,
+    isIndefinite: false,
+    totalRemainingMs: remainingMs,
+    totalDurationMs,
+    elapsedMs,
+    percentRemaining,
+    days,
+    hours,
+    minutes,
+    seconds,
+    formattedClock,
+    elapsedText,
+    remainingText,
+    fullStatusText: isExpired
+      ? `Concluded · Ran for ${challenge.durationHours}h`
+      : `${elapsedText} · ${remainingText}`,
+  };
+}
+
+
+/**
  * URL State Compression (Zero-Database sharing via LZ-string)
  */
 export function encodeChallengeToUrl(challenge: TriviaChallenge): string {
@@ -164,7 +274,15 @@ export function encodeChallengeToUrl(challenge: TriviaChallenge): string {
 
 export function decodeChallengeFromUrl(code: string): TriviaChallenge | null {
   try {
-    const decompressed = LZString.decompressFromEncodedURIComponent(code);
+    let decompressed = LZString.decompressFromEncodedURIComponent(code);
+    if (!decompressed && code.includes(" ")) {
+      decompressed = LZString.decompressFromEncodedURIComponent(code.replace(/ /g, "+"));
+    }
+    if (!decompressed) {
+      try {
+        decompressed = LZString.decompressFromEncodedURIComponent(decodeURIComponent(code));
+      } catch {}
+    }
     if (!decompressed) return null;
     const parsed = JSON.parse(decompressed);
     if (parsed && parsed.id && Array.isArray(parsed.questionIds)) {
@@ -218,26 +336,54 @@ export function getAllLocalChallenges(): TriviaChallenge[] {
   }
 }
 
-export function recordLocalChallengeScore(challengeId: string, score: ChallengeParticipantScore): void {
-  if (typeof window === "undefined") return;
+export interface RecordScoreResult {
+  recorded: boolean;
+  isFirstAttempt: boolean;
+  officialScore: ChallengeParticipantScore;
+}
+
+export function getUserChallengeAttempt(challengeId: string, username: string): ChallengeParticipantScore | null {
+  if (typeof window === "undefined" || !username) return null;
+  const scores = getLocalChallengeScores(challengeId);
+  return scores.find((s) => s.username.trim().toLowerCase() === username.trim().toLowerCase()) || null;
+}
+
+export function recordLocalChallengeScore(
+  challengeId: string,
+  score: ChallengeParticipantScore
+): RecordScoreResult {
+  if (typeof window === "undefined") {
+    return { recorded: false, isFirstAttempt: false, officialScore: score };
+  }
   try {
     const key = `fey_tc_${challengeId}_scores`;
     const raw = localStorage.getItem(key);
     const scores: ChallengeParticipantScore[] = raw ? JSON.parse(raw) : [];
-    // Deduplicate by username, keep best
-    const existingIdx = scores.findIndex(
+
+    // Strictly lock challenge leaderboard: only the FIRST attempt is logged
+    const existing = scores.find(
       (s) => s.username.trim().toLowerCase() === score.username.trim().toLowerCase()
     );
-    if (existingIdx >= 0) {
-      if (score.pct > scores[existingIdx].pct || (score.pct === scores[existingIdx].pct && score.score > scores[existingIdx].score)) {
-        scores[existingIdx] = score;
-      }
-    } else {
-      scores.push(score);
+
+    if (existing) {
+      // Score is locked from first attempt
+      return {
+        recorded: false,
+        isFirstAttempt: false,
+        officialScore: existing,
+      };
     }
+
+    scores.push(score);
     localStorage.setItem(key, JSON.stringify(scores));
+    return {
+      recorded: true,
+      isFirstAttempt: true,
+      officialScore: score,
+    };
   } catch (e) {
     console.warn("Could not record local challenge score:", e);
+    return { recorded: false, isFirstAttempt: false, officialScore: score };
   }
 }
 

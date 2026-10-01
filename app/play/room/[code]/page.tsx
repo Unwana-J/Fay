@@ -38,7 +38,7 @@ export default function ArticulateRoomPage({
   const [error, setError] = useState<string | null>(null);
   const [isSpectator, setIsSpectator] = useState(false);
   const [presencePlayers, setPresencePlayers] = useState<RoomPlayer[]>([]);
-  const [secondsRemaining, setSecondsRemaining] = useState(60);
+  const [secondsRemaining, setSecondsRemaining] = useState(30);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
 
   const channelRef = useRef<any>(null);
@@ -250,7 +250,7 @@ export default function ArticulateRoomPage({
     }
 
     const turn = room.current_turn;
-    const duration = turn.durationSeconds || 60;
+    const duration = turn.durationSeconds || room.settings?.timerSeconds || 30;
     const startedAt = turn.startedAt || Date.now();
 
     const updateTimer = () => {
@@ -337,6 +337,14 @@ export default function ArticulateRoomPage({
     dispatchAction({
       action: "shuffle_teams",
       hostId: myPlayerId,
+    });
+  };
+
+  const handleUpdateSettings = (newSettings: { timerSeconds?: number; scoreGoal?: number }) => {
+    dispatchAction({
+      action: "update_settings",
+      hostId: myPlayerId,
+      settings: newSettings,
     });
   };
 
@@ -491,6 +499,7 @@ export default function ArticulateRoomPage({
               onStartRound={handleStartRound}
               onSwitchTeam={handleSwitchTeam}
               onShuffleTeams={handleShuffleTeams}
+              onUpdateSettings={handleUpdateSettings}
             />
           </motion.div>
         ) : room.status === "playing" ? (
