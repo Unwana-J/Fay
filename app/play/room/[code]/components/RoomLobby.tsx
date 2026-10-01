@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices } from "lucide-react";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RoomLobbyProps {
@@ -14,6 +14,8 @@ interface RoomLobbyProps {
   onSwitchTeam: (targetTeam: "A" | "B") => void;
   onShuffleTeams?: () => void;
   onUpdateSettings?: (settings: { timerSeconds?: number; scoreGoal?: number }) => void;
+  onToggleInactive?: () => void;
+  onLeaveRoom?: () => void;
 }
 
 export default function RoomLobby({
@@ -25,6 +27,8 @@ export default function RoomLobby({
   onSwitchTeam,
   onShuffleTeams,
   onUpdateSettings,
+  onToggleInactive,
+  onLeaveRoom,
 }: RoomLobbyProps) {
   const [copied, setCopied] = useState(false);
 
@@ -51,10 +55,28 @@ export default function RoomLobby({
     ? "B"
     : null;
 
-  // Resolve player details from presence map
+  const isPlayerInactive = (pId: string) => {
+    return Boolean(room.inactive_players?.includes(pId));
+  };
+
+  const teamAActiveCount = room.teams.teamA.playerIds.filter(
+    (id) => !isPlayerInactive(id)
+  ).length;
+  const teamAInactiveCount = room.teams.teamA.playerIds.length - teamAActiveCount;
+
+  const teamBActiveCount = room.teams.teamB.playerIds.filter(
+    (id) => !isPlayerInactive(id)
+  ).length;
+  const teamBInactiveCount = room.teams.teamB.playerIds.length - teamBActiveCount;
+
+  // Resolve player details from presence map or persisted details
   const getPlayerDisplay = (pId: string) => {
     const found = presencePlayers.find((p) => p.id === pId);
     if (found) return found;
+    const detail = room.player_details?.[pId];
+    if (detail) {
+      return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+    }
     if (pId === room.host_id) {
       return { id: pId, name: room.host_name, avatar: "/avatars/avatar-scholar.svg", isHost: true };
     }
@@ -202,6 +224,9 @@ export default function RoomLobby({
               <h2 className="font-space font-bold text-base text-[var(--text)]">
                 {room.teams.teamA.name}
               </h2>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                {teamAActiveCount} Active{teamAInactiveCount > 0 ? ` · ${teamAInactiveCount} Away` : ""}
+              </span>
             </div>
             {myTeam !== "A" ? (
               <button
@@ -226,11 +251,14 @@ export default function RoomLobby({
               room.teams.teamA.playerIds.map((pId, idx) => {
                 const p = getPlayerDisplay(pId);
                 const isMe = pId === myPlayerId;
+                const inactive = isPlayerInactive(pId);
                 return (
                   <div
                     key={pId}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs ${
-                      isMe
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition ${
+                      inactive
+                        ? "bg-amber-500/5 border-amber-500/20 opacity-70"
+                        : isMe
                         ? "bg-[var(--olive)]/10 border-[var(--olive)]/30 font-bold"
                         : "bg-[var(--bg-card)] border-[var(--border-dim)]"
                     }`}
@@ -244,9 +272,15 @@ export default function RoomLobby({
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
-                        Round {idx * 2 + 1}
-                      </span>
+                      {inactive ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 font-medium border border-amber-500/30">
+                          <Moon className="w-2.5 h-2.5" /> Away
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
+                          Round {idx * 2 + 1}
+                        </span>
+                      )}
                       {pId === room.host_id && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">
                           <Crown className="w-3 h-3" /> Host
@@ -274,6 +308,9 @@ export default function RoomLobby({
               <h2 className="font-space font-bold text-base text-[var(--text)]">
                 {room.teams.teamB.name}
               </h2>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                {teamBActiveCount} Active{teamBInactiveCount > 0 ? ` · ${teamBInactiveCount} Away` : ""}
+              </span>
             </div>
             {myTeam !== "B" ? (
               <button
@@ -298,11 +335,14 @@ export default function RoomLobby({
               room.teams.teamB.playerIds.map((pId, idx) => {
                 const p = getPlayerDisplay(pId);
                 const isMe = pId === myPlayerId;
+                const inactive = isPlayerInactive(pId);
                 return (
                   <div
                     key={pId}
-                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs ${
-                      isMe
+                    className={`flex items-center justify-between p-2.5 rounded-xl border text-xs transition ${
+                      inactive
+                        ? "bg-amber-500/5 border-amber-500/20 opacity-70"
+                        : isMe
                         ? "bg-[var(--olive)]/10 border-[var(--olive)]/30 font-bold"
                         : "bg-[var(--bg-card)] border-[var(--border-dim)]"
                     }`}
@@ -316,9 +356,15 @@ export default function RoomLobby({
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
-                        Round {idx * 2 + 2}
-                      </span>
+                      {inactive ? (
+                        <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 font-medium border border-amber-500/30">
+                          <Moon className="w-2.5 h-2.5" /> Away
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
+                          Round {idx * 2 + 2}
+                        </span>
+                      )}
                       {pId === room.host_id && (
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">
                           <Crown className="w-3 h-3" /> Host

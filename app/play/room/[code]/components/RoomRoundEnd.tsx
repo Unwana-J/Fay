@@ -1,8 +1,27 @@
 "use client";
 
 import React from "react";
-import { ArticulateRoom } from "@/lib/articulate-room";
-import { Check, FastForward, Play, Trophy, Users, ArrowRight, Sparkles, AlertTriangle, ShieldCheck, Flag, ThumbsDown, ThumbsUp } from "lucide-react";
+import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
+import {
+  Check,
+  FastForward,
+  Play,
+  Trophy,
+  Users,
+  ArrowRight,
+  Sparkles,
+  AlertTriangle,
+  ShieldCheck,
+  Flag,
+  ThumbsDown,
+  ThumbsUp,
+  Moon,
+  CheckCircle2,
+  LogOut,
+  Crown,
+  Mic,
+  Clock,
+} from "lucide-react";
 import { motion } from "framer-motion";
 import BoardMap from "@/app/play/BoardMap";
 
@@ -11,9 +30,12 @@ interface RoomRoundEndProps {
   myPlayerId: string;
   myPlayerName: string;
   isHost: boolean;
+  presencePlayers?: RoomPlayer[];
   onStartNextRound: () => void;
   onDisputeWord: (wordIndex: number) => void;
   onResolveDispute: (wordIndex: number, resolution: "concede" | "reject") => void;
+  onToggleInactive?: () => void;
+  onLeaveRoom?: () => void;
 }
 
 export default function RoomRoundEnd({
@@ -21,9 +43,12 @@ export default function RoomRoundEnd({
   myPlayerId,
   myPlayerName,
   isHost,
+  presencePlayers = [],
   onStartNextRound,
   onDisputeWord,
   onResolveDispute,
+  onToggleInactive,
+  onLeaveRoom,
 }: RoomRoundEndProps) {
   const currentTurn = room.current_turn;
   const scoredWords = room.round_words_scored || [];
@@ -53,6 +78,76 @@ export default function RoomRoundEnd({
     nextActiveTeamKey === "A" ? room.teams.teamA.color : room.teams.teamB.color;
 
   const netPoints = scoredWords.filter((w) => w.disputeStatus !== "conceded").length;
+
+  const isPlayerInactive = (pId: string) => {
+    return Boolean(room.inactive_players?.includes(pId));
+  };
+
+  const isMeInactive = isPlayerInactive(myPlayerId);
+
+  // Helper to resolve player display details
+  const getPlayerDisplay = (pId: string) => {
+    const presenceMatch = presencePlayers.find((p) => p.id === pId);
+    if (presenceMatch) return presenceMatch;
+
+    const detailMatch = room.player_details?.[pId];
+    if (detailMatch) {
+      return {
+        id: pId,
+        name: detailMatch.name,
+        avatar: detailMatch.avatar || "/avatars/avatar-scholar.svg",
+        team: room.teams.teamA.playerIds.includes(pId)
+          ? ("A" as const)
+          : room.teams.teamB.playerIds.includes(pId)
+          ? ("B" as const)
+          : null,
+        isHost: pId === room.host_id,
+        joinedAt: 0,
+      };
+    }
+
+    if (pId === room.host_id) {
+      return {
+        id: pId,
+        name: room.host_name,
+        avatar: "/avatars/avatar-scholar.svg",
+        team: "A" as const,
+        isHost: true,
+        joinedAt: 0,
+      };
+    }
+
+    return {
+      id: pId,
+      name: `Scholar (${pId.slice(0, 5)})`,
+      avatar: "/avatars/avatar-scholar.svg",
+      team: null,
+      isHost: false,
+      joinedAt: 0,
+    };
+  };
+
+  // Compute next round speaker
+  const nextTeam = nextActiveTeamKey === "A" ? room.teams.teamA : room.teams.teamB;
+  const nextTeamActiveIds = nextTeam.playerIds.filter((id) => !isPlayerInactive(id));
+  const nextTeamEligibleIds =
+    nextTeamActiveIds.length > 0 ? nextTeamActiveIds : nextTeam.playerIds;
+  const nextTurnIndex = Math.floor((nextRoundNumber - 1) / 2);
+  const nextSpeakerId =
+    nextTeamEligibleIds.length > 0
+      ? nextTeamEligibleIds[nextTurnIndex % nextTeamEligibleIds.length]
+      : null;
+
+  // Counts for each team
+  const teamAActiveCount = room.teams.teamA.playerIds.filter(
+    (id) => !isPlayerInactive(id)
+  ).length;
+  const teamAInactiveCount = room.teams.teamA.playerIds.length - teamAActiveCount;
+
+  const teamBActiveCount = room.teams.teamB.playerIds.filter(
+    (id) => !isPlayerInactive(id)
+  ).length;
+  const teamBInactiveCount = room.teams.teamB.playerIds.length - teamBActiveCount;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 text-center">
@@ -225,6 +320,270 @@ export default function RoomRoundEnd({
         )}
       </div>
 
+      {/* Team Rosters & Player Availability */}
+      <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4 text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-dim)]">
+          <div>
+            <h3 className="font-space font-bold text-sm text-[var(--text)] flex items-center gap-2">
+              <Users className="w-4 h-4 text-[var(--olive)]" />
+              Team Rosters &amp; Availability
+            </h3>
+            <p className="text-[11px] text-[var(--text-dim)]">
+              Check who is active before launching Round {nextRoundNumber}. Away scholars are skipped for speaking.
+            </p>
+          </div>
+          <div className="text-[11px] font-mono text-[var(--text-mute)]">
+            Total: {room.teams.teamA.playerIds.length + room.teams.teamB.playerIds.length} players
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {/* Team Alpha Roster */}
+          <div
+            className="p-4 rounded-2xl border space-y-3 bg-[var(--bg-card)]"
+            style={{ borderColor: `${room.teams.teamA.color}35` }}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-dim)]/60">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-3 h-3 rounded-full shadow-xs"
+                  style={{ backgroundColor: room.teams.teamA.color }}
+                />
+                <strong className="font-space font-bold text-xs text-[var(--text)]">
+                  {room.teams.teamA.name}
+                </strong>
+                <span className="text-[10px] font-bold text-[var(--text-mute)]">
+                  ({room.teams.teamA.score} pts)
+                </span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                {teamAActiveCount} Active · {teamAInactiveCount} Away
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {room.teams.teamA.playerIds.length === 0 ? (
+                <p className="text-xs text-[var(--text-mute)] italic py-2 text-center">
+                  No scholars on this team
+                </p>
+              ) : (
+                room.teams.teamA.playerIds.map((pId) => {
+                  const p = getPlayerDisplay(pId);
+                  const isMe = pId === myPlayerId;
+                  const inactive = isPlayerInactive(pId);
+                  const isNextSpeaker =
+                    nextActiveTeamKey === "A" && nextSpeakerId === pId;
+
+                  return (
+                    <div
+                      key={pId}
+                      className={`flex items-center justify-between p-2 rounded-xl border text-xs transition ${
+                        inactive
+                          ? "bg-amber-500/5 border-amber-500/20 opacity-70"
+                          : isMe
+                          ? "bg-[var(--olive)]/10 border-[var(--olive)]/30 font-semibold"
+                          : "bg-[var(--bg)] border-[var(--border-dim)]/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.avatar}
+                          alt={p.name}
+                          className="w-6 h-6 rounded-full border border-[var(--border-dim)] flex-shrink-0 bg-[var(--bg-card)] object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                        <span className="truncate text-[var(--text)]">
+                          {p.name} {isMe && <span className="text-[10px] text-[var(--olive)] font-bold">(You)</span>}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {p.isHost && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-amber-500/15 text-amber-600 font-bold border border-amber-500/30">
+                            <Crown className="w-2.5 h-2.5" /> Host
+                          </span>
+                        )}
+                        {isNextSpeaker && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/15 text-emerald-600 font-bold border border-emerald-500/30">
+                            <Mic className="w-2.5 h-2.5" /> Speaker
+                          </span>
+                        )}
+                        {inactive ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/30">
+                            <Moon className="w-2.5 h-2.5" /> Away
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Active
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+
+          {/* Team Omega Roster */}
+          <div
+            className="p-4 rounded-2xl border space-y-3 bg-[var(--bg-card)]"
+            style={{ borderColor: `${room.teams.teamB.color}35` }}
+          >
+            <div className="flex items-center justify-between pb-2 border-b border-[var(--border-dim)]/60">
+              <div className="flex items-center gap-2">
+                <span
+                  className="w-3 h-3 rounded-full shadow-xs"
+                  style={{ backgroundColor: room.teams.teamB.color }}
+                />
+                <strong className="font-space font-bold text-xs text-[var(--text)]">
+                  {room.teams.teamB.name}
+                </strong>
+                <span className="text-[10px] font-bold text-[var(--text-mute)]">
+                  ({room.teams.teamB.score} pts)
+                </span>
+              </div>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                {teamBActiveCount} Active · {teamBInactiveCount} Away
+              </span>
+            </div>
+
+            <div className="space-y-2">
+              {room.teams.teamB.playerIds.length === 0 ? (
+                <p className="text-xs text-[var(--text-mute)] italic py-2 text-center">
+                  No scholars on this team
+                </p>
+              ) : (
+                room.teams.teamB.playerIds.map((pId) => {
+                  const p = getPlayerDisplay(pId);
+                  const isMe = pId === myPlayerId;
+                  const inactive = isPlayerInactive(pId);
+                  const isNextSpeaker =
+                    nextActiveTeamKey === "B" && nextSpeakerId === pId;
+
+                  return (
+                    <div
+                      key={pId}
+                      className={`flex items-center justify-between p-2 rounded-xl border text-xs transition ${
+                        inactive
+                          ? "bg-amber-500/5 border-amber-500/20 opacity-70"
+                          : isMe
+                          ? "bg-[var(--olive)]/10 border-[var(--olive)]/30 font-semibold"
+                          : "bg-[var(--bg)] border-[var(--border-dim)]/70"
+                      }`}
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={p.avatar}
+                          alt={p.name}
+                          className="w-6 h-6 rounded-full border border-[var(--border-dim)] flex-shrink-0 bg-[var(--bg-card)] object-cover"
+                          onError={(e) => {
+                            (e.target as HTMLElement).style.display = "none";
+                          }}
+                        />
+                        <span className="truncate text-[var(--text)]">
+                          {p.name} {isMe && <span className="text-[10px] text-[var(--olive)] font-bold">(You)</span>}
+                        </span>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {p.isHost && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-amber-500/15 text-amber-600 font-bold border border-amber-500/30">
+                            <Crown className="w-2.5 h-2.5" /> Host
+                          </span>
+                        )}
+                        {isNextSpeaker && (
+                          <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/15 text-emerald-600 font-bold border border-emerald-500/30">
+                            <Mic className="w-2.5 h-2.5" /> Speaker
+                          </span>
+                        )}
+                        {inactive ? (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/30">
+                            <Moon className="w-2.5 h-2.5" /> Away
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/30">
+                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                            Active
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Your Match Status & Availability Controls */}
+      <div className="surface rounded-3xl p-5 border border-[var(--border-dim)] shadow-sm space-y-3 text-left">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs uppercase tracking-wider font-extrabold text-[var(--olive)]">
+                Your Status
+              </span>
+              {isMeInactive ? (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 inline-flex items-center gap-1">
+                  <Moon className="w-2.5 h-2.5" /> Away / Inactive
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active &amp; Ready
+                </span>
+              )}
+            </div>
+            <p className="text-xs text-[var(--text-dim)] mt-0.5">
+              {isMeInactive
+                ? "You are marked Away. Teammates can see you are unavailable on WhatsApp/call, and you won't be picked to describe words."
+                : "You are marked Active and available to describe or guess in the upcoming sprints."}
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            {onToggleInactive && (
+              <button
+                type="button"
+                onClick={onToggleInactive}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs ${
+                  isMeInactive
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                    : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                }`}
+              >
+                {isMeInactive ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5" /> I&apos;m Back (Mark Active)
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5" /> Step Away (Mark Inactive)
+                  </>
+                )}
+              </button>
+            )}
+
+            {onLeaveRoom && (
+              <button
+                type="button"
+                onClick={onLeaveRoom}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Leave this match and return to the parlor"
+              >
+                <LogOut className="w-3.5 h-3.5" /> Leave Match
+              </button>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Articulate Board Map Progression (Roadmap from Start to Finish) */}
       <div className="space-y-2 text-left">
         <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-mute)] block px-1">
@@ -250,6 +609,15 @@ export default function RoomRoundEnd({
           </div>
           <span className="text-[11px] font-bold text-[var(--text-mute)]">Round {nextRoundNumber}</span>
         </div>
+
+        {nextTeamActiveIds.length === 0 && (
+          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-center gap-2">
+            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+            <span>
+              All scholars in <strong>{nextTeamName}</strong> are currently marked Away. One member should tap &quot;I&apos;m Back&quot; above before starting.
+            </span>
+          </div>
+        )}
 
         {myTeam === nextActiveTeamKey ? (
           <div className="space-y-2">

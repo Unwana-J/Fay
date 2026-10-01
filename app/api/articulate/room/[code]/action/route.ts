@@ -5,6 +5,8 @@ import { buildDeck } from "@/lib/game-words";
 
 async function persistRoom(room: ArticulateRoom) {
   room.updated_at = new Date().toISOString();
+  if (!room.inactive_players) room.inactive_players = [];
+  if (!room.player_details) room.player_details = {};
   memoryRooms.set(room.room_code, room);
 
   if (isSupabaseConfigured && supabase) {
@@ -60,11 +62,18 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
         round_words_passed: data.round_words_passed || [],
         active_players: data.active_players || [],
         spectators: data.spectators || [],
+        inactive_players: [],
+        player_details: {},
         created_at: data.created_at,
         updated_at: data.updated_at,
       };
       memoryRooms.set(normalized, room);
     }
+  }
+
+  if (room) {
+    if (!room.inactive_players) room.inactive_players = [];
+    if (!room.player_details) room.player_details = {};
   }
 
   return room || null;
@@ -136,6 +145,14 @@ export async function POST(
             room.teams.teamB.playerIds.push(id);
           }
         }
+
+        if (!room.player_details) room.player_details = {};
+        room.player_details[id] = {
+          id,
+          name,
+          avatar: String(body.avatar || "/avatars/avatar-scholar.svg"),
+          isHost: id === room.host_id,
+        };
 
         if (!room.active_players.includes(id)) {
           room.active_players.push(id);
@@ -236,15 +253,22 @@ export async function POST(
           activeTeam = "A";
         }
 
-        const teamPlayerIds =
+        const rawTeamPlayerIds =
           activeTeam === "A"
             ? room.teams.teamA.playerIds
             : room.teams.teamB.playerIds;
 
+        // Filter out inactive/AFK players so speaking turn is given to an available player
+        const activeAvailableIds = rawTeamPlayerIds.filter(
+          (pId) => !(room.inactive_players || []).includes(pId)
+        );
+        const teamPlayerIds = activeAvailableIds.length > 0 ? activeAvailableIds : rawTeamPlayerIds;
+
         // Pick speaker by cycling
         const teamTurnIndex = Math.floor((roundNumber - 1) / 2);
         const speakerId = teamPlayerIds[teamTurnIndex % teamPlayerIds.length] || teamPlayerIds[0];
-        const speakerName = body.speakerName || `Player (${speakerId.slice(0, 5)})`;
+        const speakerDetails = room.player_details?.[speakerId];
+        const speakerName = speakerDetails?.name || body.speakerName || `Player (${speakerId.slice(0, 5)})`;
 
         // Ensure deck has enough words
         if (room.current_word_index >= room.deck.length - 10) {
@@ -458,6 +482,64 @@ export async function POST(
           }
           if (settings.scoreGoal && typeof settings.scoreGoal === "number") {
             room.settings.scoreGoal = Math.max(5, Math.min(100, Math.round(settings.scoreGoal)));
+          }
+        }
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 9. TOGGLE INACTIVE / AFK
+      // -------------------------------------------------------------
+      case "toggle_inactive": {
+        const id = String(playerId);
+        if (!room.inactive_players) room.inactive_players = [];
+
+        const isCurrentlyInactive = room.inactive_players.includes(id);
+        if (isCurrentlyInactive) {
+          room.inactive_players = room.inactive_players.filter((p) => p !== id);
+        } else {
+          room.inactive_players.push(id);
+        }
+
+        await persistRoom(room);
+        return NextResponse.json({
+          success: true,
+          room,
+          isInactive: !isCurrentlyInactive,
+        });
+      }
+
+      // -------------------------------------------------------------
+      // 10. LEAVE ROOM
+      // -------------------------------------------------------------
+      case "leave_room": {
+        const id = String(playerId);
+
+        // Remove from team A & B
+        room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((p) => p !== id);
+        room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((p) => p !== id);
+
+        // Remove from active players, spectators, and inactive players
+        room.active_players = room.active_players.filter((p) => p !== id);
+        room.spectators = room.spectators.filter((p) => p !== id);
+        if (room.inactive_players) {
+          room.inactive_players = room.inactive_players.filter((p) => p !== id);
+        }
+
+        // If the host leaves, transfer host to the first available player
+        if (room.host_id === id) {
+          const remainingPlayers = [
+            ...room.teams.teamA.playerIds,
+            ...room.teams.teamB.playerIds,
+            ...room.spectators,
+          ];
+          if (remainingPlayers.length > 0) {
+            const newHostId = remainingPlayers[0];
+            room.host_id = newHostId;
+            const newHostName = room.player_details?.[newHostId]?.name || "Scholar";
+            room.host_name = newHostName;
           }
         }
 

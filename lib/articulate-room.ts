@@ -61,6 +61,8 @@ export interface ArticulateRoom {
   round_words_passed: GameWord[];
   active_players: string[]; // Player IDs locked in for active round
   spectators: string[]; // Player IDs waiting in spectator lounge
+  inactive_players?: string[]; // Player IDs toggled AFK / Inactive
+  player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean }>; // Persisted identity map
   created_at?: string;
   updated_at?: string;
 }
@@ -132,6 +134,15 @@ export function createInitialRoom(
     round_words_passed: [],
     active_players: [host.id],
     spectators: [],
+    inactive_players: [],
+    player_details: {
+      [host.id]: {
+        id: host.id,
+        name: host.name,
+        avatar: "/avatars/avatar-scholar.svg",
+        isHost: true,
+      },
+    },
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
