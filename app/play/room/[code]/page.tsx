@@ -77,6 +77,7 @@ export default function ArticulateRoomPage({
   const [showIdentityModal, setShowIdentityModal] = useState(false);
   const [identityModalMode, setIdentityModalMode] = useState<"join" | "edit">("join");
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
+  const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
 
   const channelRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
@@ -174,11 +175,16 @@ export default function ArticulateRoomPage({
         storedUsername !== "Learner"
       );
 
-      if (hasKnownName || alreadyInRoom) {
+      const serverName = fetched.player_details?.[myPlayerId]?.name;
+      const hasServerName = Boolean(
+        serverName &&
+        serverName !== "Scholar" &&
+        serverName !== "Learner"
+      );
+
+      if (hasKnownName || hasServerName) {
         // Player already has established name or is existing participant: auto-join
-        const nameToUse = hasKnownName
-          ? storedUsername
-          : fetched.player_details?.[myPlayerId]?.name || "Scholar";
+        const nameToUse = hasKnownName ? storedUsername : serverName!;
 
         const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
           method: "POST",
@@ -187,6 +193,24 @@ export default function ArticulateRoomPage({
             action: "join",
             playerId: myPlayerId,
             playerName: nameToUse,
+            avatar: myAvatar,
+          }),
+        });
+
+        const joinData = await res.json();
+        if (mounted && joinData.room) {
+          setRoom(joinData.room);
+          setIsSpectator(Boolean(joinData.isSpectator));
+          setHasJoinedRoom(true);
+        }
+      } else if (alreadyInRoom && serverName) {
+        const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "join",
+            playerId: myPlayerId,
+            playerName: serverName,
             avatar: myAvatar,
           }),
         });
@@ -559,14 +583,17 @@ export default function ArticulateRoomPage({
     });
   };
 
-  const handleLeaveRoom = async () => {
-    if (typeof window !== "undefined" && window.confirm("Are you sure you want to leave this Articulate match?")) {
-      await dispatchAction({
-        action: "leave_room",
-        playerId: myPlayerId,
-      });
-      router.push("/play");
-    }
+  const handleLeaveRoom = () => {
+    setShowLeaveConfirmModal(true);
+  };
+
+  const handleConfirmLeave = async () => {
+    setShowLeaveConfirmModal(false);
+    await dispatchAction({
+      action: "leave_room",
+      playerId: myPlayerId,
+    });
+    router.push("/play");
   };
 
   if (loading) {
@@ -895,6 +922,57 @@ export default function ArticulateRoomPage({
           />
         )}
       </AnimatePresence>
+
+      {/* Leave & Away Prompt Modal */}
+      {showLeaveConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="surface rounded-3xl p-6 max-w-sm w-full border border-[var(--border-dim)] shadow-2xl space-y-4 text-center">
+            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto text-xl">
+              <Moon className="w-6 h-6" />
+            </div>
+
+            <div className="space-y-1">
+              <h3 className="font-space font-extrabold text-lg text-[var(--text)]">
+                Stepping Away?
+              </h3>
+              <p className="text-xs text-[var(--text-dim)]">
+                If you just need a short break, set your status to <strong>Away</strong> so your team keeps your slot. You can also leave the match completely.
+              </p>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => {
+                  handleToggleInactive();
+                  setShowLeaveConfirmModal(false);
+                }}
+                className="w-full py-3 px-4 rounded-xl font-space font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+              >
+                <Moon className="w-4 h-4" />
+                <span>Set Status to Away (Keep Slot)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleConfirmLeave}
+                className="w-full py-2.5 px-4 rounded-xl font-space font-bold text-xs bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <LogOut className="w-4 h-4" />
+                <span>Leave Match Completely</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setShowLeaveConfirmModal(false)}
+                className="w-full py-2 text-xs font-bold text-[var(--text-mute)] hover:text-[var(--text)] transition cursor-pointer"
+              >
+                Stay in Match
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

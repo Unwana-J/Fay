@@ -58,7 +58,10 @@ export default function RoomLobby({
     : null;
 
   const isPlayerInactive = (pId: string) => {
-    return Boolean(room.inactive_players?.includes(pId));
+    const isExplicit = Boolean(room.inactive_players?.includes(pId));
+    // If presence tracking is active and this player is not in presence state, mark as away
+    const isPresenceAway = presencePlayers.length > 0 && !presencePlayers.some((p) => p.id === pId);
+    return isExplicit || isPresenceAway;
   };
 
   const teamAPlayers = room.teams?.teamA?.playerIds || [];
@@ -90,15 +93,14 @@ export default function RoomLobby({
     if (pId === room.host_id) {
       return { id: pId, name: room.host_name || "Host", avatar: "/avatars/avatar-scholar.svg", isHost: true };
     }
-    // 5. If detail or presence has any non-empty name
+    // 5. If detail or presence has any name
     if (detail?.name) {
       return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
     }
     if (found?.name) {
       return found;
     }
-    const cleanId = pId.replace(/^guest-/, "");
-    return { id: pId, name: `Scholar (${cleanId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false };
+    return { id: pId, name: "Scholar", avatar: "/avatars/avatar-scholar.svg", isHost: false };
   };
 
   return (
@@ -317,8 +319,8 @@ export default function RoomLobby({
                           <Moon className="w-2.5 h-2.5" /> Away
                         </span>
                       ) : (
-                        <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
-                          Round {idx * 2 + 1}
+                        <span className="text-[10px] text-[var(--text-dim)] bg-[var(--bg)] px-2 py-0.5 rounded-full border border-[var(--border-dim)] font-medium">
+                          {idx === 0 ? "1st Speaker" : idx === 1 ? "2nd Speaker" : idx === 2 ? "3rd Speaker" : `${idx + 1}th Speaker`}
                         </span>
                       )}
                       {pId === room.host_id && (
@@ -411,8 +413,8 @@ export default function RoomLobby({
                           <Moon className="w-2.5 h-2.5" /> Away
                         </span>
                       ) : (
-                        <span className="text-[10px] text-[var(--text-mute)] bg-[var(--bg)] px-1.5 py-0.5 rounded border border-[var(--border-dim)]">
-                          Round {idx * 2 + 2}
+                        <span className="text-[10px] text-[var(--text-dim)] bg-[var(--bg)] px-2 py-0.5 rounded-full border border-[var(--border-dim)] font-medium">
+                          {idx === 0 ? "1st Speaker" : idx === 1 ? "2nd Speaker" : idx === 2 ? "3rd Speaker" : `${idx + 1}th Speaker`}
                         </span>
                       )}
                       {pId === room.host_id && (

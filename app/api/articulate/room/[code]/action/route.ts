@@ -208,13 +208,25 @@ export async function POST(
           }
         }
 
+        const existingDetail = room.player_details?.[id];
+        const resolvedName =
+          name && name !== "Scholar" && name !== "Learner"
+            ? name
+            : existingDetail?.name && existingDetail.name !== "Scholar" && existingDetail.name !== "Learner"
+            ? existingDetail.name
+            : name || "Scholar";
+
         if (!room.player_details) room.player_details = {};
         room.player_details[id] = {
           id,
-          name,
-          avatar: String(body.avatar || "/avatars/avatar-scholar.svg"),
+          name: resolvedName,
+          avatar: String(body.avatar || existingDetail?.avatar || "/avatars/avatar-scholar.svg"),
           isHost: id === room.host_id,
         };
+
+        if (room.inactive_players) {
+          room.inactive_players = room.inactive_players.filter((p) => p !== id);
+        }
 
         if (!room.active_players.includes(id)) {
           room.active_players.push(id);
