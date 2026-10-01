@@ -33,6 +33,13 @@ export async function POST(req: NextRequest) {
     // Save in memory cache
     memoryRooms.set(code, newRoom);
 
+    const teamsPayload = {
+      teamA: newRoom.teams.teamA,
+      teamB: newRoom.teams.teamB,
+      player_details: newRoom.player_details || {},
+      inactive_players: newRoom.inactive_players || [],
+    };
+
     // Persist in Supabase if available
     if (isSupabaseConfigured && supabase) {
       try {
@@ -45,7 +52,7 @@ export async function POST(req: NextRequest) {
             status: newRoom.status,
             locked: newRoom.locked,
             settings: newRoom.settings,
-            teams: newRoom.teams,
+            teams: teamsPayload,
             current_turn: newRoom.current_turn,
             deck: newRoom.deck,
             current_word_index: newRoom.current_word_index,
@@ -107,6 +114,7 @@ export async function GET(req: NextRequest) {
         .single();
 
       if (!error && data) {
+        const rawTeams = data.teams || {};
         room = {
           id: data.id,
           room_code: data.room_code,
@@ -115,7 +123,10 @@ export async function GET(req: NextRequest) {
           status: data.status,
           locked: data.locked,
           settings: data.settings,
-          teams: data.teams,
+          teams: {
+            teamA: rawTeams.teamA || { name: "Team Alpha", color: "#EF4444", score: 0, playerIds: [] },
+            teamB: rawTeams.teamB || { name: "Team Omega", color: "#3B82F6", score: 0, playerIds: [] },
+          },
           current_turn: data.current_turn,
           deck: data.deck || [],
           current_word_index: data.current_word_index || 0,
@@ -123,9 +134,22 @@ export async function GET(req: NextRequest) {
           round_words_passed: data.round_words_passed || [],
           active_players: data.active_players || [],
           spectators: data.spectators || [],
+          inactive_players: rawTeams.inactive_players || [],
+          player_details: rawTeams.player_details || {},
           created_at: data.created_at,
           updated_at: data.updated_at,
         };
+
+        if (!room.player_details) room.player_details = {};
+        if (room.host_id && !room.player_details[room.host_id]) {
+          room.player_details[room.host_id] = {
+            id: room.host_id,
+            name: room.host_name,
+            avatar: "/avatars/avatar-scholar.svg",
+            isHost: true,
+          };
+        }
+
         memoryRooms.set(code, room);
       }
     }

@@ -10,7 +10,9 @@ import RoomSpeakerView from "./components/RoomSpeakerView";
 import RoomGuesserView from "./components/RoomGuesserView";
 import RoomRoundEnd from "./components/RoomRoundEnd";
 import RoomGameOver from "./components/RoomGameOver";
-import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2 } from "lucide-react";
+import PlayerIdentityModal from "./components/PlayerIdentityModal";
+import RoundCountdownOverlay from "./components/RoundCountdownOverlay";
+import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2, Edit2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,9 +32,38 @@ export default function ArticulateRoomPage({
   const roomCode = rawCode.toUpperCase().trim();
 
   const router = useRouter();
-  const { profile, saveArticulateRoom } = useAppStore();
-  const myPlayerId = profile?.id || "guest-" + Math.random().toString(36).slice(2, 9);
-  const myPlayerName = profile?.username || "Scholar";
+  const { profile, saveArticulateRoom, createAccount } = useAppStore();
+
+  const [devicePlayerId, setDevicePlayerId] = useState<string>(() => {
+    if (profile?.id) return profile.id;
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem("fey_device_player_id");
+      if (saved) return saved;
+      const gen = "guest-" + Math.random().toString(36).slice(2, 9);
+      localStorage.setItem("fey_device_player_id", gen);
+      return gen;
+    }
+    return "guest-" + Math.random().toString(36).slice(2, 9);
+  });
+
+  const [savedLocalName, setSavedLocalName] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("fey_player_name") || "";
+    }
+    return "";
+  });
+
+  useEffect(() => {
+    if (profile?.id && profile.id !== devicePlayerId) {
+      setDevicePlayerId(profile.id);
+      if (typeof window !== "undefined") {
+        localStorage.setItem("fey_device_player_id", profile.id);
+      }
+    }
+  }, [profile?.id, devicePlayerId]);
+
+  const myPlayerId = profile?.id || devicePlayerId;
+  const myPlayerName = profile?.username || savedLocalName || "Scholar";
   const myAvatar = profile?.avatar || "/avatars/avatar-scholar.svg";
 
   const [room, setRoom] = useState<ArticulateRoom | null>(null);
@@ -41,10 +72,15 @@ export default function ArticulateRoomPage({
   const [isSpectator, setIsSpectator] = useState(false);
   const [presencePlayers, setPresencePlayers] = useState<RoomPlayer[]>([]);
   const [secondsRemaining, setSecondsRemaining] = useState(30);
+  const [countdownRemaining, setCountdownRemaining] = useState<number | null>(null);
   const [reactions, setReactions] = useState<FloatingReaction[]>([]);
+  const [showIdentityModal, setShowIdentityModal] = useState(false);
+  const [identityModalMode, setIdentityModalMode] = useState<"join" | "edit">("join");
+  const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
 
   const channelRef = useRef<any>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const hasJoinedRef = useRef(false);
 
   // 1. Fetch Room State (Safe from transient serverless 404s)
   const fetchRoomState = useCallback(async (isInitial = false) => {
@@ -106,30 +142,65 @@ export default function ArticulateRoomPage({
     [roomCode]
   );
 
+  const storedUsername = (profile?.username || savedLocalName)?.trim();
+  const effectivePlayerName =
+    storedUsername && storedUsername !== "Scholar" && storedUsername !== "Learner"
+      ? storedUsername
+      : room?.player_details?.[myPlayerId]?.name &&
+        room.player_details[myPlayerId].name !== "Scholar" &&
+        room.player_details[myPlayerId].name !== "Learner"
+      ? room.player_details[myPlayerId].name
+      : savedLocalName || "Scholar";
+
   // 3. Initial Mount & Join
   useEffect(() => {
     let mounted = true;
 
     async function init() {
+      if (hasJoinedRef.current) return;
+      hasJoinedRef.current = true;
+
       const fetched = await fetchRoomState(true);
       if (!fetched || !mounted) return;
 
-      // Join the room on the server
-      const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          action: "join",
-          playerId: myPlayerId,
-          playerName: myPlayerName,
-          avatar: myAvatar,
-        }),
-      });
+      const inA = fetched.teams.teamA.playerIds.includes(myPlayerId);
+      const inB = fetched.teams.teamB.playerIds.includes(myPlayerId);
+      const inSpectators = fetched.spectators.includes(myPlayerId);
+      const alreadyInRoom = inA || inB || inSpectators;
 
-      const joinData = await res.json();
-      if (mounted && joinData.room) {
-        setRoom(joinData.room);
-        setIsSpectator(Boolean(joinData.isSpectator));
+      const hasKnownName = Boolean(
+        storedUsername &&
+        storedUsername !== "Scholar" &&
+        storedUsername !== "Learner"
+      );
+
+      if (hasKnownName || alreadyInRoom) {
+        // Player already has established name or is existing participant: auto-join
+        const nameToUse = hasKnownName
+          ? storedUsername
+          : fetched.player_details?.[myPlayerId]?.name || "Scholar";
+
+        const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            action: "join",
+            playerId: myPlayerId,
+            playerName: nameToUse,
+            avatar: myAvatar,
+          }),
+        });
+
+        const joinData = await res.json();
+        if (mounted && joinData.room) {
+          setRoom(joinData.room);
+          setIsSpectator(Boolean(joinData.isSpectator));
+          setHasJoinedRoom(true);
+        }
+      } else {
+        // Guest user opening WhatsApp link without a profile name: show Name Entry Gate
+        setIdentityModalMode("join");
+        setShowIdentityModal(true);
       }
     }
 
@@ -138,14 +209,89 @@ export default function ArticulateRoomPage({
     return () => {
       mounted = false;
     };
-  }, [fetchRoomState, myAvatar, myPlayerId, myPlayerName, roomCode]);
+  }, [fetchRoomState, myAvatar, myPlayerId, roomCode, storedUsername]);
+
+  // Handle Save / Rename Identity
+  const handleSaveIdentity = async (
+    chosenName: string,
+    chosenAvatar: string,
+    preferredTeam?: "A" | "B"
+  ) => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem("fey_player_name", chosenName);
+      localStorage.setItem("fey_player_avatar", chosenAvatar);
+      localStorage.setItem("fey_device_player_id", myPlayerId);
+    }
+    setSavedLocalName(chosenName);
+
+    createAccount({
+      username: chosenName,
+      avatar: chosenAvatar,
+      bio: profile?.bio || "Building knowledge one topic at a time.",
+      interests: [],
+    });
+
+    if (identityModalMode === "join") {
+      const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "join",
+          playerId: myPlayerId,
+          playerName: chosenName,
+          avatar: chosenAvatar,
+          preferredTeam,
+        }),
+      });
+      const joinData = await res.json();
+      if (joinData.room) {
+        setRoom(joinData.room);
+        setIsSpectator(Boolean(joinData.isSpectator));
+        setHasJoinedRoom(true);
+      }
+      setShowIdentityModal(false);
+
+      if (channelRef.current) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "room_action",
+          payload: { action: "join", room: joinData.room },
+        });
+        channelRef.current.track({
+          id: myPlayerId,
+          name: chosenName,
+          avatar: chosenAvatar,
+          isHost: joinData.room?.host_id === myPlayerId,
+          joinedAt: Date.now(),
+        });
+      }
+    } else {
+      await dispatchAction({
+        action: "rename_player",
+        playerId: myPlayerId,
+        newName: chosenName,
+        avatar: chosenAvatar,
+      });
+      setShowIdentityModal(false);
+
+      if (channelRef.current) {
+        channelRef.current.track({
+          id: myPlayerId,
+          name: chosenName,
+          avatar: chosenAvatar,
+          isHost: room?.host_id === myPlayerId,
+          joinedAt: Date.now(),
+        });
+      }
+    }
+  };
 
   // Sync Room to Persistent Local History so unfinished games can be resumed
   useEffect(() => {
     if (!room) return;
-    const myTeam = room.teams.teamA.playerIds.includes(myPlayerId)
+    const myTeam = (room.teams?.teamA?.playerIds || []).includes(myPlayerId)
       ? "A"
-      : room.teams.teamB.playerIds.includes(myPlayerId)
+      : (room.teams?.teamB?.playerIds || []).includes(myPlayerId)
       ? "B"
       : null;
 
@@ -155,9 +301,9 @@ export default function ArticulateRoomPage({
       hostName: room.host_name,
       myTeam,
       status: room.status,
-      scoreA: room.teams.teamA.score,
-      scoreB: room.teams.teamB.score,
-      scoreGoal: room.settings.scoreGoal || 20,
+      scoreA: room.teams?.teamA?.score ?? 0,
+      scoreB: room.teams?.teamB?.score ?? 0,
+      scoreGoal: room.settings?.scoreGoal || 20,
       roundNumber: room.current_turn?.roundNumber || 1,
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       timestamp: Date.now(),
@@ -222,7 +368,7 @@ export default function ArticulateRoomPage({
         if (status === "SUBSCRIBED") {
           await channel.track({
             id: myPlayerId,
-            name: myPlayerName,
+            name: effectivePlayerName,
             avatar: myAvatar,
             isHost: room?.host_id === myPlayerId,
             joinedAt: Date.now(),
@@ -234,7 +380,7 @@ export default function ArticulateRoomPage({
       channel.unsubscribe();
       channelRef.current = null;
     };
-  }, [fetchRoomState, myAvatar, myPlayerId, myPlayerName, room?.host_id, roomCode]);
+  }, [effectivePlayerName, fetchRoomState, myAvatar, myPlayerId, room?.host_id, roomCode]);
 
   // 5. Polling Fallback (sync every 2.5s for seamless multi-device updates)
   useEffect(() => {
@@ -245,18 +391,37 @@ export default function ArticulateRoomPage({
     return () => clearInterval(interval);
   }, [fetchRoomState]);
 
-  // 6. Synchronized Countdown Timer
+  // 6. Synchronized Countdown & Round Timer
   useEffect(() => {
     if (!room || room.status !== "playing" || !room.current_turn) {
+      setCountdownRemaining(null);
       return;
     }
 
     const turn = room.current_turn;
     const duration = turn.durationSeconds || room.settings?.timerSeconds || 30;
-    const startedAt = turn.startedAt || Date.now();
+    const countdownEndsAt = turn.countdownEndsAt || turn.startedAt || Date.now();
 
     const updateTimer = () => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
+      const now = Date.now();
+
+      // Check pre-round 3-second countdown
+      if (now < countdownEndsAt) {
+        const remainingCountdown = Math.max(1, Math.ceil((countdownEndsAt - now) / 1000));
+        setCountdownRemaining(remainingCountdown);
+        setSecondsRemaining(duration);
+        return;
+      }
+
+      // Flash "GO!" for 450ms after countdown finishes
+      if (now < countdownEndsAt + 450) {
+        setCountdownRemaining(0);
+        setSecondsRemaining(duration);
+        return;
+      }
+
+      setCountdownRemaining(null);
+      const elapsed = Math.floor((now - countdownEndsAt) / 1000);
       const remaining = Math.max(0, duration - elapsed);
       setSecondsRemaining(remaining);
 
@@ -274,7 +439,7 @@ export default function ArticulateRoomPage({
     };
 
     updateTimer();
-    timerRef.current = setInterval(updateTimer, 500);
+    timerRef.current = setInterval(updateTimer, 200);
 
     return () => {
       if (timerRef.current) clearInterval(timerRef.current);
@@ -295,28 +460,27 @@ export default function ArticulateRoomPage({
     dispatchAction({
       action: "start_round",
       hostId: myPlayerId,
-      speakerName: myPlayerName,
     });
   };
 
   const handleScoreWord = () => {
     dispatchAction({
       action: "score_word",
-      speakerId: myPlayerId,
+      speakerId: room?.current_turn?.speakerId || myPlayerId,
     });
   };
 
   const handlePassWord = () => {
     dispatchAction({
       action: "pass_word",
-      speakerId: myPlayerId,
+      speakerId: room?.current_turn?.speakerId || myPlayerId,
     });
   };
 
   const handleEndRound = () => {
     dispatchAction({
       action: "end_round",
-      speakerId: myPlayerId,
+      speakerId: room?.current_turn?.speakerId || myPlayerId,
     });
   };
 
@@ -436,17 +600,56 @@ export default function ArticulateRoomPage({
 
   const isHost = room.host_id === myPlayerId;
   const isPlaying = room.status === "playing";
-  const isSpeaker = isPlaying && room.current_turn?.speakerId === myPlayerId;
+
+  const myPlayerNameNormalized = (effectivePlayerName || "").trim().toLowerCase();
+  const currentSpeakerNameNormalized = (room.current_turn?.speakerName || "").trim().toLowerCase();
+
+  const isSpeakerByName = Boolean(
+    myPlayerNameNormalized &&
+    myPlayerNameNormalized !== "scholar" &&
+    myPlayerNameNormalized !== "learner" &&
+    currentSpeakerNameNormalized &&
+    currentSpeakerNameNormalized === myPlayerNameNormalized
+  );
+
+  const isSpeakerById = Boolean(
+    room.current_turn?.speakerId === myPlayerId ||
+    (room.player_details?.[room.current_turn?.speakerId || ""] &&
+      room.player_details[room.current_turn?.speakerId || ""].id === myPlayerId)
+  );
+
+  const isSpeaker = isPlaying && (isSpeakerById || isSpeakerByName);
   const isMeInactive = Boolean(room.inactive_players?.includes(myPlayerId));
-  const isInMatch =
-    room.teams.teamA.playerIds.includes(myPlayerId) ||
-    room.teams.teamB.playerIds.includes(myPlayerId);
+
+  const isPlayerInTeamA = Boolean(
+    (room.teams?.teamA?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamA?.playerIds || []).some(
+      (pid) =>
+        room.player_details?.[pid]?.id === myPlayerId ||
+        (myPlayerNameNormalized &&
+          myPlayerNameNormalized !== "scholar" &&
+          room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
+    )
+  );
+
+  const isPlayerInTeamB = Boolean(
+    (room.teams?.teamB?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamB?.playerIds || []).some(
+      (pid) =>
+        room.player_details?.[pid]?.id === myPlayerId ||
+        (myPlayerNameNormalized &&
+          myPlayerNameNormalized !== "scholar" &&
+          room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
+    )
+  );
+
+  const isInMatch = isPlayerInTeamA || isPlayerInTeamB;
+  const myTeam: "A" | "B" | null = isPlayerInTeamA ? "A" : isPlayerInTeamB ? "B" : null;
 
   // Decide if this user must view Spectator Lounge:
-  // 1. Explicitly marked isSpectator
-  // 2. Room is locked / playing, and player is NOT in active_players
+  // ONLY show spectator lounge if they are not in the match, not the speaker, and explicitly marked spectator or room is locked
   const showSpectatorLounge =
-    isPlaying && (isSpectator || (room.locked && !room.active_players?.includes(myPlayerId)));
+    isPlaying && !isSpeaker && !isInMatch && (isSpectator || room.locked);
 
   return (
     <div className="min-h-screen p-4 sm:p-8 max-w-4xl mx-auto flex flex-col justify-center relative overflow-hidden">
@@ -516,10 +719,19 @@ export default function ArticulateRoomPage({
             </>
           )}
 
-          <div className="flex items-center gap-2 text-xs font-bold text-[var(--text-dim)]">
+          <button
+            type="button"
+            onClick={() => {
+              setIdentityModalMode("edit");
+              setShowIdentityModal(true);
+            }}
+            className="flex items-center gap-1.5 text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer px-2 py-1 rounded-lg hover:bg-[var(--bg-card)] border border-transparent hover:border-[var(--border-dim)]"
+            title="Click to change your player name"
+          >
             <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="truncate max-w-[100px] sm:max-w-none">{myPlayerName}</span>
-          </div>
+            <span className="truncate max-w-[110px] sm:max-w-none">{effectivePlayerName}</span>
+            <Edit2 className="w-3 h-3 text-[var(--text-mute)] opacity-70" />
+          </button>
           {isHost && (
             <span className="px-2 py-0.5 rounded-full text-[10px] font-extrabold uppercase bg-amber-500/10 text-amber-600 border border-amber-500/30">
               Host
@@ -562,6 +774,10 @@ export default function ArticulateRoomPage({
               onUpdateSettings={handleUpdateSettings}
               onToggleInactive={handleToggleInactive}
               onLeaveRoom={handleLeaveRoom}
+              onEditName={() => {
+                setIdentityModalMode("edit");
+                setShowIdentityModal(true);
+              }}
             />
           </motion.div>
         ) : room.status === "playing" ? (
@@ -591,6 +807,7 @@ export default function ArticulateRoomPage({
                 room={room}
                 secondsRemaining={secondsRemaining}
                 myPlayerId={myPlayerId}
+                myTeam={myTeam}
                 onSendReaction={handleSendReaction}
               />
             </motion.div>
@@ -605,7 +822,7 @@ export default function ArticulateRoomPage({
             <RoomRoundEnd
               room={room}
               myPlayerId={myPlayerId}
-              myPlayerName={myPlayerName}
+              myPlayerName={effectivePlayerName}
               isHost={isHost}
               presencePlayers={presencePlayers}
               onStartNextRound={handleStartRound}
@@ -628,7 +845,54 @@ export default function ArticulateRoomPage({
               onResetGame={handleResetGame}
             />
           </motion.div>
-        ) : null}
+        ) : (
+          <div className="surface rounded-3xl p-8 border border-[var(--border-dim)] text-center space-y-3 my-auto">
+            <Loader2 className="w-6 h-6 animate-spin text-[var(--olive)] mx-auto" />
+            <p className="text-sm font-space font-bold text-[var(--text-dim)]">
+              Synchronizing game room...
+            </p>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Player Identity Name Gate & In-Match Rename Modal */}
+      <PlayerIdentityModal
+        isOpen={showIdentityModal}
+        mode={identityModalMode}
+        roomCode={roomCode}
+        hostName={room?.host_name}
+        currentName={effectivePlayerName !== "Scholar" ? effectivePlayerName : ""}
+        currentAvatar={myAvatar}
+        onSave={handleSaveIdentity}
+        onClose={() => {
+          if (identityModalMode === "edit" || hasJoinedRoom) {
+            setShowIdentityModal(false);
+          }
+        }}
+      />
+
+      {/* 3-Second Pre-Round Countdown Overlay */}
+      <AnimatePresence>
+        {isPlaying && countdownRemaining !== null && room?.current_turn && (
+          <RoundCountdownOverlay
+            count={countdownRemaining}
+            roundNumber={room.current_turn.roundNumber}
+            speakerName={room.current_turn.speakerName}
+            activeTeamName={
+              room.current_turn.activeTeam === "B"
+                ? room.teams.teamB.name
+                : room.teams.teamA.name
+            }
+            activeTeamColor={
+              room.current_turn.activeTeam === "B"
+                ? room.teams.teamB.color
+                : room.teams.teamA.color
+            }
+            isSpeaker={isSpeaker}
+            myTeam={myTeam}
+            activeTeam={room.current_turn.activeTeam}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

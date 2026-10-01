@@ -11,13 +11,20 @@ async function persistRoom(room: ArticulateRoom) {
 
   if (isSupabaseConfigured && supabase) {
     try {
+      const teamsPayload = {
+        teamA: room.teams.teamA,
+        teamB: room.teams.teamB,
+        player_details: room.player_details,
+        inactive_players: room.inactive_players,
+      };
+
       await supabase
         .from("articulate_rooms")
         .update({
           status: room.status,
           locked: room.locked,
           settings: room.settings,
-          teams: room.teams,
+          teams: teamsPayload,
           current_turn: room.current_turn,
           deck: room.deck,
           current_word_index: room.current_word_index,
@@ -46,6 +53,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
       .single();
 
     if (data) {
+      const rawTeams = data.teams || {};
       room = {
         id: data.id,
         room_code: data.room_code,
@@ -54,7 +62,10 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
         status: data.status,
         locked: data.locked,
         settings: data.settings,
-        teams: data.teams,
+        teams: {
+          teamA: rawTeams.teamA || { name: "Team Alpha", color: "#EF4444", score: 0, playerIds: [] },
+          teamB: rawTeams.teamB || { name: "Team Omega", color: "#3B82F6", score: 0, playerIds: [] },
+        },
         current_turn: data.current_turn,
         deck: data.deck || [],
         current_word_index: data.current_word_index || 0,
@@ -62,11 +73,22 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
         round_words_passed: data.round_words_passed || [],
         active_players: data.active_players || [],
         spectators: data.spectators || [],
-        inactive_players: [],
-        player_details: {},
+        inactive_players: rawTeams.inactive_players || [],
+        player_details: rawTeams.player_details || {},
         created_at: data.created_at,
         updated_at: data.updated_at,
       };
+
+      if (!room.player_details) room.player_details = {};
+      if (room.host_id && !room.player_details[room.host_id]) {
+        room.player_details[room.host_id] = {
+          id: room.host_id,
+          name: room.host_name,
+          avatar: "/avatars/avatar-scholar.svg",
+          isHost: true,
+        };
+      }
+
       memoryRooms.set(normalized, room);
     }
   }
@@ -102,13 +124,30 @@ export async function POST(
         const id = String(playerId);
         const name = String(playerName || "Scholar").trim();
 
-        // CHECK LOCK CONDITION:
-        // If room is locked and a round is actively playing:
-        // Late joiners CANNOT join the active round; placed into spectator lounge!
-        const isRoundPlaying = room.status === "playing" || room.locked;
-        const isAlreadyActive = room.active_players.includes(id);
+        // Check if player is reconnecting with an established name
+        const isSpeakerByName = Boolean(
+          name &&
+          name !== "Scholar" &&
+          name !== "Learner" &&
+          room.current_turn?.speakerName?.trim().toLowerCase() === name.trim().toLowerCase()
+        );
 
-        if (isRoundPlaying && !isAlreadyActive) {
+        const isTeammateByName = Boolean(
+          name &&
+          name !== "Scholar" &&
+          name !== "Learner" &&
+          Object.values(room.player_details || {}).some(
+            (d) => d.name?.trim().toLowerCase() === name.trim().toLowerCase()
+          )
+        );
+
+        const isReconnectingPlayer = room.active_players.includes(id) || isSpeakerByName || isTeammateByName;
+
+        // CHECK LOCK CONDITION:
+        // Only genuine late-joiners (not known active players reconnecting) are placed into spectator lounge
+        const isRoundPlaying = room.status === "playing" || room.locked;
+
+        if (isRoundPlaying && !isReconnectingPlayer) {
           if (!room.spectators.includes(id)) {
             room.spectators.push(id);
           }
@@ -119,6 +158,29 @@ export async function POST(
             isSpectator: true,
             message: "Round in progress. You have been placed in the Spectator Lounge until this round concludes.",
           });
+        }
+
+        // Reconnect player: update active speaker/roster slot
+        if (isSpeakerByName && room.current_turn) {
+          room.current_turn.speakerId = id;
+        }
+
+        if (isTeammateByName) {
+          const prevEntry = Object.values(room.player_details || {}).find(
+            (d) => d.name?.trim().toLowerCase() === name.trim().toLowerCase()
+          );
+          if (prevEntry && prevEntry.id !== id) {
+            const oldId = prevEntry.id;
+            room.teams.teamA.playerIds = room.teams.teamA.playerIds.map((p) => (p === oldId ? id : p));
+            room.teams.teamB.playerIds = room.teams.teamB.playerIds.map((p) => (p === oldId ? id : p));
+            room.active_players = room.active_players.map((p) => (p === oldId ? id : p));
+            if (room.current_turn?.speakerId === oldId) {
+              room.current_turn.speakerId = id;
+            }
+            if (room.player_details) {
+              delete room.player_details[oldId];
+            }
+          }
         }
 
         // Room is in lobby or round_end: player is admitted as active player
@@ -268,14 +330,21 @@ export async function POST(
         const teamTurnIndex = Math.floor((roundNumber - 1) / 2);
         const speakerId = teamPlayerIds[teamTurnIndex % teamPlayerIds.length] || teamPlayerIds[0];
         const speakerDetails = room.player_details?.[speakerId];
-        const speakerName = speakerDetails?.name || body.speakerName || `Player (${speakerId.slice(0, 5)})`;
+        const speakerName =
+          speakerDetails?.name && speakerDetails.name !== "Scholar" && speakerDetails.name !== "Learner"
+            ? speakerDetails.name
+            : speakerId === room.host_id
+            ? room.host_name
+            : speakerDetails?.name || `Scholar (${speakerId.replace(/^guest-/, "").slice(0, 5)})`;
 
-        // Ensure deck has enough words
-        if (room.current_word_index >= room.deck.length - 10) {
+        // Ensure deck has enough words with deduplication
+        if (room.current_word_index >= room.deck.length - 15) {
+          const usedWords = room.deck.map((w) => w.word);
           const freshDeck = buildDeck(
             room.settings.categories,
             room.settings.difficulty,
-            80
+            80,
+            usedWords
           );
           room.deck = [...room.deck, ...freshDeck];
         }
@@ -290,12 +359,15 @@ export async function POST(
           ...room.teams.teamB.playerIds,
         ];
 
+        const now = Date.now();
+        const countdownMs = 3500; // 3.5s countdown before 30s timer begins
         room.current_turn = {
           roundNumber,
           activeTeam,
           speakerId,
           speakerName,
-          startedAt: Date.now(),
+          startedAt: now + countdownMs,
+          countdownEndsAt: now + countdownMs,
           durationSeconds: room.settings.timerSeconds || 30,
         };
 
@@ -406,6 +478,19 @@ export async function POST(
 
         room.status = "round_end";
         room.locked = false; // UNLOCK ROOM: BETWEEN ROUNDS, NEW PEOPLE CAN ENTER!
+
+        // Burn/advance the word that was active when the round buzzer sounded
+        // so the other team NEVER sees the same word that was just described!
+        const cutOffWord = room.deck[room.current_word_index];
+        if (cutOffWord) {
+          const alreadyTracked =
+            room.round_words_scored.some((w) => w.word === cutOffWord.word) ||
+            room.round_words_passed.some((w) => w.word === cutOffWord.word);
+          if (!alreadyTracked) {
+            room.round_words_passed.push(cutOffWord);
+          }
+          room.current_word_index += 1;
+        }
 
         // ADMIT WAITING SPECTATORS INTO TEAMS
         if (room.spectators && room.spectators.length > 0) {
@@ -541,6 +626,39 @@ export async function POST(
             const newHostName = room.player_details?.[newHostId]?.name || "Scholar";
             room.host_name = newHostName;
           }
+        }
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 11. RENAME PLAYER
+      // -------------------------------------------------------------
+      case "rename_player": {
+        const id = String(playerId);
+        const newName = String(body.newName || "").trim();
+        if (!newName) {
+          return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
+        }
+
+        if (!room.player_details) room.player_details = {};
+        if (room.player_details[id]) {
+          room.player_details[id].name = newName;
+          if (body.avatar) {
+            room.player_details[id].avatar = String(body.avatar);
+          }
+        } else {
+          room.player_details[id] = {
+            id,
+            name: newName,
+            avatar: String(body.avatar || "/avatars/avatar-scholar.svg"),
+            isHost: id === room.host_id,
+          };
+        }
+
+        if (room.host_id === id) {
+          room.host_name = newName;
         }
 
         await persistRoom(room);

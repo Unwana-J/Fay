@@ -56,13 +56,13 @@ export default function RoomRoundEnd({
 
   const turnTeamKey = currentTurn?.activeTeam === "B" ? "B" : "A";
   const turnTeamName =
-    turnTeamKey === "B" ? room.teams.teamB.name : room.teams.teamA.name;
+    turnTeamKey === "B" ? room.teams?.teamB?.name || "Team Omega" : room.teams?.teamA?.name || "Team Alpha";
   const turnTeamColor =
-    turnTeamKey === "B" ? room.teams.teamB.color : room.teams.teamA.color;
+    turnTeamKey === "B" ? room.teams?.teamB?.color || "#3B82F6" : room.teams?.teamA?.color || "#EF4444";
 
-  const myTeam = room.teams.teamA.playerIds.includes(myPlayerId)
+  const myTeam = (room.teams?.teamA?.playerIds || []).includes(myPlayerId)
     ? "A"
-    : room.teams.teamB.playerIds.includes(myPlayerId)
+    : (room.teams?.teamB?.playerIds || []).includes(myPlayerId)
     ? "B"
     : null;
 
@@ -73,9 +73,9 @@ export default function RoomRoundEnd({
   const nextRoundNumber = (currentTurn?.roundNumber || 1) + 1;
   const nextActiveTeamKey: "A" | "B" = nextRoundNumber % 2 === 1 ? "A" : "B";
   const nextTeamName =
-    nextActiveTeamKey === "A" ? room.teams.teamA.name : room.teams.teamB.name;
+    nextActiveTeamKey === "A" ? room.teams?.teamA?.name || "Team Alpha" : room.teams?.teamB?.name || "Team Omega";
   const nextTeamColor =
-    nextActiveTeamKey === "A" ? room.teams.teamA.color : room.teams.teamB.color;
+    nextActiveTeamKey === "A" ? room.teams?.teamA?.color || "#EF4444" : room.teams?.teamB?.color || "#3B82F6";
 
   const netPoints = scoredWords.filter((w) => w.disputeStatus !== "conceded").length;
 
@@ -87,11 +87,21 @@ export default function RoomRoundEnd({
 
   // Helper to resolve player display details
   const getPlayerDisplay = (pId: string) => {
-    const presenceMatch = presencePlayers.find((p) => p.id === pId);
-    if (presenceMatch) return presenceMatch;
+    // 1. If it's me and I have a valid name, prefer local name
+    if (pId === myPlayerId && myPlayerName && myPlayerName !== "Scholar" && myPlayerName !== "Learner") {
+      return {
+        id: pId,
+        name: myPlayerName,
+        avatar: "/avatars/avatar-scholar.svg",
+        team: myTeam,
+        isHost: isHost,
+        joinedAt: 0,
+      };
+    }
 
+    // 2. Persisted details in room
     const detailMatch = room.player_details?.[pId];
-    if (detailMatch) {
+    if (detailMatch && detailMatch.name && detailMatch.name !== "Scholar" && detailMatch.name !== "Learner") {
       return {
         id: pId,
         name: detailMatch.name,
@@ -106,10 +116,17 @@ export default function RoomRoundEnd({
       };
     }
 
+    // 3. Presence match
+    const presenceMatch = presencePlayers.find((p) => p.id === pId);
+    if (presenceMatch && presenceMatch.name && presenceMatch.name !== "Scholar" && presenceMatch.name !== "Learner") {
+      return presenceMatch;
+    }
+
+    // 4. Host fallback
     if (pId === room.host_id) {
       return {
         id: pId,
-        name: room.host_name,
+        name: room.host_name || "Host",
         avatar: "/avatars/avatar-scholar.svg",
         team: "A" as const,
         isHost: true,
@@ -117,9 +134,27 @@ export default function RoomRoundEnd({
       };
     }
 
+    if (detailMatch?.name) {
+      return {
+        id: pId,
+        name: detailMatch.name,
+        avatar: detailMatch.avatar || "/avatars/avatar-scholar.svg",
+        team: room.teams.teamA.playerIds.includes(pId)
+          ? ("A" as const)
+          : room.teams.teamB.playerIds.includes(pId)
+          ? ("B" as const)
+          : null,
+        isHost: pId === room.host_id,
+        joinedAt: 0,
+      };
+    }
+
+    if (presenceMatch) return presenceMatch;
+
+    const cleanId = pId.replace(/^guest-/, "");
     return {
       id: pId,
-      name: `Scholar (${pId.slice(0, 5)})`,
+      name: `Scholar (${cleanId.slice(0, 5)})`,
       avatar: "/avatars/avatar-scholar.svg",
       team: null,
       isHost: false,
@@ -128,10 +163,10 @@ export default function RoomRoundEnd({
   };
 
   // Compute next round speaker
-  const nextTeam = nextActiveTeamKey === "A" ? room.teams.teamA : room.teams.teamB;
-  const nextTeamActiveIds = nextTeam.playerIds.filter((id) => !isPlayerInactive(id));
+  const nextTeam = nextActiveTeamKey === "A" ? room.teams?.teamA : room.teams?.teamB;
+  const nextTeamActiveIds = (nextTeam?.playerIds || []).filter((id) => !isPlayerInactive(id));
   const nextTeamEligibleIds =
-    nextTeamActiveIds.length > 0 ? nextTeamActiveIds : nextTeam.playerIds;
+    nextTeamActiveIds.length > 0 ? nextTeamActiveIds : nextTeam?.playerIds || [];
   const nextTurnIndex = Math.floor((nextRoundNumber - 1) / 2);
   const nextSpeakerId =
     nextTeamEligibleIds.length > 0
@@ -139,15 +174,13 @@ export default function RoomRoundEnd({
       : null;
 
   // Counts for each team
-  const teamAActiveCount = room.teams.teamA.playerIds.filter(
-    (id) => !isPlayerInactive(id)
-  ).length;
-  const teamAInactiveCount = room.teams.teamA.playerIds.length - teamAActiveCount;
+  const teamAPlayers = room.teams?.teamA?.playerIds || [];
+  const teamAActiveCount = teamAPlayers.filter((id) => !isPlayerInactive(id)).length;
+  const teamAInactiveCount = teamAPlayers.length - teamAActiveCount;
 
-  const teamBActiveCount = room.teams.teamB.playerIds.filter(
-    (id) => !isPlayerInactive(id)
-  ).length;
-  const teamBInactiveCount = room.teams.teamB.playerIds.length - teamBActiveCount;
+  const teamBPlayers = room.teams?.teamB?.playerIds || [];
+  const teamBActiveCount = teamBPlayers.filter((id) => !isPlayerInactive(id)).length;
+  const teamBInactiveCount = teamBPlayers.length - teamBActiveCount;
 
   return (
     <div className="max-w-2xl mx-auto space-y-6 text-center">

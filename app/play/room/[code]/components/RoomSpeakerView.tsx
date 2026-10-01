@@ -55,13 +55,13 @@ export default function RoomSpeakerView({
 
   const activeTeamColor =
     currentTurn?.activeTeam === "B"
-      ? room.teams.teamB.color
-      : room.teams.teamA.color;
+      ? room.teams?.teamB?.color || "#3B82F6"
+      : room.teams?.teamA?.color || "#EF4444";
 
   const activeTeamName =
     currentTurn?.activeTeam === "B"
-      ? room.teams.teamB.name
-      : room.teams.teamA.name;
+      ? room.teams?.teamB?.name || "Team Omega"
+      : room.teams?.teamA?.name || "Team Alpha";
 
   return (
     <div className="max-w-xl mx-auto space-y-6 text-center">

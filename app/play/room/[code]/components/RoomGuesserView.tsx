@@ -10,6 +10,7 @@ interface RoomGuesserViewProps {
   room: ArticulateRoom;
   secondsRemaining: number;
   myPlayerId: string;
+  myTeam?: "A" | "B" | null;
   onSendReaction: (emoji: string) => void;
 }
 
@@ -17,6 +18,7 @@ export default function RoomGuesserView({
   room,
   secondsRemaining,
   myPlayerId,
+  myTeam,
   onSendReaction,
 }: RoomGuesserViewProps) {
   const currentTurn = room.current_turn;
@@ -24,19 +26,21 @@ export default function RoomGuesserView({
   const isUrgent = secondsRemaining <= 15;
 
   const isMyTeam =
-    currentTurn?.activeTeam === "A"
-      ? room.teams.teamA.playerIds.includes(myPlayerId)
-      : room.teams.teamB.playerIds.includes(myPlayerId);
+    myTeam
+      ? myTeam === currentTurn?.activeTeam
+      : currentTurn?.activeTeam === "A"
+      ? (room.teams?.teamA?.playerIds || []).includes(myPlayerId)
+      : (room.teams?.teamB?.playerIds || []).includes(myPlayerId);
 
   const activeTeamName =
     currentTurn?.activeTeam === "B"
-      ? room.teams.teamB.name
-      : room.teams.teamA.name;
+      ? room.teams?.teamB?.name || "Team Omega"
+      : room.teams?.teamA?.name || "Team Alpha";
 
   const activeTeamColor =
     currentTurn?.activeTeam === "B"
-      ? room.teams.teamB.color
-      : room.teams.teamA.color;
+      ? room.teams?.teamB?.color || "#3B82F6"
+      : room.teams?.teamA?.color || "#EF4444";
 
   return (
     <div className="max-w-md mx-auto space-y-5 text-center">
@@ -89,15 +93,15 @@ export default function RoomGuesserView({
         {/* Minimal Scoreboard */}
         <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[var(--border-dim)]/50">
           <div className="p-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)]">
-            <div className="text-[10px] font-bold text-[var(--text-mute)] uppercase">{room.teams.teamA.name}</div>
-            <div className="font-space font-extrabold text-xl mt-0.5" style={{ color: room.teams.teamA.color }}>
-              {room.teams.teamA.score} pts
+            <div className="text-[10px] font-bold text-[var(--text-mute)] uppercase">{room.teams?.teamA?.name || "Team Alpha"}</div>
+            <div className="font-space font-extrabold text-xl mt-0.5" style={{ color: room.teams?.teamA?.color || "#EF4444" }}>
+              {room.teams?.teamA?.score ?? 0} pts
             </div>
           </div>
           <div className="p-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)]">
-            <div className="text-[10px] font-bold text-[var(--text-mute)] uppercase">{room.teams.teamB.name}</div>
-            <div className="font-space font-extrabold text-xl mt-0.5" style={{ color: room.teams.teamB.color }}>
-              {room.teams.teamB.score} pts
+            <div className="text-[10px] font-bold text-[var(--text-mute)] uppercase">{room.teams?.teamB?.name || "Team Omega"}</div>
+            <div className="font-space font-extrabold text-xl mt-0.5" style={{ color: room.teams?.teamB?.color || "#3B82F6" }}>
+              {room.teams?.teamB?.score ?? 0} pts
             </div>
           </div>
         </div>

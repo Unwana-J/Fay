@@ -20,12 +20,12 @@ export default function SpectatorLounge({
   const currentTurn = room.current_turn;
   const activeTeamName =
     currentTurn?.activeTeam === "B"
-      ? room.teams.teamB.name
-      : room.teams.teamA.name;
+      ? room.teams?.teamB?.name || "Team Omega"
+      : room.teams?.teamA?.name || "Team Alpha";
   const activeTeamColor =
     currentTurn?.activeTeam === "B"
-      ? room.teams.teamB.color
-      : room.teams.teamA.color;
+      ? room.teams?.teamB?.color || "#3B82F6"
+      : room.teams?.teamA?.color || "#EF4444";
 
   return (
     <div className="max-w-md mx-auto space-y-6 text-center py-8 px-4">
@@ -52,18 +52,18 @@ export default function SpectatorLounge({
         <div className="grid grid-cols-2 gap-3 p-3 bg-[var(--bg)] rounded-2xl border border-[var(--border-dim)]">
           <div>
             <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)]">
-              {room.teams.teamA.name}
+              {room.teams?.teamA?.name || "Team Alpha"}
             </div>
-            <div className="font-space font-extrabold text-xl" style={{ color: room.teams.teamA.color }}>
-              {room.teams.teamA.score} <span className="text-xs text-[var(--text-dim)] font-normal">pts</span>
+            <div className="font-space font-extrabold text-xl" style={{ color: room.teams?.teamA?.color || "#EF4444" }}>
+              {room.teams?.teamA?.score ?? 0} <span className="text-xs text-[var(--text-dim)] font-normal">pts</span>
             </div>
           </div>
           <div>
             <div className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)]">
-              {room.teams.teamB.name}
+              {room.teams?.teamB?.name || "Team Omega"}
             </div>
-            <div className="font-space font-extrabold text-xl" style={{ color: room.teams.teamB.color }}>
-              {room.teams.teamB.score} <span className="text-xs text-[var(--text-dim)] font-normal">pts</span>
+            <div className="font-space font-extrabold text-xl" style={{ color: room.teams?.teamB?.color || "#3B82F6" }}>
+              {room.teams?.teamB?.score ?? 0} <span className="text-xs text-[var(--text-dim)] font-normal">pts</span>
             </div>
           </div>
         </div>

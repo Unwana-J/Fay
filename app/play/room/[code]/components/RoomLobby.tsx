@@ -16,6 +16,7 @@ interface RoomLobbyProps {
   onUpdateSettings?: (settings: { timerSeconds?: number; scoreGoal?: number }) => void;
   onToggleInactive?: () => void;
   onLeaveRoom?: () => void;
+  onEditName?: () => void;
 }
 
 export default function RoomLobby({
@@ -29,6 +30,7 @@ export default function RoomLobby({
   onUpdateSettings,
   onToggleInactive,
   onLeaveRoom,
+  onEditName,
 }: RoomLobbyProps) {
   const [copied, setCopied] = useState(false);
 
@@ -49,9 +51,9 @@ export default function RoomLobby({
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   };
 
-  const myTeam = room.teams.teamA.playerIds.includes(myPlayerId)
+  const myTeam = (room.teams?.teamA?.playerIds || []).includes(myPlayerId)
     ? "A"
-    : room.teams.teamB.playerIds.includes(myPlayerId)
+    : (room.teams?.teamB?.playerIds || []).includes(myPlayerId)
     ? "B"
     : null;
 
@@ -59,28 +61,44 @@ export default function RoomLobby({
     return Boolean(room.inactive_players?.includes(pId));
   };
 
-  const teamAActiveCount = room.teams.teamA.playerIds.filter(
-    (id) => !isPlayerInactive(id)
-  ).length;
-  const teamAInactiveCount = room.teams.teamA.playerIds.length - teamAActiveCount;
+  const teamAPlayers = room.teams?.teamA?.playerIds || [];
+  const teamAActiveCount = teamAPlayers.filter((id) => !isPlayerInactive(id)).length;
+  const teamAInactiveCount = teamAPlayers.length - teamAActiveCount;
 
-  const teamBActiveCount = room.teams.teamB.playerIds.filter(
-    (id) => !isPlayerInactive(id)
-  ).length;
-  const teamBInactiveCount = room.teams.teamB.playerIds.length - teamBActiveCount;
+  const teamBPlayers = room.teams?.teamB?.playerIds || [];
+  const teamBActiveCount = teamBPlayers.filter((id) => !isPlayerInactive(id)).length;
+  const teamBInactiveCount = teamBPlayers.length - teamBActiveCount;
 
   // Resolve player details from presence map or persisted details
   const getPlayerDisplay = (pId: string) => {
-    const found = presencePlayers.find((p) => p.id === pId);
-    if (found) return found;
+    // 1. If it's me and I have a valid name, prefer local name
+    if (pId === myPlayerId && room.player_details?.[pId]?.name) {
+      const myDetail = room.player_details[pId];
+      return { id: pId, name: myDetail.name, avatar: myDetail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+    }
+    // 2. Check persisted room.player_details
     const detail = room.player_details?.[pId];
-    if (detail) {
+    if (detail && detail.name && detail.name !== "Scholar" && detail.name !== "Learner") {
       return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
     }
-    if (pId === room.host_id) {
-      return { id: pId, name: room.host_name, avatar: "/avatars/avatar-scholar.svg", isHost: true };
+    // 3. Check presence map
+    const found = presencePlayers.find((p) => p.id === pId);
+    if (found && found.name && found.name !== "Scholar" && found.name !== "Learner") {
+      return found;
     }
-    return { id: pId, name: `Scholar (${pId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false };
+    // 4. Host fallback
+    if (pId === room.host_id) {
+      return { id: pId, name: room.host_name || "Host", avatar: "/avatars/avatar-scholar.svg", isHost: true };
+    }
+    // 5. If detail or presence has any non-empty name
+    if (detail?.name) {
+      return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+    }
+    if (found?.name) {
+      return found;
+    }
+    const cleanId = pId.replace(/^guest-/, "");
+    return { id: pId, name: `Scholar (${cleanId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false };
   };
 
   return (
@@ -267,9 +285,19 @@ export default function RoomLobby({
                       <span className="w-5 h-5 rounded-md bg-[var(--bg)] flex items-center justify-center text-[10px] font-bold text-[var(--text-mute)] border border-[var(--border-dim)]">
                         #{idx + 1}
                       </span>
-                      <span className="text-[var(--text)]">
-                        {p.name} {isMe && "(You)"}
+                      <span className="text-[var(--text)] truncate">
+                        {p.name}
                       </span>
+                      {isMe && (
+                        <button
+                          type="button"
+                          onClick={onEditName}
+                          className="text-[10px] text-[var(--olive)] hover:underline font-bold inline-flex items-center gap-0.5 cursor-pointer ml-1 flex-shrink-0"
+                          title="Click to rename yourself"
+                        >
+                          (You - edit)
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {inactive ? (
@@ -351,9 +379,19 @@ export default function RoomLobby({
                       <span className="w-5 h-5 rounded-md bg-[var(--bg)] flex items-center justify-center text-[10px] font-bold text-[var(--text-mute)] border border-[var(--border-dim)]">
                         #{idx + 1}
                       </span>
-                      <span className="text-[var(--text)]">
-                        {p.name} {isMe && "(You)"}
+                      <span className="text-[var(--text)] truncate">
+                        {p.name}
                       </span>
+                      {isMe && (
+                        <button
+                          type="button"
+                          onClick={onEditName}
+                          className="text-[10px] text-[var(--olive)] hover:underline font-bold inline-flex items-center gap-0.5 cursor-pointer ml-1 flex-shrink-0"
+                          title="Click to rename yourself"
+                        >
+                          (You - edit)
+                        </button>
+                      )}
                     </div>
                     <div className="flex items-center gap-1.5">
                       {inactive ? (

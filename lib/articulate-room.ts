@@ -32,6 +32,7 @@ export interface CurrentTurn {
   speakerName: string;
   startedAt: number;
   durationSeconds: number;
+  countdownEndsAt?: number;
 }
 
 export type DisputeStatus = "none" | "disputed" | "conceded" | "rejected";
