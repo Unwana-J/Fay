@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
+import { ArticulateRoom, RoomPlayer, getNextSpeakerForTeam } from "@/lib/articulate-room";
 import {
   Check,
   FastForward,
@@ -205,16 +205,26 @@ export default function RoomRoundEnd({
     };
   };
 
-  // Compute next round speaker
+  // Compute next round speaker using sequential roster rotation
   const nextTeam = nextActiveTeamKey === "A" ? room.teams?.teamA : room.teams?.teamB;
   const rawNextIds = nextTeam?.playerIds || [];
   const nextTeamActiveIds = rawNextIds.filter((id) => !isPlayerInactive(id));
-  const eligibleNextIds = nextTeamActiveIds.length > 0 ? nextTeamActiveIds : rawNextIds;
-  const nextTeamTurnCount = Math.floor((nextRoundNumber - 1) / 2);
-  const nextSpeakerId =
-    eligibleNextIds.length > 0
-      ? eligibleNextIds[nextTeamTurnCount % eligibleNextIds.length]
-      : null;
+  const lastSpeakerId =
+    nextActiveTeamKey === "A"
+      ? room.last_speaker_ids?.teamA
+      : room.last_speaker_ids?.teamB;
+  const lastSpeakerIndex =
+    nextActiveTeamKey === "A"
+      ? room.last_speaker_indices?.teamA
+      : room.last_speaker_indices?.teamB;
+
+  const nextSpeakerResult = getNextSpeakerForTeam(
+    rawNextIds,
+    room.inactive_players || [],
+    lastSpeakerId,
+    lastSpeakerIndex
+  );
+  const nextSpeakerId = nextSpeakerResult.speakerId || null;
 
   const nextSpeakerDisplay = nextSpeakerId ? getPlayerDisplay(nextSpeakerId) : null;
   const isMeNextSpeaker = nextSpeakerId === myPlayerId;

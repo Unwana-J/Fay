@@ -74,8 +74,41 @@ export interface ArticulateRoom {
   inactive_players?: string[]; // Player IDs toggled AFK / Inactive
   player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean }>; // Persisted identity map
   last_speaker_indices?: { teamA: number; teamB: number }; // Track strict round-robin index per team
+  last_speaker_ids?: { teamA?: string; teamB?: string }; // Track strict last speaker ID per team
   created_at?: string;
   updated_at?: string;
+}
+
+/**
+ * Sequential round-robin speaker selection that steps forward through the team roster,
+ * skipping inactive scholars without ever jumping or skipping active players.
+ */
+export function getNextSpeakerForTeam(
+  playerIds: string[],
+  inactivePlayerIds: string[] = [],
+  lastSpeakerId?: string,
+  lastSpeakerIndex?: number
+): { speakerId: string; speakerIndex: number } {
+  if (!playerIds || playerIds.length === 0) return { speakerId: "", speakerIndex: -1 };
+
+  let lastIdx = -1;
+  if (lastSpeakerId && playerIds.includes(lastSpeakerId)) {
+    lastIdx = playerIds.indexOf(lastSpeakerId);
+  } else if (typeof lastSpeakerIndex === "number" && lastSpeakerIndex >= 0 && lastSpeakerIndex < playerIds.length) {
+    lastIdx = lastSpeakerIndex;
+  }
+
+  const n = playerIds.length;
+  for (let step = 1; step <= n; step++) {
+    const candidateIdx = (lastIdx + step) % n;
+    const candidateId = playerIds[candidateIdx];
+    if (!inactivePlayerIds.includes(candidateId)) {
+      return { speakerId: candidateId, speakerIndex: candidateIdx };
+    }
+  }
+
+  const fallbackIdx = (lastIdx + 1) % n;
+  return { speakerId: playerIds[fallbackIdx] || playerIds[0], speakerIndex: fallbackIdx };
 }
 
 // In-memory server fallback map for zero-setup resilience

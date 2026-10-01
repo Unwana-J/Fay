@@ -1,12 +1,14 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { memoryRooms, ArticulateRoom } from "@/lib/articulate-room";
+import { memoryRooms, ArticulateRoom, getNextSpeakerForTeam } from "@/lib/articulate-room";
 import { buildDeck } from "@/lib/game-words";
 
 async function persistRoom(room: ArticulateRoom) {
   room.updated_at = new Date().toISOString();
   if (!room.inactive_players) room.inactive_players = [];
   if (!room.player_details) room.player_details = {};
+  if (!room.last_speaker_indices) room.last_speaker_indices = { teamA: -1, teamB: -1 };
+  if (!room.last_speaker_ids) room.last_speaker_ids = {};
   memoryRooms.set(room.room_code, room);
 
   if (isSupabaseConfigured && supabase) {
@@ -17,6 +19,7 @@ async function persistRoom(room: ArticulateRoom) {
         player_details: room.player_details,
         inactive_players: room.inactive_players,
         last_speaker_indices: room.last_speaker_indices,
+        last_speaker_ids: room.last_speaker_ids,
       };
 
       await supabase
@@ -78,6 +81,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           inactive_players: rawTeams.inactive_players || [],
           player_details: rawTeams.player_details || {},
           last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
+          last_speaker_ids: rawTeams.last_speaker_ids || {},
           created_at: data.created_at,
           updated_at: data.updated_at,
         };
@@ -359,19 +363,39 @@ export async function POST(
             ? room.teams.teamA.playerIds
             : room.teams.teamB.playerIds;
 
-        const activeAvailableIds = rawTeamPlayerIds.filter(
-          (pId) => !(room.inactive_players || []).includes(pId)
-        );
-        const eligiblePlayerIds = activeAvailableIds.length > 0 ? activeAvailableIds : rawTeamPlayerIds;
+        if (!room.last_speaker_indices) room.last_speaker_indices = { teamA: -1, teamB: -1 };
+        if (!room.last_speaker_ids) room.last_speaker_ids = {};
 
-        // Team turn count (Turn 0 for Round 1/2, Turn 1 for Round 3/4, Turn 2 for Round 5/6, etc.)
-        const teamTurnCount = Math.floor((roundNumber - 1) / 2);
+        const lastSpeakerId = activeTeam === "A" ? room.last_speaker_ids.teamA : room.last_speaker_ids.teamB;
+        const lastSpeakerIndex = activeTeam === "A" ? room.last_speaker_indices.teamA : room.last_speaker_indices.teamB;
 
         let speakerId = "";
-        if (body.speakerId && eligiblePlayerIds.includes(body.speakerId)) {
+        let speakerIndex = -1;
+
+        if (
+          body.speakerId &&
+          rawTeamPlayerIds.includes(body.speakerId) &&
+          !(room.inactive_players || []).includes(body.speakerId)
+        ) {
           speakerId = body.speakerId;
+          speakerIndex = rawTeamPlayerIds.indexOf(speakerId);
         } else {
-          speakerId = eligiblePlayerIds[teamTurnCount % eligiblePlayerIds.length] || eligiblePlayerIds[0];
+          const result = getNextSpeakerForTeam(
+            rawTeamPlayerIds,
+            room.inactive_players || [],
+            lastSpeakerId,
+            lastSpeakerIndex
+          );
+          speakerId = result.speakerId;
+          speakerIndex = result.speakerIndex;
+        }
+
+        if (activeTeam === "A") {
+          room.last_speaker_ids.teamA = speakerId;
+          room.last_speaker_indices.teamA = speakerIndex;
+        } else {
+          room.last_speaker_ids.teamB = speakerId;
+          room.last_speaker_indices.teamB = speakerIndex;
         }
 
         const speakerDetails = room.player_details?.[speakerId];

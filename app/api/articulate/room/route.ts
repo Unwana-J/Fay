@@ -38,6 +38,8 @@ export async function POST(req: NextRequest) {
       teamB: newRoom.teams.teamB,
       player_details: newRoom.player_details || {},
       inactive_players: newRoom.inactive_players || [],
+      last_speaker_indices: newRoom.last_speaker_indices || { teamA: -1, teamB: -1 },
+      last_speaker_ids: newRoom.last_speaker_ids || {},
     };
 
     // Persist in Supabase if available
@@ -135,6 +137,8 @@ export async function GET(req: NextRequest) {
             spectators: data.spectators || [],
             inactive_players: rawTeams.inactive_players || [],
             player_details: rawTeams.player_details || {},
+            last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
+            last_speaker_ids: rawTeams.last_speaker_ids || {},
             created_at: data.created_at,
             updated_at: data.updated_at,
           };
