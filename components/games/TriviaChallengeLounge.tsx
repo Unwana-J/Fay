@@ -94,7 +94,7 @@ export function VisibleCountdownTimer({
   }
 
   return (
-    <div className="rounded-2xl p-3 sm:p-4 bg-[var(--bg-base)]/90 dark:bg-black/40 border border-[var(--border-dim)] shadow-xs backdrop-blur-xs flex flex-col gap-2.5 min-w-[260px] sm:min-w-[310px]">
+    <div className="rounded-2xl p-3 sm:p-4 bg-[var(--bg-base)]/90 dark:bg-black/40 border border-[var(--border-dim)] shadow-xs backdrop-blur-xs flex flex-col gap-2.5 w-full sm:w-auto sm:min-w-[300px]">
       {/* Header bar */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
@@ -559,45 +559,45 @@ export default function TriviaChallengeLounge({
 
         {/* Hero Tournament Banner Plaque */}
         <div
-          className="rounded-2xl sm:rounded-3xl p-5 sm:p-6 border relative overflow-hidden shadow-sm"
+          className="rounded-2xl sm:rounded-3xl p-5 sm:p-6 border relative overflow-hidden shadow-sm flex flex-col gap-5"
           style={{
             background: "linear-gradient(135deg, rgba(0, 135, 81, 0.12) 0%, rgba(166, 124, 30, 0.08) 100%)",
             borderColor: "rgba(0, 135, 81, 0.3)",
           }}
         >
-          <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
-            {/* Left Info */}
-            <div className="space-y-2.5 flex-1 min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--olive)]/15 text-[#008751] dark:text-emerald-400 border border-[var(--olive)]/30">
-                  <Swords size={11} /> Invitational Challenge
-                </span>
-                <span className="text-[10px] font-mono capitalize px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)]">
-                  {currentChallenge.difficulty} Mode
-                </span>
-              </div>
-
-              <h2 className="font-space text-2xl sm:text-3xl font-extrabold tracking-tight" style={{ color: "var(--text)" }}>
-                {currentChallenge.title}
-              </h2>
-
-              <p className="text-xs sm:text-sm text-[var(--text-dim)]">
-                Convened by <strong>Scholar {currentChallenge.creatorName}</strong> · {currentChallenge.questionCount} Questions · {scores.length} {scores.length === 1 ? "Scholar" : "Scholars"} Competing
-              </p>
+          {/* Challenge Identity & Title (Full Width) */}
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--olive)]/15 text-[#008751] dark:text-emerald-400 border border-[var(--olive)]/30">
+                <Swords size={11} /> Invitational Challenge
+              </span>
+              <span className="text-[10px] font-mono capitalize px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                {currentChallenge.difficulty} Mode
+              </span>
             </div>
 
-            {/* Right: Visible Digital Countdown Clock & Play Action */}
-            <div className="flex flex-col sm:flex-row lg:flex-col xl:flex-row items-stretch sm:items-center lg:items-stretch xl:items-center gap-3 shrink-0">
+            <h2 className="font-space text-2xl sm:text-3xl font-extrabold tracking-tight break-words" style={{ color: "var(--text)" }}>
+              {currentChallenge.title}
+            </h2>
+
+            <p className="text-xs sm:text-sm text-[var(--text-dim)]">
+              Convened by <strong>Scholar {currentChallenge.creatorName}</strong> · {currentChallenge.questionCount} Questions · {scores.length} {scores.length === 1 ? "Scholar" : "Scholars"} Competing
+            </p>
+          </div>
+
+          {/* Tournament Controls: Live Countdown Clock & Play Action */}
+          <div className="pt-3 border-t border-[var(--border-dim)]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="w-full sm:w-auto">
               <VisibleCountdownTimer challenge={currentChallenge} />
-
-              <button
-                onClick={() => onPlayChallenge(currentChallenge)}
-                className="px-5 py-3.5 rounded-2xl btn-terra font-space font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all whitespace-nowrap self-stretch sm:self-auto"
-              >
-                <span>Play Challenge Deck</span>
-                <ArrowRight size={14} />
-              </button>
             </div>
+
+            <button
+              onClick={() => onPlayChallenge(currentChallenge)}
+              className="px-6 py-3.5 rounded-2xl btn-terra font-space font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all whitespace-nowrap self-stretch sm:self-auto shrink-0"
+            >
+              <span>Play Challenge Deck</span>
+              <ArrowRight size={15} />
+            </button>
           </div>
         </div>
 
