@@ -754,6 +754,7 @@ export default function ArticulateRoomPage({
               secondsRemaining={secondsRemaining}
               myPlayerId={myPlayerId}
               onSendReaction={handleSendReaction}
+              presencePlayers={presencePlayers}
             />
           </motion.div>
         ) : room.status === "lobby" ? (

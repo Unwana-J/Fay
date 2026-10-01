@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { ArticulateRoom } from "@/lib/articulate-room";
 import { CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Clock } from "lucide-react";
-import { motion } from "framer-motion";
+import BoardMap from "@/app/play/BoardMap";
+import { Clock, ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 
 interface RoomGuesserViewProps {
   room: ArticulateRoom;
@@ -21,6 +22,7 @@ export default function RoomGuesserView({
   myTeam,
   onSendReaction,
 }: RoomGuesserViewProps) {
+  const [showBoard, setShowBoard] = useState(false);
   const currentTurn = room.current_turn;
   const currentWord = room.deck[room.current_word_index];
   const isUrgent = secondsRemaining <= 15;
@@ -104,6 +106,39 @@ export default function RoomGuesserView({
               {room.teams?.teamB?.score ?? 0} pts
             </div>
           </div>
+        </div>
+
+        {/* Expandable Board Map Peek */}
+        <div className="pt-2 border-t border-[var(--border-dim)]/40">
+          <button
+            type="button"
+            onClick={() => setShowBoard(!showBoard)}
+            className="w-full flex items-center justify-center gap-1.5 py-1 text-xs text-[var(--olive)] font-bold hover:underline cursor-pointer transition"
+          >
+            <span>🗺️ {showBoard ? "Hide Board Map" : "Peek at Board Map"}</span>
+            {showBoard ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+          </button>
+
+          <AnimatePresence>
+            {showBoard && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="pt-3 text-left overflow-hidden"
+              >
+                <BoardMap
+                  scoreA={room.teams?.teamA?.score ?? 0}
+                  scoreB={room.teams?.teamB?.score ?? 0}
+                  scoreGoal={room.settings?.scoreGoal || 20}
+                  colorA={room.teams?.teamA?.color || "#EF4444"}
+                  colorB={room.teams?.teamB?.color || "#3B82F6"}
+                  activeTeam={currentTurn?.activeTeam || "A"}
+                  gameMode="classic"
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
 
