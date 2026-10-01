@@ -2,7 +2,7 @@ import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { type Topic, type Difficulty, DIFFICULTY_XP } from "@/lib/topics";
 import { checkNewAchievements, type AchievementStats } from "@/lib/achievements";
-import { todayStr, daysBetween, uid } from "@/lib/utils";
+import { todayStr, daysBetween, uid, formatDateToIso, getYesterdayStr } from "@/lib/utils";
 import { analytics } from "@/lib/analytics";
 
 export interface CompletedSession {
@@ -49,6 +49,159 @@ export interface StreakData {
   total: number;
   history: Array<{ date: string; count: number }>;
   shields: number; // Scholar's seals of protection
+}
+
+// ─── Unified Streak Logic ────────────────────────────────────────────────────
+export function advanceStreakState(
+  streak: StreakData | undefined,
+  today: string = todayStr()
+): StreakData {
+  const currentStreakVal = streak?.current ?? 0;
+  let remainingShields = streak?.shields ?? 1;
+  let currentStreak = currentStreakVal;
+
+  if (streak?.lastDate === today) {
+    // Already counted today
+  } else if (streak?.lastDate && daysBetween(streak.lastDate, today) === 1) {
+    currentStreak += 1;
+  } else if (streak?.lastDate && daysBetween(streak.lastDate, today) === 2 && remainingShields > 0) {
+    // Scholar's Seal preserved the streak!
+    currentStreak += 1;
+    remainingShields -= 1;
+  } else {
+    currentStreak = 1;
+  }
+
+  const longest = Math.max(streak?.longest ?? 0, currentStreak);
+
+  // Build history entry
+  const histEntry = { date: today, count: 1 };
+  const historyList = Array.isArray(streak?.history) ? streak.history : [];
+  const existingHist = historyList.find((h) => h.date === today);
+  const newHistory = existingHist
+    ? historyList.map((h) => (h.date === today ? { ...h, count: h.count + 1 } : h))
+    : [histEntry, ...historyList];
+
+  return {
+    current: currentStreak,
+    longest,
+    lastDate: today,
+    total: (streak?.total ?? 0) + (streak?.lastDate === today ? 0 : 1),
+    history: newHistory.slice(0, 400),
+    shields: remainingShields,
+  };
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function reconcileStreakState(state: any): StreakData {
+  const today = todayStr();
+  const activityDates = new Set<string>();
+
+  if (Array.isArray(state?.sessions)) {
+    for (const s of state.sessions) {
+      if (s?.date) activityDates.add(s.date);
+    }
+  }
+
+  if (Array.isArray(state?.triviaHistory)) {
+    for (const t of state.triviaHistory) {
+      if (t?.date) {
+        activityDates.add(t.date);
+      } else if (t?.timestamp) {
+        const d = new Date(t.timestamp);
+        activityDates.add(formatDateToIso(d));
+      }
+    }
+  }
+
+  if (Array.isArray(state?.articulateHistory)) {
+    for (const a of state.articulateHistory) {
+      if (a?.timestamp) {
+        const d = new Date(a.timestamp);
+        activityDates.add(formatDateToIso(d));
+      }
+    }
+  }
+
+  if (Array.isArray(state?.streak?.history)) {
+    for (const h of state.streak.history) {
+      if (h?.date) activityDates.add(h.date);
+    }
+  }
+
+  const existingStreak: StreakData = state?.streak ?? {
+    current: 0,
+    longest: 0,
+    lastDate: null,
+    total: 0,
+    history: [],
+    shields: 1,
+  };
+
+  if (activityDates.size === 0) {
+    return existingStreak;
+  }
+
+  // Sort dates ascending
+  const sortedDates = Array.from(activityDates).sort();
+  const mostRecentDate = sortedDates[sortedDates.length - 1];
+
+  const fullHistory = Array.from(activityDates)
+    .sort()
+    .reverse()
+    .map((date) => {
+      const existing = existingStreak.history?.find((h) => h.date === date);
+      return { date, count: existing?.count ?? 1 };
+    });
+
+  const diffFromToday = daysBetween(mostRecentDate, today);
+  let currentStreak = 0;
+  let shields = existingStreak.shields ?? 1;
+
+  // Active if most recent was today (diff 0), yesterday (diff 1), or 2 days with shield
+  if (diffFromToday <= 1 || (diffFromToday === 2 && shields > 0)) {
+    let checkDate = new Date(mostRecentDate + "T00:00:00");
+    let consecutive = 0;
+
+    while (true) {
+      const checkStr = formatDateToIso(checkDate);
+      if (activityDates.has(checkStr)) {
+        consecutive++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        const prevDate = new Date(checkDate);
+        prevDate.setDate(prevDate.getDate() - 1);
+        const prevStr = formatDateToIso(prevDate);
+        if (activityDates.has(prevStr) && shields > 0) {
+          shields--;
+          consecutive++;
+          checkDate = prevDate;
+          checkDate.setDate(checkDate.getDate() - 1);
+        } else {
+          break;
+        }
+      }
+    }
+
+    currentStreak = consecutive;
+  } else {
+    currentStreak = 0;
+  }
+
+  const longest = Math.max(
+    existingStreak.longest ?? 0,
+    currentStreak,
+    sortedDates.length > 0 ? 1 : 0
+  );
+
+  return {
+    current: currentStreak,
+    longest,
+    lastDate: mostRecentDate,
+    total: Math.max(existingStreak.total ?? 0, sortedDates.length),
+    history: fullHistory.slice(0, 400),
+    shields,
+  };
 }
 
 export interface UserProfile {
@@ -169,6 +322,10 @@ export interface AppState {
   articulateHistory: ArticulateHistoryItem[];
   saveArticulateRoom: (item: ArticulateHistoryItem) => void;
   removeArticulateRoom: (roomCode: string) => void;
+
+  // Unified streak & activity synchronization
+  recordDailyActivity: (date?: string) => void;
+  syncActivityDates: (dates: string[]) => void;
 }
 
 const DEFAULT_ENABLED_CATEGORIES = [
@@ -378,23 +535,14 @@ export const useAppStore = create<AppState>()(
         const { topic, researchDurationMin } = state.activeSession;
         const today = todayStr();
 
+        // Advance streak using unified helper
+        const updatedStreak = advanceStreakState(state.streak, today);
+        const currentStreak = updatedStreak.current;
+        const remainingShields = updatedStreak.shields;
+        const longest = updatedStreak.longest;
+
         // XP calculation
         let xpEarned = DIFFICULTY_XP[topic.difficulty] ?? 100;
-        const streak = state.streak;
-        let currentStreak = streak.current;
-        let remainingShields = streak.shields ?? 1;
-
-        if (streak.lastDate === today) {
-          // already counted
-        } else if (streak.lastDate && daysBetween(streak.lastDate, today) === 1) {
-          currentStreak += 1;
-        } else if (streak.lastDate && daysBetween(streak.lastDate, today) === 2 && remainingShields > 0) {
-          // Scholar's Seal preserved the streak!
-          currentStreak += 1;
-          remainingShields -= 1;
-        } else {
-          currentStreak = 1;
-        }
         // streak bonus
         xpEarned += currentStreak * 10;
         // research bonus
@@ -405,15 +553,6 @@ export const useAppStore = create<AppState>()(
         } else if (data.speakingSeconds >= 20) {
           xpEarned += 15;
         }
-
-        const longest = Math.max(streak.longest, currentStreak);
-
-        // Build history entry
-        const histEntry = { date: today, count: 1 };
-        const existingHist = streak.history.find((h) => h.date === today);
-        const newHistory = existingHist
-          ? streak.history.map((h) => (h.date === today ? { ...h, count: h.count + 1 } : h))
-          : [histEntry, ...streak.history];
 
         const completedSession: CompletedSession = {
           id: uid(),
@@ -457,14 +596,7 @@ export const useAppStore = create<AppState>()(
         set({
           sessions: newSessions,
           activeSession: null,
-          streak: {
-            current: currentStreak,
-            longest,
-            lastDate: today,
-            total: streak.total + 1,
-            history: newHistory.slice(0, 400),
-            shields: remainingShields,
-          },
+          streak: updatedStreak,
           profile: {
             ...state.profile,
             xp: newXP + achievementXP,
@@ -584,15 +716,18 @@ export const useAppStore = create<AppState>()(
 
       saveTriviaRound: (round) =>
         set((s) => {
+          const today = todayStr();
           const item: TriviaHistoryItem = {
             ...round,
             id: uid(),
             timestamp: Date.now(),
-            date: todayStr(),
+            date: today,
           };
           const existing = Array.isArray(s.triviaHistory) ? s.triviaHistory : [];
+          const updatedStreak = advanceStreakState(s.streak, today);
           return {
             triviaHistory: [item, ...existing].slice(0, 100),
+            streak: updatedStreak,
           };
         }),
 
@@ -601,10 +736,13 @@ export const useAppStore = create<AppState>()(
 
       saveArticulateRoom: (item) =>
         set((s) => {
+          const today = todayStr();
           const list = Array.isArray(s.articulateHistory) ? s.articulateHistory : [];
           const filtered = list.filter((r) => r.roomCode !== item.roomCode);
+          const updatedStreak = advanceStreakState(s.streak, today);
           return {
             articulateHistory: [item, ...filtered].slice(0, 20),
+            streak: updatedStreak,
           };
         }),
 
@@ -614,10 +752,42 @@ export const useAppStore = create<AppState>()(
             (r) => r.roomCode !== roomCode
           ),
         })),
+
+      recordDailyActivity: (date = todayStr()) =>
+        set((s) => ({
+          streak: advanceStreakState(s.streak, date),
+        })),
+
+      syncActivityDates: (dates) =>
+        set((s) => {
+          if (!Array.isArray(dates) || dates.length === 0) return {};
+          const currentHist = s.streak?.history || [];
+          const existingDates = new Set(currentHist.map((h) => h.date));
+          const newEntries = dates
+            .filter((d) => !existingDates.has(d))
+            .map((d) => ({ date: d, count: 1 }));
+          if (newEntries.length === 0) return {};
+
+          const dummyState = {
+            ...s,
+            streak: {
+              ...(s.streak || {}),
+              history: [...newEntries, ...currentHist],
+            },
+          };
+          return {
+            streak: reconcileStreakState(dummyState),
+          };
+        }),
     }),
     {
       name: "fey-app-store",
-      version: 9,
+      version: 10,
+      onRehydrateStorage: () => (state) => {
+        if (state) {
+          state.streak = reconcileStreakState(state);
+        }
+      },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       migrate: (persistedState: any, fromVersion: number) => {
         const state = { ...persistedState };
@@ -691,6 +861,9 @@ export const useAppStore = create<AppState>()(
             });
           }
         }
+
+        // v9 → v10: Reconcile streak state from all historical activities
+        state.streak = reconcileStreakState(state);
 
         // Ensure profile has an id
         if (!state?.profile?.id) {

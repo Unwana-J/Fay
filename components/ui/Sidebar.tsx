@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -98,7 +98,7 @@ function StreakCalendarModal({
   streakShields,
   profileXp,
   onBuyShield,
-  sessions,
+  activityDates,
 }: {
   onClose: () => void;
   streakCurrent: number;
@@ -107,10 +107,10 @@ function StreakCalendarModal({
   streakShields: number;
   profileXp: number;
   onBuyShield: () => boolean;
-  sessions: CompletedSession[];
+  activityDates: Set<string>;
 }) {
   const streakDates = getStreakDates(streakCurrent, streakLastDate);
-  const hasSession = (dateStr: string) => sessions.some((s) => s.date === dateStr);
+  const hasActivity = (dateStr: string) => activityDates.has(dateStr);
   const isStreak = (dateStr: string) => streakDates.includes(dateStr);
   const [shieldMsg, setShieldMsg] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -194,18 +194,18 @@ function StreakCalendarModal({
                 {m.days.map((day, dIdx) => {
                   if (day.isPadding) return <div key={dIdx} className="w-8 h-8" />;
                   
-                  const played = hasSession(day.dateStr);
+                  const played = hasActivity(day.dateStr);
                   const active = isStreak(day.dateStr);
 
-                  let cellClass = "w-8 h-8 flex items-center justify-center text-xs font-mono transition-all relative ";
+                  let cellClass = "w-8 h-8 flex items-center justify-center text-xs font-mono transition-all relative rounded-full ";
                   const cellStyle: React.CSSProperties = {};
 
                   if (active) {
-                    cellClass += "text-white font-bold bg-[var(--terra)] ";
+                    cellClass += "text-white font-bold bg-[var(--terra)] shadow-sm ";
                   } else if (played) {
-                    cellClass += "rounded-full bg-[var(--bg-input)] border border-[var(--olive)] text-[var(--olive-text)]";
+                    cellClass += "bg-[var(--bg-input)] border border-[var(--olive)] text-[var(--olive-text)] font-semibold";
                   } else {
-                    cellClass += "text-[var(--text)] rounded-full hover:bg-[var(--bg-input)]/50";
+                    cellClass += "text-[var(--text)] hover:bg-[var(--bg-input)]/50";
                   }
 
                   return (
@@ -217,7 +217,7 @@ function StreakCalendarModal({
                     >
                       {day.dayNum}
                       {active && played && (
-                        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white/60" />
+                        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white/70" />
                       )}
                     </div>
                   );
@@ -288,11 +288,59 @@ function StreakCalendarModal({
 // ─── Main Sidebar ────────────────────────────────────────────────────────────
 export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const pathname = usePathname();
-  const { profile, streak, sessions, buyStreakShield } = useAppStore();
+  const {
+    profile,
+    streak,
+    sessions,
+    triviaHistory = [],
+    articulateHistory = [],
+    buyStreakShield,
+    syncActivityDates,
+  } = useAppStore();
   const [showStreakModal, setShowStreakModal] = useState(false);
   
   const level   = getLevelForXP(profile.xp);
   const progress = getLevelProgress(profile.xp);
+
+  // Sync historical scores from server if available for this scholar
+  useEffect(() => {
+    if (!profile?.username || profile.username.trim() === "Scholar") return;
+    fetch(`/api/trivia/scores?username=${encodeURIComponent(profile.username.trim())}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (Array.isArray(data?.dates) && data.dates.length > 0) {
+          syncActivityDates(data.dates);
+        }
+      })
+      .catch(() => {});
+  }, [profile?.username, syncActivityDates]);
+
+  // Aggregate all unique active scholar dates across solo sessions, trivia, and articulate rooms
+  const activityDates = useMemo(() => {
+    const dates = new Set<string>();
+    (sessions || []).forEach((s) => s.date && dates.add(s.date));
+    (triviaHistory || []).forEach((t) => {
+      if (t.date) dates.add(t.date);
+      else if (t.timestamp) {
+        const d = new Date(t.timestamp);
+        const yr = d.getFullYear();
+        const mo = String(d.getMonth() + 1).padStart(2, "0");
+        const dy = String(d.getDate()).padStart(2, "0");
+        dates.add(`${yr}-${mo}-${dy}`);
+      }
+    });
+    (articulateHistory || []).forEach((a) => {
+      if (a.timestamp) {
+        const d = new Date(a.timestamp);
+        const yr = d.getFullYear();
+        const mo = String(d.getMonth() + 1).padStart(2, "0");
+        const dy = String(d.getDate()).padStart(2, "0");
+        dates.add(`${yr}-${mo}-${dy}`);
+      }
+    });
+    (streak.history || []).forEach((h) => h.date && dates.add(h.date));
+    return dates;
+  }, [sessions, triviaHistory, articulateHistory, streak.history]);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -433,7 +481,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             streakShields={streak.shields ?? 1}
             profileXp={profile.xp}
             onBuyShield={buyStreakShield}
-            sessions={sessions}
+            activityDates={activityDates}
           />
         )}
       </AnimatePresence>

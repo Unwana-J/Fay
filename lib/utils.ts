@@ -18,9 +18,18 @@ export function formatDuration(minutes: number): string {
   return m > 0 ? `${h}h ${m}m` : `${h}h`;
 }
 
-export function todayStr(): string {
-  const d = new Date();
+export function formatDateToIso(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+export function todayStr(): string {
+  return formatDateToIso(new Date());
+}
+
+export function getYesterdayStr(): string {
+  const d = new Date();
+  d.setDate(d.getDate() - 1);
+  return formatDateToIso(d);
 }
 
 export function daysBetween(a: string, b: string): number {

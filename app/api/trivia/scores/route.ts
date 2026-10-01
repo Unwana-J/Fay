@@ -56,3 +56,38 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
+
+export async function GET(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const username = searchParams.get("username");
+
+    if (!username || !isSupabaseConfigured || !supabase) {
+      return NextResponse.json({ dates: [] });
+    }
+
+    const { data, error } = await supabase
+      .from("trivia_scores")
+      .select("created_at")
+      .ilike("username", username.trim())
+      .order("created_at", { ascending: false })
+      .limit(100);
+
+    if (error || !data) {
+      return NextResponse.json({ dates: [] });
+    }
+
+    const dates = Array.from(
+      new Set(
+        data
+          .filter((row) => row.created_at)
+          .map((row) => new Date(row.created_at).toISOString().slice(0, 10))
+      )
+    );
+
+    return NextResponse.json({ dates });
+  } catch (err) {
+    console.error("Error fetching user scores dates:", err);
+    return NextResponse.json({ dates: [] });
+  }
+}
