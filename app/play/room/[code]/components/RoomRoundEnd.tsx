@@ -284,13 +284,15 @@ export default function RoomRoundEnd({
               const isDisputed = w.disputeStatus === "disputed";
               const isConceded = w.disputeStatus === "conceded";
               const isRejected = w.disputeStatus === "rejected";
+              const disputeCount = w.disputeCount || (w.disputeStatus && w.disputeStatus !== "none" ? 1 : 0);
+              const canDisputeAgain = disputeCount < 3;
 
               return (
                 <div
                   key={idx}
                   className={`p-3.5 rounded-2xl border transition-all ${
                     isConceded
-                      ? "bg-red-500/5 border-red-500/30 opacity-60"
+                      ? "bg-red-500/5 border-red-500/30 opacity-75"
                       : isDisputed
                       ? "bg-amber-500/10 border-amber-500/50 shadow-sm"
                       : "bg-[var(--bg-card)] border-[var(--border-dim)]"
@@ -316,13 +318,13 @@ export default function RoomRoundEnd({
                     </div>
 
                     {/* Status Badge or Challenge Action */}
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap justify-end">
                       {!w.disputeStatus || w.disputeStatus === "none" ? (
                         isOpposingTeam ? (
                           <button
                             type="button"
                             onClick={() => onDisputeWord(idx)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 cursor-pointer transition"
+                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 cursor-pointer transition shadow-2xs"
                           >
                             <Flag className="w-3 h-3" /> Challenge Word
                           </button>
@@ -333,16 +335,40 @@ export default function RoomRoundEnd({
                         )
                       ) : isDisputed ? (
                         <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-500/15 px-2 py-0.5 rounded-md">
-                          <AlertTriangle className="w-3 h-3" /> Disputed by {w.disputedBy}
+                          <AlertTriangle className="w-3 h-3" /> Disputed by {w.disputedBy} {disputeCount > 1 && `(${disputeCount}/3)`}
                         </span>
                       ) : isConceded ? (
-                        <span className="text-[11px] font-bold text-red-500">
-                          Voided (Confirmed by {w.concededBy})
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-red-500">
+                            Voided (Confirmed by {w.concededBy})
+                          </span>
+                          {canDisputeAgain && isDescribingTeam && (
+                            <button
+                              type="button"
+                              onClick={() => onDisputeWord(idx)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 cursor-pointer transition shadow-2xs"
+                              title="Re-open discussion with opponents"
+                            >
+                              <Sparkles className="w-3 h-3" /> Re-Open ({3 - disputeCount} left)
+                            </button>
+                          )}
+                        </div>
                       ) : isRejected ? (
-                        <span className="text-[11px] font-bold text-emerald-600">
-                          Point Upheld (Dispute Contested)
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-emerald-600">
+                            Point Upheld (Dispute Contested)
+                          </span>
+                          {canDisputeAgain && isOpposingTeam && (
+                            <button
+                              type="button"
+                              onClick={() => onDisputeWord(idx)}
+                              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 cursor-pointer transition shadow-2xs"
+                              title="Challenge again after further discussion"
+                            >
+                              <Flag className="w-3 h-3" /> Re-Challenge ({3 - disputeCount} left)
+                            </button>
+                          )}
+                        </div>
                       ) : null}
                     </div>
                   </div>
@@ -355,7 +381,7 @@ export default function RoomRoundEnd({
                       className="mt-3 pt-3 border-t border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                     >
                       <span className="text-xs text-[var(--text-dim)]">
-                        Opponents challenged this word. Did your team legitimately articulate it?
+                        Opponents challenged this word (Attempt {disputeCount}/3). Did your team legitimately articulate it?
                       </span>
                       <div className="flex items-center gap-2">
                         <button
@@ -378,7 +404,7 @@ export default function RoomRoundEnd({
 
                   {isDisputed && isOpposingTeam && (
                     <div className="mt-2 pt-2 border-t border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 italic">
-                      ⏳ Challenge submitted. Awaiting confirmation/concession from the describing team.
+                      ⏳ Challenge submitted (Attempt {disputeCount}/3). Awaiting confirmation/concession from the describing team.
                     </div>
                   )}
                 </div>
@@ -404,6 +430,8 @@ export default function RoomRoundEnd({
                 const isClaimPending = w.claimStatus === "claimed";
                 const isAwarded = w.claimStatus === "awarded";
                 const isClaimRejected = w.claimStatus === "rejected";
+                const claimCount = w.claimCount || (w.claimStatus && w.claimStatus !== "none" ? 1 : 0);
+                const canClaimAgain = claimCount < 3;
 
                 return (
                   <div
@@ -433,7 +461,7 @@ export default function RoomRoundEnd({
                         </span>
                       </div>
 
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap justify-end">
                         {!w.claimStatus || w.claimStatus === "none" ? (
                           isDescribingTeam ? (
                             <button
@@ -448,16 +476,40 @@ export default function RoomRoundEnd({
                           )
                         ) : isClaimPending ? (
                           <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-600 bg-amber-500/15 px-2 py-0.5 rounded-md">
-                            <AlertTriangle className="w-3 h-3" /> Claimed by {w.claimedBy}
+                            <AlertTriangle className="w-3 h-3" /> Claimed by {w.claimedBy} {claimCount > 1 && `(${claimCount}/3)`}
                           </span>
                         ) : isAwarded ? (
-                          <span className="text-[11px] font-bold text-emerald-600">
-                            +1 Point Awarded (Confirmed by {w.awardedBy})
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-emerald-600">
+                              +1 Point Awarded (Confirmed by {w.awardedBy})
+                            </span>
+                            {canClaimAgain && isOpposingTeam && (
+                              <button
+                                type="button"
+                                onClick={() => onResolvePassedClaim?.(idx, "reject")}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 cursor-pointer transition shadow-2xs"
+                                title="Revoke award if confirmed by mistake"
+                              >
+                                Revoke ({3 - claimCount} left)
+                              </button>
+                            )}
+                          </div>
                         ) : isClaimRejected ? (
-                          <span className="text-[11px] font-bold text-[var(--text-mute)] line-through">
-                            Claim Declined
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className="text-[11px] font-bold text-[var(--text-mute)] line-through">
+                              Claim Declined
+                            </span>
+                            {canClaimAgain && isDescribingTeam && (
+                              <button
+                                type="button"
+                                onClick={() => onClaimPassedWord?.(idx)}
+                                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-[10px] font-bold border border-[var(--olive)]/40 bg-[var(--olive)]/10 hover:bg-[var(--olive)]/20 text-[var(--olive)] cursor-pointer transition shadow-2xs"
+                                title="Try claiming again after further discussion on call"
+                              >
+                                <Sparkles className="w-3 h-3" /> Re-Claim ({3 - claimCount} left)
+                              </button>
+                            )}
+                          </div>
                         ) : null}
                       </div>
                     </div>
@@ -470,7 +522,7 @@ export default function RoomRoundEnd({
                         className="mt-2.5 pt-2.5 border-t border-amber-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-2"
                       >
                         <span className="text-xs text-[var(--text-dim)]">
-                          {turnTeamName} claims they articulated &amp; guessed this. Confirm point?
+                          {turnTeamName} claims they articulated &amp; guessed this (Attempt {claimCount}/3). Confirm point?
                         </span>
                         <div className="flex items-center gap-2">
                           <button
@@ -493,7 +545,7 @@ export default function RoomRoundEnd({
 
                     {isClaimPending && isDescribingTeam && (
                       <div className="mt-2 pt-2 border-t border-amber-500/20 text-[11px] text-amber-700 dark:text-amber-300 italic">
-                        ⏳ Claim submitted. Waiting for opposing team confirmation.
+                        ⏳ Claim submitted (Attempt {claimCount}/3). Waiting for opposing team confirmation.
                       </div>
                     )}
                   </div>

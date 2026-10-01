@@ -489,8 +489,15 @@ export async function POST(
           return NextResponse.json({ error: "Invalid word index" }, { status: 400 });
         }
 
-        room.round_words_scored[wordIndex].disputeStatus = "disputed";
-        room.round_words_scored[wordIndex].disputedBy = String(opponentName || "Opposing Team");
+        const wordEntry = room.round_words_scored[wordIndex];
+        const currentCount = wordEntry.disputeCount || 0;
+        if (currentCount >= 3) {
+          return NextResponse.json({ error: "Maximum of 3 dispute attempts reached" }, { status: 400 });
+        }
+
+        wordEntry.disputeCount = currentCount + 1;
+        wordEntry.disputeStatus = "disputed";
+        wordEntry.disputedBy = String(opponentName || "Opposing Team");
 
         await persistRoom(room);
         return NextResponse.json({ success: true, room });
@@ -506,18 +513,23 @@ export async function POST(
         }
 
         const wordEntry = room.round_words_scored[wordIndex];
-        if (resolution === "concede") {
-          // Maker-checker consensus reached: describing team confirms the foul
-          if (wordEntry.disputeStatus !== "conceded") {
-            wordEntry.disputeStatus = "conceded";
-            wordEntry.concededBy = String(resolverName || "Describing Team");
+        const prevStatus = wordEntry.disputeStatus;
+        const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
 
-            const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
+        if (resolution === "concede") {
+          // Maker-checker consensus reached: describing team confirms the foul (voided)
+          wordEntry.disputeStatus = "conceded";
+          wordEntry.concededBy = String(resolverName || "Describing Team");
+
+          if (prevStatus !== "conceded") {
             room.teams[turnTeam].score = Math.max(0, room.teams[turnTeam].score - 1);
           }
         } else if (resolution === "reject") {
-          // Describing team contests the dispute: point remains intact
+          // Describing team contests the dispute / restores the point
           wordEntry.disputeStatus = "rejected";
+          if (prevStatus === "conceded") {
+            room.teams[turnTeam].score += 1;
+          }
         }
 
         await persistRoom(room);
@@ -534,6 +546,12 @@ export async function POST(
         }
 
         const passedEntry = room.round_words_passed[wordIndex];
+        const currentCount = passedEntry.claimCount || 0;
+        if (currentCount >= 3) {
+          return NextResponse.json({ error: "Maximum of 3 claim attempts reached" }, { status: 400 });
+        }
+
+        passedEntry.claimCount = currentCount + 1;
         passedEntry.claimStatus = "claimed";
         passedEntry.claimedBy = String(claimantName || "Describing Team");
 
@@ -551,12 +569,14 @@ export async function POST(
         }
 
         const passedEntry = room.round_words_passed[wordIndex];
-        if (resolution === "award") {
-          if (passedEntry.claimStatus !== "awarded") {
-            passedEntry.claimStatus = "awarded";
-            passedEntry.awardedBy = String(resolverName || "Opposing Team");
+        const prevStatus = passedEntry.claimStatus;
+        const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
 
-            const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
+        if (resolution === "award") {
+          passedEntry.claimStatus = "awarded";
+          passedEntry.awardedBy = String(resolverName || "Opposing Team");
+
+          if (prevStatus !== "awarded") {
             room.teams[turnTeam].score += 1;
 
             if (room.teams[turnTeam].score >= room.settings.scoreGoal) {
@@ -567,6 +587,10 @@ export async function POST(
         } else if (resolution === "reject") {
           passedEntry.claimStatus = "rejected";
           passedEntry.rejectedBy = String(resolverName || "Opposing Team");
+
+          if (prevStatus === "awarded") {
+            room.teams[turnTeam].score = Math.max(0, room.teams[turnTeam].score - 1);
+          }
         }
 
         await persistRoom(room);

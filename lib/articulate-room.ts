@@ -41,6 +41,7 @@ export interface ScoredWordEntry extends GameWord {
   disputeStatus?: DisputeStatus;
   disputedBy?: string; // Opponent who flagged it
   concededBy?: string; // Describing team member who confirmed it
+  disputeCount?: number; // Number of challenge/dispute attempts (up to 3)
 }
 
 export type PassedWordClaimStatus = "none" | "claimed" | "awarded" | "rejected";
@@ -50,6 +51,7 @@ export interface PassedWordEntry extends GameWord {
   claimedBy?: string; // Describing team member who claimed it
   awardedBy?: string; // Opponent who confirmed and awarded it
   rejectedBy?: string; // Opponent who rejected it
+  claimCount?: number; // Number of claim attempts (up to 3)
 }
 
 export interface ArticulateRoom {
