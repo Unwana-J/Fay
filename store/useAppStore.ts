@@ -4,6 +4,7 @@ import { type Topic, type Difficulty, DIFFICULTY_XP } from "@/lib/topics";
 import { checkNewAchievements, type AchievementStats } from "@/lib/achievements";
 import { todayStr, daysBetween, uid, formatDateToIso, getYesterdayStr } from "@/lib/utils";
 import { analytics } from "@/lib/analytics";
+import { renameLocalChallengeParticipant } from "@/lib/trivia-challenge";
 
 export interface CompletedSession {
   id: string;
@@ -654,8 +655,33 @@ export const useAppStore = create<AppState>()(
         return true;
       },
 
-      updateProfile: (data) =>
-        set((s) => ({ profile: { ...s.profile, ...data } })),
+      updateProfile: (data) => {
+        const oldUsername = get().profile.username;
+        const newUsername = data.username?.trim();
+
+        if (newUsername && newUsername !== oldUsername) {
+          // 1. Sync local challenge scores in browser
+          if (typeof window !== "undefined") {
+            try {
+              renameLocalChallengeParticipant(oldUsername, newUsername);
+              localStorage.setItem("fey_player_name", newUsername);
+            } catch {}
+
+            // 2. Sync to Supabase so past scores in trivia_scores reflect the new name
+            fetch("/api/trivia/scores", {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                oldUsername,
+                newUsername,
+                deviceId: get().profile.id,
+              }),
+            }).catch(() => {});
+          }
+        }
+
+        set((s) => ({ profile: { ...s.profile, ...data } }));
+      },
 
       updateSettings: (data) =>
         set((s) => ({ settings: { ...s.settings, ...data } })),

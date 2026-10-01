@@ -66,25 +66,26 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
       .then((res) => res.json())
       .then((data) => {
         if (data.configured && Array.isArray(data.scores) && data.scores.length > 0) {
-          const mergedMap = new Map<string, ChallengeParticipantScore>();
-          local.forEach((s) => mergedMap.set(s.username.toLowerCase(), s));
-          data.scores.forEach((cs: any) => {
-            const key = cs.username.toLowerCase();
-            const existing = mergedMap.get(key);
-            if (!existing || cs.pct > existing.pct) {
-              mergedMap.set(key, {
-                id: cs.id,
-                username: cs.username,
-                avatar: cs.avatar || "/avatars/avatar-scholar.svg",
-                score: cs.score,
-                total: cs.total,
-                pct: cs.pct,
-                gradeLabel: cs.grade_label,
-                completedAt: new Date(cs.created_at).getTime(),
-              });
+          const cloudScores: ChallengeParticipantScore[] = data.scores.map((cs: any) => ({
+            id: cs.id,
+            username: cs.username,
+            avatar: cs.avatar || "/avatars/avatar-scholar.svg",
+            score: cs.score,
+            total: cs.total,
+            pct: cs.pct,
+            gradeLabel: cs.grade_label,
+            completedAt: new Date(cs.created_at).getTime(),
+          }));
+
+          // Sync local storage so stale or renamed player names are purged
+          try {
+            if (typeof window !== "undefined") {
+              const key = `fey_tc_${selectedChallenge.id}_scores`;
+              localStorage.setItem(key, JSON.stringify(cloudScores));
             }
-          });
-          setChallengeScores(Array.from(mergedMap.values()).sort((a, b) => b.pct - a.pct || b.score - a.score));
+          } catch {}
+
+          setChallengeScores(cloudScores.sort((a, b) => b.pct - a.pct || b.score - a.score));
         } else {
           setChallengeScores(local);
         }
@@ -415,7 +416,12 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                 </div>
               ) : (
                 challengeScores.map((s, idx) => {
-                  const isUser = s.username.toLowerCase() === (profile?.username || "").toLowerCase();
+                  const isUser = Boolean(
+                    (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
+                    (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
+                  );
+                  const displayName = isUser && profile?.username ? profile.username : s.username;
+
                   return (
                     <div
                       key={s.id || s.username || idx}
@@ -447,7 +453,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                              {s.username}
+                              {displayName}
                             </span>
                             {isUser && (
                               <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">

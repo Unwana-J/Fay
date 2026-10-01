@@ -94,3 +94,43 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ dates: [] });
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  try {
+    const body = await req.json();
+    const { oldUsername, newUsername, deviceId } = body;
+
+    if (!newUsername || typeof newUsername !== "string") {
+      return NextResponse.json({ error: "Invalid username" }, { status: 400 });
+    }
+
+    const cleanNewName = sanitizeScholarName(newUsername);
+
+    if (!isSupabaseConfigured || !supabase) {
+      return NextResponse.json({ success: true, stored: false });
+    }
+
+    // Update historical scores in Supabase
+    let query = supabase.from("trivia_scores").update({ username: cleanNewName });
+
+    if (deviceId) {
+      query = query.eq("device_id", deviceId);
+    } else if (oldUsername) {
+      query = query.ilike("username", oldUsername.trim());
+    } else {
+      return NextResponse.json({ error: "Missing identifier" }, { status: 400 });
+    }
+
+    const { data, error } = await query.select();
+    if (error) {
+      console.error("Error updating score usernames:", error);
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    return NextResponse.json({ success: true, updatedCount: data?.length || 0 });
+  } catch (err) {
+    console.error("Error patching score username:", err);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
+}
+

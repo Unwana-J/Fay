@@ -403,3 +403,31 @@ export function getLocalChallengeScores(challengeId: string): ChallengeParticipa
     return [];
   }
 }
+
+export function renameLocalChallengeParticipant(oldName: string, newName: string): void {
+  if (typeof window === "undefined" || !oldName || !newName) return;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("fey_tc_") && key.endsWith("_scores")) {
+        const raw = localStorage.getItem(key);
+        if (raw) {
+          const list: ChallengeParticipantScore[] = JSON.parse(raw);
+          let changed = false;
+          list.forEach((s) => {
+            if (s.username.trim().toLowerCase() === oldName.trim().toLowerCase()) {
+              s.username = newName.trim();
+              changed = true;
+            }
+          });
+          if (changed) {
+            localStorage.setItem(key, JSON.stringify(list));
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.warn("Could not rename local challenge scores:", e);
+  }
+}
+

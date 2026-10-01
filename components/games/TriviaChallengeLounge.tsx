@@ -17,6 +17,7 @@ import {
   Target,
   RefreshCw,
   Zap,
+  Pencil,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import {
@@ -201,9 +202,11 @@ export default function TriviaChallengeLounge({
   onSelectChallenge,
   onPlayChallenge,
 }: TriviaChallengeLoungeProps) {
-  const { profile } = useAppStore();
+  const { profile, updateProfile } = useAppStore();
 
   const [localChallenges, setLocalChallenges] = useState<TriviaChallenge[]>([]);
+  const [showRenameModal, setShowRenameModal] = useState(false);
+  const [renameDraft, setRenameDraft] = useState("");
 
   useEffect(() => {
     const list = getAllLocalChallenges();
@@ -256,25 +259,27 @@ export default function TriviaChallengeLounge({
       .then((res) => res.json())
       .then((data) => {
         if (data.configured && Array.isArray(data.scores) && data.scores.length > 0) {
-          const mergedMap = new Map<string, ChallengeParticipantScore>();
-          local.forEach((s) => mergedMap.set(s.username.toLowerCase(), s));
-          data.scores.forEach((cs: any) => {
-            const key = cs.username.toLowerCase();
-            const existing = mergedMap.get(key);
-            if (!existing || cs.pct > existing.pct) {
-              mergedMap.set(key, {
-                id: cs.id,
-                username: cs.username,
-                avatar: cs.avatar || "/avatars/avatar-scholar.svg",
-                score: cs.score,
-                total: cs.total,
-                pct: cs.pct,
-                gradeLabel: cs.grade_label,
-                completedAt: new Date(cs.created_at).getTime(),
-              });
+          // Cloud scores are authoritative: map directly
+          const cloudList: ChallengeParticipantScore[] = data.scores.map((cs: any) => ({
+            id: cs.id,
+            username: cs.username,
+            avatar: cs.avatar || "/avatars/avatar-scholar.svg",
+            score: cs.score,
+            total: cs.total,
+            pct: cs.pct,
+            gradeLabel: cs.grade_label,
+            completedAt: new Date(cs.created_at).getTime(),
+          }));
+
+          // Sync local storage so stale or renamed player names are updated in browser cache
+          try {
+            if (typeof window !== "undefined") {
+              const key = `fey_tc_${currentChallenge.id}_scores`;
+              localStorage.setItem(key, JSON.stringify(cloudList));
             }
-          });
-          setScores(Array.from(mergedMap.values()).sort((a, b) => b.pct - a.pct || b.score - a.score));
+          } catch {}
+
+          setScores(cloudList.sort((a, b) => b.pct - a.pct || b.score - a.score));
         } else {
           setScores(local);
         }
@@ -286,6 +291,16 @@ export default function TriviaChallengeLounge({
   useEffect(() => {
     loadScores();
   }, [currentChallenge, view]);
+
+  const handleSaveName = async () => {
+    if (!renameDraft.trim()) return;
+    const newName = renameDraft.trim();
+    updateProfile({ username: newName });
+    setShowRenameModal(false);
+    setTimeout(() => {
+      loadScores();
+    }, 400);
+  };
 
   const shareableUrl = useMemo(() => {
     if (!currentChallenge) return "";
@@ -637,7 +652,11 @@ export default function TriviaChallengeLounge({
           ) : (
             <div className="surface rounded-2xl border overflow-hidden shadow-xs divide-y" style={{ borderColor: "var(--border-dim)" }}>
               {scores.map((s, idx) => {
-                const isCurrentUser = profile?.username && s.username.toLowerCase() === profile.username.toLowerCase();
+                const isCurrentUser = Boolean(
+                  (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
+                  (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
+                );
+                const displayName = isCurrentUser && profile?.username ? profile.username : s.username;
 
                 return (
                   <div
@@ -671,12 +690,26 @@ export default function TriviaChallengeLounge({
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                            {s.username}
+                            {displayName}
                           </span>
                           {isCurrentUser && (
-                            <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
-                              You
-                            </span>
+                            <div className="flex items-center gap-1">
+                              <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
+                                You
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setRenameDraft(profile?.username || displayName);
+                                  setShowRenameModal(true);
+                                }}
+                                className="text-[10px] text-[var(--olive)] hover:underline font-bold inline-flex items-center gap-0.5 cursor-pointer"
+                                title="Click to rename yourself"
+                              >
+                                <Pencil size={9} />
+                                <span>edit</span>
+                              </button>
+                            </div>
                           )}
                         </div>
                         <div className="text-xs truncate flex items-center gap-1.5" style={{ color: "var(--text-mute)" }}>
@@ -768,6 +801,48 @@ export default function TriviaChallengeLounge({
             <span>{copiedLink ? "Link Copied to Clipboard" : "Copy Invite Link"}</span>
           </button>
         </div>
+
+        {/* Rename Identity Modal */}
+        {showRenameModal && (
+          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
+            <div className="surface rounded-2xl p-6 max-w-sm w-full border shadow-xl space-y-4">
+              <h3 className="font-space font-bold text-base text-[var(--text)]">
+                Change Your Scholar Identity
+              </h3>
+              <p className="text-xs text-[var(--text-dim)]">
+                Update your name across tournaments, challenge boards, and past scores.
+              </p>
+              <input
+                type="text"
+                value={renameDraft}
+                onChange={(e) => setRenameDraft(e.target.value)}
+                placeholder="Enter your name..."
+                maxLength={24}
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] text-sm font-space font-bold focus:outline-hidden focus:border-[var(--olive)]"
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveName();
+                }}
+              />
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowRenameModal(false)}
+                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveName}
+                  className="px-4 py-1.5 rounded-xl btn-terra text-xs font-bold cursor-pointer"
+                >
+                  Save Name
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
