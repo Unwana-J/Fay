@@ -16,6 +16,7 @@ export interface RoomSettings {
   scoreGoal: number;
   categories: GameCategory[];
   difficulty: GameDifficulty;
+  gameMode?: "classic" | "masterchef";
 }
 
 export interface RoomTeam {
@@ -74,7 +75,7 @@ export interface ArticulateRoom {
   active_players: string[]; // Player IDs locked in for active round
   spectators: string[]; // Player IDs waiting in spectator lounge
   inactive_players?: string[]; // Player IDs toggled AFK / Inactive
-  player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean }>; // Persisted identity map
+  player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean; joinedAt?: number }>; // Persisted identity map
   last_speaker_indices?: { teamA: number; teamB: number }; // Track strict round-robin index per team
   last_speaker_ids?: { teamA?: string; teamB?: string }; // Track strict last speaker ID per team
   created_at?: string;
@@ -187,6 +188,7 @@ export function createInitialRoom(
         name: host.name,
         avatar: "/avatars/avatar-scholar.svg",
         isHost: true,
+        joinedAt: Date.now(),
       },
     },
     last_speaker_indices: {

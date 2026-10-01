@@ -13,7 +13,8 @@ import RoomGameOver from "./components/RoomGameOver";
 import PlayerIdentityModal from "./components/PlayerIdentityModal";
 import RoundCountdownOverlay from "./components/RoundCountdownOverlay";
 import RoomErrorBoundary from "./components/RoomErrorBoundary";
-import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2, Edit2 } from "lucide-react";
+import LobbyQueueModal from "./components/LobbyQueueModal";
+import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2, Edit2, RotateCw, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -79,7 +80,9 @@ export default function ArticulateRoomPage({
   const [identityModalMode, setIdentityModalMode] = useState<"join" | "edit">("join");
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [showLobbyQueueModal, setShowLobbyQueueModal] = useState(false);
   const [isStartingRound, setIsStartingRound] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [knownNames, setKnownNames] = useState<Record<string, { name: string; avatar: string }>>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -414,6 +417,42 @@ export default function ArticulateRoomPage({
       ? "B"
       : null;
 
+    const allParticipantIds = Array.from(
+      new Set([
+        ...(room.teams?.teamA?.playerIds || []),
+        ...(room.teams?.teamB?.playerIds || []),
+        ...(room.spectators || []),
+        ...Object.keys(room.player_details || {}),
+      ])
+    );
+
+    const participantsList = allParticipantIds.map((pId) => {
+      const detail = room.player_details?.[pId];
+      const team = (room.teams?.teamA?.playerIds || []).includes(pId)
+        ? ("A" as const)
+        : (room.teams?.teamB?.playerIds || []).includes(pId)
+        ? ("B" as const)
+        : null;
+      return {
+        id: pId,
+        name:
+          detail?.name && detail.name !== "Scholar" && detail.name !== "Learner"
+            ? detail.name
+            : pId === room.host_id
+            ? room.host_name
+            : `Scholar (${pId.replace(/^guest-/, "").slice(0, 5)})`,
+        avatar: detail?.avatar || "/avatars/avatar-scholar.svg",
+        team,
+        isHost: pId === room.host_id,
+      };
+    });
+
+    const matchStartTime = room.created_at ? new Date(room.created_at).getTime() : Date.now();
+    const durationSeconds = Math.max(
+      (room.current_turn?.roundNumber || 1) * (room.settings?.timerSeconds || 45),
+      Math.floor((Date.now() - matchStartTime) / 1000)
+    );
+
     saveArticulateRoom({
       id: room.room_code,
       roomCode: room.room_code,
@@ -426,16 +465,18 @@ export default function ArticulateRoomPage({
       roundNumber: room.current_turn?.roundNumber || 1,
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
       timestamp: Date.now(),
+      durationSeconds,
+      totalParticipants: participantsList.length,
+      participants: participantsList,
+      teamAName: room.teams?.teamA?.name || "Team Alpha",
+      teamBName: room.teams?.teamB?.name || "Team Omega",
+      teamAColor: room.teams?.teamA?.color || "#EF4444",
+      teamBColor: room.teams?.teamB?.color || "#3B82F6",
+      gameMode: room.settings?.gameMode || "classic",
     });
   }, [
     myPlayerId,
-    room?.room_code,
-    room?.host_name,
-    room?.status,
-    room?.teams?.teamA?.score,
-    room?.teams?.teamB?.score,
-    room?.settings?.scoreGoal,
-    room?.current_turn?.roundNumber,
+    room,
     saveArticulateRoom,
   ]);
 
@@ -799,6 +840,30 @@ export default function ArticulateRoomPage({
     });
   };
 
+  const handleAdmitPlayer = (targetPlayerId: string, targetTeam: "A" | "B") => {
+    dispatchAction({
+      action: "admit_player",
+      playerId: myPlayerId,
+      targetPlayerId,
+      targetTeam,
+    });
+  };
+
+  const handleAutoAdmitAll = () => {
+    dispatchAction({
+      action: "admit_all_spectators",
+      playerId: myPlayerId,
+    });
+  };
+
+  const handleSwitchPlayerTeam = (targetPlayerId: string, targetTeam: "A" | "B") => {
+    dispatchAction({
+      action: "switch_team",
+      playerId: targetPlayerId,
+      targetTeam,
+    });
+  };
+
   const handleLeaveRoom = () => {
     setShowLeaveConfirmModal(true);
   };
@@ -810,6 +875,25 @@ export default function ArticulateRoomPage({
       playerId: myPlayerId,
     });
     router.push("/play");
+  };
+
+  const handleManualRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      await fetchRoomState();
+      if (channelRef.current && isSupabaseConfigured) {
+        channelRef.current.track({
+          id: myPlayerId,
+          name: effectivePlayerName,
+          avatar: myAvatar,
+          isHost: room?.host_id === myPlayerId,
+          joinedAt: Date.now(),
+        });
+      }
+    } finally {
+      setTimeout(() => setIsRefreshing(false), 600);
+    }
   };
 
   if (loading) {
@@ -893,6 +977,19 @@ export default function ArticulateRoomPage({
   // ONLY show spectator lounge if they are not in the match, not the speaker, and explicitly marked spectator or room is locked
   const showSpectatorLounge =
     isPlaying && !isSpeaker && !isInMatch && (isSpectator || room.locked);
+
+  const allKnownParticipantIds = Array.from(
+    new Set([
+      ...(room.spectators || []),
+      ...(presencePlayers || []).map((p) => p.id),
+      ...Object.keys(room.player_details || {}),
+    ])
+  );
+  const waitingScholarsCount = allKnownParticipantIds.filter(
+    (id) =>
+      !(room.teams?.teamA?.playerIds || []).includes(id) &&
+      !(room.teams?.teamB?.playerIds || []).includes(id)
+  ).length;
 
   const speakerId = room.current_turn?.speakerId;
   const rawSpeakerName = room.current_turn?.speakerName;
@@ -988,6 +1085,38 @@ export default function ArticulateRoomPage({
             </>
           )}
 
+          {/* Manual Refresh / Sync Button */}
+          <button
+            type="button"
+            onClick={handleManualRefresh}
+            disabled={isRefreshing}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border-dim)] transition flex items-center gap-1.5 cursor-pointer shadow-2xs"
+            title="Sync & refresh room state"
+          >
+            <RotateCw className={`w-3 h-3 text-[var(--olive)] ${isRefreshing ? "animate-spin" : ""}`} />
+            <span className="hidden sm:inline">{isRefreshing ? "Syncing..." : "Sync"}</span>
+          </button>
+
+          {/* Lobby & Scholar Roster Queue Button */}
+          <button
+            type="button"
+            onClick={() => setShowLobbyQueueModal(true)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-bold border transition flex items-center gap-1.5 cursor-pointer shadow-2xs ${
+              waitingScholarsCount > 0
+                ? "bg-[var(--gold)]/15 hover:bg-[var(--gold)]/25 text-[var(--gold)] border-[var(--gold)]/30 font-extrabold"
+                : "bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border-dim)]"
+            }`}
+            title="View Lobby & Waiting Scholars Queue"
+          >
+            <Users className="w-3.5 h-3.5 text-[var(--olive)]" />
+            <span className="hidden sm:inline">Lobby</span>
+            {waitingScholarsCount > 0 && (
+              <span className="bg-[var(--gold)] text-black text-[10px] font-extrabold px-1.5 py-0.2 rounded-full animate-pulse">
+                {waitingScholarsCount}
+              </span>
+            )}
+          </button>
+
           <button
             type="button"
             onClick={() => {
@@ -1051,6 +1180,9 @@ export default function ArticulateRoomPage({
                   setIdentityModalMode("edit");
                   setShowIdentityModal(true);
                 }}
+                onOpenLobbyQueue={() => setShowLobbyQueueModal(true)}
+                onAdmitPlayer={handleAdmitPlayer}
+                onAutoAdmitAll={handleAutoAdmitAll}
               />
             </motion.div>
           ) : room.status === "playing" ? (
@@ -1110,6 +1242,9 @@ export default function ArticulateRoomPage({
                 onResolvePassedClaim={handleResolvePassedClaim}
                 onToggleInactive={handleToggleInactive}
                 onLeaveRoom={handleLeaveRoom}
+                onOpenLobbyQueue={() => setShowLobbyQueueModal(true)}
+                onAdmitPlayer={handleAdmitPlayer}
+                onAutoAdmitAll={handleAutoAdmitAll}
               />
             </motion.div>
           ) : room.status === "game_over" ? (
@@ -1135,6 +1270,21 @@ export default function ArticulateRoomPage({
           )}
         </AnimatePresence>
       </RoomErrorBoundary>
+
+      {/* Waiting Lobby & Scholar Roster Modal */}
+      <LobbyQueueModal
+        isOpen={showLobbyQueueModal}
+        onClose={() => setShowLobbyQueueModal(false)}
+        room={room}
+        myPlayerId={myPlayerId}
+        isHost={isHost}
+        presencePlayers={presencePlayers}
+        knownNames={knownNames}
+        onAdmitPlayer={handleAdmitPlayer}
+        onAutoAdmitAll={handleAutoAdmitAll}
+        onSwitchPlayerTeam={handleSwitchPlayerTeam}
+        onToggleInactive={handleToggleInactive}
+      />
 
       {/* Player Identity Name Gate & In-Match Rename Modal */}
       <PlayerIdentityModal

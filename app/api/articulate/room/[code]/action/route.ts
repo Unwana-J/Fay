@@ -93,6 +93,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
             name: room.host_name,
             avatar: "/avatars/avatar-scholar.svg",
             isHost: true,
+            joinedAt: Date.now(),
           };
         }
 
@@ -230,12 +231,14 @@ export async function POST(
             ? existingDetail.name
             : name || "Scholar";
 
+        const existingJoinedAt = room.player_details?.[id]?.joinedAt || Date.now();
         if (!room.player_details) room.player_details = {};
         room.player_details[id] = {
           id,
           name: resolvedName,
           avatar: String(body.avatar || existingDetail?.avatar || "/avatars/avatar-scholar.svg"),
           isHost: id === room.host_id,
+          joinedAt: existingJoinedAt,
         };
 
         if (!room.active_players.includes(id)) {
@@ -277,6 +280,100 @@ export async function POST(
         if (!room.active_players.includes(id)) {
           room.active_players.push(id);
         }
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 2b. ADMIT PLAYER FROM LOBBY / SPECTATORS QUEUE
+      // -------------------------------------------------------------
+      case "admit_player": {
+        const targetId = String(body.targetPlayerId || playerId);
+        const toTeam: "A" | "B" = body.targetTeam === "B" ? "B" : "A";
+
+        // Remove from spectators
+        room.spectators = (room.spectators || []).filter((sId) => sId !== targetId);
+
+        // Remove from both teams to prevent duplicate assignments
+        room.teams.teamA.playerIds = (room.teams.teamA.playerIds || []).filter((p) => p !== targetId);
+        room.teams.teamB.playerIds = (room.teams.teamB.playerIds || []).filter((p) => p !== targetId);
+
+        // Add to designated team
+        if (toTeam === "A") {
+          room.teams.teamA.playerIds.push(targetId);
+        } else {
+          room.teams.teamB.playerIds.push(targetId);
+        }
+
+        if (!room.active_players) room.active_players = [];
+        if (!room.active_players.includes(targetId)) {
+          room.active_players.push(targetId);
+        }
+
+        if (!room.player_details) room.player_details = {};
+        if (!room.player_details[targetId]) {
+          room.player_details[targetId] = {
+            id: targetId,
+            name: body.playerName || "Scholar",
+            avatar: body.avatar || "/avatars/avatar-scholar.svg",
+            isHost: targetId === room.host_id,
+            joinedAt: Date.now(),
+          };
+        }
+
+        // If marked away, reactivate
+        if (room.inactive_players) {
+          room.inactive_players = room.inactive_players.filter((p) => p !== targetId);
+        }
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 2c. ADMIT ALL WAITING SPECTATORS (AUTO-BALANCE TEAMS)
+      // -------------------------------------------------------------
+      case "admit_all_spectators": {
+        const waitingIds = Array.from(
+          new Set([
+            ...(room.spectators || []),
+            ...Object.keys(room.player_details || {}).filter(
+              (pId) =>
+                !(room.teams.teamA.playerIds || []).includes(pId) &&
+                !(room.teams.teamB.playerIds || []).includes(pId)
+            ),
+          ])
+        );
+
+        // Sort by joined arrival time ascending (FIFO)
+        waitingIds.sort((a, b) => {
+          const timeA = room.player_details?.[a]?.joinedAt || 0;
+          const timeB = room.player_details?.[b]?.joinedAt || 0;
+          return timeA - timeB;
+        });
+
+        for (const waitId of waitingIds) {
+          const inA = (room.teams.teamA.playerIds || []).includes(waitId);
+          const inB = (room.teams.teamB.playerIds || []).includes(waitId);
+
+          if (!inA && !inB) {
+            if ((room.teams.teamA.playerIds?.length || 0) <= (room.teams.teamB.playerIds?.length || 0)) {
+              room.teams.teamA.playerIds.push(waitId);
+            } else {
+              room.teams.teamB.playerIds.push(waitId);
+            }
+          }
+
+          if (!room.active_players.includes(waitId)) {
+            room.active_players.push(waitId);
+          }
+          if (room.inactive_players) {
+            room.inactive_players = room.inactive_players.filter((p) => p !== waitId);
+          }
+        }
+
+        room.spectators = [];
 
         await persistRoom(room);
         return NextResponse.json({ success: true, room });

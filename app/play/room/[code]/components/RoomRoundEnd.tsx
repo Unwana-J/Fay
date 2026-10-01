@@ -22,6 +22,8 @@ import {
   Mic,
   Clock,
   Loader2,
+  UserPlus,
+  Zap,
 } from "lucide-react";
 import { motion } from "framer-motion";
 import BoardMap from "@/app/play/BoardMap";
@@ -41,6 +43,9 @@ interface RoomRoundEndProps {
   onResolvePassedClaim?: (wordIndex: number, resolution: "award" | "reject") => void;
   onToggleInactive?: (targetPlayerId?: string) => void;
   onLeaveRoom?: () => void;
+  onOpenLobbyQueue?: () => void;
+  onAdmitPlayer?: (targetPlayerId: string, targetTeam: "A" | "B") => void;
+  onAutoAdmitAll?: () => void;
 }
 
 export default function RoomRoundEnd({
@@ -58,6 +63,9 @@ export default function RoomRoundEnd({
   onResolvePassedClaim,
   onToggleInactive,
   onLeaveRoom,
+  onOpenLobbyQueue,
+  onAdmitPlayer,
+  onAutoAdmitAll,
 }: RoomRoundEndProps) {
   const currentTurn = room.current_turn;
   const scoredWords = room.round_words_scored || [];
@@ -106,7 +114,7 @@ export default function RoomRoundEnd({
         avatar: "/avatars/avatar-scholar.svg",
         team: myTeam,
         isHost: isHost,
-        joinedAt: 0,
+        joinedAt: room.player_details?.[pId]?.joinedAt || Date.now(),
       };
     }
 
@@ -123,14 +131,17 @@ export default function RoomRoundEnd({
           ? ("B" as const)
           : null,
         isHost: pId === room.host_id,
-        joinedAt: 0,
+        joinedAt: detailMatch.joinedAt || Date.now(),
       };
     }
 
     // 3. Presence match
     const presenceMatch = presencePlayers.find((p) => p.id === pId);
     if (presenceMatch && presenceMatch.name && presenceMatch.name !== "Scholar" && presenceMatch.name !== "Learner") {
-      return presenceMatch;
+      return {
+        ...presenceMatch,
+        joinedAt: presenceMatch.joinedAt || detailMatch?.joinedAt || Date.now(),
+      };
     }
 
     // 4. Known names cache
@@ -146,7 +157,7 @@ export default function RoomRoundEnd({
           ? ("B" as const)
           : null,
         isHost: pId === room.host_id,
-        joinedAt: 0,
+        joinedAt: detailMatch?.joinedAt || Date.now(),
       };
     }
 
@@ -158,7 +169,7 @@ export default function RoomRoundEnd({
         avatar: "/avatars/avatar-scholar.svg",
         team: "A" as const,
         isHost: true,
-        joinedAt: 0,
+        joinedAt: detailMatch?.joinedAt || Date.now(),
       };
     }
 
@@ -173,7 +184,7 @@ export default function RoomRoundEnd({
           ? ("B" as const)
           : null,
         isHost: pId === room.host_id,
-        joinedAt: 0,
+        joinedAt: detailMatch.joinedAt || Date.now(),
       };
     }
 
@@ -190,7 +201,7 @@ export default function RoomRoundEnd({
           ? ("B" as const)
           : null,
         isHost: pId === room.host_id,
-        joinedAt: 0,
+        joinedAt: detailMatch?.joinedAt || Date.now(),
       };
     }
 
@@ -201,9 +212,27 @@ export default function RoomRoundEnd({
       avatar: "/avatars/avatar-scholar.svg",
       team: null,
       isHost: false,
-      joinedAt: 0,
+      joinedAt: detailMatch?.joinedAt || Date.now(),
     };
   };
+
+  // Find all unassigned or spectator scholars
+  const allKnownIds = Array.from(
+    new Set([
+      ...(room.spectators || []),
+      ...presencePlayers.map((p) => p.id),
+      ...Object.keys(room.player_details || {}),
+    ])
+  );
+
+  const waitingScholarIds = allKnownIds.filter(
+    (id) => !room.teams.teamA.playerIds.includes(id) && !room.teams.teamB.playerIds.includes(id)
+  );
+
+  // Sort strictly by joined arrival time ascending (FIFO - who joined first)
+  const sortedWaitingScholars = waitingScholarIds
+    .map((id) => getPlayerDisplay(id))
+    .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
 
   // Compute next round speaker using sequential roster rotation
   const nextTeam = nextActiveTeamKey === "A" ? room.teams?.teamA : room.teams?.teamB;
@@ -867,6 +896,105 @@ export default function RoomRoundEnd({
           </div>
         </div>
       </div>
+
+      {/* Waiting Scholars & Spectators Queue (Admit to balance before next round) */}
+      {sortedWaitingScholars.length > 0 && (
+        <div className="surface rounded-3xl p-5 border border-[var(--gold)]/40 bg-[var(--gold)]/5 shadow-sm space-y-4 text-left">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--gold)]/20">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[var(--gold)] animate-pulse" />
+              <h2 className="font-space font-extrabold text-sm text-[var(--text)]">
+                Waiting in Lobby Queue ({sortedWaitingScholars.length} Scholars)
+              </h2>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)]">
+                Arrival Order (FIFO)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isHost && onAutoAdmitAll && sortedWaitingScholars.length > 1 && (
+                <button
+                  type="button"
+                  onClick={onAutoAdmitAll}
+                  className="text-xs font-space font-bold px-3 py-1.5 rounded-xl bg-[var(--olive)] text-white hover:opacity-90 flex items-center gap-1.5 shadow-sm cursor-pointer transition"
+                >
+                  <Zap className="w-3.5 h-3.5" /> Auto-Balance All
+                </button>
+              )}
+              {onOpenLobbyQueue && (
+                <button
+                  type="button"
+                  onClick={onOpenLobbyQueue}
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer"
+                >
+                  View Roster
+                </button>
+              )}
+            </div>
+          </div>
+
+          <p className="text-xs text-[var(--text-dim)]">
+            These scholars joined during the sprint. Admit them into Team Alpha or Team Omega before launching Round {nextRoundNumber} to balance the teams.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {sortedWaitingScholars.map((scholar, idx) => (
+              <div
+                key={scholar.id}
+                className="surface rounded-2xl p-3 border border-[var(--border-dim)] flex items-center justify-between gap-2 shadow-2xs"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-5 h-5 rounded-md bg-[var(--bg)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                  <div className="min-w-0">
+                    <div className="font-space font-bold text-xs text-[var(--text)] truncate">
+                      {scholar.name}
+                    </div>
+                    <div className="text-[9px] text-[var(--text-dim)]">
+                      {idx === 0 ? "First to join" : `Joined #${idx + 1}`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {onAdmitPlayer && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onAdmitPlayer(scholar.id, "A")}
+                        className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
+                        style={{
+                          backgroundColor: `${room.teams.teamA.color}15`,
+                          color: room.teams.teamA.color,
+                          borderColor: `${room.teams.teamA.color}40`,
+                        }}
+                        title={`Admit ${scholar.name} into ${room.teams.teamA.name}`}
+                      >
+                        <UserPlus className="w-3 h-3" /> + Alpha
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onAdmitPlayer(scholar.id, "B")}
+                        className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
+                        style={{
+                          backgroundColor: `${room.teams.teamB.color}15`,
+                          color: room.teams.teamB.color,
+                          borderColor: `${room.teams.teamB.color}40`,
+                        }}
+                        title={`Admit ${scholar.name} into ${room.teams.teamB.name}`}
+                      >
+                        <UserPlus className="w-3 h-3" /> + Omega
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Articulate Board Map Progression (Roadmap from Start to Finish) */}
       <div className="space-y-2 text-left">

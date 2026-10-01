@@ -249,6 +249,14 @@ export interface ArticulateHistoryItem {
   roundNumber: number;
   date: string;
   timestamp: number;
+  durationSeconds?: number;
+  totalParticipants?: number;
+  participants?: Array<{ id: string; name: string; avatar: string; team?: "A" | "B" | null; isHost?: boolean }>;
+  teamAName?: string;
+  teamBName?: string;
+  teamAColor?: string;
+  teamBColor?: string;
+  gameMode?: "classic" | "masterchef";
 }
 
 export interface AppState {

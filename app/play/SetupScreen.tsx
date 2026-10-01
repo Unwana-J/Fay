@@ -2,11 +2,12 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useAppStore } from "@/store/useAppStore";
+import { useAppStore, ArticulateHistoryItem } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight, Clock, Target } from "lucide-react";
-import { motion } from "framer-motion";
+import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2 } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
+import BoardMap from "./BoardMap";
 
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const router = useRouter();
@@ -18,6 +19,16 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const [onlineJoinError, setOnlineJoinError] = useState<string | null>(null);
   const [onlineTimerSeconds, setOnlineTimerSeconds] = useState<30 | 45 | 60>(45);
   const [onlineScoreGoal, setOnlineScoreGoal] = useState<number>(20);
+  const [selectedCompletedMatch, setSelectedCompletedMatch] = useState<ArticulateHistoryItem | null>(null);
+
+  const formatMatchDuration = (seconds?: number): string => {
+    if (!seconds || seconds <= 0) return "15 mins";
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    if (mins === 0) return `${secs}s`;
+    if (secs === 0) return `${mins} min${mins === 1 ? "" : "s"}`;
+    return `${mins}m ${secs}s`;
+  };
 
   const {
     timerSeconds, setTimerSeconds,
@@ -498,34 +509,60 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                       : room.scoreB > room.scoreA
                       ? "Team Omega Won"
                       : "Tie Game";
+                  const participantCount = room.totalParticipants || room.participants?.length || 2;
 
                   return (
                     <div
                       key={room.roomCode}
-                      className="surface rounded-2xl p-4 border border-[var(--border-dim)] flex items-center justify-between relative group"
+                      className="surface rounded-2xl p-4 border border-[var(--border-dim)] flex flex-col justify-between relative group hover:border-[var(--olive)]/30 transition-all shadow-sm"
                     >
-                      <div className="space-y-1">
-                        <div className="flex items-center gap-2">
-                          <span className="font-space font-bold text-sm text-[var(--text)]">
-                            {room.roomCode}
-                          </span>
-                          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20">
-                            {winner}
-                          </span>
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className="font-space font-bold text-sm text-[var(--text)]">
+                              {room.roomCode}
+                            </span>
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20">
+                              {winner}
+                            </span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => removeArticulateRoom(room.roomCode)}
+                            className="text-[var(--text-mute)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg)] transition cursor-pointer"
+                            title="Dismiss"
+                            aria-label="Dismiss match from history"
+                          >
+                            <X className="w-3.5 h-3.5" />
+                          </button>
                         </div>
+
                         <div className="text-xs text-[var(--text-dim)] font-space">
                           Final: <strong className="text-[var(--terra)]">Alpha {room.scoreA}</strong> — <strong className="text-[var(--olive)]">{room.scoreB} Omega</strong> • {room.date}
+                        </div>
+
+                        {/* Badges: Participants & Time Spent */}
+                        <div className="flex items-center gap-2 flex-wrap pt-0.5">
+                          <span className="inline-flex items-center gap-1 text-[11px] font-space font-medium text-[var(--text-dim)] bg-[var(--bg-card)] px-2 py-0.5 rounded-md border border-[var(--border-dim)]">
+                            <Users className="w-3 h-3 text-[var(--olive)]" />
+                            {participantCount} {participantCount === 1 ? "Scholar" : "Scholars"}
+                          </span>
+                          <span className="inline-flex items-center gap-1 text-[11px] font-space font-medium text-[var(--text-dim)] bg-[var(--bg-card)] px-2 py-0.5 rounded-md border border-[var(--border-dim)]">
+                            <Clock className="w-3 h-3 text-[var(--gold)]" />
+                            {formatMatchDuration(room.durationSeconds)}
+                          </span>
                         </div>
                       </div>
 
                       <button
                         type="button"
-                        onClick={() => removeArticulateRoom(room.roomCode)}
-                        className="text-[var(--text-mute)] hover:text-red-500 p-1.5 rounded-lg hover:bg-[var(--bg)] transition cursor-pointer"
-                        title="Dismiss"
-                        aria-label="Dismiss match from history"
+                        onClick={() => setSelectedCompletedMatch(room)}
+                        className="w-full mt-3 bg-[var(--olive)]/10 hover:bg-[var(--olive)]/20 text-[var(--olive)] py-2 px-3 rounded-xl font-space font-bold text-xs flex items-center justify-center gap-1.5 transition cursor-pointer"
                       >
-                        <X className="w-3.5 h-3.5" />
+                        <Eye className="w-3.5 h-3.5" />
+                        View Board & Recap
+                        <ChevronRight className="w-3.5 h-3.5 ml-auto" />
                       </button>
                     </div>
                   );
@@ -950,6 +987,244 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
         </div>
       </div>
       )}
+
+      {/* Completed Match Board & Recap Modal */}
+      <AnimatePresence>
+        {selectedCompletedMatch && (
+          <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 15 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 15 }}
+              className="surface border border-[var(--border-dim)] rounded-3xl p-6 sm:p-8 max-w-3xl w-full shadow-2xl space-y-6 my-auto max-h-[90vh] overflow-y-auto"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-4 border-b border-[var(--border-dim)]">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-2xl bg-[var(--gold)]/10 text-[var(--gold)] flex items-center justify-center border border-[var(--gold)]/20">
+                    <Trophy className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="font-space font-extrabold text-lg text-[var(--text)]">
+                        Match Board & Summary
+                      </h2>
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                        {selectedCompletedMatch.roomCode}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-dim)]">
+                      Played on {selectedCompletedMatch.date}
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedCompletedMatch(null)}
+                  className="w-8 h-8 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] flex items-center justify-center text-[var(--text-mute)] hover:text-[var(--text)] transition cursor-pointer"
+                  aria-label="Close match recap"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Match Winner & Score Banner */}
+              <div className="surface rounded-2xl p-5 border border-[var(--gold)]/30 bg-[var(--gold)]/5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="space-y-1">
+                  <span className="text-[10px] font-mono uppercase tracking-widest text-[var(--gold)] font-bold">
+                    Match Outcome
+                  </span>
+                  <div className="text-xl font-space font-extrabold text-[var(--text)] flex items-center gap-2">
+                    {selectedCompletedMatch.scoreA > selectedCompletedMatch.scoreB ? (
+                      <>
+                        <span className="w-3 h-3 rounded-full bg-[var(--terra)]" />
+                        Team Alpha Victory!
+                      </>
+                    ) : selectedCompletedMatch.scoreB > selectedCompletedMatch.scoreA ? (
+                      <>
+                        <span className="w-3 h-3 rounded-full bg-[var(--olive)]" />
+                        Team Omega Victory!
+                      </>
+                    ) : (
+                      "Scholarly Deadlock (Tie)!"
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4 bg-[var(--bg-card)] px-4 py-2.5 rounded-2xl border border-[var(--border-dim)]">
+                  <div className="text-right">
+                    <p className="text-[10px] uppercase font-bold text-[var(--terra)]">Alpha</p>
+                    <p className="text-xl font-space font-extrabold text-[var(--terra)]">{selectedCompletedMatch.scoreA}</p>
+                  </div>
+                  <span className="text-sm font-bold text-[var(--text-mute)]">:</span>
+                  <div>
+                    <p className="text-[10px] uppercase font-bold text-[var(--olive)]">Omega</p>
+                    <p className="text-xl font-space font-extrabold text-[var(--olive)]">{selectedCompletedMatch.scoreB}</p>
+                  </div>
+                </div>
+              </div>
+
+              {/* 4-Stat Overview */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="surface rounded-2xl p-3.5 border border-[var(--border-dim)] space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
+                    <Users className="w-3.5 h-3.5 text-[var(--olive)]" /> Total Scholars
+                  </div>
+                  <div className="text-base font-space font-extrabold text-[var(--text)]">
+                    {selectedCompletedMatch.totalParticipants || selectedCompletedMatch.participants?.length || 2}
+                  </div>
+                </div>
+
+                <div className="surface rounded-2xl p-3.5 border border-[var(--border-dim)] space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
+                    <Clock className="w-3.5 h-3.5 text-[var(--gold)]" /> Time Spent
+                  </div>
+                  <div className="text-base font-space font-extrabold text-[var(--text)]">
+                    {formatMatchDuration(selectedCompletedMatch.durationSeconds)}
+                  </div>
+                </div>
+
+                <div className="surface rounded-2xl p-3.5 border border-[var(--border-dim)] space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
+                    <Target className="w-3.5 h-3.5 text-[var(--terra)]" /> Target Goal
+                  </div>
+                  <div className="text-base font-space font-extrabold text-[var(--text)]">
+                    {selectedCompletedMatch.scoreGoal || 20} pts
+                  </div>
+                </div>
+
+                <div className="surface rounded-2xl p-3.5 border border-[var(--border-dim)] space-y-1">
+                  <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
+                    <Gamepad2 className="w-3.5 h-3.5 text-[var(--olive)]" /> Game Mode
+                  </div>
+                  <div className="text-base font-space font-extrabold text-[var(--text)] capitalize truncate">
+                    {selectedCompletedMatch.gameMode || "Classic"}
+                  </div>
+                </div>
+              </div>
+
+              {/* The Articulate Board Track */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <h3 className="font-space font-bold text-sm text-[var(--text)] flex items-center gap-1.5">
+                    <Sparkles className="w-4 h-4 text-[var(--gold)]" />
+                    Final Board Positions
+                  </h3>
+                  <span className="text-[11px] text-[var(--text-dim)]">
+                    Step positions towards {selectedCompletedMatch.scoreGoal || 20} pts
+                  </span>
+                </div>
+
+                <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)]">
+                  <BoardMap
+                    scoreA={selectedCompletedMatch.scoreA}
+                    scoreB={selectedCompletedMatch.scoreB}
+                    scoreGoal={selectedCompletedMatch.scoreGoal || 20}
+                    colorA={selectedCompletedMatch.teamAColor || "#EF4444"}
+                    colorB={selectedCompletedMatch.teamBColor || "#10B981"}
+                    activeTeam="A"
+                    gameMode={selectedCompletedMatch.gameMode || "classic"}
+                  />
+                </div>
+              </div>
+
+              {/* Participants Roster Breakdown */}
+              {selectedCompletedMatch.participants && selectedCompletedMatch.participants.length > 0 && (
+                <div className="space-y-3">
+                  <h3 className="font-space font-bold text-sm text-[var(--text)] flex items-center gap-1.5">
+                    <Users className="w-4 h-4 text-[var(--olive)]" />
+                    Participating Scholars ({selectedCompletedMatch.participants.length})
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {/* Team Alpha Roster */}
+                    <div className="surface rounded-2xl p-3.5 border border-[var(--terra)]/20 bg-[var(--terra)]/5 space-y-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-[var(--terra)]/20">
+                        <span className="font-space font-extrabold text-xs text-[var(--terra)] flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[var(--terra)]" />
+                          Team Alpha
+                        </span>
+                        <span className="text-[10px] font-mono text-[var(--terra)] font-bold">
+                          {selectedCompletedMatch.participants.filter((p) => p.team === "A").length} Scholars
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {selectedCompletedMatch.participants
+                          .filter((p) => p.team === "A")
+                          .map((p) => (
+                            <div key={p.id} className="flex items-center gap-2 text-xs text-[var(--text)]">
+                              <span className="text-base">{p.avatar || "🎓"}</span>
+                              <span className="font-medium truncate">{p.name}</span>
+                              {p.isHost && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--terra)]/20 text-[var(--terra)]">
+                                  Host
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        {selectedCompletedMatch.participants.filter((p) => p.team === "A").length === 0 && (
+                          <p className="text-xs text-[var(--text-mute)] italic">No assigned scholars</p>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Team Omega Roster */}
+                    <div className="surface rounded-2xl p-3.5 border border-[var(--olive)]/20 bg-[var(--olive)]/5 space-y-2">
+                      <div className="flex items-center justify-between pb-1 border-b border-[var(--olive)]/20">
+                        <span className="font-space font-extrabold text-xs text-[var(--olive)] flex items-center gap-1.5">
+                          <span className="w-2 h-2 rounded-full bg-[var(--olive)]" />
+                          Team Omega
+                        </span>
+                        <span className="text-[10px] font-mono text-[var(--olive)] font-bold">
+                          {selectedCompletedMatch.participants.filter((p) => p.team === "B").length} Scholars
+                        </span>
+                      </div>
+                      <div className="space-y-1.5 max-h-32 overflow-y-auto">
+                        {selectedCompletedMatch.participants
+                          .filter((p) => p.team === "B")
+                          .map((p) => (
+                            <div key={p.id} className="flex items-center gap-2 text-xs text-[var(--text)]">
+                              <span className="text-base">{p.avatar || "🎓"}</span>
+                              <span className="font-medium truncate">{p.name}</span>
+                              {p.isHost && (
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/20 text-[var(--olive)]">
+                                  Host
+                                </span>
+                              )}
+                            </div>
+                          ))}
+                        {selectedCompletedMatch.participants.filter((p) => p.team === "B").length === 0 && (
+                          <p className="text-xs text-[var(--text-mute)] italic">No assigned scholars</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Modal Actions */}
+              <div className="flex flex-col sm:flex-row items-center gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => router.push(`/play/room/${selectedCompletedMatch.roomCode}`)}
+                  className="w-full sm:flex-1 bg-[var(--terra)] text-white py-3 px-4 rounded-xl font-space font-bold text-xs shadow-sm hover:opacity-95 flex items-center justify-center gap-2 cursor-pointer transition"
+                >
+                  <Play className="w-3.5 h-3.5 fill-current" />
+                  Re-Open Match Room
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCompletedMatch(null)}
+                  className="w-full sm:w-auto px-6 py-3 rounded-xl border border-[var(--border-dim)] hover:bg-[var(--bg-card)] text-xs font-space font-bold text-[var(--text-dim)] cursor-pointer transition"
+                >
+                  Close Recap
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

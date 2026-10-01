@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut } from "lucide-react";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RoomLobbyProps {
@@ -18,6 +18,9 @@ interface RoomLobbyProps {
   onToggleInactive?: (targetPlayerId?: string) => void;
   onLeaveRoom?: () => void;
   onEditName?: () => void;
+  onOpenLobbyQueue?: () => void;
+  onAdmitPlayer?: (targetPlayerId: string, targetTeam: "A" | "B") => void;
+  onAutoAdmitAll?: () => void;
 }
 
 export default function RoomLobby({
@@ -33,6 +36,9 @@ export default function RoomLobby({
   onToggleInactive,
   onLeaveRoom,
   onEditName,
+  onOpenLobbyQueue,
+  onAdmitPlayer,
+  onAutoAdmitAll,
 }: RoomLobbyProps) {
   const [copied, setCopied] = useState(false);
 
@@ -79,40 +85,58 @@ export default function RoomLobby({
     // 1. If it's me and I have a valid name, prefer local name
     if (pId === myPlayerId && room.player_details?.[pId]?.name) {
       const myDetail = room.player_details[pId];
-      return { id: pId, name: myDetail.name, avatar: myDetail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+      return { id: pId, name: myDetail.name, avatar: myDetail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: myDetail.joinedAt || Date.now() };
     }
     // 2. Check persisted room.player_details
     const detail = room.player_details?.[pId];
     if (detail && detail.name && detail.name !== "Scholar" && detail.name !== "Learner") {
-      return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+      return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail.joinedAt || Date.now() };
     }
     // 3. Check presence map
     const found = presencePlayers.find((p) => p.id === pId);
     if (found && found.name && found.name !== "Scholar" && found.name !== "Learner") {
-      return found;
+      return { id: pId, name: found.name, avatar: found.avatar || "/avatars/avatar-scholar.svg", isHost: found.isHost || pId === room.host_id, joinedAt: found.joinedAt || Date.now() };
     }
     // 4. Check knownNames persistent cache
     const known = knownNames[pId];
     if (known && known.name && known.name !== "Scholar" && known.name !== "Learner") {
-      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail?.joinedAt || Date.now() };
     }
     // 5. Host fallback
     if (pId === room.host_id) {
-      return { id: pId, name: room.host_name || "Host", avatar: "/avatars/avatar-scholar.svg", isHost: true };
+      return { id: pId, name: room.host_name || "Host", avatar: "/avatars/avatar-scholar.svg", isHost: true, joinedAt: detail?.joinedAt || Date.now() };
     }
     // 6. If detail, presence, or known has any name
     if (detail?.name) {
-      return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+      return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail.joinedAt || Date.now() };
     }
     if (found?.name) {
-      return found;
+      return { id: pId, name: found.name, avatar: found.avatar || "/avatars/avatar-scholar.svg", isHost: found.isHost || pId === room.host_id, joinedAt: found.joinedAt || Date.now() };
     }
     if (known?.name) {
-      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id };
+      return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail?.joinedAt || Date.now() };
     }
     const cleanId = pId.replace(/^guest-/, "");
-    return { id: pId, name: `Scholar (${cleanId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false };
+    return { id: pId, name: `Scholar (${cleanId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false, joinedAt: detail?.joinedAt || Date.now() };
   };
+
+  // Find all unassigned or spectator scholars
+  const allKnownIds = Array.from(
+    new Set([
+      ...(room.spectators || []),
+      ...presencePlayers.map((p) => p.id),
+      ...Object.keys(room.player_details || {}),
+    ])
+  );
+
+  const waitingScholarIds = allKnownIds.filter(
+    (id) => !teamAPlayers.includes(id) && !teamBPlayers.includes(id)
+  );
+
+  // Sort strictly by joined arrival time ascending (FIFO - who joined first)
+  const sortedWaitingScholars = waitingScholarIds
+    .map((id) => getPlayerDisplay(id))
+    .sort((a, b) => (a.joinedAt || 0) - (b.joinedAt || 0));
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
@@ -233,6 +257,101 @@ export default function RoomLobby({
           </div>
         </div>
       </div>
+
+      {/* Waiting Lobby Queue (Ordered by arrival time) */}
+      {sortedWaitingScholars.length > 0 && (
+        <div className="surface rounded-3xl p-5 border border-[var(--gold)]/40 bg-[var(--gold)]/5 shadow-sm space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--gold)]/20">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-[var(--gold)] animate-pulse" />
+              <h2 className="font-space font-extrabold text-sm text-[var(--text)]">
+                Waiting in Lobby Queue ({sortedWaitingScholars.length} Scholars)
+              </h2>
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)]">
+                Arrival Order (FIFO)
+              </span>
+            </div>
+
+            <div className="flex items-center gap-2">
+              {isHost && onAutoAdmitAll && sortedWaitingScholars.length > 1 && (
+                <button
+                  type="button"
+                  onClick={onAutoAdmitAll}
+                  className="text-xs font-space font-bold px-3 py-1.5 rounded-xl bg-[var(--olive)] text-white hover:opacity-90 flex items-center gap-1.5 shadow-sm cursor-pointer transition"
+                >
+                  <Zap className="w-3.5 h-3.5" /> Auto-Balance All
+                </button>
+              )}
+              {onOpenLobbyQueue && (
+                <button
+                  type="button"
+                  onClick={onOpenLobbyQueue}
+                  className="text-xs font-bold px-3 py-1.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer"
+                >
+                  View Roster
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {sortedWaitingScholars.map((scholar, idx) => (
+              <div
+                key={scholar.id}
+                className="surface rounded-2xl p-3 border border-[var(--border-dim)] flex items-center justify-between gap-2 shadow-2xs"
+              >
+                <div className="flex items-center gap-2 min-w-0">
+                  <span className="w-5 h-5 rounded-md bg-[var(--bg)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
+                    #{idx + 1}
+                  </span>
+                  <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                  <div className="min-w-0">
+                    <div className="font-space font-bold text-xs text-[var(--text)] truncate">
+                      {scholar.name}
+                    </div>
+                    <div className="text-[9px] text-[var(--text-dim)]">
+                      {idx === 0 ? "First to join" : `Joined #${idx + 1}`}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1.5 flex-shrink-0">
+                  {onAdmitPlayer && (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => onAdmitPlayer(scholar.id, "A")}
+                        className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
+                        style={{
+                          backgroundColor: `${room.teams.teamA.color}15`,
+                          color: room.teams.teamA.color,
+                          borderColor: `${room.teams.teamA.color}40`,
+                        }}
+                        title={`Admit ${scholar.name} into ${room.teams.teamA.name}`}
+                      >
+                        <UserPlus className="w-3 h-3" /> + Alpha
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => onAdmitPlayer(scholar.id, "B")}
+                        className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
+                        style={{
+                          backgroundColor: `${room.teams.teamB.color}15`,
+                          color: room.teams.teamB.color,
+                          borderColor: `${room.teams.teamB.color}40`,
+                        }}
+                        title={`Admit ${scholar.name} into ${room.teams.teamB.name}`}
+                      >
+                        <UserPlus className="w-3 h-3" /> + Omega
+                      </button>
+                    </>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Teams Header with Host Shuffle Action */}
       <div className="flex items-center justify-between">
