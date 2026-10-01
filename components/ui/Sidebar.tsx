@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
@@ -112,6 +113,11 @@ function StreakCalendarModal({
   const hasSession = (dateStr: string) => sessions.some((s) => s.date === dateStr);
   const isStreak = (dateStr: string) => streakDates.includes(dateStr);
   const [shieldMsg, setShieldMsg] = useState<string | null>(null);
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   const now = new Date();
   const currentYear = now.getFullYear();
@@ -137,12 +143,16 @@ function StreakCalendarModal({
     setTimeout(() => setShieldMsg(null), 3000);
   }
 
-  return (
+  if (!mounted || typeof document === "undefined") {
+    return null;
+  }
+
+  return createPortal(
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 flex items-center justify-center z-50 p-6 surface-modal"
+      className="fixed inset-0 flex items-center justify-center z-50 p-4 sm:p-6 surface-modal backdrop-blur-sm overflow-y-auto"
       onClick={onClose}
     >
       <motion.div
@@ -151,25 +161,29 @@ function StreakCalendarModal({
         exit={{ scale: 0.94, opacity: 0, y: 15 }}
         transition={{ type: "spring", stiffness: 280, damping: 18 }}
         onClick={(e) => e.stopPropagation()}
-        className="rounded-2xl p-8 max-w-2xl w-full surface-raised"
+        className="rounded-2xl sm:rounded-3xl p-6 sm:p-8 max-w-2xl w-full surface-raised shadow-2xl border border-[var(--border-dim)] my-auto"
       >
         {/* Header */}
         <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="font-space text-2xl font-bold text-display mb-1">Streak Calendar</h2>
+            <h2 className="font-space text-xl sm:text-2xl font-bold text-display mb-1">Streak Calendar</h2>
             <p style={{ color: "var(--text-dim)" }} className="text-xs">
               Active streak: <span className="font-bold text-[var(--terra)]">{streakCurrent} days</span> · Longest streak: <span className="font-semibold">{streakLongest} days</span>
             </p>
           </div>
-          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] transition-colors">
-            <X size={15} style={{ color: "var(--text-dim)" }} />
+          <button
+            onClick={onClose}
+            className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] transition-colors cursor-pointer"
+            aria-label="Close"
+          >
+            <X size={18} style={{ color: "var(--text-dim)" }} />
           </button>
         </div>
 
         <div className="print-divider mb-6" />
 
         {/* Calendar grids */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 sm:gap-8 mb-6">
           {monthsToRender.map((m, idx) => (
             <div key={idx} className="space-y-3">
               <h3 className="text-center font-space font-bold text-sm tracking-wide text-[var(--text)]">{m.label}</h3>
@@ -215,11 +229,11 @@ function StreakCalendarModal({
 
         {/* Scholar's Seal (Loss Aversion / Streak Protection) */}
         <div
-          className="p-4 rounded-xl border mb-4 flex items-center justify-between gap-4"
+          className="p-4 rounded-xl border mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"
           style={{ background: "var(--bg-input)/30", borderColor: "var(--border-dim)" }}
         >
-          <div className="flex items-center gap-3">
-            <span className="text-2xl select-none">🛡️</span>
+          <div className="flex items-start sm:items-center gap-3">
+            <span className="text-2xl select-none shrink-0">🛡️</span>
             <div>
               <div className="text-xs font-bold font-serif" style={{ color: "var(--text)" }}>
                 Scholar&apos;s Seal of Protection
@@ -242,7 +256,7 @@ function StreakCalendarModal({
             type="button"
             onClick={handleAcquireShield}
             disabled={profileXp < 150}
-            className="btn-ghost text-xs px-3 py-1.5 whitespace-nowrap font-mono cursor-pointer"
+            className="btn-ghost text-xs px-3 py-1.5 whitespace-nowrap font-mono cursor-pointer self-end sm:self-auto shrink-0"
             style={{
               opacity: profileXp >= 150 ? 1 : 0.5,
               borderColor: "var(--gold)",
@@ -266,7 +280,8 @@ function StreakCalendarModal({
           </div>
         </div>
       </motion.div>
-    </motion.div>
+    </motion.div>,
+    document.body
   );
 }
 
