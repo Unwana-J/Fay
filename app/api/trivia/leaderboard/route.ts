@@ -5,6 +5,7 @@ export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
     const challengeId = searchParams.get("challengeId");
+    const questionIdsParam = searchParams.get("qIds") || searchParams.get("questionIds");
 
     if (!isSupabaseConfigured || !supabase) {
       return NextResponse.json({
@@ -21,8 +22,19 @@ export async function GET(req: NextRequest) {
       .order("created_at", { ascending: false })
       .limit(100);
 
-    if (challengeId) {
-      query = query.eq("challenge_id", challengeId);
+    // If query specifies challengeId and/or questionIds deck signature, match either
+    const candidateIds = Array.from(
+      new Set(
+        [challengeId, questionIdsParam]
+          .filter(Boolean)
+          .map((s) => s!.trim())
+      )
+    );
+
+    if (candidateIds.length === 1) {
+      query = query.eq("challenge_id", candidateIds[0]);
+    } else if (candidateIds.length > 1) {
+      query = query.in("challenge_id", candidateIds);
     }
 
     const { data, error } = await query;
@@ -32,11 +44,11 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    // Deduplicate: If challengeId is set, lock strictly to the FIRST attempt (earliest created_at).
+    // Deduplicate: If candidateIds is set (challenge query), lock strictly to the FIRST attempt (earliest created_at).
     // For global leaderboards, keep the best run.
     const selectedByPlayer = new Map<string, (typeof data)[0]>();
 
-    if (challengeId) {
+    if (candidateIds.length > 0) {
       // Sort chronologically ascending to capture the first attempt
       const chrono = [...(data || [])].sort(
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()

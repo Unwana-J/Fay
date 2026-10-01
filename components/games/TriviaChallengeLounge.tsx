@@ -247,7 +247,12 @@ export default function TriviaChallengeLounge({
     setIsLoadingScores(true);
     const local = getLocalChallengeScores(currentChallenge.id);
 
-    fetch(`/api/trivia/leaderboard?challengeId=${encodeURIComponent(currentChallenge.id)}`)
+    const qIds = currentChallenge.questionIds?.join(",") || "";
+    const params = new URLSearchParams();
+    params.set("challengeId", currentChallenge.id);
+    if (qIds) params.set("qIds", qIds);
+
+    fetch(`/api/trivia/leaderboard?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.configured && Array.isArray(data.scores) && data.scores.length > 0) {

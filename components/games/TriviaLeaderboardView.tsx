@@ -57,7 +57,12 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
     if (!selectedChallenge) return;
     const local = getLocalChallengeScores(selectedChallenge.id);
 
-    fetch(`/api/trivia/leaderboard?challengeId=${encodeURIComponent(selectedChallenge.id)}`)
+    const qIds = selectedChallenge.questionIds?.join(",") || "";
+    const params = new URLSearchParams();
+    params.set("challengeId", selectedChallenge.id);
+    if (qIds) params.set("qIds", qIds);
+
+    fetch(`/api/trivia/leaderboard?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.configured && Array.isArray(data.scores) && data.scores.length > 0) {
