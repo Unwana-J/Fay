@@ -29,9 +29,26 @@ export default function RoomGuesserView({
   knownNames = {},
 }: RoomGuesserViewProps) {
   const [showBoard, setShowBoard] = useState(false);
+  const [flyingReactions, setFlyingReactions] = useState<{ id: number; emoji: string; xOffset: number }[]>([]);
   const currentTurn = room.current_turn;
   const currentWord = room.deck?.[room.current_word_index];
   const isUrgent = secondsRemaining <= 15;
+
+  const handleReactionTap = (emoji: string) => {
+    try {
+      navigator.vibrate?.(10);
+    } catch {}
+    
+    // Spawn floating emoji particle
+    const reactionId = Date.now() + Math.random();
+    const randomOffset = (Math.random() - 0.5) * 160;
+    setFlyingReactions((prev) => [...prev.slice(-8), { id: reactionId, emoji, xOffset: randomOffset }]);
+    setTimeout(() => {
+      setFlyingReactions((prev) => prev.filter((r) => r.id !== reactionId));
+    }, 1200);
+
+    onSendReaction(emoji);
+  };
 
   const speakerId = currentTurn?.speakerId;
   const rawSpeakerName = speakerName || currentTurn?.speakerName;
@@ -77,7 +94,31 @@ export default function RoomGuesserView({
       : room.teams?.teamA?.color || "#EF4444";
 
   return (
-    <div className="max-w-md mx-auto space-y-5 text-center">
+    <div className="max-w-md mx-auto space-y-5 text-center relative">
+      {/* Floating Reaction Particles */}
+      <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
+        <AnimatePresence>
+          {flyingReactions.map((r) => (
+            <motion.div
+              key={r.id}
+              initial={{ opacity: 1, y: "85vh", x: `calc(50vw + ${r.xOffset}px)`, scale: 0.8, rotate: 0 }}
+              animate={{
+                opacity: 0,
+                y: "25vh",
+                x: `calc(50vw + ${r.xOffset + (Math.random() - 0.5) * 60}px)`,
+                scale: 1.8,
+                rotate: (Math.random() - 0.5) * 35,
+              }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 1.1, ease: "easeOut" }}
+              className="absolute text-4xl select-none"
+            >
+              {r.emoji}
+            </motion.div>
+          ))}
+        </AnimatePresence>
+      </div>
+
       {/* Speaker Banner */}
       <div className="flex items-center justify-between px-4 py-2 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-bold">
         <div className="flex items-center gap-2">
@@ -89,13 +130,13 @@ export default function RoomGuesserView({
         </span>
       </div>
 
-      {/* Countdown Timer */}
+      {/* Countdown Timer with glowing aura */}
       <motion.div
-        animate={isUrgent ? { scale: [1, 1.04, 1] } : {}}
+        animate={isUrgent ? { scale: [1, 1.05, 1] } : {}}
         transition={{ repeat: Infinity, duration: 1 }}
         className={`inline-flex items-center gap-2 px-6 py-2.5 rounded-full font-space font-extrabold text-3xl border transition-colors shadow-sm ${
           isUrgent
-            ? "bg-red-500/15 border-red-500 text-red-500"
+            ? "bg-red-500/15 border-red-500 text-red-500 shadow-red-500/20 shadow-md"
             : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)]"
         }`}
       >
@@ -106,19 +147,28 @@ export default function RoomGuesserView({
       {/* Category Hint & Score Card */}
       <div className="surface rounded-3xl p-6 sm:p-8 border border-[var(--border-dim)] shadow-sm space-y-4">
         {currentWord && (
-          <div
+          <motion.div
+            key={currentWord.category}
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
             className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-bold text-white shadow-sm"
             style={{ backgroundColor: CATEGORY_COLORS[currentWord.category] || "var(--olive)" }}
           >
             <span>{CATEGORY_ICONS[currentWord.category] || "📦"}</span>
             <span>Category: {currentWord.category}</span>
-          </div>
+          </motion.div>
         )}
 
         <div className="py-4">
-          <div className="font-space font-extrabold text-4xl text-[var(--text)]">
+          <motion.div
+            key={room.round_words_scored?.length || 0}
+            initial={{ scale: 1.2, color: "var(--olive)" }}
+            animate={{ scale: 1, color: "var(--text)" }}
+            transition={{ type: "spring", stiffness: 400, damping: 20 }}
+            className="font-space font-extrabold text-4xl"
+          >
             +{room.round_words_scored?.length || 0}
-          </div>
+          </motion.div>
           <div className="text-xs text-[var(--text-dim)] uppercase tracking-wider font-bold mt-1">
             Words Scored This Turn
           </div>
@@ -181,8 +231,8 @@ export default function RoomGuesserView({
             key={emoji}
             whileHover={{ scale: 1.15 }}
             whileTap={{ scale: 0.9 }}
-            onClick={() => onSendReaction(emoji)}
-            className="w-11 h-11 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] hover:border-[var(--olive)] text-xl flex items-center justify-center cursor-pointer shadow-xs"
+            onClick={() => handleReactionTap(emoji)}
+            className="w-11 h-11 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] hover:border-[var(--olive)] text-xl flex items-center justify-center cursor-pointer shadow-xs touch-manipulation select-none active:scale-95"
           >
             {emoji}
           </motion.button>

@@ -622,9 +622,14 @@ export default function RoomLobby({
             <motion.button
               whileHover={{ scale: isStartingRound ? 1 : 1.02 }}
               whileTap={{ scale: isStartingRound ? 1 : 0.98 }}
-              onClick={() => onStartRound()}
+              onClick={() => {
+                try {
+                  navigator.vibrate?.(15);
+                } catch {}
+                onStartRound();
+              }}
               disabled={isStartingRound}
-              className={`w-full py-4 rounded-2xl font-space font-extrabold text-base shadow-md flex items-center justify-center gap-2 transition ${
+              className={`w-full py-4 rounded-2xl font-space font-extrabold text-base shadow-md flex items-center justify-center gap-2 transition touch-manipulation select-none active:scale-[0.98] ${
                 isStartingRound
                   ? "bg-[var(--terra)]/80 text-white cursor-wait opacity-90"
                   : "bg-[var(--terra)] text-white hover:shadow-lg cursor-pointer"

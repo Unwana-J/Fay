@@ -331,8 +331,10 @@ export default function BoardMap({
                 {hasA && (
                   <motion.div
                     layoutId="token-A"
-                    transition={{ type: "spring", stiffness: 180, damping: 15 }}
-                    className="z-10 filter drop-shadow-xs"
+                    initial={{ scale: 0.8, y: -6 }}
+                    animate={{ scale: [0.8, 1.3, 1], y: [0, -6, 0] }}
+                    transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                    className="z-10 filter drop-shadow-md"
                   >
                     <FeyLogo size={isVeryLargeBoard ? 12 : isLargeBoard ? 14 : 26} color={colorA} />
                   </motion.div>
@@ -340,8 +342,10 @@ export default function BoardMap({
                 {hasB && (
                   <motion.div
                     layoutId="token-B"
-                    transition={{ type: "spring", stiffness: 180, damping: 15 }}
-                    className="z-10 filter drop-shadow-xs"
+                    initial={{ scale: 0.8, y: -6 }}
+                    animate={{ scale: [0.8, 1.3, 1], y: [0, -6, 0] }}
+                    transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                    className="z-10 filter drop-shadow-md"
                   >
                     <FeyLogo size={isVeryLargeBoard ? 12 : isLargeBoard ? 14 : 26} color={colorB} />
                   </motion.div>

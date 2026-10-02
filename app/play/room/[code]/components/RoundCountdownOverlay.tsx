@@ -54,10 +54,17 @@ export default function RoundCountdownOverlay({
   const lastSoundCountRef = useRef<number | null>(null);
   const isTeammate = myTeam === activeTeam && !isSpeaker;
 
-  // Sound effect triggers on countdown ticks
+  // Sound effect & haptic feedback triggers on countdown ticks
   useEffect(() => {
     if (lastSoundCountRef.current === count) return;
     lastSoundCountRef.current = count;
+
+    if (typeof window !== "undefined" && "vibrate" in navigator) {
+      try {
+        if (count > 0) navigator.vibrate(25);
+        else navigator.vibrate(60);
+      } catch {}
+    }
 
     if (count === 3) playBeep(440, 0.12);
     else if (count === 2) playBeep(440, 0.12);
@@ -82,7 +89,7 @@ export default function RoundCountdownOverlay({
       exit={{ opacity: 0 }}
       transition={{ duration: 0.2 }}
       onClick={() => onDismiss?.()}
-      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none cursor-pointer"
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 bg-black/80 backdrop-blur-md select-none cursor-pointer touch-manipulation"
       title="Tap anywhere to skip countdown"
     >
       <div className="max-w-md w-full mx-auto flex flex-col items-center text-center space-y-6">
@@ -145,29 +152,36 @@ export default function RoundCountdownOverlay({
           )}
         </motion.div>
 
-        {/* Massive Animated Countdown Number */}
-        <div className="relative py-4 flex items-center justify-center">
-          {/* Subtle Outer Glow Ring */}
+        {/* Massive Animated Countdown Number with Concentric Shockwave Rings */}
+        <div className="relative py-6 flex items-center justify-center">
+          {/* Concentric Expanding Shockwave Rings */}
           <motion.div
-            key={`ring-${count}`}
-            initial={{ scale: 0.8, opacity: 0.6 }}
-            animate={{ scale: 1.4, opacity: 0 }}
-            transition={{ duration: 0.85, ease: "easeOut" }}
-            className="absolute w-36 h-36 rounded-full border-2 border-white/40 pointer-events-none"
+            key={`ring-outer-${count}`}
+            initial={{ scale: 0.6, opacity: 0.9 }}
+            animate={{ scale: 2.2, opacity: 0 }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+            className="absolute w-32 h-32 rounded-full border-2 border-white/50 pointer-events-none"
             style={{ borderColor: activeTeamColor }}
+          />
+          <motion.div
+            key={`ring-inner-${count}`}
+            initial={{ scale: 0.8, opacity: 0.7 }}
+            animate={{ scale: 1.5, opacity: 0 }}
+            transition={{ duration: 0.7, ease: "easeOut", delay: 0.05 }}
+            className="absolute w-28 h-28 rounded-full border border-white/40 pointer-events-none"
           />
 
           <AnimatePresence mode="popLayout">
             <motion.div
               key={displayCount}
-              initial={{ scale: 0.3, opacity: 0, y: 10 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
-              exit={{ scale: 1.6, opacity: 0 }}
-              transition={{ type: "spring", stiffness: 450, damping: 25 }}
-              className={`font-space font-black tracking-tighter drop-shadow-2xl ${
+              initial={{ scale: 0.2, opacity: 0, y: 15, rotate: displayCount === "GO!" ? -5 : 0 }}
+              animate={{ scale: [0.2, 1.25, 1], opacity: 1, y: 0, rotate: 0 }}
+              exit={{ scale: 1.8, opacity: 0, filter: "blur(4px)" }}
+              transition={{ type: "spring", stiffness: 500, damping: 22 }}
+              className={`font-space font-black tracking-tighter drop-shadow-2xl select-none ${
                 displayCount === "GO!"
-                  ? "text-6xl sm:text-7xl text-emerald-400"
-                  : "text-7xl sm:text-8xl text-white"
+                  ? "text-7xl sm:text-8xl text-emerald-400 drop-shadow-[0_0_25px_rgba(52,211,153,0.6)] animate-pulse"
+                  : "text-8xl sm:text-9xl text-white drop-shadow-[0_0_30px_rgba(255,255,255,0.4)]"
               }`}
             >
               {displayCount}

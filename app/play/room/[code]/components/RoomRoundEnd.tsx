@@ -1092,8 +1092,13 @@ export default function RoomRoundEnd({
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
-                  onClick={() => onFinishGame?.()}
-                  className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2.5 transition cursor-pointer"
+                  onClick={() => {
+                    try {
+                      navigator.vibrate?.(20);
+                    } catch {}
+                    onFinishGame?.();
+                  }}
+                  className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2.5 transition cursor-pointer touch-manipulation select-none active:scale-[0.98]"
                 >
                   <Trophy className="w-5 h-5 text-[var(--gold)]" />
                   Announce Winner & Declare Victory ({winningTeamName})
@@ -1102,10 +1107,13 @@ export default function RoomRoundEnd({
                 <button
                   type="button"
                   onClick={() => {
+                    try {
+                      navigator.vibrate?.(15);
+                    } catch {}
                     if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
                   }}
                   disabled={isStartingRound}
-                  className="w-full py-3 rounded-xl border border-[var(--border-dim)] hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer flex items-center justify-center gap-1.5"
+                  className="w-full py-3 rounded-xl border border-[var(--border-dim)] hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer flex items-center justify-center gap-1.5 touch-manipulation select-none"
                 >
                   <Play className="w-3.5 h-3.5" /> Continue to Round {nextRoundNumber} (Play Another Round)
                 </button>
@@ -1151,10 +1159,13 @@ export default function RoomRoundEnd({
                   whileHover={!isStartingRound ? { scale: 1.02 } : {}}
                   whileTap={!isStartingRound ? { scale: 0.98 } : {}}
                   onClick={() => {
+                    try {
+                      navigator.vibrate?.(15);
+                    } catch {}
                     if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
                   }}
                   disabled={isStartingRound}
-                  className={`w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
+                  className={`w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition touch-manipulation select-none active:scale-[0.98] ${
                     isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer animate-pulse"
                   }`}
                   style={{ backgroundColor: nextTeamColor }}
@@ -1181,10 +1192,13 @@ export default function RoomRoundEnd({
                   whileHover={!isStartingRound ? { scale: 1.02 } : {}}
                   whileTap={!isStartingRound ? { scale: 0.98 } : {}}
                   onClick={() => {
+                    try {
+                      navigator.vibrate?.(15);
+                    } catch {}
                     if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
                   }}
                   disabled={isStartingRound}
-                  className={`w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
+                  className={`w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition touch-manipulation select-none active:scale-[0.98] ${
                     isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer"
                   }`}
                 >
