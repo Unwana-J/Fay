@@ -1330,6 +1330,9 @@ export default function ArticulateRoomPage({
               <RoomGameOver
                 room={room}
                 isHost={isHost}
+                myPlayerId={myPlayerId}
+                presencePlayers={presencePlayers}
+                knownNames={knownNames}
                 onResetGame={handleResetGame}
               />
             </motion.div>
