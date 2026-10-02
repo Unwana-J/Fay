@@ -12,15 +12,19 @@ import { todayStr, formatDateToIso, addDaysToDate } from "@/lib/utils";
 
 export async function generateMetadata({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams?: Promise<{ d?: string; q?: string; t?: string; c?: string; cat?: string; diff?: string }>;
 }): Promise<Metadata> {
   const { code } = await params;
+  const sp = searchParams ? await searchParams : {};
   const cleanCode = code?.toUpperCase().trim() || "LEAGUE";
+  const titleFallback = sp?.t ? `${sp.t} · Fey League` : `🏆 Friendship Trivia League (${cleanCode}) · Fey`;
 
   if (!isSupabaseConfigured || !supabase) {
     return {
-      title: `🏆 Friendship Trivia League (${cleanCode}) · Fey`,
+      title: titleFallback,
       description: "Join the multi-day Naija Trivia League on Fey.",
     };
   }
@@ -57,17 +61,20 @@ export async function generateMetadata({
   } catch {}
 
   return {
-    title: `🏆 Friendship Trivia League (${cleanCode}) · Fey`,
+    title: titleFallback,
     description: "Join the multi-day Naija Trivia League on Fey.",
   };
 }
 
 export default async function LeaguePage({
   params,
+  searchParams,
 }: {
   params: Promise<{ code: string }>;
+  searchParams?: Promise<{ d?: string; q?: string; t?: string; c?: string; cat?: string; diff?: string }>;
 }) {
   const { code } = await params;
+  const sp = searchParams ? await searchParams : {};
   const cleanCode = code?.toUpperCase().trim() || "LEAGUE";
 
   let league: FriendshipLeague | null = null;
@@ -127,21 +134,34 @@ export default async function LeaguePage({
     }
   }
 
-  // If not found in database, construct resilient deterministic fallback for this code
+  // If not found in database, construct resilient deterministic fallback with query params or code seed
   if (!league) {
+    const durationDays = [3, 5, 7, 14].includes(Number(sp?.d)) ? Number(sp.d) : 5;
+    const questionsPerDay = [5, 10].includes(Number(sp?.q)) ? Number(sp.q) : 5;
+    const title = sp?.t ? decodeURIComponent(sp.t) : `Friendship League (${cleanCode})`;
+    const creatorName = sp?.c ? decodeURIComponent(sp.c) : "Scholar";
+    const category = sp?.cat || "all";
+    const difficulty = sp?.diff || "mixed";
     const today = todayStr();
+
     league = {
       code: cleanCode,
-      title: `Friendship League (${cleanCode})`,
-      creatorName: "Scholar",
+      title,
+      creatorName,
       creatorId: "creator",
-      durationDays: 5,
+      durationDays,
       startDate: today,
-      endDate: formatDateToIso(addDaysToDate(new Date(), 4)),
-      questionsPerDay: 5,
-      difficulty: "mixed",
-      category: "all",
-      dailySeedMap: generateDailyLeagueQuestions(5, 5, "mixed", "all"),
+      endDate: formatDateToIso(addDaysToDate(new Date(), durationDays - 1)),
+      questionsPerDay,
+      difficulty,
+      category,
+      dailySeedMap: generateDailyLeagueQuestions(
+        durationDays,
+        questionsPerDay,
+        difficulty,
+        category,
+        cleanCode
+      ),
     };
   }
 

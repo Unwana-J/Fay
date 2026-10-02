@@ -49,20 +49,38 @@ export interface LeagueLeaderboardEntry {
 }
 
 /**
+ * Deterministic PRNG based on string seed.
+ */
+function createSeededRandom(seedStr: string) {
+  let h = 2166136261 >>> 0;
+  for (let i = 0; i < seedStr.length; i++) {
+    h = Math.imul(h ^ seedStr.charCodeAt(i), 16777619);
+  }
+  return function () {
+    h += 0x6d2b79f5;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+
+/**
  * Generate distinct question IDs for each day of a multi-day league.
+ * Deterministically keyed by seedKey (code) so all players get identical questions on identical days.
  */
 export function generateDailyLeagueQuestions(
   durationDays: number,
   questionsPerDay: number,
   difficulty: string = "mixed",
-  category: string = "all"
+  category: string = "all",
+  seedKey?: string
 ): Record<string, string[]> {
   let pool = [...TRIVIA_QUESTIONS];
 
   if (category !== "all") {
-    pool = pool.filter((q) => q.category.toLowerCase() === category.toLowerCase());
-    if (pool.length < durationDays * questionsPerDay) {
-      pool = [...TRIVIA_QUESTIONS]; // fallback to full pool if category is small
+    const catPool = pool.filter((q) => q.category.toLowerCase() === category.toLowerCase());
+    if (catPool.length >= durationDays * questionsPerDay) {
+      pool = catPool;
     }
   }
 
@@ -73,8 +91,9 @@ export function generateDailyLeagueQuestions(
     }
   }
 
-  // Shuffle pool
-  const shuffled = [...pool].sort(() => Math.random() - 0.5);
+  // Deterministic or random shuffle
+  const rng = seedKey ? createSeededRandom(seedKey) : Math.random;
+  const shuffled = [...pool].sort(() => rng() - 0.5);
   const totalNeeded = durationDays * questionsPerDay;
   const selected = shuffled.slice(0, totalNeeded);
 

@@ -73,6 +73,18 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
         return;
       }
 
+      // Save to localStorage immediately so this device always has full league configuration
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`fey_league_${data.league.code}`, JSON.stringify(data.league));
+          const recentRaw = localStorage.getItem("fey_recent_leagues");
+          const recent: string[] = recentRaw ? JSON.parse(recentRaw) : [];
+          if (!recent.includes(data.league.code)) {
+            localStorage.setItem("fey_recent_leagues", JSON.stringify([data.league.code, ...recent].slice(0, 10)));
+          }
+        } catch {}
+      }
+
       setCreatedCode(data.league.code);
 
       try {
@@ -89,9 +101,22 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
     }
   }
 
-  const leagueUrl = typeof window !== "undefined" && createdCode
-    ? `${window.location.origin}/games/trivia/league/${createdCode}`
-    : `https://fey.lokinlabs.com.ng/games/trivia/league/${createdCode || ""}`;
+  const queryParams = new URLSearchParams({
+    d: String(durationDays),
+    q: String(questionsPerDay),
+    t: title.trim(),
+    c: profile.username || "Scholar",
+    cat: category,
+    diff: difficulty,
+  }).toString();
+
+  const baseUrl = typeof window !== "undefined"
+    ? window.location.origin
+    : "https://fey.lokinlabs.com.ng";
+
+  const leagueUrl = createdCode
+    ? `${baseUrl}/games/trivia/league/${createdCode}?${queryParams}`
+    : `${baseUrl}/games/trivia/league`;
 
   function copyInviteLink() {
     if (typeof navigator !== "undefined") {
@@ -104,7 +129,7 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
   function shareWhatsApp() {
     const text = encodeURIComponent(
       `🏆 Join my ${durationDays}-day Friendship League "${title.trim()}" on Fey!\n` +
-      `Answer 1 daily quiz drop and compete for the top scholar ranking.\n\n` +
+      `Answer 1 daily quiz drop (${questionsPerDay} Qs) and compete for the top scholar ranking.\n\n` +
       `Join here: ${leagueUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");

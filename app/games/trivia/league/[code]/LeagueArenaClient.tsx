@@ -31,11 +31,14 @@ import {
   getLeagueStatus,
   getQuestionsForLeagueDay,
   calculateLeaguePoints,
+  aggregateLeagueLeaderboard,
+  generateDailyLeagueQuestions,
 } from "@/lib/trivia-league";
-import { type TriviaQuestion } from "@/lib/trivia-questions";
+import { TRIVIA_QUESTIONS, type TriviaQuestion } from "@/lib/trivia-questions";
 import { playAudioTone } from "@/lib/sound";
 import confetti from "canvas-confetti";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { todayStr } from "@/lib/utils";
 
 interface LeagueArenaClientProps {
   code?: string;
@@ -56,16 +59,18 @@ export default function LeagueArenaClient({
   const [scores, setScores] = useState<LeagueDailyScore[]>(initialScores);
   const [leaderboard, setLeaderboard] = useState<LeagueLeaderboardEntry[]>(initialLeaderboard);
 
-  // Hydrate custom league created locally if available
+  // Hydrate custom league created locally & local scores if available
   useEffect(() => {
     const leagueCode = code || initialLeague.code;
     if (typeof window !== "undefined" && leagueCode) {
       try {
         const stored = localStorage.getItem(`fey_league_${leagueCode}`);
+        let activeLeague = initialLeague;
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed && parsed.code) {
             setLeague(parsed);
+            activeLeague = parsed;
           }
         }
         // Track recent leagues
@@ -75,9 +80,26 @@ export default function LeagueArenaClient({
           const updatedRecent = [leagueCode, ...recent].slice(0, 10);
           localStorage.setItem("fey_recent_leagues", JSON.stringify(updatedRecent));
         }
+
+        // Hydrate local scores and merge with initialScores
+        const storedScoresRaw = localStorage.getItem(`fey_league_scores_${leagueCode}`);
+        const localScores: LeagueDailyScore[] = storedScoresRaw ? JSON.parse(storedScoresRaw) : [];
+        if (localScores.length > 0) {
+          const scoreMap = new Map<string, LeagueDailyScore>();
+          for (const s of initialScores) {
+            scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+          }
+          for (const s of localScores) {
+            scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+          }
+          const merged = Array.from(scoreMap.values());
+          setScores(merged);
+          const currentStatus = getLeagueStatus(activeLeague.startDate, activeLeague.durationDays);
+          setLeaderboard(aggregateLeagueLeaderboard(merged, currentStatus.dayNumber));
+        }
       } catch {}
     }
-  }, [code, initialLeague.code]);
+  }, [code, initialLeague.code, initialScores]);
 
   const [phase, setPhase] = useState<"overview" | "playing" | "round_summary">("overview");
 
@@ -152,7 +174,20 @@ export default function LeagueArenaClient({
   function startDailyRound() {
     if (hasCompletedToday || status.isCompleted || status.isUpcoming) return;
 
-    const dailyQuestions = getQuestionsForLeagueDay(league, currentDay);
+    let dailyQuestions = getQuestionsForLeagueDay(league, currentDay);
+    if (dailyQuestions.length === 0) {
+      const fallbackMap = generateDailyLeagueQuestions(
+        league.durationDays,
+        league.questionsPerDay || 5,
+        league.difficulty || "mixed",
+        league.category || "all",
+        league.code
+      );
+      const qIds = fallbackMap[`day_${currentDay}`] || [];
+      const qMap = new Map(TRIVIA_QUESTIONS.map((q) => [q.id, q]));
+      dailyQuestions = qIds.map((id) => qMap.get(id)).filter(Boolean) as TriviaQuestion[];
+    }
+
     if (dailyQuestions.length === 0) return;
 
     setQuestions(dailyQuestions);
@@ -231,6 +266,37 @@ export default function LeagueArenaClient({
       categoryBreakdown: [],
     });
 
+    const myScoreEntry: LeagueDailyScore = {
+      id: `score_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      leagueCode: league.code,
+      userId: myIdentifier,
+      username: profile.username || "Scholar",
+      avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+      dayNumber: currentDay,
+      date: todayStr(),
+      score: correctCount,
+      totalQuestions: questions.length,
+      points: finalPoints,
+      durationSeconds: elapsedSeconds,
+      questionResults,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Update local state immediately so user NEVER loses their score
+    setScores((prevScores) => {
+      const filtered = prevScores.filter(
+        (s) => !(s.dayNumber === currentDay && (s.userId === myIdentifier || s.username.toLowerCase() === (profile.username || "").toLowerCase()))
+      );
+      const updated = [...filtered, myScoreEntry];
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(`fey_league_scores_${league.code}`, JSON.stringify(updated));
+        } catch {}
+      }
+      setLeaderboard(aggregateLeagueLeaderboard(updated, currentDay));
+      return updated;
+    });
+
     if (correctCount >= Math.ceil(questions.length * 0.7)) {
       try {
         confetti({
@@ -242,7 +308,7 @@ export default function LeagueArenaClient({
       } catch {}
     }
 
-    // Submit to Supabase / API
+    // Submit to Supabase / API in background for cloud sync
     setSubmittingScore(true);
     try {
       const res = await fetch("/api/trivia/league/score", {
@@ -266,8 +332,6 @@ export default function LeagueArenaClient({
       if (res.ok) {
         // Refresh league data
         fetchLeagueData();
-      } else {
-        setSubmitError(data.error || "Failed to record cloud score.");
       }
     } catch {
       setSubmittingScore(false);
@@ -280,8 +344,25 @@ export default function LeagueArenaClient({
       if (res.ok) {
         const data = await res.json();
         if (data.league) setLeague(data.league);
-        if (data.scores) setScores(data.scores);
-        if (data.leaderboard) setLeaderboard(data.leaderboard);
+        if (data.scores && Array.isArray(data.scores)) {
+          setScores((prevScores) => {
+            const scoreMap = new Map<string, LeagueDailyScore>();
+            for (const s of prevScores) {
+              scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+            }
+            for (const s of data.scores) {
+              scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+            }
+            const merged = Array.from(scoreMap.values());
+            if (typeof window !== "undefined") {
+              try {
+                localStorage.setItem(`fey_league_scores_${league.code}`, JSON.stringify(merged));
+              } catch {}
+            }
+            setLeaderboard(aggregateLeagueLeaderboard(merged, currentDay));
+            return merged;
+          });
+        }
       }
     } catch {}
   }

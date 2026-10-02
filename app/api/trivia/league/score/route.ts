@@ -26,9 +26,10 @@ export async function POST(req: NextRequest) {
     const cleanLeagueCode = leagueCode.toUpperCase().trim();
     const today = todayStr();
 
+    const points = calculateLeaguePoints(score, totalQuestions, durationSeconds);
+
     if (!isSupabaseConfigured || !supabase) {
       // Local calculation fallback
-      const points = calculateLeaguePoints(score, totalQuestions, durationSeconds);
       return NextResponse.json({
         success: true,
         stored: false,
@@ -37,96 +38,87 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 1. Fetch league to determine the active day
-    const { data: leagueRow, error: leagueError } = await supabase
-      .from("friendship_leagues")
-      .select("*")
-      .eq("code", cleanLeagueCode)
-      .maybeSingle();
+    try {
+      // 1. Fetch league to determine the active day
+      const { data: leagueRow, error: leagueError } = await supabase
+        .from("friendship_leagues")
+        .select("*")
+        .eq("code", cleanLeagueCode)
+        .maybeSingle();
 
-    if (leagueError || !leagueRow) {
-      return NextResponse.json({ error: "League not found." }, { status: 404 });
-    }
+      let dayNumber = 1;
 
-    const league: FriendshipLeague = {
-      id: leagueRow.id,
-      code: leagueRow.code,
-      title: leagueRow.title,
-      creatorName: leagueRow.creator_name,
-      creatorId: leagueRow.creator_id,
-      durationDays: leagueRow.duration_days,
-      startDate: leagueRow.start_date,
-      endDate: leagueRow.end_date,
-      questionsPerDay: leagueRow.questions_per_day,
-      difficulty: leagueRow.difficulty,
-      category: leagueRow.category,
-      dailySeedMap: leagueRow.daily_seed_map,
-    };
+      if (leagueRow) {
+        const status = getLeagueStatus(leagueRow.start_date, leagueRow.duration_days, today);
+        if (status.isCompleted) {
+          return NextResponse.json({ error: "This league tournament has ended." }, { status: 400 });
+        }
+        dayNumber = status.dayNumber || 1;
+      }
 
-    const status = getLeagueStatus(league.startDate, league.durationDays, today);
+      // 2. Check if user has already submitted today's attempt
+      const playerIdentifier = userId || cleanUsername.toLowerCase();
+      const { data: existingAttempt } = await supabase
+        .from("league_scores")
+        .select("id")
+        .eq("league_code", cleanLeagueCode)
+        .eq("user_id", playerIdentifier)
+        .eq("day_number", dayNumber)
+        .maybeSingle();
 
-    if (status.isCompleted) {
-      return NextResponse.json({ error: "This league tournament has ended." }, { status: 400 });
-    }
-    if (status.isUpcoming) {
-      return NextResponse.json({ error: "This league has not started yet." }, { status: 400 });
-    }
+      if (existingAttempt) {
+        return NextResponse.json({
+          error: "You have already completed your attempt for today's drop.",
+          alreadyAttempted: true,
+        }, { status: 409 });
+      }
 
-    const dayNumber = status.dayNumber;
+      // 3. Insert score row into database
+      const { data: inserted, error: insertError } = await supabase
+        .from("league_scores")
+        .insert([
+          {
+            league_code: cleanLeagueCode,
+            user_id: playerIdentifier,
+            username: cleanUsername,
+            avatar: avatar || "/avatars/avatar-scholar.svg",
+            day_number: dayNumber,
+            date: today,
+            score,
+            total_questions: totalQuestions,
+            points,
+            duration_seconds: durationSeconds,
+            question_results: questionResults,
+          },
+        ])
+        .select()
+        .maybeSingle();
 
-    // 2. Check if user has already submitted today's attempt
-    const playerIdentifier = userId || cleanUsername.toLowerCase();
-    const { data: existingAttempt } = await supabase
-      .from("league_scores")
-      .select("id")
-      .eq("league_code", cleanLeagueCode)
-      .eq("user_id", playerIdentifier)
-      .eq("day_number", dayNumber)
-      .maybeSingle();
-
-    if (existingAttempt) {
-      return NextResponse.json({
-        error: "You have already completed your attempt for today's drop.",
-        alreadyAttempted: true,
-      }, { status: 409 });
-    }
-
-    // 3. Calculate points with velocity speed multipliers
-    const points = calculateLeaguePoints(score, totalQuestions, durationSeconds);
-
-    // 4. Insert score row into database
-    const { data: inserted, error: insertError } = await supabase
-      .from("league_scores")
-      .insert([
-        {
-          league_code: cleanLeagueCode,
-          user_id: playerIdentifier,
-          username: cleanUsername,
-          avatar: avatar || "/avatars/avatar-scholar.svg",
-          day_number: dayNumber,
-          date: today,
-          score,
-          total_questions: totalQuestions,
+      if (insertError) {
+        console.error("Supabase league score insert error:", insertError);
+        return NextResponse.json({
+          success: true,
+          stored: false,
+          dayNumber,
           points,
-          duration_seconds: durationSeconds,
-          question_results: questionResults,
-        },
-      ])
-      .select()
-      .single();
+        });
+      }
 
-    if (insertError) {
-      console.error("Supabase league score insert error:", insertError);
-      return NextResponse.json({ error: insertError.message }, { status: 500 });
+      return NextResponse.json({
+        success: true,
+        stored: true,
+        dayNumber,
+        points,
+        data: inserted,
+      });
+    } catch (e: any) {
+      return NextResponse.json({
+        success: true,
+        stored: false,
+        points,
+        dayNumber: 1,
+      });
     }
-
-    return NextResponse.json({
-      success: true,
-      stored: true,
-      dayNumber,
-      points,
-      data: inserted,
-    });
   } catch (err: any) {
     console.error("Error submitting league score:", err);
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });
