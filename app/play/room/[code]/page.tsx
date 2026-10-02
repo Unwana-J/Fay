@@ -593,27 +593,64 @@ export default function ArticulateRoomPage({
   const currentHostId = room?.host_id;
 
   // 6. Resilient Client-Anchored Countdown & Round Timer
-  const localTurnAnchorRef = useRef<{ round: number; localStart: number } | null>(null);
+  const turnAnchorMapRef = useRef<Record<string, number>>({});
+  const completedCountdownTurnsRef = useRef<Set<string>>(new Set());
+
+  const activeTurnRound = room?.current_turn?.roundNumber || 0;
+  const activeTurnTeam = room?.current_turn?.activeTeam || "A";
+  const activeTurnSpeaker = room?.current_turn?.speakerId || "";
+  const activeTurnKey =
+    room?.status === "playing" && activeTurnRound > 0
+      ? `${roomCode}_r${activeTurnRound}_${activeTurnTeam}_${activeTurnSpeaker}`
+      : null;
 
   useEffect(() => {
-    if (currentRoomStatus !== "playing" || !currentTurnStartedAt) {
+    if (currentRoomStatus !== "playing" || !activeTurnKey) {
       setCountdownRemaining(null);
-      localTurnAnchorRef.current = null;
       return;
     }
 
     const duration = currentDuration;
-    const currentRound = currentTurnRound || 1;
 
-    // Anchor local start time when a new round starts
-    if (!localTurnAnchorRef.current || localTurnAnchorRef.current.round !== currentRound) {
-      localTurnAnchorRef.current = { round: currentRound, localStart: Date.now() };
+    // Anchor local start time ONCE per turn key (synchronized with server timestamp if available)
+    if (!turnAnchorMapRef.current[activeTurnKey]) {
+      const serverCountdownEnds = currentCountdownEndsAt;
+      const now = Date.now();
+      if (serverCountdownEnds && Math.abs(now - serverCountdownEnds) < (duration + 15) * 1000) {
+        turnAnchorMapRef.current[activeTurnKey] = serverCountdownEnds - 3500;
+      } else {
+        turnAnchorMapRef.current[activeTurnKey] = now;
+      }
     }
 
-    const localStart = localTurnAnchorRef.current.localStart;
+    const localStart = turnAnchorMapRef.current[activeTurnKey];
 
     const updateTimer = () => {
       const elapsedMs = Date.now() - localStart;
+
+      // If this turn has already completed or dismissed its countdown, jump directly to active round timer
+      if (completedCountdownTurnsRef.current.has(activeTurnKey)) {
+        setCountdownRemaining((prev) => (prev !== null ? null : prev));
+        const activeElapsedSec = Math.floor(Math.max(0, elapsedMs - 3500) / 1000);
+        const remainingSec = Math.max(0, duration - activeElapsedSec);
+        setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
+
+        // Time's Up: Only active speaker or host triggers end_round
+        if (remainingSec === 0) {
+          if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
+            hasDispatchedEndRoundRef.current = activeTurnRound;
+            const isSpeakerOrHost =
+              myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
+            if (isSpeakerOrHost) {
+              dispatchAction({
+                action: "end_round",
+                speakerId: myPlayerId,
+              });
+            }
+          }
+        }
+        return;
+      }
 
       // 1. Pre-round 3-second countdown (0ms - 3000ms)
       if (elapsedMs < 3000) {
@@ -630,7 +667,8 @@ export default function ArticulateRoomPage({
         return;
       }
 
-      // 3. Active Round (3500ms onwards)
+      // 3. Active Round (3500ms onwards) - Permanently mark countdown as complete for this turn
+      completedCountdownTurnsRef.current.add(activeTurnKey);
       setCountdownRemaining((prev) => (prev !== null ? null : prev));
       const activeElapsedSec = Math.floor((elapsedMs - 3500) / 1000);
       const remainingSec = Math.max(0, duration - activeElapsedSec);
@@ -638,8 +676,8 @@ export default function ArticulateRoomPage({
 
       // 4. Time's Up: Only active speaker or host triggers end_round
       if (remainingSec === 0) {
-        if (hasDispatchedEndRoundRef.current !== currentRound) {
-          hasDispatchedEndRoundRef.current = currentRound;
+        if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
+          hasDispatchedEndRoundRef.current = activeTurnRound;
           const isSpeakerOrHost =
             myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
           if (isSpeakerOrHost) {
@@ -660,8 +698,8 @@ export default function ArticulateRoomPage({
     };
   }, [
     currentRoomStatus,
-    currentTurnStartedAt,
-    currentTurnRound,
+    activeTurnKey,
+    activeTurnRound,
     currentDuration,
     currentSpeakerId,
     currentHostId,
@@ -1329,7 +1367,12 @@ export default function ArticulateRoomPage({
             isSpeaker={isSpeaker}
             myTeam={myTeam}
             activeTeam={room.current_turn.activeTeam}
-            onDismiss={() => setCountdownRemaining(null)}
+            onDismiss={() => {
+              if (activeTurnKey) {
+                completedCountdownTurnsRef.current.add(activeTurnKey);
+              }
+              setCountdownRemaining(null);
+            }}
           />
         )}
       </AnimatePresence>
