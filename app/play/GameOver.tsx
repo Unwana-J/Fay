@@ -5,6 +5,7 @@ import { useGameStore } from "@/store/useGameStore";
 import { Trophy, ArrowLeft, RotateCcw, Medal, Brain } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
+import ScholarTrophy from "@/components/ui/ScholarTrophy";
 
 export default function GameOver({
   onRestart,
@@ -13,7 +14,7 @@ export default function GameOver({
   onRestart: () => void;
   onMinimize?: () => void;
 }) {
-  const { turnsHistory, resetGame } = useGameStore();
+  const { turnsHistory, resetGame, colorA, colorB } = useGameStore();
 
   // Group scores by Team
   const scoreTeamA = turnsHistory
@@ -36,6 +37,7 @@ export default function GameOver({
 
   // Calculate winner
   const winner = scoreTeamA > scoreTeamB ? "Alpha" : scoreTeamB > scoreTeamA ? "Omega" : "Tie";
+  const winnerColor = winner === "Alpha" ? colorA : winner === "Omega" ? colorB : "#F59E0B";
 
   // Calculate global summary stats
   const totalCorrect = scoreTeamA + scoreTeamB;
@@ -54,8 +56,12 @@ export default function GameOver({
       <div className="flex-1 overflow-y-auto pr-1 pb-4 space-y-6">
         {/* Trophy Header */}
         <div className="text-center space-y-3 pt-2">
-          <div className="inline-flex p-4 bg-amber-500/10 text-amber-500 rounded-full border border-amber-500/20">
-            <Trophy className="w-12 h-12 animate-bounce" />
+          <div className="flex justify-center">
+            <ScholarTrophy
+              winnerColor={winnerColor}
+              teamName={winner === "Tie" ? "Scholars" : `Team ${winner}`}
+              size={170}
+            />
           </div>
           <h2 className="font-space font-black text-4xl text-[var(--text)] tracking-tight">
             {winner === "Tie" ? "It's a Tie!" : `Team ${winner} Wins!`}

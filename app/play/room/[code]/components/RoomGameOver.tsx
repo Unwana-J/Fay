@@ -7,6 +7,7 @@ import { motion } from "framer-motion";
 import canvasConfetti from "canvas-confetti";
 import Link from "next/link";
 import BoardMap from "@/app/play/BoardMap";
+import ScholarTrophy from "@/components/ui/ScholarTrophy";
 
 interface RoomGameOverProps {
   room: ArticulateRoom;
@@ -102,33 +103,16 @@ export default function RoomGameOver({
       {/* Hero Victory & Winner Podium Showcase */}
       <div className="space-y-4">
         <motion.div
-          initial={{ scale: 0.7, opacity: 0, rotate: -10 }}
-          animate={{ scale: 1, opacity: 1, rotate: 0 }}
+          initial={{ scale: 0.75, opacity: 0, y: 15 }}
+          animate={{ scale: 1, opacity: 1, y: 0 }}
           transition={{ type: "spring", stiffness: 220, damping: 16 }}
-          className="relative inline-flex items-center justify-center"
+          className="relative inline-flex items-center justify-center my-1"
         >
-          {/* Radiant Aura Ring */}
-          <div
-            className="absolute inset-0 rounded-full blur-xl opacity-40 animate-pulse"
-            style={{ backgroundColor: winner.color }}
+          <ScholarTrophy
+            winnerColor={winner.color}
+            teamName={winner.name}
+            size={180}
           />
-          <div
-            className="w-24 h-24 sm:w-28 sm:h-28 rounded-3xl relative flex items-center justify-center shadow-2xl border-4 transform transition-transform hover:scale-105"
-            style={{
-              backgroundColor: `${winner.color}18`,
-              borderColor: winner.color,
-              color: winner.color,
-            }}
-          >
-            <Trophy className="w-12 h-12 sm:w-14 sm:h-14" />
-            <motion.div
-              animate={{ rotate: [0, 10, -10, 0] }}
-              transition={{ repeat: Infinity, duration: 3, ease: "easeInOut" }}
-              className="absolute -top-3.5 -right-3.5 p-2 rounded-full bg-[var(--gold)] text-black shadow-lg border-2 border-[var(--bg)]"
-            >
-              <Crown className="w-4 h-4 fill-current" />
-            </motion.div>
-          </div>
         </motion.div>
 
         <div className="space-y-2">
