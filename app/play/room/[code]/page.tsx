@@ -900,6 +900,13 @@ export default function ArticulateRoomPage({
     });
   };
 
+  const handleFinishGame = () => {
+    dispatchAction({
+      action: "finish_game",
+      hostId: myPlayerId,
+    });
+  };
+
   const handleSwitchPlayerTeam = (targetPlayerId: string, targetTeam: "A" | "B") => {
     dispatchAction({
       action: "switch_team",
@@ -1285,6 +1292,7 @@ export default function ArticulateRoomPage({
                 onResolveDispute={handleResolveDispute}
                 onClaimPassedWord={handleClaimPassedWord}
                 onResolvePassedClaim={handleResolvePassedClaim}
+                onFinishGame={handleFinishGame}
                 onToggleInactive={handleToggleInactive}
                 onLeaveRoom={handleLeaveRoom}
                 onOpenLobbyQueue={() => setShowLobbyQueueModal(true)}

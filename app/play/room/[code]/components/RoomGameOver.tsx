@@ -99,6 +99,47 @@ export default function RoomGameOver({
         </div>
       </div>
 
+      {/* Match Word Review Accordion */}
+      {(room.round_words_scored?.length > 0 || room.round_words_passed?.length > 0) && (
+        <div className="surface rounded-2xl border border-[var(--border-dim)] p-4 text-left space-y-3">
+          <div className="flex items-center justify-between pb-2 border-b border-[var(--border-dim)]">
+            <span className="text-xs font-bold uppercase tracking-wider text-[var(--text-mute)]">
+              Final Round Words
+            </span>
+            <span className="text-[11px] text-[var(--text-dim)] font-medium">
+              {room.round_words_scored?.length || 0} scored • {room.round_words_passed?.length || 0} passed
+            </span>
+          </div>
+
+          <div className="flex flex-wrap gap-1.5">
+            {room.round_words_scored?.map((w, idx) => (
+              <span
+                key={`scored-${idx}`}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${
+                  w.disputeStatus === "conceded"
+                    ? "bg-red-500/10 text-red-600 line-through border-red-500/20"
+                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+                }`}
+              >
+                {w.word}
+              </span>
+            ))}
+            {room.round_words_passed?.map((w, idx) => (
+              <span
+                key={`passed-${idx}`}
+                className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium border ${
+                  w.claimStatus === "awarded"
+                    ? "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20 font-bold"
+                    : "bg-[var(--bg-card)] text-[var(--text-mute)] border-[var(--border-dim)]"
+                }`}
+              >
+                {w.word} (passed)
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Action Buttons */}
       <div className="space-y-3 pt-2">
         {isHost && (

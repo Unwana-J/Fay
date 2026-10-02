@@ -579,12 +579,6 @@ export async function POST(
           const teamKey =
             room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
           room.teams[teamKey].score += 1;
-
-          // Check Win Condition
-          if (room.teams[teamKey].score >= room.settings.scoreGoal) {
-            room.status = "game_over";
-            room.locked = false;
-          }
         }
 
         room.current_word_index += 1;
@@ -690,11 +684,6 @@ export async function POST(
 
           if (prevStatus !== "awarded") {
             room.teams[turnTeam].score += 1;
-
-            if (room.teams[turnTeam].score >= room.settings.scoreGoal) {
-              room.status = "game_over";
-              room.locked = false;
-            }
           }
         } else if (resolution === "reject") {
           passedEntry.claimStatus = "rejected";
@@ -787,6 +776,17 @@ export async function POST(
           room,
           message: "Round ended. Room unlocked and waiting spectators admitted!",
         });
+      }
+
+      // -------------------------------------------------------------
+      // 6b. FINISH GAME / DECLARE WINNER (After round review & contesting)
+      // -------------------------------------------------------------
+      case "finish_game":
+      case "declare_winner": {
+        room.status = "game_over";
+        room.locked = false;
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
       }
 
       // -------------------------------------------------------------

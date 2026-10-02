@@ -41,6 +41,7 @@ interface RoomRoundEndProps {
   onResolveDispute: (wordIndex: number, resolution: "concede" | "reject") => void;
   onClaimPassedWord?: (wordIndex: number) => void;
   onResolvePassedClaim?: (wordIndex: number, resolution: "award" | "reject") => void;
+  onFinishGame?: () => void;
   onToggleInactive?: (targetPlayerId?: string) => void;
   onLeaveRoom?: () => void;
   onOpenLobbyQueue?: () => void;
@@ -61,6 +62,7 @@ export default function RoomRoundEnd({
   onResolveDispute,
   onClaimPassedWord,
   onResolvePassedClaim,
+  onFinishGame,
   onToggleInactive,
   onLeaveRoom,
   onOpenLobbyQueue,
@@ -85,6 +87,41 @@ export default function RoomRoundEnd({
 
   const isDescribingTeam = myTeam === turnTeamKey;
   const isOpposingTeam = myTeam !== null && !isDescribingTeam;
+
+  // Score goal & match conclusion calculations
+  const scoreGoal = room.settings?.scoreGoal || 20;
+  const scoreA = room.teams?.teamA?.score ?? 0;
+  const scoreB = room.teams?.teamB?.score ?? 0;
+  const isTeamAWinner = scoreA >= scoreGoal;
+  const isTeamBWinner = scoreB >= scoreGoal;
+  const isGoalReached = isTeamAWinner || isTeamBWinner;
+  const winningTeamKey: "A" | "B" | "tie" | null = isGoalReached
+    ? scoreA >= scoreGoal && scoreB >= scoreGoal
+      ? scoreA > scoreB
+        ? "A"
+        : scoreB > scoreA
+        ? "B"
+        : "tie"
+      : scoreA >= scoreGoal
+      ? "A"
+      : "B"
+    : null;
+
+  const winningTeamName =
+    winningTeamKey === "A"
+      ? room.teams?.teamA?.name || "Team Alpha"
+      : winningTeamKey === "B"
+      ? room.teams?.teamB?.name || "Team Omega"
+      : "Both Teams (Tie)";
+
+  const winningTeamColor =
+    winningTeamKey === "A"
+      ? room.teams?.teamA?.color || "#EF4444"
+      : winningTeamKey === "B"
+      ? room.teams?.teamB?.color || "#3B82F6"
+      : "var(--gold)";
+
+  const winningScore = winningTeamKey === "A" ? scoreA : winningTeamKey === "B" ? scoreB : Math.max(scoreA, scoreB);
 
   // Next round calculation
   const nextRoundNumber = (currentTurn?.roundNumber || 1) + 1;
@@ -281,6 +318,28 @@ export default function RoomRoundEnd({
           Described by <strong className="text-[var(--text)]">{currentTurn?.speakerName}</strong>
         </p>
       </div>
+
+      {/* Victory Threshold Notice (Allows full review & contesting before declaring game over) */}
+      {isGoalReached && (
+        <motion.div
+          initial={{ opacity: 0, y: 10, scale: 0.98 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          className="surface rounded-3xl p-5 border-2 border-[var(--gold)] bg-[var(--gold)]/10 shadow-lg text-center space-y-2.5 relative overflow-hidden"
+        >
+          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--gold)] text-black font-space font-extrabold text-xs shadow-xs">
+            <Trophy className="w-3.5 h-3.5" />
+            <span>Target Goal Reached! ({scoreGoal} pts)</span>
+          </div>
+          <h3 className="font-space font-extrabold text-xl sm:text-2xl text-[var(--text)]">
+            {winningTeamKey === "tie"
+              ? "Tied at the Victory Threshold!"
+              : `${winningTeamName} has reached the winning score (${winningScore} pts)!`}
+          </h3>
+          <p className="text-xs text-[var(--text-dim)] max-w-md mx-auto leading-relaxed">
+            Review and contest any words below to settle fouls or claims. Once everyone has reviewed, the Host can announce the final champion or launch another round.
+          </p>
+        </motion.div>
+      )}
 
       {/* Spectator Admission Notice */}
       <motion.div
@@ -1016,104 +1075,157 @@ export default function RoomRoundEnd({
         />
       </div>
 
-      {/* Next Round CTA with Team Turn Passing */}
+      {/* Next Round CTA / Match Victory Controls */}
       <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-xs text-[var(--text-dim)]">
-            <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: nextTeamColor }} />
-            <span>Next turn: <strong style={{ color: nextTeamColor }}>{nextTeamName}</strong></span>
-          </div>
-          <span className="text-[11px] font-bold text-[var(--text-mute)]">Round {nextRoundNumber}</span>
-        </div>
-
-        {nextTeamActiveIds.length === 0 && (
-          <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-center gap-2">
-            <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-            <span>
-              All scholars in <strong>{nextTeamName}</strong> are currently marked Away. One member should tap &quot;I&apos;m Back&quot; above before starting.
-            </span>
-          </div>
-        )}
-
-        {isMeNextSpeaker ? (
-          <div className="space-y-2">
-            <motion.button
-              whileHover={!isStartingRound ? { scale: 1.02 } : {}}
-              whileTap={!isStartingRound ? { scale: 0.98 } : {}}
-              onClick={() => {
-                if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
-              }}
-              disabled={isStartingRound}
-              className={`w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
-                isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer animate-pulse"
-              }`}
-              style={{ backgroundColor: nextTeamColor }}
-            >
-              {isStartingRound ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Starting Sprint...
-                </>
-              ) : (
-                <>
-                  <Mic className="w-5 h-5 fill-current" />
-                  I&apos;m the Speaker — Start My Turn
-                </>
-              )}
-            </motion.button>
-            <p className="text-xs text-[var(--text-dim)]">
-              🎤 You are describing this round! When you tap start, the 3s countdown begins for everyone.
-            </p>
-          </div>
-        ) : isHost ? (
-          <div className="space-y-2">
-            <motion.button
-              whileHover={!isStartingRound ? { scale: 1.02 } : {}}
-              whileTap={!isStartingRound ? { scale: 0.98 } : {}}
-              onClick={() => {
-                if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
-              }}
-              disabled={isStartingRound}
-              className={`w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
-                isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer"
-              }`}
-            >
-              {isStartingRound ? (
-                <>
-                  <Loader2 className="w-5 h-5 animate-spin" />
-                  Launching Round {nextRoundNumber}...
-                </>
-              ) : (
-                <>
-                  <Play className="w-5 h-5 fill-current" />
-                  Start Round {nextRoundNumber} as Host ({nextSpeakerDisplay?.name || nextTeamName})
-                </>
-              )}
-            </motion.button>
-            <p className="text-xs text-[var(--text-dim)]">
-              👑 You can launch as Host, or wait for {nextSpeakerDisplay?.name || nextTeamName} to start when ready.
-            </p>
-          </div>
-        ) : myTeam === nextActiveTeamKey ? (
-          <div className="py-3 space-y-1">
-            <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
-              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
-              Waiting for <strong>{nextSpeakerDisplay?.name || "your speaker"}</strong> to start the sprint...
+        {isGoalReached ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)]">
+              <div className="flex items-center gap-2 text-xs font-bold text-[var(--gold)]">
+                <Crown className="w-4 h-4" />
+                <span>Match Deciding Phase</span>
+              </div>
+              <span className="text-[11px] font-bold text-[var(--text-mute)]">Goal: {scoreGoal} pts</span>
             </div>
-            <p className="text-xs text-[var(--text-dim)]">
-              Your teammate will describe words. The round will launch on your screen as soon as they tap Start!
-            </p>
+
+            {isHost ? (
+              <div className="space-y-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => onFinishGame?.()}
+                  className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2.5 transition cursor-pointer"
+                >
+                  <Trophy className="w-5 h-5 text-[var(--gold)]" />
+                  Announce Winner & Declare Victory ({winningTeamName})
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
+                  }}
+                  disabled={isStartingRound}
+                  className="w-full py-3 rounded-xl border border-[var(--border-dim)] hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5" /> Continue to Round {nextRoundNumber} (Play Another Round)
+                </button>
+
+                <p className="text-xs text-[var(--text-dim)]">
+                  👑 As Host, verify all word disputes and claims above are settled before announcing the final winner.
+                </p>
+              </div>
+            ) : (
+              <div className="py-4 space-y-2 text-center">
+                <div className="inline-flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
+                  <Trophy className="w-4 h-4 text-[var(--gold)] animate-bounce" />
+                  <span>Victory Threshold Reached by <strong>{winningTeamName}</strong>!</span>
+                </div>
+                <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
+                  Review the words above and dispute any fouls. Host ({room.host_name}) will announce the official match winner when review is concluded.
+                </p>
+              </div>
+            )}
           </div>
         ) : (
-          <div className="py-3 space-y-1">
-            <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
-              <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
-              Waiting for {nextSpeakerDisplay?.name ? `${nextSpeakerDisplay.name} (${nextTeamName})` : nextTeamName} to start...
+          <>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2 text-xs text-[var(--text-dim)]">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: nextTeamColor }} />
+                <span>Next turn: <strong style={{ color: nextTeamColor }}>{nextTeamName}</strong></span>
+              </div>
+              <span className="text-[11px] font-bold text-[var(--text-mute)]">Round {nextRoundNumber}</span>
             </div>
-            <p className="text-xs text-[var(--text-dim)]">
-              The round will automatically launch on your screen as soon as they start!
-            </p>
-          </div>
+
+            {nextTeamActiveIds.length === 0 && (
+              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                <span>
+                  All scholars in <strong>{nextTeamName}</strong> are currently marked Away. One member should tap &quot;I&apos;m Back&quot; above before starting.
+                </span>
+              </div>
+            )}
+
+            {isMeNextSpeaker ? (
+              <div className="space-y-2">
+                <motion.button
+                  whileHover={!isStartingRound ? { scale: 1.02 } : {}}
+                  whileTap={!isStartingRound ? { scale: 0.98 } : {}}
+                  onClick={() => {
+                    if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
+                  }}
+                  disabled={isStartingRound}
+                  className={`w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
+                    isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer animate-pulse"
+                  }`}
+                  style={{ backgroundColor: nextTeamColor }}
+                >
+                  {isStartingRound ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Starting Sprint...
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-5 h-5 fill-current" />
+                      I&apos;m the Speaker — Start My Turn
+                    </>
+                  )}
+                </motion.button>
+                <p className="text-xs text-[var(--text-dim)]">
+                  🎤 You are describing this round! When you tap start, the 3s countdown begins for everyone.
+                </p>
+              </div>
+            ) : isHost ? (
+              <div className="space-y-2">
+                <motion.button
+                  whileHover={!isStartingRound ? { scale: 1.02 } : {}}
+                  whileTap={!isStartingRound ? { scale: 0.98 } : {}}
+                  onClick={() => {
+                    if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
+                  }}
+                  disabled={isStartingRound}
+                  className={`w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition ${
+                    isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer"
+                  }`}
+                >
+                  {isStartingRound ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Launching Round {nextRoundNumber}...
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-5 h-5 fill-current" />
+                      Start Round {nextRoundNumber} as Host ({nextSpeakerDisplay?.name || nextTeamName})
+                    </>
+                  )}
+                </motion.button>
+                <p className="text-xs text-[var(--text-dim)]">
+                  👑 You can launch as Host, or wait for {nextSpeakerDisplay?.name || nextTeamName} to start when ready.
+                </p>
+              </div>
+            ) : myTeam === nextActiveTeamKey ? (
+              <div className="py-3 space-y-1">
+                <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
+                  <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
+                  Waiting for <strong>{nextSpeakerDisplay?.name || "your speaker"}</strong> to start the sprint...
+                </div>
+                <p className="text-xs text-[var(--text-dim)]">
+                  Your teammate will describe words. The round will launch on your screen as soon as they tap Start!
+                </p>
+              </div>
+            ) : (
+              <div className="py-3 space-y-1">
+                <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
+                  <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
+                  Waiting for {nextSpeakerDisplay?.name ? `${nextSpeakerDisplay.name} (${nextTeamName})` : nextTeamName} to start...
+                </div>
+                <p className="text-xs text-[var(--text-dim)]">
+                  The round will automatically launch on your screen as soon as they start!
+                </p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
