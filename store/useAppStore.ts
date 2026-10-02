@@ -5,6 +5,13 @@ import { checkNewAchievements, type AchievementStats } from "@/lib/achievements"
 import { todayStr, daysBetween, uid, formatDateToIso, getYesterdayStr } from "@/lib/utils";
 import { analytics } from "@/lib/analytics";
 import { renameLocalChallengeParticipant } from "@/lib/trivia-challenge";
+import {
+  signUpWithEmail,
+  signInWithEmail,
+  signOutUser,
+  syncStateToCloud,
+  syncSessionToCloud,
+} from "@/lib/auth-sync";
 
 export interface CompletedSession {
   id: string;
@@ -268,6 +275,16 @@ export interface AppState {
   dismissClaimAccountPrompt: () => void;
   claimPromptDismissed: boolean;
 
+  // Cloud Authentication & Sync (Supabase)
+  authEmail: string | null;
+  authUserId: string | null;
+  isCloudSynced: boolean;
+  lastCloudSyncAt: number | null;
+  registerWithCloud: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  loginWithCloud: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  logoutFromCloud: () => Promise<void>;
+  syncToCloud: () => Promise<void>;
+
   // Profile
   profile: UserProfile;
 
@@ -379,6 +396,10 @@ export const useAppStore = create<AppState>()(
         shields: 1, // 1 free Scholar's Seal on account creation
       },
       claimedQuestIds: [],
+      authEmail: null,
+      authUserId: null,
+      isCloudSynced: false,
+      lastCloudSyncAt: null,
       settings: {
         enabledCategories: DEFAULT_ENABLED_CATEGORIES,
         favoriteCategories: ["Artificial Intelligence", "Technology"],
@@ -393,6 +414,149 @@ export const useAppStore = create<AppState>()(
       seenTriviaQuestionIds: [],
       triviaHistory: [],
       articulateHistory: [],
+
+      registerWithCloud: async (email, password) => {
+        const state = get();
+        const trimmed = email.trim().toLowerCase();
+        const res = await signUpWithEmail(trimmed, password, {
+          profile: state.profile,
+          streak: state.streak,
+          settings: state.settings,
+          sessions: state.sessions,
+          claimedQuestIds: state.claimedQuestIds,
+        });
+
+        if (res.success && res.user) {
+          set((s) => ({
+            authEmail: trimmed,
+            authUserId: res.user!.id,
+            isCloudSynced: true,
+            lastCloudSyncAt: Date.now(),
+            profile: {
+              ...s.profile,
+              id: res.user!.id,
+              email: trimmed,
+              hasClaimedAccount: true,
+            },
+            claimPromptDismissed: true,
+          }));
+
+          analytics.identify(res.user.id, {
+            email: trimmed,
+            username: state.profile.username,
+            hasClaimedAccount: true,
+          });
+          analytics.track("account_registered_cloud", { email: trimmed });
+          return { success: true };
+        } else {
+          return { success: false, error: res.error || "Failed to seal scholarship in the cloud." };
+        }
+      },
+
+      loginWithCloud: async (email, password) => {
+        const trimmed = email.trim().toLowerCase();
+        const res = await signInWithEmail(trimmed, password);
+        if (res.success && res.user && res.data) {
+          const local = get();
+          const cloud = res.data;
+
+          // Merge sessions: union by topicId + date or id
+          const existingSessionKeys = new Set(local.sessions.map((s) => `${s.topicId}-${s.date}`));
+          const cloudSessions = cloud.sessions || [];
+          const mergedSessions = [...local.sessions];
+          for (const cs of cloudSessions) {
+            if (!existingSessionKeys.has(`${cs.topicId}-${cs.date}`)) {
+              mergedSessions.push(cs);
+            }
+          }
+          mergedSessions.sort((a, b) => (b.date > a.date ? 1 : -1));
+
+          // Merge achievements
+          const mergedAchievements = Array.from(
+            new Set([...local.profile.unlockedAchievements, ...(cloud.unlockedAchievements || [])])
+          );
+
+          // Merge claimed quest ids
+          const mergedQuests = Array.from(
+            new Set([...local.claimedQuestIds, ...(cloud.claimedQuestIds || [])])
+          );
+
+          // Merge streak
+          const mergedStreak: StreakData = {
+            current: Math.max(local.streak.current, cloud.streak?.current || 0),
+            longest: Math.max(local.streak.longest, cloud.streak?.longest || 0),
+            total: Math.max(local.streak.total, cloud.streak?.total || 0),
+            lastDate: cloud.streak?.lastDate || local.streak.lastDate,
+            shields: Math.max(local.streak.shields, cloud.streak?.shields ?? 1),
+            history: reconcileStreakState({
+              sessions: mergedSessions,
+              streak: {
+                history: [...(local.streak.history || []), ...(cloud.streak?.history || [])],
+              },
+            }).history,
+          };
+
+          const finalXP = Math.max(local.profile.xp, cloud.profile.xp || 0);
+
+          set({
+            isOnboarded: true,
+            authEmail: res.user.email,
+            authUserId: res.user.id,
+            isCloudSynced: true,
+            lastCloudSyncAt: Date.now(),
+            profile: {
+              ...local.profile,
+              id: res.user.id,
+              email: res.user.email,
+              username: cloud.profile.username || local.profile.username || "Scholar",
+              avatar: cloud.profile.avatar || local.profile.avatar || "/avatars/avatar-scholar.svg",
+              bio: cloud.profile.bio || local.profile.bio,
+              xp: finalXP,
+              unlockedAchievements: mergedAchievements,
+              hasClaimedAccount: true,
+            },
+            sessions: mergedSessions,
+            streak: mergedStreak,
+            claimedQuestIds: mergedQuests,
+            settings: cloud.settings || local.settings,
+          });
+
+          analytics.identify(res.user.id, {
+            email: res.user.email,
+            username: cloud.profile.username || local.profile.username,
+          });
+          analytics.track("account_logged_in_cloud", { email: res.user.email });
+
+          return { success: true };
+        } else {
+          return { success: false, error: res.error || "Invalid email or password." };
+        }
+      },
+
+      logoutFromCloud: async () => {
+        await signOutUser();
+        set({
+          authEmail: null,
+          authUserId: null,
+          isCloudSynced: false,
+          lastCloudSyncAt: null,
+        });
+        analytics.track("account_logged_out_cloud", {});
+      },
+
+      syncToCloud: async () => {
+        const state = get();
+        if (!state.authUserId) return;
+        const ok = await syncStateToCloud(state.authUserId, {
+          profile: state.profile,
+          streak: state.streak,
+          settings: state.settings,
+          claimedQuestIds: state.claimedQuestIds,
+        });
+        if (ok) {
+          set({ lastCloudSyncAt: Date.now(), isCloudSynced: true });
+        }
+      },
 
       createAccount: ({ username, avatar, bio, interests }) => {
         const state = get();
@@ -428,6 +592,10 @@ export const useAppStore = create<AppState>()(
         analytics.reset();
         set({
           isOnboarded: false,
+          authEmail: null,
+          authUserId: null,
+          isCloudSynced: false,
+          lastCloudSyncAt: null,
           profile: {
             id: uid(),
             username: "",
@@ -628,6 +796,21 @@ export const useAppStore = create<AppState>()(
           shieldsRemaining: remainingShields,
         });
 
+        // If logged into cloud account, sync session and profile state in background
+        if (state.authUserId) {
+          syncSessionToCloud(state.authUserId, completedSession).catch(() => {});
+          syncStateToCloud(state.authUserId, {
+            profile: {
+              ...state.profile,
+              xp: newXP + achievementXP,
+              unlockedAchievements: [...state.profile.unlockedAchievements, ...newAchievementIds],
+            },
+            streak: updatedStreak,
+            settings: state.settings,
+            claimedQuestIds: state.claimedQuestIds,
+          }).catch(() => {});
+        }
+
         return { xpEarned: xpEarned + achievementXP, newAchievements: newAchievementIds };
       },
 
@@ -636,13 +819,23 @@ export const useAppStore = create<AppState>()(
       claimQuestXP: (questId, xpReward) => {
         const state = get();
         if (state.claimedQuestIds.includes(questId)) return;
+        const newClaimed = [...state.claimedQuestIds, questId];
+        const newProfile = {
+          ...state.profile,
+          xp: state.profile.xp + xpReward,
+        };
         set({
-          claimedQuestIds: [...state.claimedQuestIds, questId],
-          profile: {
-            ...state.profile,
-            xp: state.profile.xp + xpReward,
-          },
+          claimedQuestIds: newClaimed,
+          profile: newProfile,
         });
+        if (state.authUserId) {
+          syncStateToCloud(state.authUserId, {
+            profile: newProfile,
+            streak: state.streak,
+            settings: state.settings,
+            claimedQuestIds: newClaimed,
+          }).catch(() => {});
+        }
       },
 
       buyStreakShield: () => {
@@ -650,16 +843,26 @@ export const useAppStore = create<AppState>()(
         const cost = 150;
         if (state.profile.xp < cost) return false;
         const currentShields = state.streak.shields ?? 0;
+        const newProfile = {
+          ...state.profile,
+          xp: state.profile.xp - cost,
+        };
+        const newStreak = {
+          ...state.streak,
+          shields: currentShields + 1,
+        };
         set({
-          profile: {
-            ...state.profile,
-            xp: state.profile.xp - cost,
-          },
-          streak: {
-            ...state.streak,
-            shields: currentShields + 1,
-          },
+          profile: newProfile,
+          streak: newStreak,
         });
+        if (state.authUserId) {
+          syncStateToCloud(state.authUserId, {
+            profile: newProfile,
+            streak: newStreak,
+            settings: state.settings,
+            claimedQuestIds: state.claimedQuestIds,
+          }).catch(() => {});
+        }
         return true;
       },
 
@@ -688,7 +891,18 @@ export const useAppStore = create<AppState>()(
           }
         }
 
-        set((s) => ({ profile: { ...s.profile, ...data } }));
+        const updatedProfile = { ...get().profile, ...data };
+        set({ profile: updatedProfile });
+
+        const authUserId = get().authUserId;
+        if (authUserId) {
+          syncStateToCloud(authUserId, {
+            profile: updatedProfile,
+            streak: get().streak,
+            settings: get().settings,
+            claimedQuestIds: get().claimedQuestIds,
+          }).catch(() => {});
+        }
       },
 
       updateSettings: (data) =>
@@ -730,13 +944,22 @@ export const useAppStore = create<AppState>()(
           customTopics: s.customTopics.filter((t) => t.id !== id),
         })),
 
-      addXP: (amount) =>
-        set((s) => ({
-          profile: {
-            ...s.profile,
-            xp: s.profile.xp + amount,
-          },
-        })),
+      addXP: (amount) => {
+        const state = get();
+        const newProfile = {
+          ...state.profile,
+          xp: state.profile.xp + amount,
+        };
+        set({ profile: newProfile });
+        if (state.authUserId) {
+          syncStateToCloud(state.authUserId, {
+            profile: newProfile,
+            streak: state.streak,
+            settings: state.settings,
+            claimedQuestIds: state.claimedQuestIds,
+          }).catch(() => {});
+        }
+      },
 
       markTriviaQuestionsSeen: (ids) =>
         set((s) => {
@@ -748,37 +971,53 @@ export const useAppStore = create<AppState>()(
       resetSeenTriviaQuestions: () =>
         set({ seenTriviaQuestionIds: [] }),
 
-      saveTriviaRound: (round) =>
-        set((s) => {
-          const today = todayStr();
-          const item: TriviaHistoryItem = {
-            ...round,
-            id: uid(),
-            timestamp: Date.now(),
-            date: today,
-          };
-          const existing = Array.isArray(s.triviaHistory) ? s.triviaHistory : [];
-          const updatedStreak = advanceStreakState(s.streak, today);
-          return {
-            triviaHistory: [item, ...existing].slice(0, 100),
+      saveTriviaRound: (round) => {
+        const state = get();
+        const today = todayStr();
+        const item: TriviaHistoryItem = {
+          ...round,
+          id: uid(),
+          timestamp: Date.now(),
+          date: today,
+        };
+        const existing = Array.isArray(state.triviaHistory) ? state.triviaHistory : [];
+        const updatedStreak = advanceStreakState(state.streak, today);
+        set({
+          triviaHistory: [item, ...existing].slice(0, 100),
+          streak: updatedStreak,
+        });
+        if (state.authUserId) {
+          syncStateToCloud(state.authUserId, {
+            profile: state.profile,
             streak: updatedStreak,
-          };
-        }),
+            settings: state.settings,
+            claimedQuestIds: state.claimedQuestIds,
+          }).catch(() => {});
+        }
+      },
 
       clearTriviaHistory: () =>
         set({ triviaHistory: [] }),
 
-      saveArticulateRoom: (item) =>
-        set((s) => {
-          const today = todayStr();
-          const list = Array.isArray(s.articulateHistory) ? s.articulateHistory : [];
-          const filtered = list.filter((r) => r.roomCode !== item.roomCode);
-          const updatedStreak = advanceStreakState(s.streak, today);
-          return {
-            articulateHistory: [item, ...filtered].slice(0, 20),
+      saveArticulateRoom: (item) => {
+        const state = get();
+        const today = todayStr();
+        const list = Array.isArray(state.articulateHistory) ? state.articulateHistory : [];
+        const filtered = list.filter((r) => r.roomCode !== item.roomCode);
+        const updatedStreak = advanceStreakState(state.streak, today);
+        set({
+          articulateHistory: [item, ...filtered].slice(0, 20),
+          streak: updatedStreak,
+        });
+        if (state.authUserId) {
+          syncStateToCloud(state.authUserId, {
+            profile: state.profile,
             streak: updatedStreak,
-          };
-        }),
+            settings: state.settings,
+            claimedQuestIds: state.claimedQuestIds,
+          }).catch(() => {});
+        }
+      },
 
       removeArticulateRoom: (roomCode) =>
         set((s) => ({
@@ -787,10 +1026,19 @@ export const useAppStore = create<AppState>()(
           ),
         })),
 
-      recordDailyActivity: (date = todayStr()) =>
-        set((s) => ({
-          streak: advanceStreakState(s.streak, date),
-        })),
+      recordDailyActivity: (date = todayStr()) => {
+        const state = get();
+        const updatedStreak = advanceStreakState(state.streak, date);
+        set({ streak: updatedStreak });
+        if (state.authUserId) {
+          syncStateToCloud(state.authUserId, {
+            profile: state.profile,
+            streak: updatedStreak,
+            settings: state.settings,
+            claimedQuestIds: state.claimedQuestIds,
+          }).catch(() => {});
+        }
+      },
 
       syncActivityDates: (dates) =>
         set((s) => {

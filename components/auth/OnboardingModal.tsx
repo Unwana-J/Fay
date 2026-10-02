@@ -2,7 +2,19 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, ArrowRight, ArrowLeft, Check, Compass, BookOpen, ChevronDown } from "lucide-react";
+import {
+  Sparkles,
+  ArrowRight,
+  ArrowLeft,
+  Check,
+  ChevronDown,
+  Eye,
+  EyeOff,
+  Loader2,
+  ShieldCheck,
+  Smartphone,
+  Laptop,
+} from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/topics";
 import { AVATARS, DEFAULT_AVATAR_PATH, PRESET_MISSIONS } from "@/lib/avatars";
@@ -13,10 +25,15 @@ import { useRouter, usePathname } from "next/navigation";
 export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { createAccount } = useAppStore();
+  const { createAccount, loginWithCloud } = useAppStore();
   const [mode, setMode] = useState<"create" | "signin">("create");
+  const [signInType, setSignInType] = useState<"cloud" | "guest">("cloud");
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
   const [avatar, setAvatar] = useState(DEFAULT_AVATAR_PATH);
   const [mission, setMission] = useState(PRESET_MISSIONS[0]);
   const [customMission, setCustomMission] = useState("");
@@ -38,9 +55,39 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
     setStep(2);
   }
 
-  function handleQuickSignIn() {
+  async function handleCloudSignIn(e: React.FormEvent) {
+    e.preventDefault();
+    if (!email.trim() || !email.includes("@")) {
+      setError("Please enter a valid email address.");
+      return;
+    }
+    if (!password) {
+      setError("Please enter your password.");
+      return;
+    }
+
+    setError("");
+    setIsLoading(true);
+
+    try {
+      const result = await loginWithCloud(email.trim(), password);
+      setIsLoading(false);
+      if (!result.success) {
+        setError(result.error || "Invalid email or password.");
+        return;
+      }
+      if (pathname && pathname.includes("/community/room/")) {
+        router.refresh();
+      }
+    } catch (err: any) {
+      setIsLoading(false);
+      setError(err.message || "Sign in failed.");
+    }
+  }
+
+  function handleQuickGuestSignIn() {
     if (!username.trim()) {
-      setError("Please enter your username to log in.");
+      setError("Please enter your display name.");
       return;
     }
     createAccount({
@@ -94,7 +141,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
         className="w-full max-w-xl rounded-2xl p-6 sm:p-8 surface-raised shadow-2xl relative border overflow-hidden"
         style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}
       >
-        {/* Subtle decorative glow */}
+        {/* Decorative glow */}
         <div
           className="absolute -top-24 -right-24 w-60 h-60 rounded-full blur-3xl pointer-events-none opacity-20"
           style={{ background: "var(--olive)" }}
@@ -104,62 +151,247 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
           style={{ background: "var(--terra)" }}
         />
 
-        {/* Step Indicator */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-2">
-            <span className="w-6 h-6 rounded-full bg-[var(--olive)] text-white text-xs font-bold flex items-center justify-center font-mono">
-              {step}
-            </span>
-            <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: "var(--text-mute)" }}>
-              Step {step} of 3
-            </span>
+        {/* Header / Mode Indicator */}
+        {mode === "create" ? (
+          <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center gap-2">
+              <span className="w-6 h-6 rounded-full bg-[var(--olive)] text-white text-xs font-bold flex items-center justify-center font-mono">
+                {step}
+              </span>
+              <span className="text-xs uppercase tracking-wider font-semibold" style={{ color: "var(--text-mute)" }}>
+                Step {step} of 3
+              </span>
+            </div>
+            <div className="flex gap-1.5">
+              {[1, 2, 3].map((s) => (
+                <div
+                  key={s}
+                  className="h-1.5 rounded-full transition-all duration-300"
+                  style={{
+                    width: s === step ? "24px" : "8px",
+                    background: s <= step ? "var(--olive)" : "var(--border)",
+                  }}
+                />
+              ))}
+            </div>
           </div>
-          <div className="flex gap-1.5">
-            {[1, 2, 3].map((s) => (
-              <div
-                key={s}
-                className="h-1.5 rounded-full transition-all duration-300"
-                style={{
-                  width: s === step ? "24px" : "8px",
-                  background: s <= step ? "var(--olive)" : "var(--border)",
-                }}
-              />
-            ))}
+        ) : (
+          <div className="flex items-center justify-between mb-4 pb-2 border-b" style={{ borderColor: "var(--border-dim)" }}>
+            <div className="flex items-center gap-1.5 text-xs font-semibold text-[var(--olive-text)]">
+              <ShieldCheck size={16} /> Existing Scholar Login
+            </div>
+            <button
+              type="button"
+              onClick={() => {
+                setMode("create");
+                setError("");
+              }}
+              className="text-xs font-semibold px-2.5 py-1 rounded-lg border hover:bg-[var(--bg-input)] transition-colors"
+              style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+            >
+              ← New Account
+            </button>
           </div>
-        </div>
+        )}
 
         <AnimatePresence mode="wait">
-          {/* STEP 1: IDENTITY */}
-          {step === 1 && (
+          {/* SIGN IN MODE */}
+          {mode === "signin" && (
+            <motion.div
+              key="signin"
+              initial={{ opacity: 0, x: -15 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 15 }}
+              className="space-y-5"
+            >
+              <div>
+                <h2 className="font-space text-2xl sm:text-3xl font-bold mb-1" style={{ color: "var(--text)" }}>
+                  Welcome Back to Fey
+                </h2>
+                <p className="text-xs sm:text-sm" style={{ color: "var(--text-dim)" }}>
+                  Log in to restore your active streak, voice recordings, and customized knowledge library.
+                </p>
+              </div>
+
+              {/* Sub-tab selection */}
+              <div className="flex gap-2 p-1 rounded-xl bg-[var(--bg-input)] border" style={{ borderColor: "var(--border-dim)" }}>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignInType("cloud");
+                    setError("");
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    signInType === "cloud"
+                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm"
+                      : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  }`}
+                >
+                  <ShieldCheck size={13} /> Cloud Account (Email)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSignInType("guest");
+                    setError("");
+                  }}
+                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                    signInType === "guest"
+                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm"
+                      : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                  }`}
+                >
+                  Quick Guest Name
+                </button>
+              </div>
+
+              {signInType === "cloud" ? (
+                <form onSubmit={handleCloudSignIn} className="space-y-3.5">
+                  <div
+                    className="flex items-center gap-2 p-2.5 rounded-xl border text-[11px]"
+                    style={{
+                      background: "rgba(92, 106, 54, 0.08)",
+                      borderColor: "rgba(92, 106, 54, 0.25)",
+                      color: "var(--text)",
+                    }}
+                  >
+                    <div className="flex gap-1 text-[var(--olive-text)] shrink-0">
+                      <Smartphone size={13} />
+                      <Laptop size={13} />
+                    </div>
+                    <span>Access your notes and vocal streak across all your devices.</span>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold block mb-1" style={{ color: "var(--text)" }}>
+                      Email Address
+                    </label>
+                    <input
+                      type="email"
+                      placeholder="scholar@university.edu"
+                      value={email}
+                      onChange={(e) => {
+                        setEmail(e.target.value);
+                        if (error) setError("");
+                      }}
+                      className="w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none surface-input"
+                      style={{ borderColor: error ? "var(--terra)" : "var(--border)", color: "var(--text)" }}
+                      autoFocus
+                    />
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold block mb-1" style={{ color: "var(--text)" }}>
+                      Password
+                    </label>
+                    <div className="relative">
+                      <input
+                        type={showPassword ? "text" : "password"}
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={(e) => {
+                          setPassword(e.target.value);
+                          if (error) setError("");
+                        }}
+                        className="w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none surface-input pr-10"
+                        style={{ borderColor: error ? "var(--terra)" : "var(--border)", color: "var(--text)" }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] hover:text-[var(--text)]"
+                      >
+                        {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
+                      </button>
+                    </div>
+                    {error && <p className="text-xs font-medium text-[var(--terra)] mt-1.5">{error}</p>}
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="btn-primary px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
+                    >
+                      {isLoading ? (
+                        <>
+                          <Loader2 size={15} className="animate-spin" /> Logging In...
+                        </>
+                      ) : (
+                        <>
+                          Sign In & Restore Streak <ArrowRight size={15} />
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <div className="space-y-4">
+                  <div>
+                    <label className="text-xs font-semibold block mb-1.5" style={{ color: "var(--text)" }}>
+                      Display Name
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="e.g. Adaeze, Tobi, or Scholar"
+                      value={username}
+                      onChange={(e) => {
+                        setUsername(e.target.value);
+                        if (error) setError("");
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") handleQuickGuestSignIn();
+                      }}
+                      className="w-full px-4 py-3 rounded-xl border text-sm font-medium focus:outline-none surface-input"
+                      style={{ borderColor: error ? "var(--terra)" : "var(--border)", color: "var(--text)" }}
+                      autoFocus
+                    />
+                    {error && <p className="text-xs font-medium text-[var(--terra)] mt-1.5">{error}</p>}
+                  </div>
+
+                  <div className="pt-2 flex justify-end">
+                    <button
+                      type="button"
+                      onClick={handleQuickGuestSignIn}
+                      className="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
+                    >
+                      Enter as Guest <ArrowRight size={15} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          )}
+
+          {/* STEP 1: CREATE IDENTITY */}
+          {mode === "create" && step === 1 && (
             <motion.div
               key="step1"
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.2 }}
-              className="space-y-6"
+              className="space-y-5"
             >
               <div className="flex items-start justify-between gap-3">
                 <div>
-                  <h2 className="font-space text-2xl sm:text-3xl font-bold mb-1.5" style={{ color: "var(--text)" }}>
-                    {mode === "signin" ? "Welcome Back to Fey" : "Welcome to Fey"}
+                  <h2 className="font-space text-2xl sm:text-3xl font-bold mb-1" style={{ color: "var(--text)" }}>
+                    Welcome to Fey
                   </h2>
                   <p className="text-xs sm:text-sm" style={{ color: "var(--text-dim)" }}>
-                    {mode === "signin"
-                      ? "Enter your display name to jump right in."
-                      : "Research deeply, articulate clearly, and synthesize ideas in your own voice."}
+                    Research deeply, articulate clearly, and synthesize ideas in your own voice.
                   </p>
                 </div>
                 <button
                   type="button"
                   onClick={() => {
-                    setMode(mode === "create" ? "signin" : "create");
+                    setMode("signin");
                     setError("");
                   }}
                   className="text-xs font-semibold px-2.5 py-1.5 rounded-xl border text-[var(--olive-text)] hover:bg-[var(--bg-input)] transition-colors shrink-0 mt-0.5"
                   style={{ borderColor: "var(--border-dim)" }}
                 >
-                  {mode === "signin" ? "New Account" : "Log In"}
+                  Log In
                 </button>
               </div>
 
@@ -168,7 +400,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                 <label className="text-xs font-semibold block mb-2" style={{ color: "var(--text)" }}>
                   Choose Your Learning Avatar
                 </label>
-                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-56 overflow-y-auto pr-1">
+                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2.5 max-h-52 overflow-y-auto pr-1">
                   {AVATARS.map((item) => {
                     const isSelected = avatar === item.path;
                     return (
@@ -183,7 +415,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                           boxShadow: isSelected ? "0 0 0 2px var(--olive)" : "none",
                         }}
                       >
-                        <div className="w-12 h-12 rounded-full overflow-hidden mb-1.5 border group-hover:scale-105 transition-transform" style={{ borderColor: isSelected ? "var(--olive)" : "var(--border)" }}>
+                        <div className="w-11 h-11 rounded-full overflow-hidden mb-1 border group-hover:scale-105 transition-transform" style={{ borderColor: isSelected ? "var(--olive)" : "var(--border)" }}>
                           <img src={item.path} alt={item.title} className="w-full h-full object-cover" />
                         </div>
                         <span
@@ -221,7 +453,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                   onKeyDown={(e) => {
                     if (e.key === "Enter") handleNextFromStep1();
                   }}
-                  className="w-full px-4 py-3 rounded-xl border text-sm font-medium focus:outline-none transition-all surface-input"
+                  className="w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none transition-all surface-input"
                   style={{
                     borderColor: error ? "var(--terra)" : "var(--border)",
                     color: "var(--text)",
@@ -239,7 +471,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                   <select
                     value={mission}
                     onChange={(e) => setMission(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border text-xs sm:text-sm font-medium focus:outline-none transition-all surface-input appearance-none pr-10 cursor-pointer"
+                    className="w-full px-4 py-2 rounded-xl border text-xs sm:text-sm font-medium focus:outline-none transition-all surface-input appearance-none pr-10 cursor-pointer"
                     style={{ borderColor: "var(--border)", color: "var(--text)" }}
                   >
                     {PRESET_MISSIONS.map((m) => (
@@ -267,7 +499,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                       placeholder="e.g. Synthesizing research into actionable insights."
                       value={customMission}
                       onChange={(e) => setCustomMission(e.target.value)}
-                      className="w-full px-4 py-2.5 rounded-xl border text-xs focus:outline-none transition-all surface-input"
+                      className="w-full px-4 py-2 rounded-xl border text-xs focus:outline-none transition-all surface-input"
                       style={{ borderColor: "var(--border)", color: "var(--text)" }}
                       autoFocus
                     />
@@ -280,29 +512,19 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
               )}
 
               <div className="pt-2 flex justify-end">
-                {mode === "signin" ? (
-                  <button
-                    type="button"
-                    onClick={handleQuickSignIn}
-                    className="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
-                  >
-                    Log In & Enter <ArrowRight size={15} />
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleNextFromStep1}
-                    className="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
-                  >
-                    Continue <ArrowRight size={15} />
-                  </button>
-                )}
+                <button
+                  type="button"
+                  onClick={handleNextFromStep1}
+                  className="btn-primary px-5 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
+                >
+                  Continue <ArrowRight size={15} />
+                </button>
               </div>
             </motion.div>
           )}
 
           {/* STEP 2: INTERESTS */}
-          {step === 2 && (
+          {mode === "create" && step === 2 && (
             <motion.div
               key="step2"
               initial={{ opacity: 0, x: 20 }}
@@ -320,7 +542,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                 </p>
               </div>
 
-              <div className="max-h-64 overflow-y-auto pr-1 space-y-1.5">
+              <div className="max-h-60 overflow-y-auto pr-1 space-y-1.5">
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                   {CATEGORIES.map((cat) => {
                     const isSelected = selectedCategories.includes(cat);
@@ -372,7 +594,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
           )}
 
           {/* STEP 3: CONFIRMATION & LAUNCH */}
-          {step === 3 && (
+          {mode === "create" && step === 3 && (
             <motion.div
               key="step3"
               initial={{ opacity: 0, x: 20 }}

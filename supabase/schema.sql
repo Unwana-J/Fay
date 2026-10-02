@@ -85,3 +85,84 @@ create policy "Allow public update access on articulate_rooms"
 create index if not exists idx_articulate_rooms_code on public.articulate_rooms (room_code);
 create index if not exists idx_articulate_rooms_updated on public.articulate_rooms (updated_at desc);
 
+-- ==============================================================================
+-- FEY PLATFORM: USER PROFILES & CROSS-DEVICE CLOUD SYNC
+-- ==============================================================================
+
+-- 6. Create user_profiles table linked to Supabase Auth users
+create table if not exists public.user_profiles (
+  id uuid primary key references auth.users(id) on delete cascade,
+  email text,
+  username text not null,
+  avatar text default '/avatars/avatar-scholar.svg',
+  bio text default 'Building knowledge one topic at a time.',
+  xp integer default 0,
+  streak jsonb default '{"current": 0, "longest": 0, "total": 0, "lastDate": null, "shields": 1, "history": []}'::jsonb,
+  settings jsonb default '{"enabledCategories": ["Artificial Intelligence", "Philosophy", "Psychology", "Economics", "History", "Physics"], "favoriteCategories": ["Artificial Intelligence", "Philosophy", "Psychology"], "favoriteTopics": [], "preferredDifficulty": "any", "difficultyMode": "Standard", "researchMin": 15, "speakingSec": 90, "mode": "roulette"}'::jsonb,
+  unlocked_achievements text[] default '{}'::text[],
+  claimed_quest_ids text[] default '{}'::text[],
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.user_profiles enable row level security;
+
+drop policy if exists "Users can view their own profile" on public.user_profiles;
+create policy "Users can view their own profile"
+  on public.user_profiles for select
+  using (auth.uid() = id);
+
+drop policy if exists "Users can insert their own profile" on public.user_profiles;
+create policy "Users can insert their own profile"
+  on public.user_profiles for insert
+  with check (auth.uid() = id);
+
+drop policy if exists "Users can update their own profile" on public.user_profiles;
+create policy "Users can update their own profile"
+  on public.user_profiles for update
+  using (auth.uid() = id);
+
+-- 7. Create completed_sessions table for synchronized vocal notes & recordings
+create table if not exists public.completed_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) on delete cascade not null,
+  topic_id text not null,
+  topic_text text not null,
+  category text not null,
+  difficulty text not null,
+  date text not null,
+  research_minutes integer default 0,
+  speaking_seconds integer default 0,
+  notes text default '',
+  summary text default '',
+  reflection jsonb default '{}'::jsonb,
+  ratings jsonb default '{}'::jsonb,
+  xp_earned integer default 0,
+  tags text[] default '{}'::text[],
+  audio_base64 text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.completed_sessions enable row level security;
+
+drop policy if exists "Users can view their own sessions" on public.completed_sessions;
+create policy "Users can view their own sessions"
+  on public.completed_sessions for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert their own sessions" on public.completed_sessions;
+create policy "Users can insert their own sessions"
+  on public.completed_sessions for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update their own sessions" on public.completed_sessions;
+create policy "Users can update their own sessions"
+  on public.completed_sessions for update
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can delete their own sessions" on public.completed_sessions;
+create policy "Users can delete their own sessions"
+  on public.completed_sessions for delete
+  using (auth.uid() = user_id);
+
+create index if not exists idx_completed_sessions_user on public.completed_sessions (user_id, date desc);
