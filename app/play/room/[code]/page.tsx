@@ -592,48 +592,54 @@ export default function ArticulateRoomPage({
   const currentSpeakerId = room?.current_turn?.speakerId;
   const currentHostId = room?.host_id;
 
-  // 6. Synchronized Countdown & Round Timer (State-deduplicated to prevent unnecessary re-renders)
+  // 6. Resilient Client-Anchored Countdown & Round Timer
+  const localTurnAnchorRef = useRef<{ round: number; localStart: number } | null>(null);
+
   useEffect(() => {
     if (currentRoomStatus !== "playing" || !currentTurnStartedAt) {
       setCountdownRemaining(null);
+      localTurnAnchorRef.current = null;
       return;
     }
 
     const duration = currentDuration;
-    const countdownEndsAt = currentCountdownEndsAt || currentTurnStartedAt;
+    const currentRound = currentTurnRound || 1;
+
+    // Anchor local start time when a new round starts
+    if (!localTurnAnchorRef.current || localTurnAnchorRef.current.round !== currentRound) {
+      localTurnAnchorRef.current = { round: currentRound, localStart: Date.now() };
+    }
+
+    const localStart = localTurnAnchorRef.current.localStart;
 
     const updateTimer = () => {
-      const now = Date.now();
+      const elapsedMs = Date.now() - localStart;
 
-      // Check pre-round 3-second countdown
-      if (now < countdownEndsAt) {
-        const remainingCountdown = Math.max(1, Math.ceil((countdownEndsAt - now) / 1000));
-        // If countdown duration exceeds 4s due to client-server clock drift, force start round immediately
-        if (remainingCountdown > 4) {
-          setCountdownRemaining(null);
-        } else {
-          setCountdownRemaining((prev) => (prev !== remainingCountdown ? remainingCountdown : prev));
-          setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
-          return;
-        }
+      // 1. Pre-round 3-second countdown (0ms - 3000ms)
+      if (elapsedMs < 3000) {
+        const remainingCount = Math.max(1, 3 - Math.floor(elapsedMs / 1000));
+        setCountdownRemaining((prev) => (prev !== remainingCount ? remainingCount : prev));
+        setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
+        return;
       }
 
-      // Flash "GO!" for 450ms after countdown finishes
-      if (now >= countdownEndsAt && now < countdownEndsAt + 450) {
+      // 2. Flash "GO!" for 500ms (3000ms - 3500ms)
+      if (elapsedMs < 3500) {
         setCountdownRemaining((prev) => (prev !== 0 ? 0 : prev));
         setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
         return;
       }
 
+      // 3. Active Round (3500ms onwards)
       setCountdownRemaining((prev) => (prev !== null ? null : prev));
-      const elapsed = Math.floor((now - countdownEndsAt) / 1000);
-      const remaining = Math.max(0, duration - elapsed);
-      setSecondsRemaining((prev) => (prev !== remaining ? remaining : prev));
+      const activeElapsedSec = Math.floor((elapsedMs - 3500) / 1000);
+      const remainingSec = Math.max(0, duration - activeElapsedSec);
+      setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
 
-      // Time's up: only the active speaker or host triggers end_round to avoid race conditions
-      if (remaining === 0) {
-        if (hasDispatchedEndRoundRef.current !== currentTurnRound) {
-          hasDispatchedEndRoundRef.current = currentTurnRound ?? null;
+      // 4. Time's Up: Only active speaker or host triggers end_round
+      if (remainingSec === 0) {
+        if (hasDispatchedEndRoundRef.current !== currentRound) {
+          hasDispatchedEndRoundRef.current = currentRound;
           const isSpeakerOrHost =
             myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
           if (isSpeakerOrHost) {
@@ -647,7 +653,7 @@ export default function ArticulateRoomPage({
     };
 
     updateTimer();
-    const timer = setInterval(updateTimer, 250);
+    const timer = setInterval(updateTimer, 200);
 
     return () => {
       clearInterval(timer);
@@ -657,7 +663,6 @@ export default function ArticulateRoomPage({
     currentTurnStartedAt,
     currentTurnRound,
     currentDuration,
-    currentCountdownEndsAt,
     currentSpeakerId,
     currentHostId,
     dispatchAction,
@@ -674,14 +679,15 @@ export default function ArticulateRoomPage({
   }, [reactions]);
 
   // Handlers
-  const handleStartRound = async (speakerId?: string) => {
+  const handleStartRound = async (speakerId?: any) => {
+    const validSpeakerId = typeof speakerId === "string" ? speakerId : undefined;
     if (isStartingRound) return;
     setIsStartingRound(true);
     try {
       await dispatchAction({
         action: "start_round",
         hostId: myPlayerId,
-        speakerId,
+        speakerId: validSpeakerId,
         knownNames,
       });
     } finally {

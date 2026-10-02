@@ -735,6 +735,15 @@ export async function POST(
           return NextResponse.json({ success: true, room });
         }
 
+        // Prevent premature ending if round was started less than 5 seconds ago (unless manually triggered by speaker)
+        const roundStartedAt = room.current_turn?.startedAt || 0;
+        const now = Date.now();
+        const isCurrentSpeaker = body.speakerId && body.speakerId === room.current_turn?.speakerId;
+        if (roundStartedAt > 0 && now < roundStartedAt + 5000 && !isCurrentSpeaker && !body.manualEnd) {
+          // Ignore premature clock-drift triggers from background peers
+          return NextResponse.json({ success: true, room });
+        }
+
         room.status = "round_end";
         room.locked = false; // UNLOCK ROOM: BETWEEN ROUNDS, NEW PEOPLE CAN ENTER!
 

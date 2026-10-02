@@ -622,7 +622,7 @@ export default function RoomLobby({
             <motion.button
               whileHover={{ scale: isStartingRound ? 1 : 1.02 }}
               whileTap={{ scale: isStartingRound ? 1 : 0.98 }}
-              onClick={onStartRound}
+              onClick={() => onStartRound()}
               disabled={isStartingRound}
               className={`w-full py-4 rounded-2xl font-space font-extrabold text-base shadow-md flex items-center justify-center gap-2 transition ${
                 isStartingRound
