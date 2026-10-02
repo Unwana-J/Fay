@@ -58,6 +58,7 @@ export interface PassedWordEntry extends GameWord {
 export interface ArticulateRoom {
   id?: string;
   room_code: string;
+  room_name?: string; // Custom match / group title e.g. "Lokin Labs Hangout", "Designers vs Engineers"
   host_id: string;
   host_name: string;
   status: RoomStatus;
@@ -138,7 +139,8 @@ export function generateRoomCode(): string {
 export function createInitialRoom(
   code: string,
   host: { id: string; name: string },
-  settings: Partial<RoomSettings> = {}
+  settings: Partial<RoomSettings> = {},
+  options: { roomName?: string; teamAName?: string; teamBName?: string } = {}
 ): ArticulateRoom {
   const mergedSettings: RoomSettings = {
     timerSeconds: settings.timerSeconds || 45,
@@ -155,6 +157,7 @@ export function createInitialRoom(
 
   return {
     room_code: code.toUpperCase().trim(),
+    room_name: options.roomName?.trim() || undefined,
     host_id: host.id,
     host_name: host.name,
     status: "lobby",
@@ -162,13 +165,13 @@ export function createInitialRoom(
     settings: mergedSettings,
     teams: {
       teamA: {
-        name: "Team Alpha",
+        name: options.teamAName?.trim() || "Team Alpha",
         color: "#EF4444",
         score: 0,
         playerIds: [host.id],
       },
       teamB: {
-        name: "Team Omega",
+        name: options.teamBName?.trim() || "Team Omega",
         color: "#3B82F6",
         score: 0,
         playerIds: [],

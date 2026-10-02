@@ -19,6 +19,10 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const [onlineJoinError, setOnlineJoinError] = useState<string | null>(null);
   const [onlineTimerSeconds, setOnlineTimerSeconds] = useState<30 | 45 | 60>(45);
   const [onlineScoreGoal, setOnlineScoreGoal] = useState<number>(20);
+  const [onlineRoomName, setOnlineRoomName] = useState("");
+  const [onlineTeamAName, setOnlineTeamAName] = useState("");
+  const [onlineTeamBName, setOnlineTeamBName] = useState("");
+  const [showAdvancedNaming, setShowAdvancedNaming] = useState(false);
   const [selectedCompletedMatch, setSelectedCompletedMatch] = useState<ArticulateHistoryItem | null>(null);
   const [isLoadingMatchDetails, setIsLoadingMatchDetails] = useState(false);
 
@@ -88,6 +92,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
           const enriched: ArticulateHistoryItem = {
             ...match,
+            roomName: roomData.room_name || roomData.teams?.room_name || match.roomName,
             scoreA: roomData.teams?.teamA?.score ?? match.scoreA,
             scoreB: roomData.teams?.teamB?.score ?? match.scoreB,
             scoreGoal: roomData.settings?.scoreGoal || match.scoreGoal || 20,
@@ -208,6 +213,9 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
         body: JSON.stringify({
           hostId: effectiveHostId,
           hostName: effectiveHostName,
+          roomName: onlineRoomName.trim() || undefined,
+          teamAName: onlineTeamAName.trim() || undefined,
+          teamBName: onlineTeamBName.trim() || undefined,
           settings: {
             timerSeconds: onlineTimerSeconds,
             scoreGoal: onlineScoreGoal,
@@ -327,6 +335,63 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     <span className="text-[10px] text-[var(--text-mute)] font-medium">
                       Host picks rules
                     </span>
+                  </div>
+
+                  {/* Match / Group Title (Optional) */}
+                  <div className="space-y-1.5">
+                    <label className="text-[11px] font-semibold text-[var(--text-dim)] flex items-center justify-between">
+                      <span>Match / Group Title (Optional)</span>
+                      <span className="text-[10px] text-[var(--text-mute)] font-normal">e.g. Lokin Labs Hangout</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={onlineRoomName}
+                      onChange={(e) => setOnlineRoomName(e.target.value)}
+                      placeholder="e.g. Friday Game Night, Designers vs Engineers"
+                      maxLength={40}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-[var(--terra)] focus:outline-none placeholder:text-[var(--text-mute)]"
+                    />
+                  </div>
+
+                  {/* Custom Team Names (Expandable) */}
+                  <div className="space-y-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setShowAdvancedNaming(!showAdvancedNaming)}
+                      className="text-[11px] font-bold text-[var(--terra)] hover:underline flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>{showAdvancedNaming ? "▲ Hide Custom Team Names" : "▼ Customize Team Names"}</span>
+                    </button>
+                    {showAdvancedNaming && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div>
+                          <label className="text-[10px] font-semibold text-[var(--text-mute)] block mb-1">
+                            Team 1 Name
+                          </label>
+                          <input
+                            type="text"
+                            value={onlineTeamAName}
+                            onChange={(e) => setOnlineTeamAName(e.target.value)}
+                            placeholder="Team Alpha"
+                            maxLength={24}
+                            className="w-full px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-[var(--terra)] focus:outline-none placeholder:text-[var(--text-mute)]"
+                          />
+                        </div>
+                        <div>
+                          <label className="text-[10px] font-semibold text-[var(--text-mute)] block mb-1">
+                            Team 2 Name
+                          </label>
+                          <input
+                            type="text"
+                            value={onlineTeamBName}
+                            onChange={(e) => setOnlineTeamBName(e.target.value)}
+                            placeholder="Team Omega"
+                            maxLength={24}
+                            className="w-full px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-[var(--olive)] focus:outline-none placeholder:text-[var(--text-mute)]"
+                          />
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Sprint Duration Selector: 30s vs 45s vs 60s */}
@@ -517,6 +582,9 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                       ? `Round ${room.roundNumber} Intermission`
                       : `Round ${room.roundNumber} In Progress`;
 
+                  const teamAName = room.teamAName || "Team Alpha";
+                  const teamBName = room.teamBName || "Team Omega";
+
                   return (
                     <div
                       key={room.roomCode}
@@ -537,9 +605,20 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
                       <div className="space-y-2">
                         <div className="flex items-center gap-2 pr-6 flex-wrap">
-                          <span className="font-space font-extrabold text-lg tracking-wider text-[var(--text)]">
-                            {room.roomCode}
-                          </span>
+                          {room.roomName ? (
+                            <>
+                              <span className="font-space font-extrabold text-base text-[var(--text)] truncate max-w-[200px]" title={room.roomName}>
+                                {room.roomName}
+                              </span>
+                              <span className="font-mono text-xs font-bold text-[var(--text-mute)] bg-[var(--bg-card)] px-2 py-0.5 rounded-md border border-[var(--border-dim)]">
+                                {room.roomCode}
+                              </span>
+                            </>
+                          ) : (
+                            <span className="font-space font-extrabold text-lg tracking-wider text-[var(--text)]">
+                              {room.roomCode}
+                            </span>
+                          )}
                           <span className="text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 border border-emerald-500/20">
                             {statusLabel}
                           </span>
@@ -553,23 +632,23 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             <>
                               <span>•</span>
                               <span className="font-bold text-[var(--terra)]">
-                                Team {room.myTeam === "A" ? "Alpha" : "Omega"}
+                                {room.myTeam === "A" ? teamAName : teamBName}
                               </span>
                             </>
                           )}
                         </div>
 
                         <div className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] flex items-center justify-between text-xs font-space">
-                          <div className="flex items-center gap-2">
-                            <span className="w-2.5 h-2.5 rounded-full bg-[var(--terra)]" />
-                            <span className="font-bold text-[var(--text)]">Team Alpha</span>
+                          <div className="flex items-center gap-2 truncate">
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: room.teamAColor || "var(--terra)" }} />
+                            <span className="font-bold text-[var(--text)] truncate max-w-[90px]">{teamAName}</span>
                             <span className="font-extrabold text-sm text-[var(--terra)]">{room.scoreA}</span>
                           </div>
-                          <span className="text-[var(--text-mute)] text-xs font-normal">vs</span>
-                          <div className="flex items-center gap-2">
+                          <span className="text-[var(--text-mute)] text-xs font-normal px-2 shrink-0">vs</span>
+                          <div className="flex items-center gap-2 truncate justify-end">
                             <span className="font-extrabold text-sm text-[var(--olive)]">{room.scoreB}</span>
-                            <span className="font-bold text-[var(--text)]">Team Omega</span>
-                            <span className="w-2.5 h-2.5 rounded-full bg-[var(--olive)]" />
+                            <span className="font-bold text-[var(--text)] truncate max-w-[90px]">{teamBName}</span>
+                            <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: room.teamBColor || "var(--olive)" }} />
                           </div>
                         </div>
                       </div>
@@ -607,11 +686,13 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {completedRooms.slice(0, 4).map((room) => {
+                  const nameA = room.teamAName || "Team Alpha";
+                  const nameB = room.teamBName || "Team Omega";
                   const winner =
                     room.scoreA > room.scoreB
-                      ? "Team Alpha Won"
+                      ? `${nameA} Won`
                       : room.scoreB > room.scoreA
-                      ? "Team Omega Won"
+                      ? `${nameB} Won`
                       : "Tie Game";
                   const participantCount = room.totalParticipants || room.participants?.length || 2;
 
@@ -623,10 +704,15 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                       <div className="space-y-2">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
-                            <span className="font-space font-bold text-sm text-[var(--text)]">
+                            {room.roomName ? (
+                              <span className="font-space font-bold text-sm text-[var(--text)] truncate max-w-[140px]" title={room.roomName}>
+                                {room.roomName}
+                              </span>
+                            ) : null}
+                            <span className="font-mono text-xs font-bold text-[var(--text-dim)] px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-dim)]">
                               {room.roomCode}
                             </span>
-                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20">
+                            <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/20 truncate max-w-[130px]">
                               {winner}
                             </span>
                           </div>
@@ -643,7 +729,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         </div>
 
                         <div className="text-xs text-[var(--text-dim)] font-space">
-                          Final: <strong className="text-[var(--terra)]">Alpha {room.scoreA}</strong> — <strong className="text-[var(--olive)]">{room.scoreB} Omega</strong> • {room.date}
+                          Final: <strong className="text-[var(--terra)]">{nameA} {room.scoreA}</strong> — <strong className="text-[var(--olive)]">{room.scoreB} {nameB}</strong> • {room.date}
                         </div>
 
                         {/* Badges: Participants & Time Spent */}
@@ -1111,7 +1197,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                   <div>
                     <div className="flex items-center gap-2">
                       <h2 className="font-space font-extrabold text-lg text-[var(--text)]">
-                        Match Board & Summary
+                        {selectedCompletedMatch.roomName || "Match Board & Summary"}
                       </h2>
                       <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)]">
                         {selectedCompletedMatch.roomCode}
@@ -1143,12 +1229,12 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     {selectedCompletedMatch.scoreA > selectedCompletedMatch.scoreB ? (
                       <>
                         <span className="w-3 h-3 rounded-full bg-[var(--terra)]" />
-                        Team Alpha Victory!
+                        {selectedCompletedMatch.teamAName || "Team Alpha"} Victory!
                       </>
                     ) : selectedCompletedMatch.scoreB > selectedCompletedMatch.scoreA ? (
                       <>
                         <span className="w-3 h-3 rounded-full bg-[var(--olive)]" />
-                        Team Omega Victory!
+                        {selectedCompletedMatch.teamBName || "Team Omega"} Victory!
                       </>
                     ) : (
                       "Scholarly Deadlock (Tie)!"
@@ -1158,12 +1244,12 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
                 <div className="flex items-center gap-4 bg-[var(--bg-card)] px-4 py-2.5 rounded-2xl border border-[var(--border-dim)]">
                   <div className="text-right">
-                    <p className="text-[10px] uppercase font-bold text-[var(--terra)]">Alpha</p>
+                    <p className="text-[10px] uppercase font-bold text-[var(--terra)] truncate max-w-[80px]">{selectedCompletedMatch.teamAName || "Alpha"}</p>
                     <p className="text-xl font-space font-extrabold text-[var(--terra)]">{selectedCompletedMatch.scoreA}</p>
                   </div>
                   <span className="text-sm font-bold text-[var(--text-mute)]">:</span>
                   <div>
-                    <p className="text-[10px] uppercase font-bold text-[var(--olive)]">Omega</p>
+                    <p className="text-[10px] uppercase font-bold text-[var(--olive)] truncate max-w-[80px]">{selectedCompletedMatch.teamBName || "Omega"}</p>
                     <p className="text-xl font-space font-extrabold text-[var(--olive)]">{selectedCompletedMatch.scoreB}</p>
                   </div>
                 </div>
@@ -1262,7 +1348,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                       <div className="flex items-center justify-between pb-1 border-b border-[var(--terra)]/20">
                         <span className="font-space font-extrabold text-xs text-[var(--terra)] flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-[var(--terra)]" />
-                          Team Alpha
+                          {selectedCompletedMatch.teamAName || "Team Alpha"}
                         </span>
                         <span className="text-[10px] font-mono text-[var(--terra)] font-bold">
                           {selectedCompletedMatch.participants.filter((p) => p.team === "A").length} Scholars
@@ -1292,7 +1378,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                       <div className="flex items-center justify-between pb-1 border-b border-[var(--olive)]/20">
                         <span className="font-space font-extrabold text-xs text-[var(--olive)] flex items-center gap-1.5">
                           <span className="w-2 h-2 rounded-full bg-[var(--olive)]" />
-                          Team Omega
+                          {selectedCompletedMatch.teamBName || "Team Omega"}
                         </span>
                         <span className="text-[10px] font-mono text-[var(--olive)] font-bold">
                           {selectedCompletedMatch.participants.filter((p) => p.team === "B").length} Scholars

@@ -247,6 +247,7 @@ export interface TriviaHistoryItem {
 export interface ArticulateHistoryItem {
   id: string; // room code
   roomCode: string;
+  roomName?: string; // Custom match / group title e.g. "Lokin Labs Hangout", "Design vs Eng"
   hostName: string;
   myTeam?: "A" | "B" | null;
   status: "lobby" | "playing" | "round_end" | "game_over";

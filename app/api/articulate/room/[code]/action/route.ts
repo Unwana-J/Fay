@@ -14,6 +14,7 @@ async function persistRoom(room: ArticulateRoom) {
   if (isSupabaseConfigured && supabase) {
     try {
       const teamsPayload = {
+        room_name: room.room_name || "",
         teamA: room.teams.teamA,
         teamB: room.teams.teamB,
         player_details: room.player_details,
@@ -62,6 +63,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
         room = {
           id: data.id,
           room_code: data.room_code,
+          room_name: rawTeams.room_name || data.room_name || undefined,
           host_id: data.host_id,
           host_name: data.host_name,
           status: data.status,
@@ -939,8 +941,44 @@ export async function POST(
           room.host_name = newName;
         }
 
-        if (room.current_turn && room.current_turn.speakerId === id) {
-          room.current_turn.speakerName = newName;
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 12. RENAME ROOM / MATCH (Host custom group name)
+      // -------------------------------------------------------------
+      case "rename_room": {
+        const actingHostId = String(hostId || playerId);
+        if (room.host_id !== actingHostId) {
+          return NextResponse.json(
+            { error: "Only the host can rename the match" },
+            { status: 403 }
+          );
+        }
+        const newRoomName = String(body.newRoomName || body.roomName || "").trim();
+        room.room_name = newRoomName || undefined;
+
+        await persistRoom(room);
+        return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 13. RENAME TEAM (Host custom team names)
+      // -------------------------------------------------------------
+      case "rename_team": {
+        const actingHostId = String(hostId || playerId);
+        if (room.host_id !== actingHostId) {
+          return NextResponse.json(
+            { error: "Only the host can rename teams" },
+            { status: 403 }
+          );
+        }
+        const targetTeamKey: "teamA" | "teamB" = (body.targetTeam === "B" || body.team === "B") ? "teamB" : "teamA";
+        const newTeamName = String(body.newTeamName || body.teamName || "").trim();
+
+        if (newTeamName) {
+          room.teams[targetTeamKey].name = newTeamName;
         }
 
         await persistRoom(room);

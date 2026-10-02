@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2 } from "lucide-react";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RoomLobbyProps {
@@ -22,6 +22,8 @@ interface RoomLobbyProps {
   onOpenLobbyQueue?: () => void;
   onAdmitPlayer?: (targetPlayerId: string, targetTeam: "A" | "B") => void;
   onAutoAdmitAll?: () => void;
+  onRenameRoom?: (newName: string) => void;
+  onRenameTeam?: (team: "A" | "B", newName: string) => void;
 }
 
 export default function RoomLobby({
@@ -41,8 +43,14 @@ export default function RoomLobby({
   onOpenLobbyQueue,
   onAdmitPlayer,
   onAutoAdmitAll,
+  onRenameRoom,
+  onRenameTeam,
 }: RoomLobbyProps) {
   const [copied, setCopied] = useState(false);
+  const [isEditingRoomName, setIsEditingRoomName] = useState(false);
+  const [roomNameInput, setRoomNameInput] = useState(room.room_name || "");
+  const [editingTeam, setEditingTeam] = useState<"A" | "B" | null>(null);
+  const [teamNameInput, setTeamNameInput] = useState("");
 
   const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/play/room/${room.room_code}`
@@ -146,12 +154,76 @@ export default function RoomLobby({
       <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-[var(--border-dim)]">
           <div>
-            <span className="text-[11px] uppercase tracking-wider font-extrabold text-[var(--olive)]">
-              Multiplayer Room Lobby
-            </span>
-            <h1 className="font-space font-extrabold text-3xl text-[var(--text)] tracking-tight flex items-center gap-3">
-              {room.room_code}
-            </h1>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] uppercase tracking-wider font-extrabold text-[var(--olive)]">
+                Multiplayer Room Lobby
+              </span>
+              {room.room_name && (
+                <span className="text-[11px] px-2 py-0.5 rounded-md bg-[var(--terra)]/10 text-[var(--terra)] font-bold font-space truncate max-w-[240px]">
+                  {room.room_name}
+                </span>
+              )}
+            </div>
+            {isEditingRoomName && isHost ? (
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <input
+                  type="text"
+                  value={roomNameInput}
+                  onChange={(e) => setRoomNameInput(e.target.value)}
+                  placeholder="e.g. Lokin Labs Hangout"
+                  maxLength={40}
+                  className="px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--terra)] text-sm font-space font-bold text-[var(--text)] focus:outline-none"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      onRenameRoom?.(roomNameInput.trim());
+                      setIsEditingRoomName(false);
+                    } else if (e.key === "Escape") {
+                      setIsEditingRoomName(false);
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    onRenameRoom?.(roomNameInput.trim());
+                    setIsEditingRoomName(false);
+                  }}
+                  className="p-1.5 rounded-lg bg-[var(--terra)] text-white hover:opacity-90 cursor-pointer"
+                  title="Save Match Title"
+                >
+                  <Check className="w-4 h-4" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setIsEditingRoomName(false)}
+                  className="p-1.5 rounded-lg bg-[var(--bg-card)] border text-[var(--text-mute)] hover:text-[var(--text)] cursor-pointer"
+                  title="Cancel"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-3">
+                <h1 className="font-space font-extrabold text-3xl text-[var(--text)] tracking-tight flex items-center gap-3">
+                  {room.room_code}
+                </h1>
+                {isHost && onRenameRoom && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setRoomNameInput(room.room_name || "");
+                      setIsEditingRoomName(true);
+                    }}
+                    className="p-1.5 rounded-xl border border-[var(--border-dim)] hover:border-[var(--terra)] text-[var(--text-mute)] hover:text-[var(--terra)] transition cursor-pointer text-xs font-space flex items-center gap-1 shadow-2xs"
+                    title="Rename Match / Group"
+                  >
+                    <Edit2 className="w-3.5 h-3.5" />
+                    <span className="text-[10px] font-bold">{room.room_name ? "Rename Match" : "Add Match Name"}</span>
+                  </button>
+                )}
+              </div>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -383,15 +455,69 @@ export default function RoomLobby({
           className="surface rounded-3xl p-5 border shadow-sm space-y-4"
           style={{ borderColor: `${room.teams.teamA.color}40` }}
         >
-          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)]">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)] gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <div
-                className="w-3.5 h-3.5 rounded-full shadow-sm"
+                className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0"
                 style={{ backgroundColor: room.teams.teamA.color }}
               />
-              <h2 className="font-space font-bold text-base text-[var(--text)]">
-                {room.teams.teamA.name}
-              </h2>
+              {editingTeam === "A" && isHost ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={teamNameInput}
+                    onChange={(e) => setTeamNameInput(e.target.value)}
+                    placeholder="Team Alpha"
+                    maxLength={24}
+                    className="px-2 py-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--terra)] text-xs font-space font-bold text-[var(--text)] focus:outline-none"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (teamNameInput.trim()) onRenameTeam?.("A", teamNameInput.trim());
+                        setEditingTeam(null);
+                      } else if (e.key === "Escape") {
+                        setEditingTeam(null);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (teamNameInput.trim()) onRenameTeam?.("A", teamNameInput.trim());
+                      setEditingTeam(null);
+                    }}
+                    className="p-1 rounded bg-[var(--terra)] text-white hover:opacity-90 cursor-pointer"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTeam(null)}
+                    className="p-1 rounded bg-[var(--bg-card)] border text-[var(--text-mute)] hover:text-[var(--text)] cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <h2 className="font-space font-bold text-base text-[var(--text)]">
+                    {room.teams.teamA.name}
+                  </h2>
+                  {isHost && onRenameTeam && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTeamNameInput(room.teams.teamA.name);
+                        setEditingTeam("A");
+                      }}
+                      className="text-[var(--text-mute)] hover:text-[var(--terra)] p-0.5 rounded transition cursor-pointer"
+                      title="Rename Team"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border-dim)] text-[var(--text-dim)]">
                 {teamAActiveCount} Active{teamAInactiveCount > 0 ? ` · ${teamAInactiveCount} Away` : ""}
               </span>
@@ -501,15 +627,69 @@ export default function RoomLobby({
           className="surface rounded-3xl p-5 border shadow-sm space-y-4"
           style={{ borderColor: `${room.teams.teamB.color}40` }}
         >
-          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)]">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)] gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap">
               <div
-                className="w-3.5 h-3.5 rounded-full shadow-sm"
+                className="w-3.5 h-3.5 rounded-full shadow-sm shrink-0"
                 style={{ backgroundColor: room.teams.teamB.color }}
               />
-              <h2 className="font-space font-bold text-base text-[var(--text)]">
-                {room.teams.teamB.name}
-              </h2>
+              {editingTeam === "B" && isHost ? (
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="text"
+                    value={teamNameInput}
+                    onChange={(e) => setTeamNameInput(e.target.value)}
+                    placeholder="Team Omega"
+                    maxLength={24}
+                    className="px-2 py-0.5 rounded-lg bg-[var(--bg-card)] border border-[var(--olive)] text-xs font-space font-bold text-[var(--text)] focus:outline-none"
+                    autoFocus
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        if (teamNameInput.trim()) onRenameTeam?.("B", teamNameInput.trim());
+                        setEditingTeam(null);
+                      } else if (e.key === "Escape") {
+                        setEditingTeam(null);
+                      }
+                    }}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (teamNameInput.trim()) onRenameTeam?.("B", teamNameInput.trim());
+                      setEditingTeam(null);
+                    }}
+                    className="p-1 rounded bg-[var(--olive)] text-white hover:opacity-90 cursor-pointer"
+                  >
+                    <Check className="w-3 h-3" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditingTeam(null)}
+                    className="p-1 rounded bg-[var(--bg-card)] border text-[var(--text-mute)] hover:text-[var(--text)] cursor-pointer"
+                  >
+                    <X className="w-3 h-3" />
+                  </button>
+                </div>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <h2 className="font-space font-bold text-base text-[var(--text)]">
+                    {room.teams.teamB.name}
+                  </h2>
+                  {isHost && onRenameTeam && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setTeamNameInput(room.teams.teamB.name);
+                        setEditingTeam("B");
+                      }}
+                      className="text-[var(--text-mute)] hover:text-[var(--olive)] p-0.5 rounded transition cursor-pointer"
+                      title="Rename Team"
+                    >
+                      <Edit2 className="w-3 h-3" />
+                    </button>
+                  )}
+                </div>
+              )}
               <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border-dim)] text-[var(--text-dim)]">
                 {teamBActiveCount} Active{teamBInactiveCount > 0 ? ` · ${teamBInactiveCount} Away` : ""}
               </span>

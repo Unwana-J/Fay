@@ -456,6 +456,7 @@ export default function ArticulateRoomPage({
     saveArticulateRoom({
       id: room.room_code,
       roomCode: room.room_code,
+      roomName: room.room_name,
       hostName: room.host_name,
       myTeam,
       status: room.status,
@@ -900,6 +901,23 @@ export default function ArticulateRoomPage({
     });
   };
 
+  const handleRenameRoom = (newName: string) => {
+    dispatchAction({
+      action: "rename_room",
+      hostId: myPlayerId,
+      roomName: newName,
+    });
+  };
+
+  const handleRenameTeam = (team: "A" | "B", newName: string) => {
+    dispatchAction({
+      action: "rename_team",
+      hostId: myPlayerId,
+      team,
+      teamName: newName,
+    });
+  };
+
   const handleFinishGame = () => {
     dispatchAction({
       action: "finish_game",
@@ -1235,6 +1253,8 @@ export default function ArticulateRoomPage({
                 onOpenLobbyQueue={() => setShowLobbyQueueModal(true)}
                 onAdmitPlayer={handleAdmitPlayer}
                 onAutoAdmitAll={handleAutoAdmitAll}
+                onRenameRoom={handleRenameRoom}
+                onRenameTeam={handleRenameTeam}
               />
             </motion.div>
           ) : room.status === "playing" ? (

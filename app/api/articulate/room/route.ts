@@ -10,7 +10,7 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { hostId, hostName, settings } = body;
+    const { hostId, hostName, settings, roomName, teamAName, teamBName } = body;
 
     const effectiveHostId = (hostId && String(hostId).trim()) || `host-${Math.random().toString(36).slice(2, 9)}`;
     const effectiveHostName = (hostName && String(hostName).trim()) || "Scholar Host";
@@ -27,13 +27,19 @@ export async function POST(req: NextRequest) {
     const newRoom: ArticulateRoom = createInitialRoom(
       code,
       { id: effectiveHostId, name: effectiveHostName },
-      settings
+      settings,
+      {
+        roomName: typeof roomName === "string" ? roomName.trim() : undefined,
+        teamAName: typeof teamAName === "string" ? teamAName.trim() : undefined,
+        teamBName: typeof teamBName === "string" ? teamBName.trim() : undefined,
+      }
     );
 
     // Save in memory cache
     memoryRooms.set(code, newRoom);
 
     const teamsPayload = {
+      room_name: newRoom.room_name || "",
       teamA: newRoom.teams.teamA,
       teamB: newRoom.teams.teamB,
       player_details: newRoom.player_details || {},
@@ -119,6 +125,7 @@ export async function GET(req: NextRequest) {
           room = {
             id: data.id,
             room_code: data.room_code,
+            room_name: rawTeams.room_name || data.room_name || undefined,
             host_id: data.host_id,
             host_name: data.host_name,
             status: data.status,
