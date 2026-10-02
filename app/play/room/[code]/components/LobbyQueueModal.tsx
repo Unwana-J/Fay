@@ -280,7 +280,11 @@ export default function LobbyQueueModal({
                       <span className="w-6 h-6 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
                         #{idx + 1}
                       </span>
-                      <span className="text-xl flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                      {scholar.avatar?.startsWith("/") || scholar.avatar?.includes(".svg") ? (
+                        <img src={scholar.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                      ) : (
+                        <span className="text-xl flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                      )}
                       <div className="min-w-0">
                         <div className="flex items-center gap-1.5">
                           <span className="font-space font-bold text-xs text-[var(--text)] truncate">
@@ -371,7 +375,11 @@ export default function LobbyQueueModal({
                           className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs"
                         >
                           <span className="truncate flex items-center gap-1.5">
-                            <span>{p.avatar || "🎓"}</span>
+                            {p.avatar?.startsWith("/") || p.avatar?.includes(".svg") ? (
+                              <img src={p.avatar} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                            ) : (
+                              <span>{p.avatar || "🎓"}</span>
+                            )}
                             <span className={inactive ? "opacity-60 line-through text-[var(--text-mute)]" : "font-medium"}>
                               {p.name}
                             </span>
@@ -433,7 +441,11 @@ export default function LobbyQueueModal({
                           className="flex items-center justify-between gap-2 p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs"
                         >
                           <span className="truncate flex items-center gap-1.5">
-                            <span>{p.avatar || "🎓"}</span>
+                            {p.avatar?.startsWith("/") || p.avatar?.includes(".svg") ? (
+                              <img src={p.avatar} alt="" className="w-4 h-4 rounded-full object-cover shrink-0" />
+                            ) : (
+                              <span>{p.avatar || "🎓"}</span>
+                            )}
                             <span className={inactive ? "opacity-60 line-through text-[var(--text-mute)]" : "font-medium"}>
                               {p.name}
                             </span>

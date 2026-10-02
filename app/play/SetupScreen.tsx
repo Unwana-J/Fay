@@ -1272,11 +1272,10 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         {selectedCompletedMatch.participants
                           .filter((p) => p.team === "A")
                           .map((p) => (
-                            <div key={p.id} className="flex items-center gap-2 text-xs text-[var(--text)]">
-                              <span className="text-base">{p.avatar || "🎓"}</span>
-                              <span className="font-medium truncate">{p.name}</span>
+                            <div key={p.id} className="flex items-center justify-between gap-2 text-xs py-0.5 border-b border-[var(--border-dim)]/40 last:border-0">
+                              <span className="font-medium text-[var(--text)] truncate">{p.name}</span>
                               {p.isHost && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--terra)]/20 text-[var(--terra)]">
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--terra)]/20 text-[var(--terra)] shrink-0">
                                   Host
                                 </span>
                               )}
@@ -1303,11 +1302,10 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         {selectedCompletedMatch.participants
                           .filter((p) => p.team === "B")
                           .map((p) => (
-                            <div key={p.id} className="flex items-center gap-2 text-xs text-[var(--text)]">
-                              <span className="text-base">{p.avatar || "🎓"}</span>
-                              <span className="font-medium truncate">{p.name}</span>
+                            <div key={p.id} className="flex items-center justify-between gap-2 text-xs py-0.5 border-b border-[var(--border-dim)]/40 last:border-0">
+                              <span className="font-medium text-[var(--text)] truncate">{p.name}</span>
                               {p.isHost && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/20 text-[var(--olive)]">
+                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/20 text-[var(--olive)] shrink-0">
                                   Host
                                 </span>
                               )}

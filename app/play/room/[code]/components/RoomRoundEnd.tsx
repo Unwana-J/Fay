@@ -947,7 +947,11 @@ export default function RoomRoundEnd({
                   <span className="w-5 h-5 rounded-md bg-[var(--bg)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
                     #{idx + 1}
                   </span>
-                  <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                  {scholar.avatar?.startsWith("/") || scholar.avatar?.includes(".svg") ? (
+                    <img src={scholar.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                  ) : (
+                    <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                  )}
                   <div className="min-w-0">
                     <div className="font-space font-bold text-xs text-[var(--text)] truncate">
                       {scholar.name}
