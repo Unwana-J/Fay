@@ -38,12 +38,14 @@ import confetti from "canvas-confetti";
 import UserAvatar from "@/components/ui/UserAvatar";
 
 interface LeagueArenaClientProps {
+  code?: string;
   initialLeague: FriendshipLeague;
   initialScores: LeagueDailyScore[];
   initialLeaderboard: LeagueLeaderboardEntry[];
 }
 
 export default function LeagueArenaClient({
+  code,
   initialLeague,
   initialScores,
   initialLeaderboard,
@@ -53,6 +55,29 @@ export default function LeagueArenaClient({
   const [league, setLeague] = useState<FriendshipLeague>(initialLeague);
   const [scores, setScores] = useState<LeagueDailyScore[]>(initialScores);
   const [leaderboard, setLeaderboard] = useState<LeagueLeaderboardEntry[]>(initialLeaderboard);
+
+  // Hydrate custom league created locally if available
+  useEffect(() => {
+    const leagueCode = code || initialLeague.code;
+    if (typeof window !== "undefined" && leagueCode) {
+      try {
+        const stored = localStorage.getItem(`fey_league_${leagueCode}`);
+        if (stored) {
+          const parsed = JSON.parse(stored);
+          if (parsed && parsed.code) {
+            setLeague(parsed);
+          }
+        }
+        // Track recent leagues
+        const recentRaw = localStorage.getItem("fey_recent_leagues");
+        const recent: string[] = recentRaw ? JSON.parse(recentRaw) : [];
+        if (!recent.includes(leagueCode)) {
+          const updatedRecent = [leagueCode, ...recent].slice(0, 10);
+          localStorage.setItem("fey_recent_leagues", JSON.stringify(updatedRecent));
+        }
+      } catch {}
+    }
+  }, [code, initialLeague.code]);
 
   const [phase, setPhase] = useState<"overview" | "playing" | "round_summary">("overview");
 
