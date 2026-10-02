@@ -2,13 +2,14 @@
 
 import React, { useState } from "react";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap } from "lucide-react";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RoomLobbyProps {
   room: ArticulateRoom;
   myPlayerId: string;
   isHost: boolean;
+  isStartingRound?: boolean;
   presencePlayers: RoomPlayer[];
   knownNames?: Record<string, { name: string; avatar: string }>;
   onStartRound: () => void;
@@ -27,6 +28,7 @@ export default function RoomLobby({
   room,
   myPlayerId,
   isHost,
+  isStartingRound = false,
   presencePlayers,
   knownNames = {},
   onStartRound,
@@ -618,13 +620,27 @@ export default function RoomLobby({
         {isHost ? (
           <>
             <motion.button
-              whileHover={{ scale: 1.02 }}
-              whileTap={{ scale: 0.98 }}
+              whileHover={{ scale: isStartingRound ? 1 : 1.02 }}
+              whileTap={{ scale: isStartingRound ? 1 : 0.98 }}
               onClick={onStartRound}
-              className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition"
+              disabled={isStartingRound}
+              className={`w-full py-4 rounded-2xl font-space font-extrabold text-base shadow-md flex items-center justify-center gap-2 transition ${
+                isStartingRound
+                  ? "bg-[var(--terra)]/80 text-white cursor-wait opacity-90"
+                  : "bg-[var(--terra)] text-white hover:shadow-lg cursor-pointer"
+              }`}
             >
-              <Play className="w-5 h-5 fill-current" />
-              Lock Room & Start Round 1
+              {isStartingRound ? (
+                <>
+                  <Loader2 className="w-5 h-5 animate-spin" />
+                  <span>Locking Room & Starting Round 1...</span>
+                </>
+              ) : (
+                <>
+                  <Play className="w-5 h-5 fill-current" />
+                  <span>Lock Room & Start Round 1</span>
+                </>
+              )}
             </motion.button>
             <p className="text-xs text-[var(--text-dim)] leading-relaxed">
               🔒 When you click start, the room locks for Round 1. Any friends who join while the round is in progress will wait in the Spectator Lounge until this round ends.

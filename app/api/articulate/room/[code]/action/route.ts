@@ -434,9 +434,19 @@ export async function POST(
           });
         }
 
+        // Ensure settings exist
+        if (!room.settings) {
+          room.settings = {
+            timerSeconds: 45,
+            scoreGoal: 20,
+            categories: ["Object", "Nature", "Person", "Action", "World", "Random"],
+            difficulty: "mixed",
+          };
+        }
+
         // Must have at least 1 player on both teams (or at least 1 total if solo testing)
         const totalPlayers =
-          room.teams.teamA.playerIds.length + room.teams.teamB.playerIds.length;
+          (room.teams?.teamA?.playerIds?.length || 0) + (room.teams?.teamB?.playerIds?.length || 0);
         if (totalPlayers === 0) {
           return NextResponse.json(
             { error: "At least one player is required to start" },
@@ -449,16 +459,16 @@ export async function POST(
         // Alternate active team: Round 1 -> Team A, Round 2 -> Team B, etc.
         let activeTeam: "A" | "B" = roundNumber % 2 === 1 ? "A" : "B";
         // If the chosen team has 0 players, fallback to the other
-        if (activeTeam === "A" && room.teams.teamA.playerIds.length === 0) {
+        if (activeTeam === "A" && (room.teams?.teamA?.playerIds?.length || 0) === 0) {
           activeTeam = "B";
-        } else if (activeTeam === "B" && room.teams.teamB.playerIds.length === 0) {
+        } else if (activeTeam === "B" && (room.teams?.teamB?.playerIds?.length || 0) === 0) {
           activeTeam = "A";
         }
 
         const rawTeamPlayerIds =
           activeTeam === "A"
-            ? room.teams.teamA.playerIds
-            : room.teams.teamB.playerIds;
+            ? (room.teams?.teamA?.playerIds || [])
+            : (room.teams?.teamB?.playerIds || []);
 
         if (!room.last_speaker_indices) room.last_speaker_indices = { teamA: -1, teamB: -1 };
         if (!room.last_speaker_ids) room.last_speaker_ids = {};
@@ -487,6 +497,11 @@ export async function POST(
           speakerIndex = result.speakerIndex;
         }
 
+        if (!speakerId) {
+          speakerId = rawTeamPlayerIds[0] || room.host_id || "guest-scholar";
+          speakerIndex = 0;
+        }
+
         if (activeTeam === "A") {
           room.last_speaker_ids.teamA = speakerId;
           room.last_speaker_indices.teamA = speakerIndex;
@@ -508,16 +523,16 @@ export async function POST(
             ? speakerDetails.name
             : `Scholar (${speakerId.replace(/^guest-/, "").slice(0, 5)})`;
 
-        // Ensure deck has enough words with deduplication
-        if (room.current_word_index >= room.deck.length - 15) {
-          const usedWords = room.deck.map((w) => w.word);
+        // Ensure deck exists and has enough words with deduplication
+        if (!room.deck || !Array.isArray(room.deck) || room.deck.length === 0 || (room.current_word_index || 0) >= room.deck.length - 15) {
+          const usedWords = Array.isArray(room.deck) ? room.deck.map((w) => w.word) : [];
           const freshDeck = buildDeck(
-            room.settings.categories,
-            room.settings.difficulty,
+            room.settings?.categories,
+            room.settings?.difficulty || "mixed",
             80,
             usedWords
           );
-          room.deck = [...room.deck, ...freshDeck];
+          room.deck = [...(room.deck || []), ...freshDeck];
         }
 
         // LOCK ROOM & UPDATE STATUS
@@ -526,8 +541,8 @@ export async function POST(
         room.round_words_scored = [];
         room.round_words_passed = [];
         room.active_players = [
-          ...room.teams.teamA.playerIds,
-          ...room.teams.teamB.playerIds,
+          ...(room.teams?.teamA?.playerIds || []),
+          ...(room.teams?.teamB?.playerIds || []),
         ];
 
         const now = Date.now();
@@ -539,7 +554,7 @@ export async function POST(
           speakerName,
           startedAt: now + countdownMs,
           countdownEndsAt: now + countdownMs,
-          durationSeconds: room.settings.timerSeconds || 30,
+          durationSeconds: room.settings?.timerSeconds || 45,
         };
 
         await persistRoom(room);

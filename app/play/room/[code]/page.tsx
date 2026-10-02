@@ -1168,6 +1168,7 @@ export default function ArticulateRoomPage({
                 room={room}
                 myPlayerId={myPlayerId}
                 isHost={isHost}
+                isStartingRound={isStartingRound}
                 presencePlayers={presencePlayers}
                 knownNames={knownNames}
                 onStartRound={handleStartRound}

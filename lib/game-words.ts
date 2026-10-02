@@ -1174,24 +1174,30 @@ function shuffle<T>(arr: T[]): T[] {
 }
 
 export function buildDeck(
-  categories: GameCategory[],
-  difficulty: GameDifficulty,
+  categories?: GameCategory[],
+  difficulty: GameDifficulty = "mixed",
   count = 60,
   excludeWords: string[] = []
 ): GameWord[] {
+  const safeCategories = Array.isArray(categories) && categories.length > 0 ? categories : GAME_CATEGORIES;
+  const safeDiff = difficulty || "mixed";
+  const safeExclude = Array.isArray(excludeWords) ? excludeWords : [];
+
   // Pass 1: exact category, difficulty, excluding used words
-  let categoryPool = GAME_WORDS.filter((w) => categories.includes(w.category));
+  let categoryPool = GAME_WORDS.filter((w) => safeCategories.includes(w.category));
+  if (categoryPool.length === 0) categoryPool = GAME_WORDS;
 
   let filtered = categoryPool;
-  if (difficulty === "easy") {
+  if (safeDiff === "easy") {
     filtered = categoryPool.filter((w) => w.difficulty === "easy");
-  } else if (difficulty === "hard") {
+  } else if (safeDiff === "hard") {
     filtered = categoryPool.filter((w) => w.difficulty !== "easy");
   }
+  if (filtered.length === 0) filtered = categoryPool;
 
   let finalPool = filtered;
-  if (excludeWords.length > 0) {
-    const withoutExcluded = filtered.filter((w) => !excludeWords.includes(w.word));
+  if (safeExclude.length > 0) {
+    const withoutExcluded = filtered.filter((w) => !safeExclude.includes(w.word));
     // If enough words remain (at least 10), use withoutExcluded; otherwise recycle used words
     if (withoutExcluded.length >= 10) {
       finalPool = withoutExcluded;
@@ -1200,7 +1206,7 @@ export function buildDeck(
 
   // Fallback 1: if finalPool is empty, relax difficulty constraint for these categories
   if (finalPool.length === 0) {
-    finalPool = categoryPool.filter((w) => !excludeWords.includes(w.word));
+    finalPool = categoryPool.filter((w) => !safeExclude.includes(w.word));
     if (finalPool.length < 5) finalPool = categoryPool;
   }
 
