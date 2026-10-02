@@ -166,3 +166,69 @@ create policy "Users can delete their own sessions"
   using (auth.uid() = user_id);
 
 create index if not exists idx_completed_sessions_user on public.completed_sessions (user_id, date desc);
+
+-- ==============================================================================
+-- FEY PLATFORM: FRIENDSHIP LEAGUES & MULTI-DAY TOURNAMENTS
+-- ==============================================================================
+
+-- 8. Create friendship_leagues table
+create table if not exists public.friendship_leagues (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  title text not null,
+  creator_name text not null,
+  creator_id text not null,
+  duration_days integer not null default 5,
+  start_date text not null,
+  end_date text not null,
+  questions_per_day integer not null default 5,
+  difficulty text not null default 'mixed',
+  category text not null default 'all',
+  daily_seed_map jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.friendship_leagues enable row level security;
+
+drop policy if exists "Allow public read access on friendship_leagues" on public.friendship_leagues;
+create policy "Allow public read access on friendship_leagues"
+  on public.friendship_leagues for select
+  using (true);
+
+drop policy if exists "Allow public insert access on friendship_leagues" on public.friendship_leagues;
+create policy "Allow public insert access on friendship_leagues"
+  on public.friendship_leagues for insert
+  with check (true);
+
+-- 9. Create league_scores table for daily attempts & cumulative leaderboard
+create table if not exists public.league_scores (
+  id uuid primary key default gen_random_uuid(),
+  league_code text references public.friendship_leagues(code) on delete cascade not null,
+  user_id text not null,
+  username text not null,
+  avatar text default '/avatars/avatar-scholar.svg',
+  day_number integer not null,
+  date text not null,
+  score integer not null,
+  total_questions integer not null,
+  points integer not null,
+  duration_seconds integer default 0,
+  question_results jsonb default '[]'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint uq_league_user_day unique (league_code, user_id, day_number)
+);
+
+alter table public.league_scores enable row level security;
+
+drop policy if exists "Allow public read access on league_scores" on public.league_scores;
+create policy "Allow public read access on league_scores"
+  on public.league_scores for select
+  using (true);
+
+drop policy if exists "Allow public insert access on league_scores" on public.league_scores;
+create policy "Allow public insert access on league_scores"
+  on public.league_scores for insert
+  with check (true);
+
+create index if not exists idx_league_scores_lookup on public.league_scores (league_code, day_number);
+create index if not exists idx_league_scores_ranking on public.league_scores (league_code, points desc);

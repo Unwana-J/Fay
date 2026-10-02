@@ -34,6 +34,7 @@ import ShareTriviaModal from "@/components/games/ShareTriviaModal";
 import TriviaHistoryView from "@/components/games/TriviaHistoryView";
 import TriviaLeaderboardView from "@/components/games/TriviaLeaderboardView";
 import TriviaChallengeLounge from "@/components/games/TriviaChallengeLounge";
+import TriviaLeagueLounge from "@/components/trivia/TriviaLeagueLounge";
 import {
   type TriviaChallenge,
   decodeChallengeFromUrl,
@@ -49,7 +50,7 @@ import { getTriviaPerformanceRemark, type TriviaRemark } from "@/lib/trivia-rema
 
 export type ReviewMode = "instant" | "suspense";
 export type GamePhase = "setup" | "playing" | "results";
-export type SetupTab = "solo" | "challenge" | "leaderboard" | "history";
+export type SetupTab = "solo" | "league" | "challenge" | "leaderboard" | "history";
 export type DurationOption = { label: string; minutes: number; emoji: string };
 
 export interface DifficultyOption {
@@ -156,34 +157,46 @@ function SetupScreen({
 
       {/* Navigation Tab Bar */}
       <div
-        className="grid grid-cols-4 gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
+        className="grid grid-cols-5 gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
         style={{ borderColor: "var(--border-dim)" }}
       >
         <button
           onClick={() => onTabChange("solo")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
             activeTab === "solo"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
           <span>🎮</span>
-          <span className="hidden sm:inline">Play </span>
-          <span>Quiz</span>
+          <span className="hidden sm:inline">Play</span>
+        </button>
+
+        <button
+          onClick={() => onTabChange("league")}
+          className={cn(
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
+            activeTab === "league"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+          )}
+        >
+          <span>🏆</span>
+          <span>Leagues</span>
         </button>
 
         <button
           onClick={() => onTabChange("challenge")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer relative truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer relative truncate",
             activeTab === "challenge"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
           <span>⚔️</span>
-          <span>Challenges</span>
+          <span>1v1</span>
           {activeChallenge && (
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--terra)] animate-pulse shrink-0" />
           )}
@@ -192,21 +205,21 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("leaderboard")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
             activeTab === "leaderboard"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
           <Trophy size={12} className="text-[var(--gold)] shrink-0" />
-          <span className="hidden sm:inline">Leader</span>
-          <span>board</span>
+          <span className="hidden sm:inline">Ranks</span>
+          <span className="sm:hidden">Top</span>
         </button>
 
         <button
           onClick={() => onTabChange("history")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2.5 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 sm:gap-1.5 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
             activeTab === "history"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
@@ -216,6 +229,11 @@ function SetupScreen({
           <span>History{historyCount > 0 ? ` (${historyCount})` : ""}</span>
         </button>
       </div>
+
+      {/* Tab: Friendship Leagues */}
+      {activeTab === "league" && (
+        <TriviaLeagueLounge />
+      )}
 
       {/* Tab: Group Challenge Lounge */}
       {activeTab === "challenge" && (
