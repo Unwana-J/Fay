@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { memoryRooms, ArticulateRoom, getNextSpeakerForTeam } from "@/lib/articulate-room";
+import { memoryRooms, ArticulateRoom, getNextSpeakerForTeam, sanitizeRoomPlayers } from "@/lib/articulate-room";
 import { buildDeck } from "@/lib/game-words";
 
 async function persistRoom(room: ArticulateRoom) {
+  room = sanitizeRoomPlayers(room);
   room.updated_at = new Date().toISOString();
   if (!room.inactive_players) room.inactive_players = [];
   if (!room.player_details) room.player_details = {};
@@ -19,6 +20,7 @@ async function persistRoom(room: ArticulateRoom) {
         teamB: room.teams.teamB,
         player_details: room.player_details,
         inactive_players: room.inactive_players,
+        kicked_players: room.kicked_players || [],
         last_speaker_indices: room.last_speaker_indices,
         last_speaker_ids: room.last_speaker_ids,
       };
@@ -81,6 +83,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           active_players: data.active_players || [],
           spectators: data.spectators || [],
           inactive_players: rawTeams.inactive_players || [],
+          kicked_players: rawTeams.kicked_players || [],
           player_details: rawTeams.player_details || {},
           last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
           last_speaker_ids: rawTeams.last_speaker_ids || {},
@@ -99,6 +102,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           };
         }
 
+        room = sanitizeRoomPlayers(room);
         memoryRooms.set(normalized, room);
       }
     } catch (err) {
@@ -113,6 +117,8 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
   if (room) {
     if (!room.inactive_players) room.inactive_players = [];
     if (!room.player_details) room.player_details = {};
+    if (!room.kicked_players) room.kicked_players = [];
+    room = sanitizeRoomPlayers(room);
   }
 
   return room;
@@ -131,7 +137,7 @@ export async function POST(
     }
 
     const body = await req.json().catch(() => ({}));
-    const { action, playerId, playerName, preferredTeam, targetTeam, settings, hostId } = body;
+    const { action, playerId, playerName, preferredTeam, targetTeam, settings, hostId, previousPlayerId } = body;
 
     switch (action) {
       // -------------------------------------------------------------
@@ -139,35 +145,113 @@ export async function POST(
       // -------------------------------------------------------------
       case "join": {
         const id = String(playerId);
+        const prevId = previousPlayerId ? String(previousPlayerId) : undefined;
         const name = String(playerName || "Scholar").trim();
+        const normName = name.toLowerCase();
 
-        // Check if player is reconnecting with an established name
-        const isSpeakerByName = Boolean(
-          name &&
-          name !== "Scholar" &&
-          name !== "Learner" &&
-          room.current_turn?.speakerName?.trim().toLowerCase() === name.trim().toLowerCase()
-        );
+        // Check if player or former guest ID is kicked by host
+        if (
+          room.kicked_players?.includes(id) ||
+          (prevId && room.kicked_players?.includes(prevId))
+        ) {
+          return NextResponse.json(
+            { error: "You were removed from this room by the host." },
+            { status: 403 }
+          );
+        }
 
-        const isTeammateByName = Boolean(
-          name &&
-          name !== "Scholar" &&
-          name !== "Learner" &&
-          Object.values(room.player_details || {}).some(
-            (d) => d.name?.trim().toLowerCase() === name.trim().toLowerCase()
-          )
-        );
+        // Validate Name Uniqueness in the match
+        const isGenericName = normName === "scholar" || normName === "learner" || !name;
+        if (!isGenericName) {
+          const conflictEntry = Object.values(room.player_details || {}).find(
+            (d) => d.name?.trim().toLowerCase() === normName
+          );
 
-        const isReconnectingPlayer = room.active_players.includes(id) || isSpeakerByName || isTeammateByName;
+          if (conflictEntry) {
+            const isSameId = conflictEntry.id === id;
+            const isClaimedPrevId = prevId && conflictEntry.id === prevId;
+            const isGuestUpgrade =
+              conflictEntry.id.startsWith("guest-") &&
+              (!prevId || prevId === conflictEntry.id);
+
+            if (isSameId || isClaimedPrevId || isGuestUpgrade) {
+              // Same user claiming/reconnecting: upgrade previous guest ID
+              const oldId = conflictEntry.id;
+              if (oldId !== id) {
+                room.teams.teamA.playerIds = room.teams.teamA.playerIds.map((p) => (p === oldId ? id : p));
+                room.teams.teamB.playerIds = room.teams.teamB.playerIds.map((p) => (p === oldId ? id : p));
+                room.active_players = room.active_players.map((p) => (p === oldId ? id : p));
+                room.spectators = room.spectators.map((p) => (p === oldId ? id : p));
+                if (room.inactive_players) {
+                  room.inactive_players = room.inactive_players.map((p) => (p === oldId ? id : p));
+                }
+                if (room.current_turn?.speakerId === oldId) {
+                  room.current_turn.speakerId = id;
+                }
+                if (room.host_id === oldId) {
+                  room.host_id = id;
+                }
+                if (room.player_details) {
+                  delete room.player_details[oldId];
+                }
+              }
+            } else {
+              // Another distinct player already occupies this name!
+              return NextResponse.json(
+                { error: `The name "${name}" is already taken in this room. Please choose a unique nickname.` },
+                { status: 400 }
+              );
+            }
+          }
+        }
+
+        // If explicit previousPlayerId was passed and is different from id, migrate old slot
+        if (prevId && prevId !== id) {
+          room.teams.teamA.playerIds = room.teams.teamA.playerIds.map((p) => (p === prevId ? id : p));
+          room.teams.teamB.playerIds = room.teams.teamB.playerIds.map((p) => (p === prevId ? id : p));
+          room.active_players = room.active_players.map((p) => (p === prevId ? id : p));
+          room.spectators = room.spectators.map((p) => (p === prevId ? id : p));
+          if (room.inactive_players) {
+            room.inactive_players = room.inactive_players.map((p) => (p === prevId ? id : p));
+          }
+          if (room.current_turn?.speakerId === prevId) {
+            room.current_turn.speakerId = id;
+          }
+          if (room.host_id === prevId) {
+            room.host_id = id;
+          }
+          if (room.player_details) {
+            delete room.player_details[prevId];
+          }
+        }
 
         // CHECK LOCK CONDITION:
-        // Only genuine late-joiners (not known active players reconnecting) are placed into spectator lounge
+        const isReconnectingPlayer =
+          room.active_players.includes(id) ||
+          room.teams.teamA.playerIds.includes(id) ||
+          room.teams.teamB.playerIds.includes(id);
+
         const isRoundPlaying = room.status === "playing" || room.locked;
 
         if (isRoundPlaying && !isReconnectingPlayer) {
           if (!room.spectators.includes(id)) {
             room.spectators.push(id);
           }
+          // Remove from teams if placed in spectator lounge
+          room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((p) => p !== id);
+          room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((p) => p !== id);
+
+          const existingDetail = room.player_details?.[id];
+          if (!room.player_details) room.player_details = {};
+          room.player_details[id] = {
+            id,
+            name: name || existingDetail?.name || "Scholar",
+            avatar: String(body.avatar || existingDetail?.avatar || "/avatars/avatar-scholar.svg"),
+            isHost: id === room.host_id,
+            joinedAt: existingDetail?.joinedAt || Date.now(),
+          };
+
+          sanitizeRoomPlayers(room);
           await persistRoom(room);
           return NextResponse.json({
             success: true,
@@ -177,37 +261,13 @@ export async function POST(
           });
         }
 
-        // Reconnect player: update active speaker/roster slot
-        if (isSpeakerByName && room.current_turn) {
-          room.current_turn.speakerId = id;
-        }
-
-        if (isTeammateByName) {
-          const prevEntry = Object.values(room.player_details || {}).find(
-            (d) => d.name?.trim().toLowerCase() === name.trim().toLowerCase()
-          );
-          if (prevEntry && prevEntry.id !== id) {
-            const oldId = prevEntry.id;
-            room.teams.teamA.playerIds = room.teams.teamA.playerIds.map((p) => (p === oldId ? id : p));
-            room.teams.teamB.playerIds = room.teams.teamB.playerIds.map((p) => (p === oldId ? id : p));
-            room.active_players = room.active_players.map((p) => (p === oldId ? id : p));
-            if (room.current_turn?.speakerId === oldId) {
-              room.current_turn.speakerId = id;
-            }
-            if (room.player_details) {
-              delete room.player_details[oldId];
-            }
-          }
-        }
-
-        // Room is in lobby or round_end: player is admitted as active player
+        // Admitted to lobby / game
         room.spectators = room.spectators.filter((sId) => sId !== id);
 
         const inA = room.teams.teamA.playerIds.includes(id);
         const inB = room.teams.teamB.playerIds.includes(id);
 
         if (!inA && !inB) {
-          // Assign to chosen team or balance teams
           const countA = room.teams.teamA.playerIds.length;
           const countB = room.teams.teamB.playerIds.length;
 
@@ -247,6 +307,7 @@ export async function POST(
           room.active_players.push(id);
         }
 
+        sanitizeRoomPlayers(room);
         await persistRoom(room);
         return NextResponse.json({
           success: true,
@@ -922,6 +983,21 @@ export async function POST(
           return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
         }
 
+        const normNew = newName.toLowerCase();
+        const isGeneric = normNew === "scholar" || normNew === "learner";
+
+        if (!isGeneric) {
+          const isTaken = Object.values(room.player_details || {}).some(
+            (d) => d.id !== id && d.name?.trim().toLowerCase() === normNew
+          );
+          if (isTaken) {
+            return NextResponse.json(
+              { error: `The name "${newName}" is already taken by another scholar in this room.` },
+              { status: 400 }
+            );
+          }
+        }
+
         if (!room.player_details) room.player_details = {};
         if (room.player_details[id]) {
           room.player_details[id].name = newName;
@@ -941,8 +1017,64 @@ export async function POST(
           room.host_name = newName;
         }
 
+        sanitizeRoomPlayers(room);
         await persistRoom(room);
         return NextResponse.json({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 11b. KICK PLAYER (Host ejects a player from the room)
+      // -------------------------------------------------------------
+      case "kick_player": {
+        const actingHostId = String(hostId || playerId);
+        if (room.host_id !== actingHostId) {
+          return NextResponse.json(
+            { error: "Only the room host can remove players from the match" },
+            { status: 403 }
+          );
+        }
+
+        const targetId = String(body.targetPlayerId || "").trim();
+        if (!targetId) {
+          return NextResponse.json({ error: "Missing targetPlayerId" }, { status: 400 });
+        }
+
+        if (targetId === room.host_id) {
+          return NextResponse.json({ error: "The host cannot kick themselves from the room" }, { status: 400 });
+        }
+
+        // Remove from everywhere
+        room.teams.teamA.playerIds = (room.teams.teamA.playerIds || []).filter((p) => p !== targetId);
+        room.teams.teamB.playerIds = (room.teams.teamB.playerIds || []).filter((p) => p !== targetId);
+        room.active_players = (room.active_players || []).filter((p) => p !== targetId);
+        room.spectators = (room.spectators || []).filter((p) => p !== targetId);
+        if (room.inactive_players) {
+          room.inactive_players = room.inactive_players.filter((p) => p !== targetId);
+        }
+        if (room.player_details) {
+          delete room.player_details[targetId];
+        }
+
+        // Record in kicked_players list to deny re-entry
+        if (!room.kicked_players) room.kicked_players = [];
+        if (!room.kicked_players.includes(targetId)) {
+          room.kicked_players.push(targetId);
+        }
+
+        // If the kicked player was currently speaking, end turn
+        if (room.current_turn && room.current_turn.speakerId === targetId) {
+          room.current_turn = null;
+          room.status = "round_end";
+        }
+
+        sanitizeRoomPlayers(room);
+        await persistRoom(room);
+
+        return NextResponse.json({
+          success: true,
+          room,
+          kickedPlayerId: targetId,
+        });
       }
 
       // -------------------------------------------------------------

@@ -10,6 +10,7 @@ import { useFeyVoice } from "@/lib/useFeyVoice";
 import { useAIReferee } from "@/lib/useAIReferee";
 import { useSpeechInput } from "@/lib/useSpeechInput";
 import AIJudgePanel from "@/components/ui/AIJudgePanel";
+import { playBuzzerSound } from "@/lib/sound";
 
 export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) => void }) {
   const {
@@ -129,6 +130,7 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
   // Handle timer completion side effects
   useEffect(() => {
     if (timeLeft === 0 && !isPaused) {
+      playBuzzerSound();
       triggerConfetti();
       const teamName = activeTeam === "A" ? "Alpha" : "Omega";
       announce({ type: "turnEnd", wordCount: correctInCurrentTurn.length, teamName });

@@ -76,6 +76,7 @@ export interface ArticulateRoom {
   active_players: string[]; // Player IDs locked in for active round
   spectators: string[]; // Player IDs waiting in spectator lounge
   inactive_players?: string[]; // Player IDs toggled AFK / Inactive
+  kicked_players?: string[]; // Player IDs ejected from match by host
   player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean; joinedAt?: number }>; // Persisted identity map
   last_speaker_indices?: { teamA: number; teamB: number }; // Track strict round-robin index per team
   last_speaker_ids?: { teamA?: string; teamB?: string }; // Track strict last speaker ID per team
@@ -185,6 +186,7 @@ export function createInitialRoom(
     active_players: [host.id],
     spectators: [],
     inactive_players: [],
+    kicked_players: [],
     player_details: {
       [host.id]: {
         id: host.id,
@@ -202,3 +204,103 @@ export function createInitialRoom(
     updated_at: new Date().toISOString(),
   };
 }
+
+/**
+ * Robustly sanitizes player rosters and identity maps across a room:
+ * 1. Purges kicked player IDs from all rosters.
+ * 2. Deduplicates player arrays in both teams.
+ * 3. Ensures no ID exists in both Team Alpha and Team Omega.
+ * 4. Ensures no team player is also in spectators.
+ * 5. Re-syncs active_players with team rosters.
+ * 6. Eliminates duplicate display names (ghost IDs from guest-to-registered transitions).
+ */
+export function sanitizeRoomPlayers(room: ArticulateRoom): ArticulateRoom {
+  if (!room.teams) {
+    room.teams = {
+      teamA: { name: "Team Alpha", color: "#EF4444", score: 0, playerIds: [] },
+      teamB: { name: "Team Omega", color: "#3B82F6", score: 0, playerIds: [] },
+    };
+  }
+  if (!room.teams.teamA.playerIds) room.teams.teamA.playerIds = [];
+  if (!room.teams.teamB.playerIds) room.teams.teamB.playerIds = [];
+  if (!room.active_players) room.active_players = [];
+  if (!room.spectators) room.spectators = [];
+  if (!room.inactive_players) room.inactive_players = [];
+  if (!room.player_details) room.player_details = {};
+  if (!room.kicked_players) room.kicked_players = [];
+
+  // 1. Remove kicked players from all lists
+  if (room.kicked_players.length > 0) {
+    const kickedSet = new Set(room.kicked_players);
+    room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((id) => !kickedSet.has(id));
+    room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((id) => !kickedSet.has(id));
+    room.active_players = room.active_players.filter((id) => !kickedSet.has(id));
+    room.spectators = room.spectators.filter((id) => !kickedSet.has(id));
+    room.inactive_players = room.inactive_players.filter((id) => !kickedSet.has(id));
+    for (const kId of kickedSet) {
+      delete room.player_details[kId];
+    }
+  }
+
+  // 2. Deduplicate within teams
+  room.teams.teamA.playerIds = Array.from(new Set(room.teams.teamA.playerIds.filter(Boolean)));
+  room.teams.teamB.playerIds = Array.from(new Set(room.teams.teamB.playerIds.filter(Boolean)));
+
+  // 3. Prevent any player ID from existing in BOTH teamA and teamB
+  const setA = new Set(room.teams.teamA.playerIds);
+  room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((id) => !setA.has(id));
+
+  // 4. Prevent any team player from existing in spectators
+  const teamPlayerSet = new Set([...room.teams.teamA.playerIds, ...room.teams.teamB.playerIds]);
+  room.spectators = Array.from(new Set(room.spectators.filter((id) => Boolean(id) && !teamPlayerSet.has(id))));
+
+  // 5. Deduplicate and align active_players with actual team rosters
+  room.active_players = Array.from(new Set([...room.teams.teamA.playerIds, ...room.teams.teamB.playerIds]));
+
+  // 6. Clean inactive_players so only existing players remain
+  const allExistingIds = new Set([...teamPlayerSet, ...room.spectators]);
+  room.inactive_players = Array.from(new Set(room.inactive_players.filter((id) => allExistingIds.has(id))));
+
+  // 7. Resolve duplicate display names (e.g. from user registration/guest transition)
+  const nameToIdMap = new Map<string, string>();
+  for (const [pId, detail] of Object.entries(room.player_details)) {
+    if (!detail?.name) continue;
+    const norm = detail.name.trim().toLowerCase();
+    if (norm === "scholar" || norm === "learner") continue;
+
+    if (nameToIdMap.has(norm)) {
+      const existingId = nameToIdMap.get(norm)!;
+      const existingInTeam = teamPlayerSet.has(existingId);
+      const currentInTeam = teamPlayerSet.has(pId);
+
+      let keepId = existingId;
+      let dropId = pId;
+
+      if (!existingInTeam && currentInTeam) {
+        keepId = pId;
+        dropId = existingId;
+        nameToIdMap.set(norm, pId);
+      } else if (existingInTeam && currentInTeam) {
+        // Both in a team: if one is guest and one is registered, keep registered
+        if (existingId.startsWith("guest-") && !pId.startsWith("guest-")) {
+          keepId = pId;
+          dropId = existingId;
+          nameToIdMap.set(norm, pId);
+        }
+      }
+
+      // Drop the ghost ID
+      room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((id) => id !== dropId);
+      room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((id) => id !== dropId);
+      room.active_players = room.active_players.filter((id) => id !== dropId);
+      room.spectators = room.spectators.filter((id) => id !== dropId);
+      room.inactive_players = room.inactive_players.filter((id) => id !== dropId);
+      delete room.player_details[dropId];
+    } else {
+      nameToIdMap.set(norm, pId);
+    }
+  }
+
+  return room;
+}
+

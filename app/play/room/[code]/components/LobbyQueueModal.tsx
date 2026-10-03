@@ -13,6 +13,7 @@ import {
   Crown,
   Clock,
   Zap,
+  UserX,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
@@ -28,6 +29,7 @@ interface LobbyQueueModalProps {
   onAutoAdmitAll?: () => void;
   onSwitchPlayerTeam?: (targetPlayerId: string, targetTeam: "A" | "B") => void;
   onToggleInactive?: (targetPlayerId: string) => void;
+  onKickPlayer?: (targetPlayerId: string) => void;
 }
 
 export default function LobbyQueueModal({
@@ -42,6 +44,7 @@ export default function LobbyQueueModal({
   onAutoAdmitAll,
   onSwitchPlayerTeam,
   onToggleInactive,
+  onKickPlayer,
 }: LobbyQueueModalProps) {
   if (!isOpen) return null;
 
@@ -337,6 +340,17 @@ export default function LobbyQueueModal({
                         <UserPlus className="w-3 h-3" />
                         + {room.teams?.teamB?.name || "Omega"}
                       </button>
+
+                      {isHost && onKickPlayer && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
+                        <button
+                          type="button"
+                          onClick={() => onKickPlayer(scholar.id)}
+                          className="text-xs font-space font-bold p-1.5 rounded-xl border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer flex items-center justify-center"
+                          title={`Kick ${scholar.name} out of room`}
+                        >
+                          <UserX className="w-3.5 h-3.5" />
+                        </button>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -410,6 +424,16 @@ export default function LobbyQueueModal({
                                 → Omega
                               </button>
                             )}
+                            {isHost && onKickPlayer && pId !== myPlayerId && pId !== room.host_id && (
+                              <button
+                                type="button"
+                                onClick={() => onKickPlayer(pId)}
+                                className="text-[10px] font-bold p-1 rounded border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer"
+                                title={`Kick ${p.name}`}
+                              >
+                                <UserX className="w-2.5 h-2.5" />
+                              </button>
+                            )}
                           </div>
                         </div>
                       );
@@ -474,6 +498,16 @@ export default function LobbyQueueModal({
                                 title="Move to Team Alpha"
                               >
                                 → Alpha
+                              </button>
+                            )}
+                            {isHost && onKickPlayer && pId !== myPlayerId && pId !== room.host_id && (
+                              <button
+                                type="button"
+                                onClick={() => onKickPlayer(pId)}
+                                className="text-[10px] font-bold p-1 rounded border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 cursor-pointer"
+                                title={`Kick ${p.name}`}
+                              >
+                                <UserX className="w-2.5 h-2.5" />
                               </button>
                             )}
                           </div>

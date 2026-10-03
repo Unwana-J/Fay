@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef, use } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, use } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
+import { playBuzzerSound } from "@/lib/sound";
 import RoomLobby from "./components/RoomLobby";
 import SpectatorLounge from "./components/SpectatorLounge";
 import RoomSpeakerView from "./components/RoomSpeakerView";
@@ -55,8 +56,13 @@ export default function ArticulateRoomPage({
     return "";
   });
 
+  const [previousPlayerId, setPreviousPlayerId] = useState<string | null>(null);
+
   useEffect(() => {
     if (profile?.id && profile.id !== devicePlayerId) {
+      if (devicePlayerId && !devicePlayerId.startsWith(profile.id)) {
+        setPreviousPlayerId(devicePlayerId);
+      }
       setDevicePlayerId(profile.id);
       if (typeof window !== "undefined") {
         localStorage.setItem("fey_device_player_id", profile.id);
@@ -97,6 +103,7 @@ export default function ArticulateRoomPage({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hasJoinedRef = useRef(false);
   const hasDispatchedEndRoundRef = useRef<number | null>(null);
+  const hasBuzzedTurnRef = useRef<string | null>(null);
 
   // Synchronize known player names to persistent local cache
   useEffect(() => {
@@ -262,6 +269,15 @@ export default function ArticulateRoomPage({
       const fetched = await fetchRoomState(true);
       if (!fetched || !mounted) return;
 
+      // Check if user was kicked from room
+      if (
+        fetched.kicked_players?.includes(myPlayerId) ||
+        (previousPlayerId && fetched.kicked_players?.includes(previousPlayerId))
+      ) {
+        setError("You were removed from this room by the host.");
+        return;
+      }
+
       const inA = fetched.teams.teamA.playerIds.includes(myPlayerId);
       const inB = fetched.teams.teamB.playerIds.includes(myPlayerId);
       const inSpectators = fetched.spectators.includes(myPlayerId);
@@ -290,16 +306,29 @@ export default function ArticulateRoomPage({
           body: JSON.stringify({
             action: "join",
             playerId: myPlayerId,
+            previousPlayerId: previousPlayerId || undefined,
             playerName: nameToUse,
             avatar: myAvatar,
           }),
         });
 
         const joinData = await res.json();
-        if (mounted && joinData.room) {
-          setRoom(joinData.room);
-          setIsSpectator(Boolean(joinData.isSpectator));
-          setHasJoinedRoom(true);
+        if (mounted) {
+          if (!res.ok || joinData.error) {
+            if (res.status === 403) {
+              setError(joinData.error || "You were removed from this room by the host.");
+              return;
+            }
+            // Name was occupied by another scholar: prompt for unique name
+            setIdentityModalMode("join");
+            setShowIdentityModal(true);
+            return;
+          }
+          if (joinData.room) {
+            setRoom(joinData.room);
+            setIsSpectator(Boolean(joinData.isSpectator));
+            setHasJoinedRoom(true);
+          }
         }
       } else if (alreadyInRoom && serverName) {
         const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
@@ -308,16 +337,28 @@ export default function ArticulateRoomPage({
           body: JSON.stringify({
             action: "join",
             playerId: myPlayerId,
+            previousPlayerId: previousPlayerId || undefined,
             playerName: serverName,
             avatar: myAvatar,
           }),
         });
 
         const joinData = await res.json();
-        if (mounted && joinData.room) {
-          setRoom(joinData.room);
-          setIsSpectator(Boolean(joinData.isSpectator));
-          setHasJoinedRoom(true);
+        if (mounted) {
+          if (!res.ok || joinData.error) {
+            if (res.status === 403) {
+              setError(joinData.error || "You were removed from this room by the host.");
+              return;
+            }
+            setIdentityModalMode("join");
+            setShowIdentityModal(true);
+            return;
+          }
+          if (joinData.room) {
+            setRoom(joinData.room);
+            setIsSpectator(Boolean(joinData.isSpectator));
+            setHasJoinedRoom(true);
+          }
         }
       } else {
         // Guest user opening WhatsApp link without a profile name: show Name Entry Gate
@@ -331,7 +372,7 @@ export default function ArticulateRoomPage({
     return () => {
       mounted = false;
     };
-  }, [fetchRoomState, myAvatar, myPlayerId, roomCode, storedUsername]);
+  }, [fetchRoomState, myAvatar, myPlayerId, previousPlayerId, roomCode, storedUsername]);
 
   // Handle Save / Rename Identity
   const handleSaveIdentity = async (
@@ -360,12 +401,17 @@ export default function ArticulateRoomPage({
         body: JSON.stringify({
           action: "join",
           playerId: myPlayerId,
+          previousPlayerId: previousPlayerId || undefined,
           playerName: chosenName,
           avatar: chosenAvatar,
           preferredTeam,
         }),
       });
       const joinData = await res.json();
+      if (!res.ok || joinData.error) {
+        alert(joinData.error || "Could not join match with this name. Please choose another.");
+        return;
+      }
       if (joinData.room) {
         setRoom(joinData.room);
         setIsSpectator(Boolean(joinData.isSpectator));
@@ -388,12 +434,31 @@ export default function ArticulateRoomPage({
         });
       }
     } else {
-      await dispatchAction({
-        action: "rename_player",
-        playerId: myPlayerId,
-        newName: chosenName,
-        avatar: chosenAvatar,
+      const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "rename_player",
+          playerId: myPlayerId,
+          newName: chosenName,
+          avatar: chosenAvatar,
+        }),
       });
+      const renameData = await res.json();
+      if (!res.ok || renameData.error) {
+        alert(renameData.error || "Could not change name");
+        return;
+      }
+      if (renameData.room) {
+        setRoom(renameData.room);
+        if (channelRef.current) {
+          channelRef.current.send({
+            type: "broadcast",
+            event: "room_action",
+            payload: { action: "rename_player", room: renameData.room },
+          });
+        }
+      }
       setShowIdentityModal(false);
 
       if (channelRef.current) {
@@ -514,6 +579,15 @@ export default function ArticulateRoomPage({
         setPresencePlayers(players);
       })
       .on("broadcast", { event: "room_action" }, (event) => {
+        if (
+          event.payload?.kickedPlayerId === myPlayerId ||
+          (event.payload?.room?.kicked_players && event.payload.room.kicked_players.includes(myPlayerId))
+        ) {
+          alert("You have been removed from the room by the host.");
+          router.push("/play");
+          return;
+        }
+
         if (event.payload?.room) {
           const incomingRoom = event.payload.room as ArticulateRoom;
           setRoom((prev) => {
@@ -539,9 +613,16 @@ export default function ArticulateRoomPage({
             }
             return incomingRoom;
           });
-          // If room transitioned to round_end or lobby, update spectator state
+          // If room transitioned to round_end or lobby, update spectator state and ensure buzzer has sounded
           if (event.payload.room.status === "round_end" || event.payload.room.status === "lobby") {
             setIsSpectator(false);
+          }
+          if (event.payload.action === "end_round" || event.payload.room.status === "round_end") {
+            const turnKey = `${incomingRoom.current_turn?.roundNumber || "round"}-${incomingRoom.current_turn?.speakerId || "turn"}`;
+            if (hasBuzzedTurnRef.current !== turnKey) {
+              hasBuzzedTurnRef.current = turnKey;
+              playBuzzerSound();
+            }
           }
         } else {
           fetchRoomState();
@@ -636,8 +717,12 @@ export default function ArticulateRoomPage({
         const remainingSec = Math.max(0, duration - activeElapsedSec);
         setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
 
-        // Time's Up: Only active speaker or host triggers end_round
+        // Time's Up: Play buzzer sound across all participants and trigger end_round
         if (remainingSec === 0) {
+          if (hasBuzzedTurnRef.current !== activeTurnKey) {
+            hasBuzzedTurnRef.current = activeTurnKey;
+            playBuzzerSound();
+          }
           if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
             hasDispatchedEndRoundRef.current = activeTurnRound;
             const isSpeakerOrHost =
@@ -675,8 +760,12 @@ export default function ArticulateRoomPage({
       const remainingSec = Math.max(0, duration - activeElapsedSec);
       setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
 
-      // 4. Time's Up: Only active speaker or host triggers end_round
+      // 4. Time's Up: Play buzzer sound across all participants and trigger end_round
       if (remainingSec === 0) {
+        if (hasBuzzedTurnRef.current !== activeTurnKey) {
+          hasBuzzedTurnRef.current = activeTurnKey;
+          playBuzzerSound();
+        }
         if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
           hasDispatchedEndRoundRef.current = activeTurnRound;
           const isSpeakerOrHost =
@@ -783,6 +872,7 @@ export default function ArticulateRoomPage({
   };
 
   const handleEndRound = () => {
+    playBuzzerSound();
     dispatchAction({
       action: "end_round",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
@@ -932,6 +1022,61 @@ export default function ArticulateRoomPage({
       targetTeam,
     });
   };
+
+  const handleKickPlayer = useCallback(
+    async (targetPlayerId: string) => {
+      const targetName =
+        room?.player_details?.[targetPlayerId]?.name ||
+        presencePlayers.find((p) => p.id === targetPlayerId)?.name ||
+        "this scholar";
+
+      if (!window.confirm(`Are you sure you want to kick ${targetName} out of this match?`)) {
+        return;
+      }
+
+      const updated = await dispatchAction({
+        action: "kick_player",
+        hostId: myPlayerId,
+        targetPlayerId,
+      });
+
+      if (channelRef.current && updated) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "room_action",
+          payload: { action: "kick_player", room: updated, kickedPlayerId: targetPlayerId },
+        });
+      }
+    },
+    [dispatchAction, myPlayerId, presencePlayers, room?.player_details]
+  );
+
+  const takenNames = useMemo(() => {
+    const names = new Set<string>();
+    if (room?.player_details) {
+      Object.entries(room.player_details).forEach(([id, detail]) => {
+        if (id !== myPlayerId && detail?.name) {
+          names.add(detail.name);
+        }
+      });
+    }
+    presencePlayers.forEach((p) => {
+      if (p.id !== myPlayerId && p.name) {
+        names.add(p.name);
+      }
+    });
+    return Array.from(names);
+  }, [room?.player_details, presencePlayers, myPlayerId]);
+
+  // Reactive ejection check if room state indicates user was kicked
+  useEffect(() => {
+    if (room && hasJoinedRoom && myPlayerId) {
+      if (room.kicked_players?.includes(myPlayerId)) {
+        alert("You have been removed from the room by the host.");
+        router.push("/play");
+      }
+    }
+  }, [room, hasJoinedRoom, myPlayerId, router]);
 
   const handleLeaveRoom = () => {
     setShowLeaveConfirmModal(true);
@@ -1245,6 +1390,7 @@ export default function ArticulateRoomPage({
                 onShuffleTeams={handleShuffleTeams}
                 onUpdateSettings={handleUpdateSettings}
                 onToggleInactive={handleToggleInactive}
+                onKickPlayer={handleKickPlayer}
                 onLeaveRoom={handleLeaveRoom}
                 onEditName={() => {
                   setIdentityModalMode("edit");
@@ -1360,6 +1506,7 @@ export default function ArticulateRoomPage({
         onAutoAdmitAll={handleAutoAdmitAll}
         onSwitchPlayerTeam={handleSwitchPlayerTeam}
         onToggleInactive={handleToggleInactive}
+        onKickPlayer={handleKickPlayer}
       />
 
       {/* Player Identity Name Gate & In-Match Rename Modal */}
@@ -1370,6 +1517,7 @@ export default function ArticulateRoomPage({
         hostName={room?.host_name}
         currentName={effectivePlayerName !== "Scholar" ? effectivePlayerName : ""}
         currentAvatar={myAvatar}
+        takenNames={takenNames}
         onSave={handleSaveIdentity}
         onClose={() => {
           if (identityModalMode === "edit" || hasJoinedRoom) {

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X } from "lucide-react";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X, UserX } from "lucide-react";
 import { motion } from "framer-motion";
 
 interface RoomLobbyProps {
@@ -17,6 +17,7 @@ interface RoomLobbyProps {
   onShuffleTeams?: () => void;
   onUpdateSettings?: (settings: { timerSeconds?: number; scoreGoal?: number }) => void;
   onToggleInactive?: (targetPlayerId?: string) => void;
+  onKickPlayer?: (targetPlayerId: string) => void;
   onLeaveRoom?: () => void;
   onEditName?: () => void;
   onOpenLobbyQueue?: () => void;
@@ -38,6 +39,7 @@ export default function RoomLobby({
   onShuffleTeams,
   onUpdateSettings,
   onToggleInactive,
+  onKickPlayer,
   onLeaveRoom,
   onEditName,
   onOpenLobbyQueue,
@@ -424,6 +426,16 @@ export default function RoomLobby({
                       </button>
                     </>
                   )}
+                  {isHost && onKickPlayer && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
+                    <button
+                      type="button"
+                      onClick={() => onKickPlayer(scholar.id)}
+                      className="p-1 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer flex items-center justify-center"
+                      title={`Kick ${scholar.name} out of room`}
+                    >
+                      <UserX className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
@@ -614,6 +626,17 @@ export default function RoomLobby({
                           <Crown className="w-3 h-3" /> Host
                         </span>
                       )}
+                      {isHost && onKickPlayer && pId !== myPlayerId && pId !== room.host_id && (
+                        <button
+                          type="button"
+                          onClick={() => onKickPlayer(pId)}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title={`Kick ${p.name} out of room`}
+                        >
+                          <UserX className="w-2.5 h-2.5" />
+                          <span>Kick</span>
+                        </button>
+                      )}
                     </div>
                   </div>
                 );
@@ -785,6 +808,17 @@ export default function RoomLobby({
                         <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/10 text-amber-600 font-bold">
                           <Crown className="w-3 h-3" /> Host
                         </span>
+                      )}
+                      {isHost && onKickPlayer && pId !== myPlayerId && pId !== room.host_id && (
+                        <button
+                          type="button"
+                          onClick={() => onKickPlayer(pId)}
+                          className="text-[10px] font-bold px-2 py-0.5 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title={`Kick ${p.name} out of room`}
+                        >
+                          <UserX className="w-2.5 h-2.5" />
+                          <span>Kick</span>
+                        </button>
                       )}
                     </div>
                   </div>

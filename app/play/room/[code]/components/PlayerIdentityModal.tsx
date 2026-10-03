@@ -13,6 +13,7 @@ interface PlayerIdentityModalProps {
   currentName?: string;
   currentAvatar?: string;
   preferredTeam?: "A" | "B" | null;
+  takenNames?: string[];
   onSave: (name: string, avatar: string, preferredTeam?: "A" | "B") => void;
   onClose?: () => void;
 }
@@ -36,6 +37,7 @@ export default function PlayerIdentityModal({
   currentName = "",
   currentAvatar = "/avatars/avatar-scholar.svg",
   preferredTeam = null,
+  takenNames = [],
   onSave,
   onClose,
 }: PlayerIdentityModalProps) {
@@ -63,6 +65,14 @@ export default function PlayerIdentityModal({
       setError("Name must be 25 characters or fewer.");
       return;
     }
+
+    const lower = trimmed.toLowerCase();
+    const isOwnCurrent = currentName && currentName.trim().toLowerCase() === lower;
+    if (!isOwnCurrent && takenNames.some((t) => t && t.trim().toLowerCase() === lower)) {
+      setError(`"${trimmed}" is already taken in this room. Please choose a unique name.`);
+      return;
+    }
+
     setError(null);
     onSave(
       trimmed,
