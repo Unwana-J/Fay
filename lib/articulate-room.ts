@@ -11,12 +11,30 @@ export interface RoomPlayer {
   joinedAt: number;
 }
 
+export type BuzzerSoundType = "classic" | "airhorn" | "bell" | "gong" | "arcade";
+
+export interface BuzzerOption {
+  id: BuzzerSoundType;
+  label: string;
+  icon: string;
+  description: string;
+}
+
+export const BUZZER_OPTIONS: BuzzerOption[] = [
+  { id: "classic", label: "Classic Buzzer", icon: "🚨", description: "Iconic board-game vibrating electric buzz" },
+  { id: "airhorn", label: "Party Airhorn", icon: "📢", description: "Hype stadium triple DJ airhorn blast" },
+  { id: "bell", label: "Boxing Bell", icon: "🔔", description: "Sharp triple-ding championship round bell" },
+  { id: "gong", label: "Temple Gong", icon: "🥁", description: "Deep resonant cinematic bronze strike" },
+  { id: "arcade", label: "8-Bit Arcade", icon: "👾", description: "Retro gaming down-pitch laser zap" },
+];
+
 export interface RoomSettings {
   timerSeconds: number;
   scoreGoal: number;
   categories: GameCategory[];
   difficulty: GameDifficulty;
   gameMode?: "classic" | "masterchef";
+  buzzerSound?: BuzzerSoundType;
 }
 
 export interface RoomTeam {
@@ -148,6 +166,7 @@ export function createInitialRoom(
     scoreGoal: settings.scoreGoal || 20,
     categories: settings.categories || ["Object", "Nature", "Person", "Action", "World", "Random"],
     difficulty: settings.difficulty || "mixed",
+    buzzerSound: settings.buzzerSound || "classic",
   };
 
   const deck = buildDeck(

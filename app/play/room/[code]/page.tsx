@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, use } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
+import { ArticulateRoom, RoomPlayer, BuzzerSoundType } from "@/lib/articulate-room";
 import { playBuzzerSound } from "@/lib/sound";
 import RoomLobby from "./components/RoomLobby";
 import SpectatorLounge from "./components/SpectatorLounge";
@@ -621,7 +621,7 @@ export default function ArticulateRoomPage({
             const turnKey = `${incomingRoom.current_turn?.roundNumber || "round"}-${incomingRoom.current_turn?.speakerId || "turn"}`;
             if (hasBuzzedTurnRef.current !== turnKey) {
               hasBuzzedTurnRef.current = turnKey;
-              playBuzzerSound();
+              playBuzzerSound(incomingRoom?.settings?.buzzerSound || "classic");
             }
           }
         } else {
@@ -721,7 +721,7 @@ export default function ArticulateRoomPage({
         if (remainingSec === 0) {
           if (hasBuzzedTurnRef.current !== activeTurnKey) {
             hasBuzzedTurnRef.current = activeTurnKey;
-            playBuzzerSound();
+            playBuzzerSound(room?.settings?.buzzerSound || "classic");
           }
           if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
             hasDispatchedEndRoundRef.current = activeTurnRound;
@@ -764,7 +764,7 @@ export default function ArticulateRoomPage({
       if (remainingSec === 0) {
         if (hasBuzzedTurnRef.current !== activeTurnKey) {
           hasBuzzedTurnRef.current = activeTurnKey;
-          playBuzzerSound();
+          playBuzzerSound(room?.settings?.buzzerSound || "classic");
         }
         if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
           hasDispatchedEndRoundRef.current = activeTurnRound;
@@ -872,7 +872,7 @@ export default function ArticulateRoomPage({
   };
 
   const handleEndRound = () => {
-    playBuzzerSound();
+    playBuzzerSound(room?.settings?.buzzerSound || "classic");
     dispatchAction({
       action: "end_round",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
@@ -901,7 +901,7 @@ export default function ArticulateRoomPage({
     });
   };
 
-  const handleUpdateSettings = (newSettings: { timerSeconds?: number; scoreGoal?: number }) => {
+  const handleUpdateSettings = (newSettings: { timerSeconds?: number; scoreGoal?: number; buzzerSound?: BuzzerSoundType }) => {
     dispatchAction({
       action: "update_settings",
       hostId: myPlayerId,

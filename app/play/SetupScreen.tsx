@@ -5,8 +5,10 @@ import { useRouter } from "next/navigation";
 import { useAppStore, ArticulateHistoryItem } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2 } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { BuzzerSoundType, BUZZER_OPTIONS } from "@/lib/articulate-room";
+import { playBuzzerSound } from "@/lib/sound";
 import BoardMap from "./BoardMap";
 
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
@@ -19,6 +21,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const [onlineJoinError, setOnlineJoinError] = useState<string | null>(null);
   const [onlineTimerSeconds, setOnlineTimerSeconds] = useState<30 | 45 | 60>(45);
   const [onlineScoreGoal, setOnlineScoreGoal] = useState<number>(20);
+  const [onlineBuzzerSound, setOnlineBuzzerSound] = useState<BuzzerSoundType>("classic");
   const [onlineRoomName, setOnlineRoomName] = useState("");
   const [onlineTeamAName, setOnlineTeamAName] = useState("");
   const [onlineTeamBName, setOnlineTeamBName] = useState("");
@@ -221,6 +224,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
             scoreGoal: onlineScoreGoal,
             categories: selectedCategories,
             difficulty,
+            buzzerSound: onlineBuzzerSound,
           },
         }),
       });
@@ -468,6 +472,56 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                           {pts} pts
                         </button>
                       ))}
+                    </div>
+                  </div>
+
+                  {/* Buzzer Sound Effect Selector */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
+                        <Volume2 className="w-3 h-3 text-[var(--text-mute)]" />
+                        Round-Over Buzzer Sound
+                      </span>
+                      <span className="text-[10px] text-[var(--text-mute)] font-normal">
+                        Tap sound to test
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                      {BUZZER_OPTIONS.map((opt) => {
+                        const isSelected = onlineBuzzerSound === opt.id;
+                        return (
+                          <button
+                            key={opt.id}
+                            type="button"
+                            onClick={() => {
+                              setOnlineBuzzerSound(opt.id);
+                              playBuzzerSound(opt.id);
+                            }}
+                            className={`p-2 rounded-xl border text-left transition-all cursor-pointer flex flex-col justify-between ${
+                              isSelected
+                                ? "bg-[var(--terra)]/10 border-[var(--terra)] text-[var(--text)] shadow-xs ring-1 ring-[var(--terra)]"
+                                : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text-dim)] hover:border-[var(--text-dim)] hover:text-[var(--text)]"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between w-full mb-1">
+                              <span className="text-base">{opt.icon}</span>
+                              {isSelected ? (
+                                <span className="w-2 h-2 rounded-full bg-[var(--terra)]" />
+                              ) : (
+                                <span className="text-[9px] text-[var(--text-mute)] opacity-60">▶ Test</span>
+                              )}
+                            </div>
+                            <div>
+                              <div className="text-xs font-bold font-space text-[var(--text)] leading-tight">
+                                {opt.label}
+                              </div>
+                              <div className="text-[9px] text-[var(--text-mute)] line-clamp-1 mt-0.5">
+                                {opt.description}
+                              </div>
+                            </div>
+                          </button>
+                        );
+                      })}
                     </div>
                   </div>
 

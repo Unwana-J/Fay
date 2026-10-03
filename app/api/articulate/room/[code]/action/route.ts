@@ -899,6 +899,12 @@ export async function POST(
           if (settings.scoreGoal && typeof settings.scoreGoal === "number") {
             room.settings.scoreGoal = Math.max(5, Math.min(100, Math.round(settings.scoreGoal)));
           }
+          if (
+            settings.buzzerSound &&
+            ["classic", "airhorn", "bell", "gong", "arcade"].includes(settings.buzzerSound)
+          ) {
+            room.settings.buzzerSound = settings.buzzerSound;
+          }
         }
 
         await persistRoom(room);

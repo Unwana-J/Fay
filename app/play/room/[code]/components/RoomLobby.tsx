@@ -1,9 +1,10 @@
 "use client";
 
 import React, { useState } from "react";
-import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X, UserX } from "lucide-react";
+import { ArticulateRoom, RoomPlayer, BuzzerSoundType, BUZZER_OPTIONS } from "@/lib/articulate-room";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X, UserX, Volume2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { playBuzzerSound } from "@/lib/sound";
 
 interface RoomLobbyProps {
   room: ArticulateRoom;
@@ -15,7 +16,7 @@ interface RoomLobbyProps {
   onStartRound: () => void;
   onSwitchTeam: (targetTeam: "A" | "B") => void;
   onShuffleTeams?: () => void;
-  onUpdateSettings?: (settings: { timerSeconds?: number; scoreGoal?: number }) => void;
+  onUpdateSettings?: (settings: { timerSeconds?: number; scoreGoal?: number; buzzerSound?: BuzzerSoundType }) => void;
   onToggleInactive?: (targetPlayerId?: string) => void;
   onKickPlayer?: (targetPlayerId: string) => void;
   onLeaveRoom?: () => void;
@@ -319,6 +320,49 @@ export default function RoomLobby({
               </div>
             ) : (
               <span className="font-medium">First to {room.settings.scoreGoal} points</span>
+            )}
+          </div>
+
+          {/* Buzzer Sound Selector */}
+          <div className="flex items-center gap-1.5">
+            <Volume2 className="w-3.5 h-3.5 text-[var(--text-mute)]" />
+            {isHost && onUpdateSettings ? (
+              <div className="flex items-center gap-1 bg-[var(--bg-input)]/60 p-0.5 rounded-lg border border-[var(--border-dim)]">
+                <span className="text-[10px] text-[var(--text-mute)] pl-1 pr-0.5 hidden sm:inline">Buzzer:</span>
+                {BUZZER_OPTIONS.map((opt) => {
+                  const isSelected = (room.settings.buzzerSound || "classic") === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        onUpdateSettings({ buzzerSound: opt.id });
+                        playBuzzerSound(opt.id);
+                      }}
+                      className={`px-1.5 py-0.5 rounded-md text-[11px] font-bold font-space transition cursor-pointer flex items-center gap-1 ${
+                        isSelected
+                          ? "bg-[var(--terra)] text-white shadow-xs"
+                          : "text-[var(--text-dim)] hover:text-[var(--text)]"
+                      }`}
+                      title={`${opt.label}: ${opt.description} (Tap to select & preview)`}
+                    >
+                      <span>{opt.icon}</span>
+                      <span className="hidden md:inline">{opt.label.split(" ")[0]}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <button
+                type="button"
+                onClick={() => playBuzzerSound(room.settings.buzzerSound || "classic")}
+                className="flex items-center gap-1 font-medium hover:text-[var(--text)] transition cursor-pointer px-2 py-0.5 rounded-lg bg-[var(--bg-input)]/40 border border-[var(--border-dim)] text-[11px]"
+                title="Tap to preview this room's buzzer sound"
+              >
+                <span>{BUZZER_OPTIONS.find((b) => b.id === (room.settings.buzzerSound || "classic"))?.icon || "🚨"}</span>
+                <span>{BUZZER_OPTIONS.find((b) => b.id === (room.settings.buzzerSound || "classic"))?.label || "Classic Buzzer"}</span>
+                <span className="text-[9px] opacity-70">🔊</span>
+              </button>
             )}
           </div>
 
