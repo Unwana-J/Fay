@@ -10,7 +10,7 @@ import { useFeyVoice } from "@/lib/useFeyVoice";
 import { useAIReferee } from "@/lib/useAIReferee";
 import { useSpeechInput } from "@/lib/useSpeechInput";
 import AIJudgePanel from "@/components/ui/AIJudgePanel";
-import { playBuzzerSound } from "@/lib/sound";
+import { playBuzzerSound, warmUpAudio } from "@/lib/sound";
 
 export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) => void }) {
   const {
@@ -60,8 +60,9 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
     },
   });
 
-  // Fire voice "Go!" when the turn begins
+  // Fire voice "Go!" when the turn begins & pre-warm audio engine
   useEffect(() => {
+    warmUpAudio();
     const t = setTimeout(() => announce({ type: "turnStart" }), 300);
     return () => clearTimeout(t);
   // eslint-disable-next-line react-hooks/exhaustive-deps

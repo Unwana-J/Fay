@@ -4,7 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef, use } from "r
 import { useAppStore } from "@/store/useAppStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { ArticulateRoom, RoomPlayer, BuzzerSoundType } from "@/lib/articulate-room";
-import { playBuzzerSound } from "@/lib/sound";
+import { playBuzzerSound, warmUpAudio } from "@/lib/sound";
 import RoomLobby from "./components/RoomLobby";
 import SpectatorLounge from "./components/SpectatorLounge";
 import RoomSpeakerView from "./components/RoomSpeakerView";
@@ -104,6 +104,11 @@ export default function ArticulateRoomPage({
   const hasJoinedRef = useRef(false);
   const hasDispatchedEndRoundRef = useRef<number | null>(null);
   const hasBuzzedTurnRef = useRef<string | null>(null);
+
+  // Pre-warm audio engine on page mount to eliminate cold-start hardware latency
+  useEffect(() => {
+    warmUpAudio();
+  }, []);
 
   // Synchronize known player names to persistent local cache
   useEffect(() => {
@@ -618,9 +623,9 @@ export default function ArticulateRoomPage({
             setIsSpectator(false);
           }
           if (event.payload.action === "end_round" || event.payload.room.status === "round_end") {
-            const turnKey = `${incomingRoom.current_turn?.roundNumber || "round"}-${incomingRoom.current_turn?.speakerId || "turn"}`;
-            if (hasBuzzedTurnRef.current !== turnKey) {
-              hasBuzzedTurnRef.current = turnKey;
+            const canonicalKey = `r${incomingRoom.current_turn?.roundNumber || "round"}_${incomingRoom.current_turn?.speakerId || "turn"}`;
+            if (hasBuzzedTurnRef.current !== canonicalKey) {
+              hasBuzzedTurnRef.current = canonicalKey;
               playBuzzerSound(incomingRoom?.settings?.buzzerSound || "classic");
             }
           }
@@ -706,6 +711,7 @@ export default function ArticulateRoomPage({
     }
 
     const localStart = turnAnchorMapRef.current[activeTurnKey];
+    const canonicalTurnKey = `r${activeTurnRound}_${activeTurnSpeaker}`;
 
     const updateTimer = () => {
       const elapsedMs = Date.now() - localStart;
@@ -717,10 +723,10 @@ export default function ArticulateRoomPage({
         const remainingSec = Math.max(0, duration - activeElapsedSec);
         setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
 
-        // Time's Up: Play buzzer sound across all participants and trigger end_round
-        if (remainingSec === 0) {
-          if (hasBuzzedTurnRef.current !== activeTurnKey) {
-            hasBuzzedTurnRef.current = activeTurnKey;
+        // Time's Up: Play buzzer sound across all participants and trigger end_round immediately
+        if (remainingSec <= 0 || elapsedMs >= 3500 + duration * 1000) {
+          if (hasBuzzedTurnRef.current !== canonicalTurnKey) {
+            hasBuzzedTurnRef.current = canonicalTurnKey;
             playBuzzerSound(room?.settings?.buzzerSound || "classic");
           }
           if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
@@ -740,6 +746,7 @@ export default function ArticulateRoomPage({
 
       // 1. Pre-round 3-second countdown (0ms - 3000ms)
       if (elapsedMs < 3000) {
+        warmUpAudio();
         const remainingCount = Math.max(1, 3 - Math.floor(elapsedMs / 1000));
         setCountdownRemaining((prev) => (prev !== remainingCount ? remainingCount : prev));
         setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
@@ -760,10 +767,10 @@ export default function ArticulateRoomPage({
       const remainingSec = Math.max(0, duration - activeElapsedSec);
       setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
 
-      // 4. Time's Up: Play buzzer sound across all participants and trigger end_round
-      if (remainingSec === 0) {
-        if (hasBuzzedTurnRef.current !== activeTurnKey) {
-          hasBuzzedTurnRef.current = activeTurnKey;
+      // 4. Time's Up: Play buzzer sound across all participants and trigger end_round immediately
+      if (remainingSec <= 0 || elapsedMs >= 3500 + duration * 1000) {
+        if (hasBuzzedTurnRef.current !== canonicalTurnKey) {
+          hasBuzzedTurnRef.current = canonicalTurnKey;
           playBuzzerSound(room?.settings?.buzzerSound || "classic");
         }
         if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
@@ -781,7 +788,7 @@ export default function ArticulateRoomPage({
     };
 
     updateTimer();
-    const timer = setInterval(updateTimer, 200);
+    const timer = setInterval(updateTimer, 50);
 
     return () => {
       clearInterval(timer);
@@ -790,12 +797,25 @@ export default function ArticulateRoomPage({
     currentRoomStatus,
     activeTurnKey,
     activeTurnRound,
+    activeTurnSpeaker,
     currentDuration,
     currentSpeakerId,
     currentHostId,
     dispatchAction,
     myPlayerId,
+    room?.settings?.buzzerSound,
   ]);
+
+  // Fallback: whenever room transitions to round_end, guarantee immediate buzzer playback
+  useEffect(() => {
+    if (room?.status === "round_end") {
+      const canonicalKey = `r${room.current_turn?.roundNumber || 0}_${room.current_turn?.speakerId || "speaker"}`;
+      if (hasBuzzedTurnRef.current !== canonicalKey) {
+        hasBuzzedTurnRef.current = canonicalKey;
+        playBuzzerSound(room.settings?.buzzerSound || "classic");
+      }
+    }
+  }, [room?.status, room?.current_turn?.roundNumber, room?.current_turn?.speakerId, room?.settings?.buzzerSound]);
 
   // Remove old floating reactions after animation
   useEffect(() => {
@@ -808,6 +828,7 @@ export default function ArticulateRoomPage({
 
   // Handlers
   const handleStartRound = async (speakerId?: any) => {
+    warmUpAudio();
     const validSpeakerId = typeof speakerId === "string" ? speakerId : undefined;
     if (isStartingRound) return;
     setIsStartingRound(true);
