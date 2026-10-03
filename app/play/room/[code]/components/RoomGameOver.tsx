@@ -285,8 +285,8 @@ export default function RoomGameOver({
       </div>
 
       {/* The Fey Board Journey Map */}
-      <div className="surface rounded-3xl border border-[var(--border-dim)] p-4 sm:p-5 text-left space-y-3 shadow-sm">
-        <div className="flex items-center justify-between">
+      <div className="surface rounded-3xl border border-[var(--border-dim)] p-3.5 sm:p-5 text-left space-y-3 shadow-sm">
+        <div className="flex items-center justify-between pb-1 border-b border-[var(--border-dim)]/50">
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 text-[var(--gold)]" />
             <h3 className="font-space font-bold text-sm text-[var(--text)]">
@@ -303,17 +303,15 @@ export default function RoomGameOver({
         </div>
 
         {showBoard && (
-          <div className="p-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)]">
-            <BoardMap
-              scoreA={teamA.score}
-              scoreB={teamB.score}
-              scoreGoal={room.settings.scoreGoal}
-              colorA={teamA.color}
-              colorB={teamB.color}
-              activeTeam={null}
-              gameMode={room.settings.gameMode || "classic"}
-            />
-          </div>
+          <BoardMap
+            scoreA={teamA.score}
+            scoreB={teamB.score}
+            scoreGoal={room.settings.scoreGoal}
+            colorA={teamA.color}
+            colorB={teamB.color}
+            activeTeam={null}
+            gameMode={room.settings.gameMode || "classic"}
+          />
         )}
       </div>
 

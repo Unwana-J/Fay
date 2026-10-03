@@ -1314,14 +1314,14 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                   </span>
                 </div>
 
-                <div className="p-4 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)]">
+                <div className="p-2 sm:p-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)]">
                   <BoardMap
                     scoreA={selectedCompletedMatch.scoreA}
                     scoreB={selectedCompletedMatch.scoreB}
                     scoreGoal={selectedCompletedMatch.scoreGoal || 20}
                     colorA={selectedCompletedMatch.teamAColor || "#EF4444"}
                     colorB={selectedCompletedMatch.teamBColor || "#10B981"}
-                    activeTeam="A"
+                    activeTeam={null}
                     gameMode={selectedCompletedMatch.gameMode || "classic"}
                   />
                 </div>
