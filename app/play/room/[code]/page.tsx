@@ -633,6 +633,14 @@ export default function ArticulateRoomPage({
           fetchRoomState();
         }
       })
+      .on("broadcast", { event: "instant_buzzer" }, (event) => {
+        const canonicalKey = event.payload?.turnKey;
+        const sound = event.payload?.buzzerSound || room?.settings?.buzzerSound || "classic";
+        if (canonicalKey && hasBuzzedTurnRef.current !== canonicalKey) {
+          hasBuzzedTurnRef.current = canonicalKey;
+          playBuzzerSound(sound);
+        }
+      })
       .on("broadcast", { event: "reaction" }, (event) => {
         const emoji = event.payload?.emoji;
         if (emoji) {
@@ -728,6 +736,13 @@ export default function ArticulateRoomPage({
           if (hasBuzzedTurnRef.current !== canonicalTurnKey) {
             hasBuzzedTurnRef.current = canonicalTurnKey;
             playBuzzerSound(room?.settings?.buzzerSound || "classic");
+            if (channelRef.current) {
+              channelRef.current.send({
+                type: "broadcast",
+                event: "instant_buzzer",
+                payload: { turnKey: canonicalTurnKey, buzzerSound: room?.settings?.buzzerSound || "classic" },
+              });
+            }
           }
           if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
             hasDispatchedEndRoundRef.current = activeTurnRound;
@@ -772,6 +787,13 @@ export default function ArticulateRoomPage({
         if (hasBuzzedTurnRef.current !== canonicalTurnKey) {
           hasBuzzedTurnRef.current = canonicalTurnKey;
           playBuzzerSound(room?.settings?.buzzerSound || "classic");
+          if (channelRef.current) {
+            channelRef.current.send({
+              type: "broadcast",
+              event: "instant_buzzer",
+              payload: { turnKey: canonicalTurnKey, buzzerSound: room?.settings?.buzzerSound || "classic" },
+            });
+          }
         }
         if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
           hasDispatchedEndRoundRef.current = activeTurnRound;
@@ -893,7 +915,16 @@ export default function ArticulateRoomPage({
   };
 
   const handleEndRound = () => {
+    const canonicalKey = `r${room?.current_turn?.roundNumber || 0}_${room?.current_turn?.speakerId || myPlayerId}`;
+    hasBuzzedTurnRef.current = canonicalKey;
     playBuzzerSound(room?.settings?.buzzerSound || "classic");
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "instant_buzzer",
+        payload: { turnKey: canonicalKey, buzzerSound: room?.settings?.buzzerSound || "classic" },
+      });
+    }
     dispatchAction({
       action: "end_round",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
