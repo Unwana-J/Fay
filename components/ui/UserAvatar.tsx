@@ -58,12 +58,15 @@ export default function UserAvatar({
       style={{
         borderColor: "var(--border)",
         background: "var(--bg-card)",
+        width: sizeConfig.px,
+        height: sizeConfig.px,
       }}
     >
       <img
         src={resolved.value}
         alt={alt}
         className="w-full h-full object-cover select-none pointer-events-none"
+        style={{ width: sizeConfig.px, height: sizeConfig.px }}
         loading="eager"
       />
     </div>

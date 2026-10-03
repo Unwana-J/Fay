@@ -12,6 +12,7 @@ import { motion, AnimatePresence } from "framer-motion";
 
 import BoardMap from "./BoardMap";
 import { type GamePhase } from "@/store/useGameStore";
+import { useAppStore } from "@/store/useAppStore";
 
 const stageVariants = {
   enter: { opacity: 0, x: 20 },
@@ -80,10 +81,15 @@ export default function PlayPage() {
     // setPhase("handoff") is handled by startTurn() inside store
   }, [startTurn]);
 
+  const triggerActivityFeedbackIfEligible = useAppStore((s) => s.triggerActivityFeedbackIfEligible);
+
   const handleGameOver = useCallback(() => {
     setOverlayHidden(false);
     setPhase("gameover");
-  }, [setPhase]);
+    setTimeout(() => {
+      triggerActivityFeedbackIfEligible("articulate");
+    }, 1200);
+  }, [setPhase, triggerActivityFeedbackIfEligible]);
 
   const handleRestart = useCallback(() => {
     setOverlayHidden(false);

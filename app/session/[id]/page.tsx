@@ -1291,7 +1291,7 @@ const stageSlideVariants = {
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const unwrappedParams = use(params);
   const router = useRouter();
-  const { activeSession, updateActiveSessionStage, updateNotes, completeSession, abandonSession, streak } = useAppStore();
+  const { activeSession, updateActiveSessionStage, updateNotes, completeSession, abandonSession, streak, triggerActivityFeedbackIfEligible } = useAppStore();
   const [speakingSeconds, setSpeakingSeconds] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [completionData, setCompletionData] = useState<{ xpEarned: number; newAchievements: string[] } | null>(null);
@@ -1354,6 +1354,11 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     });
     setCompletionData(result);
     fireConfetti();
+
+    // Trigger NPS feedback prompt if eligible (after Day 1, with 7-day snooze)
+    setTimeout(() => {
+      triggerActivityFeedbackIfEligible("solo_sprint");
+    }, 1500);
   }
 
   function handleAbandon() {

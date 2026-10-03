@@ -7,7 +7,8 @@ import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
   BookOpen, Compass, Network,
-  Activity, User, Zap, X, Calendar, ChevronRight, Users, Library, Gamepad2
+  Activity, User, Zap, X, Calendar, ChevronRight, Users, Library, Gamepad2,
+  ShieldAlert, Sparkles
 } from "lucide-react";
 import { useAppStore, type CompletedSession } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress } from "@/lib/achievements";
@@ -296,6 +297,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     articulateHistory = [],
     buyStreakShield,
     syncActivityDates,
+    openFeedbackPrompt,
+    openSafetyModal,
   } = useAppStore();
   const [showStreakModal, setShowStreakModal] = useState(false);
   

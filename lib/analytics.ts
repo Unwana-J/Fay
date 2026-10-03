@@ -112,4 +112,26 @@ export const analytics = {
   }) => {
     analytics.track("podium_deck_generated", data);
   },
+
+  // Feedback & Safety
+  trackFeedbackSubmitted: (data: {
+    rating: number;
+    promptType: "what_could_be_better" | "extra_star_if";
+    message: string;
+    path?: string;
+    username?: string;
+  }) => {
+    analytics.track("feedback_submitted", data);
+  },
+
+  trackIncidentReported: (data: {
+    category: string;
+    hasEmail: boolean;
+    isRegistered: boolean;
+    roomId?: string;
+    targetUser?: string;
+  }) => {
+    analytics.track("incident_reported", data);
+  },
 };
+

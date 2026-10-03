@@ -222,6 +222,9 @@ export interface UserProfile {
   createdAt?: number;
   email?: string;
   hasClaimedAccount?: boolean;
+  isBanned?: boolean;
+  banReason?: string;
+  isDeactivated?: boolean;
 }
 
 export interface TriviaHistoryItem {
@@ -267,7 +270,15 @@ export interface ArticulateHistoryItem {
   gameMode?: "classic" | "masterchef";
 }
 
+export interface FeedbackScheduleData {
+  lastPromptedAt?: number;
+  lastSkippedAt?: number;
+  hasSubmitted?: boolean;
+  lastSubmittedAt?: number;
+}
+
 export interface AppState {
+
   // Authentication & Onboarding
   isOnboarded: boolean;
   createAccount: (data: { username: string; avatar: string; bio?: string; interests: string[] }) => void;
@@ -353,6 +364,22 @@ export interface AppState {
   // Unified streak & activity synchronization
   recordDailyActivity: (date?: string) => void;
   syncActivityDates: (dates: string[]) => void;
+
+  // NPS & Activity Feedback Prompt Scheduling
+  feedbackSchedule: FeedbackScheduleData;
+  isFeedbackPromptOpen: boolean;
+  feedbackTriggerActivity?: string;
+  openFeedbackPrompt: (activity?: string) => void;
+  closeFeedbackPrompt: () => void;
+  triggerActivityFeedbackIfEligible: (activity: string) => boolean;
+  recordFeedbackSkipped: () => void;
+  recordFeedbackSubmitted: () => void;
+
+  // Safety Incident Reporting Modal
+  isSafetyModalOpen: boolean;
+  safetyModalContext?: { roomId?: string; targetUser?: string };
+  openSafetyModal: (context?: { roomId?: string; targetUser?: string }) => void;
+  closeSafetyModal: () => void;
 }
 
 const DEFAULT_ENABLED_CATEGORIES = [
@@ -415,6 +442,17 @@ export const useAppStore = create<AppState>()(
       seenTriviaQuestionIds: [],
       triviaHistory: [],
       articulateHistory: [],
+
+      feedbackSchedule: {
+        lastPromptedAt: undefined,
+        lastSkippedAt: undefined,
+        hasSubmitted: false,
+        lastSubmittedAt: undefined,
+      },
+      isFeedbackPromptOpen: false,
+      feedbackTriggerActivity: undefined,
+      isSafetyModalOpen: false,
+      safetyModalContext: undefined,
 
       registerWithCloud: async (email, password) => {
         const state = get();
@@ -1062,7 +1100,98 @@ export const useAppStore = create<AppState>()(
             streak: reconcileStreakState(dummyState),
           };
         }),
+
+      // NPS & Activity Feedback Prompt Engine
+      openFeedbackPrompt: (activity = "manual") =>
+        set({ isFeedbackPromptOpen: true, feedbackTriggerActivity: activity }),
+
+      closeFeedbackPrompt: () =>
+        set({ isFeedbackPromptOpen: false }),
+
+      triggerActivityFeedbackIfEligible: (activity: string) => {
+        const state = get();
+        const schedule = state.feedbackSchedule || {};
+        const now = Date.now();
+
+        // 1. If user already submitted feedback in the last 30 days, snooze
+        if (schedule.hasSubmitted && schedule.lastSubmittedAt) {
+          const daysSinceSubmitted = (now - schedule.lastSubmittedAt) / (1000 * 60 * 60 * 24);
+          if (daysSinceSubmitted < 30) return false;
+        }
+
+        // 2. If user skipped, only show again after 1 full week (7 days)
+        if (schedule.lastSkippedAt) {
+          const daysSinceSkipped = (now - schedule.lastSkippedAt) / (1000 * 60 * 60 * 24);
+          if (daysSinceSkipped < 7) return false;
+        }
+
+        // 3. New User check: For brand-new users, show only AFTER day 1
+        // Existing users: account > 24h old OR streak >= 2 OR has XP / sessions / history
+        const createdAt = state.profile?.createdAt || now;
+        const hoursSinceCreated = (now - createdAt) / (1000 * 60 * 60);
+        const hasExistingHistory =
+          (state.streak?.current || 0) >= 2 ||
+          (state.profile?.xp || 0) > 0 ||
+          (state.sessions || []).length > 0 ||
+          (state.triviaHistory || []).length > 0;
+
+        const isBrandNewDayOneUser = hoursSinceCreated < 24 && !hasExistingHistory;
+
+        if (isBrandNewDayOneUser) {
+          // Brand-new day 1 user with no prior history; wait until day 2+
+          return false;
+        }
+
+        // 4. Do not prompt more than once every 12 hours
+        if (schedule.lastPromptedAt) {
+          const hoursSincePrompt = (now - schedule.lastPromptedAt) / (1000 * 60 * 60);
+          if (hoursSincePrompt < 12) return false;
+        }
+
+        // User is eligible! Trigger the prompt at the end of this activity
+        set({
+          isFeedbackPromptOpen: true,
+          feedbackTriggerActivity: activity,
+          feedbackSchedule: {
+            ...schedule,
+            lastPromptedAt: now,
+          },
+        });
+        return true;
+      },
+
+      recordFeedbackSkipped: () => {
+        const state = get();
+        const schedule = state.feedbackSchedule || {};
+        set({
+          isFeedbackPromptOpen: false,
+          feedbackSchedule: {
+            ...schedule,
+            lastSkippedAt: Date.now(),
+          },
+        });
+      },
+
+      recordFeedbackSubmitted: () => {
+        const state = get();
+        const schedule = state.feedbackSchedule || {};
+        set({
+          isFeedbackPromptOpen: false,
+          feedbackSchedule: {
+            ...schedule,
+            hasSubmitted: true,
+            lastSubmittedAt: Date.now(),
+          },
+        });
+      },
+
+      openSafetyModal: (context) =>
+        set({ isSafetyModalOpen: true, safetyModalContext: context }),
+
+      closeSafetyModal: () =>
+        set({ isSafetyModalOpen: false, safetyModalContext: undefined }),
     }),
+
     {
       name: "fey-app-store",
       version: 10,

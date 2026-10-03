@@ -1110,6 +1110,7 @@ export default function TriviaGameClient({
     resetSeenTriviaQuestions,
     triviaHistory = [],
     saveTriviaRound,
+    triggerActivityFeedbackIfEligible,
   } = useAppStore();
 
   const [phase, setPhase] = useState<GamePhase>("setup");
@@ -1337,6 +1338,11 @@ export default function TriviaGameClient({
     setXpEarned(totalXP);
     if (totalXP > 0) addXP(totalXP);
     setPhase("results");
+
+    // Trigger NPS / Feedback prompt if eligible (after day 1, with 7-day snooze)
+    setTimeout(() => {
+      triggerActivityFeedbackIfEligible("trivia");
+    }, 1200);
   }
 
   if (phase === "playing") {

@@ -232,3 +232,72 @@ create policy "Allow public insert access on league_scores"
 
 create index if not exists idx_league_scores_lookup on public.league_scores (league_code, day_number);
 create index if not exists idx_league_scores_ranking on public.league_scores (league_code, points desc);
+
+-- ==============================================================================
+-- FEY PLATFORM: FEEDBACK ("YOU DEY FEEL AM?") & INCIDENT SAFETY DESK
+-- ==============================================================================
+
+-- 10. Create feedback_responses table
+create table if not exists public.feedback_responses (
+  id uuid primary key default gen_random_uuid(),
+  rating integer not null check (rating between 1 and 5),
+  prompt_type text not null, -- 'what_could_be_better' (<=3) or 'extra_star_if' (4-5)
+  message text not null,
+  user_id text,
+  username text,
+  path text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.feedback_responses enable row level security;
+
+drop policy if exists "Allow public insert on feedback_responses" on public.feedback_responses;
+create policy "Allow public insert on feedback_responses"
+  on public.feedback_responses for insert
+  with check (true);
+
+drop policy if exists "Allow public read on feedback_responses" on public.feedback_responses;
+create policy "Allow public read on feedback_responses"
+  on public.feedback_responses for select
+  using (true);
+
+create index if not exists idx_feedback_rating on public.feedback_responses (rating, created_at desc);
+
+-- 11. Create incident_reports table
+create table if not exists public.incident_reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id text,
+  reporter_email text,
+  reporter_username text,
+  category text not null,
+  details text not null,
+  target_user text,
+  room_id text,
+  status text not null default 'pending', -- 'pending', 'investigating', 'resolved'
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.incident_reports enable row level security;
+
+drop policy if exists "Allow public insert on incident_reports" on public.incident_reports;
+create policy "Allow public insert on incident_reports"
+  on public.incident_reports for insert
+  with check (true);
+
+drop policy if exists "Allow public read on incident_reports" on public.incident_reports;
+create policy "Allow public read on incident_reports"
+  on public.incident_reports for select
+  using (true);
+
+drop policy if exists "Allow public update on incident_reports" on public.incident_reports;
+create policy "Allow public update on incident_reports"
+  on public.incident_reports for update
+  using (true);
+
+create index if not exists idx_incident_status on public.incident_reports (status, created_at desc);
+
+-- 12. Add moderation columns to user_profiles
+alter table public.user_profiles
+  add column if not exists is_banned boolean default false,
+  add column if not exists ban_reason text default null,
+  add column if not exists is_deactivated boolean default false;
