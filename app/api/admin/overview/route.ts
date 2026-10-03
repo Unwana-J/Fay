@@ -19,11 +19,11 @@ export async function GET() {
     const totalRatings = feedback.length;
     const avgRating = totalRatings > 0
       ? (feedback.reduce((sum, f) => sum + f.rating, 0) / totalRatings).toFixed(1)
-      : "5.0";
+      : "0";
 
     const promoters = feedback.filter((f) => f.rating >= 4).length;
     const detractors = feedback.filter((f) => f.rating <= 3).length;
-    const csatPercent = totalRatings > 0 ? Math.round((promoters / totalRatings) * 100) : 100;
+    const csatPercent = totalRatings > 0 ? Math.round((promoters / totalRatings) * 100) : 0;
 
     // Incidents
     const pendingIncidents = incidents.filter((i) => i.status === "pending").length;

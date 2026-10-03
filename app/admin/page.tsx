@@ -420,10 +420,19 @@ export default function AdminPage() {
                   <Star size={14} className="text-[var(--gold)]" />
                 </div>
                 <div className="font-mono text-3xl font-bold" style={{ color: "var(--gold)" }}>
-                  {overviewData?.csat?.average || "4.8"}<span className="text-sm font-normal text-[var(--text-mute)]"> / 5.0</span>
+                  {overviewData?.csat?.total > 0 ? (
+                    <>
+                      {overviewData.csat.average}
+                      <span className="text-sm font-normal text-[var(--text-mute)]"> / 5.0</span>
+                    </>
+                  ) : (
+                    <span className="text-2xl text-[var(--text-mute)] font-sans">No data yet</span>
+                  )}
                 </div>
                 <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
-                  {overviewData?.csat?.csatPercent || "92"}% Promoters (4-5★)
+                  {overviewData?.csat?.total > 0
+                    ? `${overviewData.csat.csatPercent}% Promoters (4-5★) · ${overviewData.csat.total} rating${overviewData.csat.total === 1 ? "" : "s"}`
+                    : "Awaiting live scholar responses"}
                 </div>
               </div>
 
