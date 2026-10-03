@@ -124,6 +124,11 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
   return room;
 }
 
+function actionResponse(payload: Record<string, any>, init?: number | ResponseInit) {
+  const options = typeof init === "number" ? { status: init } : init;
+  return NextResponse.json({ ...payload, serverTime: Date.now() }, options);
+}
+
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
@@ -133,7 +138,7 @@ export async function POST(
     const room = await getRoom(code);
 
     if (!room) {
-      return NextResponse.json({ error: "Room not found" }, { status: 404 });
+      return actionResponse({ error: "Room not found" }, { status: 404 });
     }
 
     const body = await req.json().catch(() => ({}));
@@ -154,7 +159,7 @@ export async function POST(
           room.kicked_players?.includes(id) ||
           (prevId && room.kicked_players?.includes(prevId))
         ) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "You were removed from this room by the host." },
             { status: 403 }
           );
@@ -197,7 +202,7 @@ export async function POST(
               }
             } else {
               // Another distinct player already occupies this name!
-              return NextResponse.json(
+              return actionResponse(
                 { error: `The name "${name}" is already taken in this room. Please choose a unique nickname.` },
                 { status: 400 }
               );
@@ -253,7 +258,7 @@ export async function POST(
 
           sanitizeRoomPlayers(room);
           await persistRoom(room);
-          return NextResponse.json({
+          return actionResponse({
             success: true,
             room,
             isSpectator: true,
@@ -309,7 +314,7 @@ export async function POST(
 
         sanitizeRoomPlayers(room);
         await persistRoom(room);
-        return NextResponse.json({
+        return actionResponse({
           success: true,
           room,
           isSpectator: false,
@@ -324,7 +329,7 @@ export async function POST(
         const toTeam = targetTeam === "B" ? "B" : "A";
 
         if (room.status === "playing" && room.locked) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Cannot switch teams while a round is in progress" },
             { status: 400 }
           );
@@ -345,7 +350,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -391,7 +396,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -439,7 +444,7 @@ export async function POST(
         room.spectators = [];
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -447,7 +452,7 @@ export async function POST(
       // -------------------------------------------------------------
       case "shuffle_teams": {
         if (room.status !== "lobby" && room.status !== "round_end") {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Can only shuffle teams between rounds" },
             { status: 400 }
           );
@@ -469,7 +474,7 @@ export async function POST(
         room.teams.teamB.playerIds = allPlayers.slice(half);
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -477,7 +482,7 @@ export async function POST(
       // -------------------------------------------------------------
       case "start_round": {
         if (room.status === "playing") {
-          return NextResponse.json({ success: true, room });
+          return actionResponse({ success: true, room });
         }
 
         // Sync any knownNames sent from host's client cache into room.player_details
@@ -511,7 +516,7 @@ export async function POST(
         const totalPlayers =
           (room.teams?.teamA?.playerIds?.length || 0) + (room.teams?.teamB?.playerIds?.length || 0);
         if (totalPlayers === 0) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "At least one player is required to start" },
             { status: 400 }
           );
@@ -609,19 +614,23 @@ export async function POST(
         ];
 
         const now = Date.now();
-        const countdownMs = 3500; // 3.5s countdown before 30s timer begins
+        const countdownMs = 3500; // 3.5s countdown before timer begins
+        const durationSeconds = room.settings?.timerSeconds || 45;
+        const countdownEndsAt = now + countdownMs;
+        const turnEndsAt = countdownEndsAt + durationSeconds * 1000;
         room.current_turn = {
           roundNumber,
           activeTeam,
           speakerId,
           speakerName,
-          startedAt: now + countdownMs,
-          countdownEndsAt: now + countdownMs,
-          durationSeconds: room.settings?.timerSeconds || 45,
+          startedAt: countdownEndsAt,
+          countdownEndsAt,
+          turnEndsAt,
+          durationSeconds,
         };
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -629,7 +638,7 @@ export async function POST(
       // -------------------------------------------------------------
       case "score_word": {
         if (room.status !== "playing") {
-          return NextResponse.json({ error: "Game is not playing" }, { status: 400 });
+          return actionResponse({ error: "Game is not playing" }, { status: 400 });
         }
 
         const currentWord = room.deck[room.current_word_index];
@@ -646,7 +655,7 @@ export async function POST(
 
         room.current_word_index += 1;
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -655,13 +664,13 @@ export async function POST(
       case "dispute_word": {
         const { wordIndex, opponentName } = body;
         if (typeof wordIndex !== "number" || !room.round_words_scored[wordIndex]) {
-          return NextResponse.json({ error: "Invalid word index" }, { status: 400 });
+          return actionResponse({ error: "Invalid word index" }, { status: 400 });
         }
 
         const wordEntry = room.round_words_scored[wordIndex];
         const currentCount = wordEntry.disputeCount || 0;
         if (currentCount >= 3) {
-          return NextResponse.json({ error: "Maximum of 3 dispute attempts reached" }, { status: 400 });
+          return actionResponse({ error: "Maximum of 3 dispute attempts reached" }, { status: 400 });
         }
 
         wordEntry.disputeCount = currentCount + 1;
@@ -669,7 +678,7 @@ export async function POST(
         wordEntry.disputedBy = String(opponentName || "Opposing Team");
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -678,7 +687,7 @@ export async function POST(
       case "resolve_dispute": {
         const { wordIndex, resolverName, resolution } = body;
         if (typeof wordIndex !== "number" || !room.round_words_scored[wordIndex]) {
-          return NextResponse.json({ error: "Invalid word index" }, { status: 400 });
+          return actionResponse({ error: "Invalid word index" }, { status: 400 });
         }
 
         const wordEntry = room.round_words_scored[wordIndex];
@@ -702,7 +711,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -711,13 +720,13 @@ export async function POST(
       case "claim_passed_word": {
         const { wordIndex, claimantName } = body;
         if (typeof wordIndex !== "number" || !room.round_words_passed[wordIndex]) {
-          return NextResponse.json({ error: "Invalid passed word index" }, { status: 400 });
+          return actionResponse({ error: "Invalid passed word index" }, { status: 400 });
         }
 
         const passedEntry = room.round_words_passed[wordIndex];
         const currentCount = passedEntry.claimCount || 0;
         if (currentCount >= 3) {
-          return NextResponse.json({ error: "Maximum of 3 claim attempts reached" }, { status: 400 });
+          return actionResponse({ error: "Maximum of 3 claim attempts reached" }, { status: 400 });
         }
 
         passedEntry.claimCount = currentCount + 1;
@@ -725,7 +734,7 @@ export async function POST(
         passedEntry.claimedBy = String(claimantName || "Describing Team");
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -734,7 +743,7 @@ export async function POST(
       case "resolve_passed_claim": {
         const { wordIndex, resolverName, resolution } = body;
         if (typeof wordIndex !== "number" || !room.round_words_passed[wordIndex]) {
-          return NextResponse.json({ error: "Invalid passed word index" }, { status: 400 });
+          return actionResponse({ error: "Invalid passed word index" }, { status: 400 });
         }
 
         const passedEntry = room.round_words_passed[wordIndex];
@@ -758,7 +767,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -766,7 +775,7 @@ export async function POST(
       // -------------------------------------------------------------
       case "pass_word": {
         if (room.status !== "playing") {
-          return NextResponse.json({ error: "Game is not playing" }, { status: 400 });
+          return actionResponse({ error: "Game is not playing" }, { status: 400 });
         }
 
         const currentWord = room.deck[room.current_word_index];
@@ -776,7 +785,7 @@ export async function POST(
 
         room.current_word_index += 1;
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -784,7 +793,7 @@ export async function POST(
       // -------------------------------------------------------------
       case "end_round": {
         if (room.status !== "playing") {
-          return NextResponse.json({ success: true, room });
+          return actionResponse({ success: true, room });
         }
 
         // Prevent premature ending if round was started less than 5 seconds ago (unless manually triggered by speaker)
@@ -793,7 +802,7 @@ export async function POST(
         const isCurrentSpeaker = body.speakerId && body.speakerId === room.current_turn?.speakerId;
         if (roundStartedAt > 0 && now < roundStartedAt + 5000 && !isCurrentSpeaker && !body.manualEnd) {
           // Ignore premature clock-drift triggers from background peers
-          return NextResponse.json({ success: true, room });
+          return actionResponse({ success: true, room });
         }
 
         room.status = "round_end";
@@ -834,7 +843,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({
+        return actionResponse({
           success: true,
           room,
           message: "Round ended. Room unlocked and waiting spectators admitted!",
@@ -849,7 +858,7 @@ export async function POST(
         room.status = "game_over";
         room.locked = false;
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -871,7 +880,7 @@ export async function POST(
         );
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -880,13 +889,13 @@ export async function POST(
       case "update_settings": {
         const actingHostId = String(hostId || playerId);
         if (room.host_id !== actingHostId) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Only the host can modify match settings" },
             { status: 403 }
           );
         }
         if (room.status === "playing") {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Cannot modify settings while a round is in progress" },
             { status: 400 }
           );
@@ -908,7 +917,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -920,7 +929,7 @@ export async function POST(
 
         // If someone other than the player themselves is toggling, verify they are the host
         if (actingHostId && actingHostId !== targetId && room.host_id !== actingHostId) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Only the host or the player can toggle away status" },
             { status: 403 }
           );
@@ -936,7 +945,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({
+        return actionResponse({
           success: true,
           room,
           isInactive: !isCurrentlyInactive,
@@ -976,7 +985,7 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -986,7 +995,7 @@ export async function POST(
         const id = String(playerId);
         const newName = String(body.newName || "").trim();
         if (!newName) {
-          return NextResponse.json({ error: "Name cannot be empty" }, { status: 400 });
+          return actionResponse({ error: "Name cannot be empty" }, { status: 400 });
         }
 
         const normNew = newName.toLowerCase();
@@ -997,7 +1006,7 @@ export async function POST(
             (d) => d.id !== id && d.name?.trim().toLowerCase() === normNew
           );
           if (isTaken) {
-            return NextResponse.json(
+            return actionResponse(
               { error: `The name "${newName}" is already taken by another scholar in this room.` },
               { status: 400 }
             );
@@ -1025,7 +1034,7 @@ export async function POST(
 
         sanitizeRoomPlayers(room);
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -1034,7 +1043,7 @@ export async function POST(
       case "kick_player": {
         const actingHostId = String(hostId || playerId);
         if (room.host_id !== actingHostId) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Only the room host can remove players from the match" },
             { status: 403 }
           );
@@ -1042,11 +1051,11 @@ export async function POST(
 
         const targetId = String(body.targetPlayerId || "").trim();
         if (!targetId) {
-          return NextResponse.json({ error: "Missing targetPlayerId" }, { status: 400 });
+          return actionResponse({ error: "Missing targetPlayerId" }, { status: 400 });
         }
 
         if (targetId === room.host_id) {
-          return NextResponse.json({ error: "The host cannot kick themselves from the room" }, { status: 400 });
+          return actionResponse({ error: "The host cannot kick themselves from the room" }, { status: 400 });
         }
 
         // Remove from everywhere
@@ -1076,7 +1085,7 @@ export async function POST(
         sanitizeRoomPlayers(room);
         await persistRoom(room);
 
-        return NextResponse.json({
+        return actionResponse({
           success: true,
           room,
           kickedPlayerId: targetId,
@@ -1089,7 +1098,7 @@ export async function POST(
       case "rename_room": {
         const actingHostId = String(hostId || playerId);
         if (room.host_id !== actingHostId) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Only the host can rename the match" },
             { status: 403 }
           );
@@ -1098,7 +1107,7 @@ export async function POST(
         room.room_name = newRoomName || undefined;
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       // -------------------------------------------------------------
@@ -1107,7 +1116,7 @@ export async function POST(
       case "rename_team": {
         const actingHostId = String(hostId || playerId);
         if (room.host_id !== actingHostId) {
-          return NextResponse.json(
+          return actionResponse(
             { error: "Only the host can rename teams" },
             { status: 403 }
           );
@@ -1120,15 +1129,15 @@ export async function POST(
         }
 
         await persistRoom(room);
-        return NextResponse.json({ success: true, room });
+        return actionResponse({ success: true, room });
       }
 
       default:
-        return NextResponse.json({ error: "Unknown action" }, { status: 400 });
+        return actionResponse({ error: "Unknown action" }, { status: 400 });
     }
   } catch (error) {
     console.error("Error performing room action:", error);
-    return NextResponse.json(
+    return actionResponse(
       { error: "Internal server error" },
       { status: 500 }
     );

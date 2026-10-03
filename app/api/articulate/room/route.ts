@@ -88,6 +88,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       room: newRoom,
+      serverTime: Date.now(),
     });
   } catch (error) {
     console.error("Error creating articulate room:", error);
@@ -187,6 +188,7 @@ export async function GET(req: NextRequest) {
       success: true,
       exists: true,
       room,
+      serverTime: Date.now(),
     });
   } catch (error) {
     console.error("Error fetching articulate room:", error);

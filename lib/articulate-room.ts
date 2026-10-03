@@ -52,6 +52,7 @@ export interface CurrentTurn {
   startedAt: number;
   durationSeconds: number;
   countdownEndsAt?: number;
+  turnEndsAt?: number;
 }
 
 export type DisputeStatus = "none" | "disputed" | "conceded" | "rejected";

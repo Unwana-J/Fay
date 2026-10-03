@@ -104,6 +104,21 @@ export default function ArticulateRoomPage({
   const hasJoinedRef = useRef(false);
   const hasDispatchedEndRoundRef = useRef<number | null>(null);
   const hasBuzzedTurnRef = useRef<string | null>(null);
+  const dismissedCountdownsRef = useRef<Set<string>>(new Set());
+  const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
+  const serverOffsetRef = useRef<number>(0);
+
+  // Cristian's Algorithm: Synchronize client clock with server clock across all peers
+  const recordServerTimeOffset = useCallback((serverTime: number | undefined, reqStart: number, reqEnd: number) => {
+    if (typeof serverTime !== "number" || isNaN(serverTime)) return;
+    const measuredOffset = Math.round(serverTime - (reqStart + reqEnd) / 2);
+    if (serverOffsetRef.current === 0) {
+      serverOffsetRef.current = measuredOffset;
+    } else {
+      // Smoothed exponential moving average filter to reject network latency jitter
+      serverOffsetRef.current = Math.round(serverOffsetRef.current * 0.7 + measuredOffset * 0.3);
+    }
+  }, []);
 
   // Pre-warm audio engine on page mount to eliminate cold-start hardware latency
   useEffect(() => {
@@ -151,7 +166,9 @@ export default function ArticulateRoomPage({
   // 1. Fetch Room State (Safe from transient serverless 404s)
   const fetchRoomState = useCallback(async (isInitial = false) => {
     try {
+      const reqStart = Date.now();
       const res = await fetch(`/api/articulate/room?code=${roomCode}`);
+      const reqEnd = Date.now();
       if (!res.ok) {
         // ONLY trigger fatal full-page error on initial load if room has never been loaded
         if (isInitial && res.status === 404) {
@@ -160,6 +177,9 @@ export default function ArticulateRoomPage({
         return null;
       }
       const data = await res.json();
+      if (typeof data.serverTime === "number") {
+        recordServerTimeOffset(data.serverTime, reqStart, reqEnd);
+      }
       if (data.room) {
         setRoom((prev) => {
           if (!prev) return data.room;
@@ -197,18 +217,23 @@ export default function ArticulateRoomPage({
         setLoading(false);
       }
     }
-  }, [roomCode]);
+  }, [recordServerTimeOffset, roomCode]);
 
   // 2. Dispatch Server Action
   const dispatchAction = useCallback(
     async (actionPayload: Record<string, any>) => {
       try {
+        const reqStart = Date.now();
         const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(actionPayload),
         });
+        const reqEnd = Date.now();
         const data = await res.json();
+        if (typeof data.serverTime === "number") {
+          recordServerTimeOffset(data.serverTime, reqStart, reqEnd);
+        }
         if (data.room) {
           setRoom((prev) => {
             if (!prev) return data.room;
@@ -250,7 +275,7 @@ export default function ArticulateRoomPage({
         console.error("Action error:", err);
       }
     },
-    [roomCode]
+    [recordServerTimeOffset, roomCode]
   );
 
   const storedUsername = (profile?.username || savedLocalName)?.trim();
@@ -654,6 +679,7 @@ export default function ArticulateRoomPage({
       })
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
+          setIsRealtimeConnected(true);
           await channel.track({
             id: myPlayerId,
             name: effectivePlayerName,
@@ -661,36 +687,40 @@ export default function ArticulateRoomPage({
             isHost: room?.host_id === myPlayerId,
             joinedAt: Date.now(),
           });
+        } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+          setIsRealtimeConnected(false);
         }
       });
 
     return () => {
       channel.unsubscribe();
       channelRef.current = null;
+      setIsRealtimeConnected(false);
     };
   }, [effectivePlayerName, fetchRoomState, myAvatar, myPlayerId, room?.host_id, roomCode]);
 
-  // 5. Polling Fallback (sync every 3s for seamless multi-device updates)
+  // 5. Smart Polling Fallback (25s sanity check when Realtime WebSocket is connected, 3s if disconnected)
   useEffect(() => {
+    const pollInterval = isRealtimeConnected ? 25000 : 3000;
     const interval = setInterval(() => {
       fetchRoomState();
-    }, 3000);
+    }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [fetchRoomState]);
+  }, [fetchRoomState, isRealtimeConnected]);
 
   const currentTurnStartedAt = room?.current_turn?.startedAt;
   const currentTurnRound = room?.current_turn?.roundNumber;
   const currentRoomStatus = room?.status;
   const currentDuration = room?.current_turn?.durationSeconds || room?.settings?.timerSeconds || 30;
   const currentCountdownEndsAt = room?.current_turn?.countdownEndsAt || currentTurnStartedAt || 0;
+  const currentTurnEndsAt =
+    room?.current_turn?.turnEndsAt ||
+    (currentCountdownEndsAt ? currentCountdownEndsAt + currentDuration * 1000 : 0);
   const currentSpeakerId = room?.current_turn?.speakerId;
   const currentHostId = room?.host_id;
 
-  // 6. Resilient Client-Anchored Countdown & Round Timer
-  const turnAnchorMapRef = useRef<Record<string, number>>({});
-  const completedCountdownTurnsRef = useRef<Set<string>>(new Set());
-
+  // 6. Resilient Synchronized Absolute-Target Timer (Millisecond-accurate across all players)
   const activeTurnRound = room?.current_turn?.roundNumber || 0;
   const activeTurnTeam = room?.current_turn?.activeTeam || "A";
   const activeTurnSpeaker = room?.current_turn?.speakerId || "";
@@ -700,90 +730,49 @@ export default function ArticulateRoomPage({
       : null;
 
   useEffect(() => {
-    if (currentRoomStatus !== "playing" || !activeTurnKey) {
+    if (currentRoomStatus !== "playing" || !activeTurnKey || !currentCountdownEndsAt) {
       setCountdownRemaining(null);
       return;
     }
 
     const duration = currentDuration;
-
-    // Anchor local start time ONCE per turn key (synchronized with server timestamp if available)
-    if (!turnAnchorMapRef.current[activeTurnKey]) {
-      const serverCountdownEnds = currentCountdownEndsAt;
-      const now = Date.now();
-      if (serverCountdownEnds && Math.abs(now - serverCountdownEnds) < (duration + 15) * 1000) {
-        turnAnchorMapRef.current[activeTurnKey] = serverCountdownEnds - 3500;
-      } else {
-        turnAnchorMapRef.current[activeTurnKey] = now;
-      }
-    }
-
-    const localStart = turnAnchorMapRef.current[activeTurnKey];
     const canonicalTurnKey = `r${activeTurnRound}_${activeTurnSpeaker}`;
 
     const updateTimer = () => {
-      const elapsedMs = Date.now() - localStart;
+      const syncedNow = Date.now() + (serverOffsetRef.current || 0);
 
-      // If this turn has already completed or dismissed its countdown, jump directly to active round timer
-      if (completedCountdownTurnsRef.current.has(activeTurnKey)) {
-        setCountdownRemaining((prev) => (prev !== null ? null : prev));
-        const activeElapsedSec = Math.floor(Math.max(0, elapsedMs - 3500) / 1000);
-        const remainingSec = Math.max(0, duration - activeElapsedSec);
-        setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
-
-        // Time's Up: Play buzzer sound across all participants and trigger end_round immediately
-        if (remainingSec <= 0 || elapsedMs >= 3500 + duration * 1000) {
-          if (hasBuzzedTurnRef.current !== canonicalTurnKey) {
-            hasBuzzedTurnRef.current = canonicalTurnKey;
-            playBuzzerSound(room?.settings?.buzzerSound || "classic");
-            if (channelRef.current) {
-              channelRef.current.send({
-                type: "broadcast",
-                event: "instant_buzzer",
-                payload: { turnKey: canonicalTurnKey, buzzerSound: room?.settings?.buzzerSound || "classic" },
-              });
-            }
-          }
-          if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
-            hasDispatchedEndRoundRef.current = activeTurnRound;
-            const isSpeakerOrHost =
-              myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
-            if (isSpeakerOrHost) {
-              dispatchAction({
-                action: "end_round",
-                speakerId: myPlayerId,
-              });
-            }
-          }
-        }
+      // If countdown was dismissed manually by user for this turn
+      if (dismissedCountdownsRef.current.has(activeTurnKey) && syncedNow < currentCountdownEndsAt) {
+        setCountdownRemaining(null);
+        setSecondsRemaining(duration);
         return;
       }
 
-      // 1. Pre-round 3-second countdown (0ms - 3000ms)
-      if (elapsedMs < 3000) {
+      // Phase 1: Pre-round 3-second countdown (syncedNow < currentCountdownEndsAt - 500)
+      if (syncedNow < currentCountdownEndsAt - 500) {
         warmUpAudio();
-        const remainingCount = Math.max(1, 3 - Math.floor(elapsedMs / 1000));
-        setCountdownRemaining((prev) => (prev !== remainingCount ? remainingCount : prev));
-        setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
+        const msUntilGo = currentCountdownEndsAt - 500 - syncedNow;
+        const count = Math.max(1, Math.min(3, Math.ceil(msUntilGo / 1000)));
+        setCountdownRemaining(count);
+        setSecondsRemaining(duration);
         return;
       }
 
-      // 2. Flash "GO!" for 500ms (3000ms - 3500ms)
-      if (elapsedMs < 3500) {
-        setCountdownRemaining((prev) => (prev !== 0 ? 0 : prev));
-        setSecondsRemaining((prev) => (prev !== duration ? duration : prev));
+      // Phase 2: Flash "GO!" for 500ms before active round begins (currentCountdownEndsAt - 500 to currentCountdownEndsAt)
+      if (syncedNow < currentCountdownEndsAt) {
+        setCountdownRemaining(0); // 0 triggers the "GO!" animation overlay
+        setSecondsRemaining(duration);
         return;
       }
 
-      // 3. Active Round (3500ms onwards) - Permanently mark countdown as complete for this turn
-      completedCountdownTurnsRef.current.add(activeTurnKey);
-      setCountdownRemaining((prev) => (prev !== null ? null : prev));
-      const activeElapsedSec = Math.floor((elapsedMs - 3500) / 1000);
-      const remainingSec = Math.max(0, duration - activeElapsedSec);
-      setSecondsRemaining((prev) => (prev !== remainingSec ? remainingSec : prev));
+      // Phase 3: Active Round (syncedNow >= currentCountdownEndsAt)
+      setCountdownRemaining(null);
+      const msRemaining = currentTurnEndsAt - syncedNow;
+      const secRemaining = Math.max(0, Math.ceil(msRemaining / 1000));
+      setSecondsRemaining(secRemaining);
 
-      // 4. Time's Up: Play buzzer sound across all participants and trigger end_round immediately
-      if (remainingSec <= 0 || elapsedMs >= 3500 + duration * 1000) {
+      // Phase 4: Time's Up (Buzzer synchronized across all devices at exact same millisecond)
+      if (msRemaining <= 0) {
         if (hasBuzzedTurnRef.current !== canonicalTurnKey) {
           hasBuzzedTurnRef.current = canonicalTurnKey;
           playBuzzerSound(room?.settings?.buzzerSound || "classic");
@@ -795,6 +784,7 @@ export default function ArticulateRoomPage({
             });
           }
         }
+
         if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
           hasDispatchedEndRoundRef.current = activeTurnRound;
           const isSpeakerOrHost =
@@ -821,6 +811,8 @@ export default function ArticulateRoomPage({
     activeTurnRound,
     activeTurnSpeaker,
     currentDuration,
+    currentCountdownEndsAt,
+    currentTurnEndsAt,
     currentSpeakerId,
     currentHostId,
     dispatchAction,
@@ -1600,7 +1592,7 @@ export default function ArticulateRoomPage({
             activeTeam={room.current_turn.activeTeam}
             onDismiss={() => {
               if (activeTurnKey) {
-                completedCountdownTurnsRef.current.add(activeTurnKey);
+                dismissedCountdownsRef.current.add(activeTurnKey);
               }
               setCountdownRemaining(null);
             }}
