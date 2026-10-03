@@ -6,10 +6,20 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const users = await getAllUsers();
-    return NextResponse.json({ success: true, users });
+    const { lastUsersQueryError } = await import("@/lib/admin-data");
+    return NextResponse.json({
+      success: true,
+      users,
+      debug: {
+        supabaseConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+        supabaseUrlSet: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
+        anonKeySet: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
+        queryResult: lastUsersQueryError,
+      }
+    });
   } catch (err: any) {
     console.error("Error fetching admin users:", err);
-    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error", message: err?.message }, { status: 500 });
   }
 }
 

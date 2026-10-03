@@ -203,7 +203,10 @@ export async function updateIncidentStatus(id: string, status: IncidentReportIte
 
 // ─── Users & Moderation ───────────────────────────────────────────────────────
 
+export let lastUsersQueryError: any = null;
+
 export async function getAllUsers(): Promise<AdminUserItem[]> {
+  lastUsersQueryError = null;
   if (isSupabaseConfigured && supabase) {
     try {
       const { data, error } = await supabase
@@ -212,6 +215,7 @@ export async function getAllUsers(): Promise<AdminUserItem[]> {
         .order("xp", { ascending: false });
 
       if (error) {
+        lastUsersQueryError = { message: error.message, details: error.details, hint: error.hint, code: error.code };
         console.error("Supabase getAllUsers error:", error.message, error.details);
       }
       if (!error && data && data.length > 0) {
@@ -231,10 +235,15 @@ export async function getAllUsers(): Promise<AdminUserItem[]> {
           lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "Recent",
         }));
       }
-    } catch (err) {
+      if (!error && data) {
+        lastUsersQueryError = { status: "Empty table returned", count: data.length };
+      }
+    } catch (err: any) {
+      lastUsersQueryError = { caught: err?.message };
       console.warn("Supabase getAllUsers warning, using fallback list:", err);
     }
   } else {
+    lastUsersQueryError = { error: "Supabase not configured (missing env vars)" };
     console.warn("Supabase is not configured on server (missing URL or Anon key)");
   }
   return fallbackUsers;
