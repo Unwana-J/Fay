@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { getAllFeedback, getAllIncidents, getAllUsers } from "@/lib/admin-data";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const [feedback, incidents, users] = await Promise.all([

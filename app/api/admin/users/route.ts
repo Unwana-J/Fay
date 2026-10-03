@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllUsers, moderateUser } from "@/lib/admin-data";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
   try {
     const users = await getAllUsers();

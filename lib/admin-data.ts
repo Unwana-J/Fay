@@ -211,6 +211,9 @@ export async function getAllUsers(): Promise<AdminUserItem[]> {
         .select("*")
         .order("xp", { ascending: false });
 
+      if (error) {
+        console.error("Supabase getAllUsers error:", error.message, error.details);
+      }
       if (!error && data && data.length > 0) {
         return data.map((p: any) => ({
           id: p.id,
@@ -231,6 +234,8 @@ export async function getAllUsers(): Promise<AdminUserItem[]> {
     } catch (err) {
       console.warn("Supabase getAllUsers warning, using fallback list:", err);
     }
+  } else {
+    console.warn("Supabase is not configured on server (missing URL or Anon key)");
   }
   return fallbackUsers;
 }
