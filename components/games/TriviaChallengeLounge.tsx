@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowRight,
   Clock,
@@ -21,6 +21,9 @@ import {
   ChevronDown,
   ChevronUp,
   User,
+  Globe,
+  Trash2,
+  Compass,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import {
@@ -33,6 +36,8 @@ import {
   encodeChallengeToUrl,
   saveLocalChallenge,
   getAllLocalChallenges,
+  getPublicChallenges,
+  deleteLocalChallenge,
   getLocalChallengeScores,
   DURATION_CHOICES,
 } from "@/lib/trivia-challenge";
@@ -65,41 +70,40 @@ export function VisibleCountdownTimer({
 
   if (countdown.isIndefinite) {
     return (
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-mono text-[var(--text-dim)]">
-        <span className="text-[var(--gold)] text-sm">∞</span>
-        <span>Untimed Challenge (Open Indefinitely)</span>
+      <div className="inline-flex items-center gap-2 px-3 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[11px] font-mono text-[var(--text-dim)]">
+        <span className="text-[var(--gold)] text-xs">∞</span>
+        <span>Open Indefinitely</span>
       </div>
     );
   }
 
   if (countdown.isExpired) {
     return (
-      <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-xs font-mono font-bold">
-        <span className="w-2 h-2 rounded-full bg-rose-500 shrink-0" />
-        <span>Gauntlet Concluded · Submissions Closed</span>
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 dark:text-rose-400 text-[11px] font-mono font-bold">
+        <span className="w-1.5 h-1.5 rounded-full bg-rose-500 shrink-0" />
+        <span>Concluded</span>
+      </div>
+    );
+  }
+
+  if (compact) {
+    return (
+      <div className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-[11px] font-mono font-bold">
+        <span className="relative flex h-1.5 w-1.5 shrink-0">
+          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+          <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" />
+        </span>
+        <Clock size={11} className="shrink-0" />
+        <span className="tracking-tight">{countdown.formattedClock}</span>
+        <span className="text-[10px] text-emerald-700/70 dark:text-emerald-400/70">left</span>
       </div>
     );
   }
 
   const pad = (n: number) => n.toString().padStart(2, "0");
 
-  if (compact) {
-    return (
-      <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-800 dark:text-emerald-300 text-xs font-mono">
-        <span className="relative flex h-2 w-2 shrink-0">
-          <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
-        </span>
-        <Clock size={11} className="shrink-0" />
-        <span className="font-bold tracking-tight">{countdown.formattedClock}</span>
-        <span className="text-[10px] text-emerald-700/70 dark:text-emerald-400/70">left</span>
-      </div>
-    );
-  }
-
   return (
     <div className="rounded-2xl p-3 sm:p-4 bg-[var(--bg-base)]/90 dark:bg-black/40 border border-[var(--border-dim)] shadow-xs backdrop-blur-xs flex flex-col gap-2.5 w-full sm:w-auto sm:min-w-[300px]">
-      {/* Header bar */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <span className="relative flex h-2 w-2 shrink-0">
@@ -115,7 +119,6 @@ export function VisibleCountdownTimer({
         </span>
       </div>
 
-      {/* Digits Display */}
       <div className="flex items-center gap-1.5 sm:gap-2 justify-center sm:justify-start">
         {countdown.days > 0 && (
           <>
@@ -133,7 +136,6 @@ export function VisibleCountdownTimer({
           </>
         )}
 
-        {/* Hours */}
         <div className="flex flex-col items-center">
           <div className="min-w-[40px] sm:min-w-[48px] px-2 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-inner text-center">
             <span className="font-mono font-black text-xl sm:text-2xl text-[var(--text)] tracking-wider">
@@ -147,7 +149,6 @@ export function VisibleCountdownTimer({
 
         <span className="font-mono font-bold text-lg sm:text-xl text-[var(--text-mute)] -mt-4 animate-pulse">:</span>
 
-        {/* Mins */}
         <div className="flex flex-col items-center">
           <div className="min-w-[40px] sm:min-w-[48px] px-2 py-1.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-inner text-center">
             <span className="font-mono font-black text-xl sm:text-2xl text-[var(--text)] tracking-wider">
@@ -161,7 +162,6 @@ export function VisibleCountdownTimer({
 
         <span className="font-mono font-bold text-lg sm:text-xl text-[var(--text-mute)] -mt-4 animate-pulse">:</span>
 
-        {/* Secs */}
         <div className="flex flex-col items-center">
           <div className="min-w-[40px] sm:min-w-[48px] px-2 py-1.5 rounded-xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/35 shadow-inner text-center">
             <span className="font-mono font-black text-xl sm:text-2xl text-[#008751] dark:text-emerald-400 tracking-wider">
@@ -174,7 +174,6 @@ export function VisibleCountdownTimer({
         </div>
       </div>
 
-      {/* Progress Bar & Sub-stats */}
       <div className="space-y-1 pt-0.5">
         <div className="w-full h-1.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] overflow-hidden">
           <div
@@ -187,7 +186,7 @@ export function VisibleCountdownTimer({
         </div>
         <div className="flex items-center justify-between text-[9px] font-mono text-[var(--text-dim)] px-0.5">
           <span>{Math.round(countdown.percentRemaining)}% window remaining</span>
-          <span>{challenge.durationHours}h gauntlet</span>
+          <span>{challenge.durationHours > 0 ? `${challenge.durationHours}h gauntlet` : "Permanent"}</span>
         </div>
       </div>
     </div>
@@ -208,33 +207,39 @@ export default function TriviaChallengeLounge({
   const { profile, updateProfile } = useAppStore();
 
   const [localChallenges, setLocalChallenges] = useState<TriviaChallenge[]>([]);
+  const [publicChallenges, setPublicChallenges] = useState<TriviaChallenge[]>([]);
+  const [selectedSubTab, setSelectedSubTab] = useState<"my" | "public">("public");
+  const [publicCategoryFilter, setPublicCategoryFilter] = useState<string>("all");
+
   const [showRenameModal, setShowRenameModal] = useState(false);
   const [renameDraft, setRenameDraft] = useState("");
 
+  function refreshChallengeLists() {
+    setLocalChallenges(getAllLocalChallenges());
+    setPublicChallenges(getPublicChallenges());
+  }
+
   useEffect(() => {
-    const list = getAllLocalChallenges();
-    setLocalChallenges(list);
+    refreshChallengeLists();
   }, [activeChallenge]);
 
   const [view, setView] = useState<"list" | "detail" | "create" | "standings">(() => {
     if (activeChallenge) return "standings";
-    const existing = getAllLocalChallenges();
-    return existing.length > 0 ? "list" : "create";
+    return "list";
   });
 
+  // Creation form state
   const [title, setTitle] = useState("");
   const [durationHours, setDurationHours] = useState<number>(24);
-  const [questionCount, setQuestionCount] = useState<number>(15);
+  const [questionCount, setQuestionCount] = useState<number>(10);
   const [difficulty, setDifficulty] = useState<TriviaDifficultyFilter>("random");
+  const [category, setCategory] = useState<string>("all");
+  const [isPublic, setIsPublic] = useState<boolean>(true);
   const [createdChallenge, setCreatedChallenge] = useState<TriviaChallenge | null>(activeChallenge);
 
   const [copiedLink, setCopiedLink] = useState(false);
 
   const currentChallenge = activeChallenge || createdChallenge;
-
-  const [timeStatus, setTimeStatus] = useState(() =>
-    currentChallenge ? getChallengeTimeStatus(currentChallenge) : null
-  );
 
   const [scores, setScores] = useState<ChallengeParticipantScore[]>([]);
   const [isLoadingScores, setIsLoadingScores] = useState(false);
@@ -255,15 +260,6 @@ export default function TriviaChallengeLounge({
     }, 120);
   }
 
-  useEffect(() => {
-    if (!currentChallenge) return;
-    setTimeStatus(getChallengeTimeStatus(currentChallenge));
-    const interval = setInterval(() => {
-      setTimeStatus(getChallengeTimeStatus(currentChallenge));
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [currentChallenge]);
-
   function loadScores() {
     if (!currentChallenge) return;
     setIsLoadingScores(true);
@@ -278,7 +274,6 @@ export default function TriviaChallengeLounge({
       .then((res) => res.json())
       .then((data) => {
         if (data.configured && Array.isArray(data.scores) && data.scores.length > 0) {
-          // Cloud scores are authoritative: map directly
           const cloudList: ChallengeParticipantScore[] = data.scores.map((cs: any) => ({
             id: cs.id,
             username: cs.username,
@@ -290,7 +285,6 @@ export default function TriviaChallengeLounge({
             completedAt: new Date(cs.created_at).getTime(),
           }));
 
-          // Sync local storage so stale or renamed player names are updated in browser cache
           try {
             if (typeof window !== "undefined") {
               const key = `fey_tc_${currentChallenge.id}_scores`;
@@ -340,12 +334,14 @@ export default function TriviaChallengeLounge({
       durationHours,
       questionCount,
       difficulty,
+      category,
+      isPublic,
     });
 
     saveLocalChallenge(challenge);
     setCreatedChallenge(challenge);
     onSelectChallenge(challenge);
-    setLocalChallenges(getAllLocalChallenges());
+    refreshChallengeLists();
     setView("standings");
   }
 
@@ -366,27 +362,49 @@ export default function TriviaChallengeLounge({
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   }
 
-  // ── View 1: List of Active & Past Group Challenges ──
+  function handleDeleteChallenge(id: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    if (confirm("Delete this challenge from your list?")) {
+      deleteLocalChallenge(id);
+      refreshChallengeLists();
+    }
+  }
+
+  // Filtered public list
+  const filteredPublicChallenges = useMemo(() => {
+    if (publicCategoryFilter === "all") return publicChallenges;
+    return publicChallenges.filter(
+      (c) => c.category?.toLowerCase() === publicCategoryFilter.toLowerCase()
+    );
+  }, [publicChallenges, publicCategoryFilter]);
+
+  // ── View 1: List of Active & Past Challenges + Public Arena Feed ──
   if (view === "list") {
-    const activeList = localChallenges.filter((c) => !getChallengeTimeStatus(c).isExpired);
-    const pastList = localChallenges.filter((c) => getChallengeTimeStatus(c).isExpired);
+    const activeMyList = localChallenges.filter((c) => !getChallengeTimeStatus(c).isExpired);
+    const pastMyList = localChallenges.filter((c) => getChallengeTimeStatus(c).isExpired);
 
     return (
-      <div className="surface rounded-2xl sm:rounded-3xl p-5 sm:p-7 border shadow-xs space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5" style={{ borderColor: "var(--border-dim)" }}>
+      <div className="surface rounded-3xl p-5 sm:p-7 border shadow-xs space-y-6">
+        {/* Top Header */}
+        <div
+          className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-5"
+          style={{ borderColor: "var(--border-dim)" }}
+        >
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-[var(--terra)]" />
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--olive)]">
-                Scholar Gauntlets
+                Head-to-Head Gauntlets
               </span>
             </div>
-            <h2 className="font-space font-extrabold text-2xl tracking-tight" style={{ color: "var(--text)" }}>
-              Your Group Challenges
+            <h2
+              className="font-space font-extrabold text-2xl tracking-tight"
+              style={{ color: "var(--text)" }}
+            >
+              Trivia Challenges &amp; Arena
             </h2>
             <p className="text-xs sm:text-sm text-[var(--text-dim)] mt-0.5">
-              Track custom leaderboards, invite friends, and compete on identical question decks.
+              Play identical decks, invite friends to 1v1 duels, or compete in public community clashes.
             </p>
           </div>
 
@@ -395,23 +413,66 @@ export default function TriviaChallengeLounge({
             className="px-4 py-2.5 rounded-xl btn-terra font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all whitespace-nowrap self-start sm:self-auto shrink-0"
           >
             <Swords size={13} />
-            <span>+ Convene Challenge</span>
+            <span>+ Create Challenge</span>
           </button>
         </div>
 
-        {/* Section 1: Active Challenges */}
-        {activeList.length > 0 && (
+        {/* Sub-tab switcher: Public Community Arena vs My Challenges */}
+        <div className="flex items-center gap-2 p-1 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-dim)]">
+          <button
+            type="button"
+            onClick={() => setSelectedSubTab("public")}
+            className={cn(
+              "flex-1 py-2 sm:py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+              selectedSubTab === "public"
+                ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+                : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            )}
+          >
+            <Globe size={13} className="text-[var(--olive)]" />
+            <span>🌍 Public Community Arena ({publicChallenges.length})</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setSelectedSubTab("my")}
+            className={cn(
+              "flex-1 py-2 sm:py-2.5 px-3 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer",
+              selectedSubTab === "my"
+                ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+                : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            )}
+          >
+            <Swords size={13} className="text-[var(--terra)]" />
+            <span>⚔️ My Challenges ({localChallenges.length})</span>
+          </button>
+        </div>
+
+        {/* ── Tab Mode 1: Public Community Arena ── */}
+        {selectedSubTab === "public" && (
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--olive)] flex items-center gap-2">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                <span>Live Gauntlets ({activeList.length})</span>
-              </span>
+            {/* Category filter pills */}
+            <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
+              {["all", "History", "Pop Culture", "General Knowledge"].map((cat) => (
+                <button
+                  key={cat}
+                  type="button"
+                  onClick={() => setPublicCategoryFilter(cat)}
+                  className={cn(
+                    "px-3 py-1.5 rounded-xl font-space text-[11px] font-bold transition-all shrink-0 cursor-pointer border",
+                    publicCategoryFilter.toLowerCase() === cat.toLowerCase()
+                      ? "border-[var(--olive)] bg-[var(--olive)]/15 text-[var(--text)] shadow-xs"
+                      : "border-[var(--border-dim)] bg-[var(--bg-input)] text-[var(--text-dim)] hover:text-[var(--text)]"
+                  )}
+                >
+                  {cat === "all" ? "All Disciplines" : cat}
+                </button>
+              ))}
             </div>
 
+            {/* Public Gauntlets List */}
             <div className="grid grid-cols-1 gap-4">
-              {activeList.map((c) => {
-                const status = getChallengeTimeStatus(c);
+              {filteredPublicChallenges.map((c) => {
                 const cScores = getLocalChallengeScores(c.id);
 
                 return (
@@ -421,21 +482,35 @@ export default function TriviaChallengeLounge({
                     style={{ borderColor: "var(--border-dim)" }}
                   >
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                      {/* Left info */}
+                      {/* Left details */}
                       <div className="space-y-1.5 min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
                           <VisibleCountdownTimer challenge={c} compact />
+                          {c.category && (
+                            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded-full bg-[var(--olive)]/10 text-[var(--olive)] border border-[var(--olive)]/30 font-bold">
+                              {c.category}
+                            </span>
+                          )}
                           <span className="text-[10px] font-mono capitalize px-2 py-0.5 rounded-full bg-[var(--bg-input)] text-[var(--text-dim)] border border-[var(--border-dim)]">
                             {c.difficulty}
                           </span>
                         </div>
 
-                        <h3 className="font-space font-extrabold text-xl tracking-tight" style={{ color: "var(--text)" }}>
+                        <h3
+                          className="font-space font-extrabold text-lg sm:text-xl tracking-tight"
+                          style={{ color: "var(--text)" }}
+                        >
                           {c.title}
                         </h3>
 
-                        <div className="text-xs text-[var(--text-dim)] flex flex-wrap items-center gap-x-2 gap-y-1">
-                          <span>Convened by <strong>Scholar {c.creatorName}</strong></span>
+                        {c.description && (
+                          <p className="text-xs text-[var(--text-dim)] leading-relaxed max-w-xl">
+                            {c.description}
+                          </p>
+                        )}
+
+                        <div className="text-xs text-[var(--text-dim)] flex flex-wrap items-center gap-x-2 gap-y-1 pt-1">
+                          <span>By <strong>{c.creatorName}</strong></span>
                           <span>•</span>
                           <span>{c.questionCount} Questions</span>
                           <span>•</span>
@@ -445,9 +520,10 @@ export default function TriviaChallengeLounge({
                         </div>
                       </div>
 
-                      {/* Actions */}
+                      {/* Right Actions */}
                       <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 shrink-0 pt-3 sm:pt-0 border-t sm:border-t-0 border-[var(--border-dim)]">
                         <button
+                          type="button"
                           onClick={() => {
                             onSelectChallenge(c);
                             setCreatedChallenge(c);
@@ -457,17 +533,19 @@ export default function TriviaChallengeLounge({
                           style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
                         >
                           <Trophy size={13} className="text-[var(--gold)]" />
-                          <span>Leaderboard</span>
+                          <span>Board</span>
                         </button>
 
                         <button
+                          type="button"
                           onClick={() => {
                             onSelectChallenge(c);
                             onPlayChallenge(c);
                           }}
                           className="px-4 py-2.5 rounded-xl btn-terra font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all text-center whitespace-nowrap"
                         >
-                          <span>Play Deck</span>
+                          <Zap size={13} />
+                          <span>Play Gauntlet</span>
                           <ArrowRight size={13} />
                         </button>
                       </div>
@@ -479,90 +557,176 @@ export default function TriviaChallengeLounge({
           </div>
         )}
 
-        {/* Section 2: Concluded Challenges */}
-        {pastList.length > 0 && (
-          <div className="space-y-3 pt-4 border-t" style={{ borderColor: "var(--border-dim)" }}>
-            <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--text-mute)] block">
-              Concluded Gauntlets ({pastList.length})
-            </span>
+        {/* ── Tab Mode 2: My Created Challenges & Duels ── */}
+        {selectedSubTab === "my" && (
+          <div className="space-y-6">
+            {/* Active challenges */}
+            {activeMyList.length > 0 && (
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--olive)] flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span>Live Gauntlets ({activeMyList.length})</span>
+                  </span>
+                </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {pastList.map((c) => {
-                const cScores = getLocalChallengeScores(c.id);
+                <div className="grid grid-cols-1 gap-3.5">
+                  {activeMyList.map((c) => {
+                    const cScores = getLocalChallengeScores(c.id);
 
-                return (
-                  <div
-                    key={c.id}
-                    className="p-4 rounded-2xl border surface opacity-90 hover:opacity-100 transition-opacity flex flex-col sm:flex-row sm:items-center justify-between gap-3"
-                    style={{ borderColor: "var(--border-dim)" }}
-                  >
-                    <div className="min-w-0">
-                      <span className="text-[10px] font-mono uppercase text-[var(--text-mute)] block">
-                        Concluded · Ran for {c.durationHours}h
-                      </span>
-                      <h4 className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                        {c.title}
-                      </h4>
-                      <p className="text-[11px] text-[var(--text-dim)]">
-                        {cScores.length} Scholars competed
-                      </p>
-                    </div>
+                    return (
+                      <div
+                        key={c.id}
+                        className="p-5 rounded-2xl border surface transition-all hover:shadow-xs relative"
+                        style={{ borderColor: "var(--border-dim)" }}
+                      >
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                          <div className="space-y-1.5 min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <VisibleCountdownTimer challenge={c} compact />
+                              {c.isPublic && (
+                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-bold">
+                                  Public Arena
+                                </span>
+                              )}
+                              <span className="text-[10px] font-mono capitalize px-2 py-0.5 rounded-full bg-[var(--bg-input)] text-[var(--text-dim)] border border-[var(--border-dim)]">
+                                {c.difficulty}
+                              </span>
+                            </div>
 
-                    <button
-                      onClick={() => {
-                        onSelectChallenge(c);
-                        setCreatedChallenge(c);
-                        setView("standings");
-                      }}
-                      className="w-full sm:w-auto px-3 py-1.5 rounded-lg border text-xs font-space font-bold cursor-pointer hover:bg-[var(--bg-card)] transition-colors text-center shrink-0"
-                      style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                            <h3 className="font-space font-extrabold text-lg text-[var(--text)] tracking-tight">
+                              {c.title}
+                            </h3>
+
+                            <div className="text-xs text-[var(--text-dim)] flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span>Convened by <strong>{c.creatorName}</strong></span>
+                              <span>•</span>
+                              <span>{c.questionCount} Questions</span>
+                              <span>•</span>
+                              <span className="flex items-center gap-1 font-semibold text-[var(--text)]">
+                                <Users size={12} /> {cScores.length} Contenders
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            <button
+                              type="button"
+                              onClick={(e) => handleDeleteChallenge(c.id, e)}
+                              className="p-2 rounded-xl border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300 cursor-pointer bg-[var(--bg-input)]"
+                              title="Delete Challenge"
+                            >
+                              <Trash2 size={13} />
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectChallenge(c);
+                                setCreatedChallenge(c);
+                                setView("standings");
+                              }}
+                              className="px-3 py-2 rounded-xl border text-xs font-space font-bold cursor-pointer hover:bg-[var(--bg-card)]"
+                              style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                            >
+                              Leaderboard
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => {
+                                onSelectChallenge(c);
+                                onPlayChallenge(c);
+                              }}
+                              className="px-4 py-2 rounded-xl btn-terra text-xs font-space font-bold flex items-center gap-1.5 cursor-pointer shadow-sm"
+                            >
+                              <span>Play</span>
+                              <ArrowRight size={13} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Past challenges */}
+            {pastMyList.length > 0 && (
+              <div className="space-y-3 pt-3 border-t" style={{ borderColor: "var(--border-dim)" }}>
+                <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--text-mute)] block">
+                  Concluded Challenges ({pastMyList.length})
+                </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {pastMyList.map((c) => (
+                    <div
+                      key={c.id}
+                      className="p-4 rounded-2xl border surface opacity-90 hover:opacity-100 flex items-center justify-between gap-3"
+                      style={{ borderColor: "var(--border-dim)" }}
                     >
-                      Final Board
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+                      <div className="min-w-0">
+                        <span className="text-[10px] font-mono uppercase text-[var(--text-mute)] block">
+                          Concluded
+                        </span>
+                        <h4 className="font-space font-bold text-sm truncate text-[var(--text)]">
+                          {c.title}
+                        </h4>
+                      </div>
+                      <button
+                        onClick={() => {
+                          onSelectChallenge(c);
+                          setCreatedChallenge(c);
+                          setView("standings");
+                        }}
+                        className="px-3 py-1.5 rounded-lg border text-xs font-space font-bold cursor-pointer"
+                        style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                      >
+                        Board
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
-        {/* Empty State */}
-        {localChallenges.length === 0 && (
-          <div className="py-16 text-center space-y-3">
-            <div className="w-14 h-14 rounded-2xl bg-[var(--olive)]/10 text-[var(--olive)] mx-auto flex items-center justify-center text-xl">
-              <Swords size={24} />
-            </div>
-            <h3 className="font-space font-extrabold text-lg text-[var(--text)]">
-              No Group Challenges Yet
-            </h3>
-            <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
-              Convene an invitational gauntlet, pick a duration, and drop the link in your group chats to see who tops the leaderboard.
-            </p>
-            <button
-              onClick={() => setView("create")}
-              className="px-5 py-3 rounded-2xl btn-terra font-space font-bold text-xs cursor-pointer inline-flex items-center gap-2 shadow-sm"
-            >
-              <span>Convene Your First Challenge</span>
-              <ArrowRight size={13} />
-            </button>
+            {localChallenges.length === 0 && (
+              <div className="py-12 text-center space-y-3">
+                <div className="w-12 h-12 rounded-2xl bg-[var(--olive)]/10 text-[var(--olive)] mx-auto flex items-center justify-center">
+                  <Swords size={20} />
+                </div>
+                <h3 className="font-space font-extrabold text-base text-[var(--text)]">
+                  No Custom Gauntlets Created Yet
+                </h3>
+                <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
+                  Convene an invitational gauntlet, pick a duration, and drop the link in your group chats.
+                </p>
+                <button
+                  onClick={() => setView("create")}
+                  className="px-4 py-2.5 rounded-xl btn-terra font-space font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
+                >
+                  <span>Convene Your First Challenge</span>
+                  <ArrowRight size={13} />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
     );
   }
 
-  // ── View 2: Challenge Custom Leaderboard (Standings Arena) ──
+  // ── View 2: Challenge Standings / Leaderboard Arena ──
   if (currentChallenge && (view === "standings" || view === "detail")) {
     return (
       <div className="surface rounded-2xl p-6 sm:p-7 border shadow-xs space-y-6">
-        {/* Navigation & Actions Top Bar */}
         <div className="flex items-center justify-between border-b pb-4" style={{ borderColor: "var(--border-dim)" }}>
           <button
-            onClick={() => (localChallenges.length > 0 ? setView("list") : setView("create"))}
+            onClick={() => setView("list")}
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer"
           >
             <ArrowLeft size={13} />
-            <span>All Group Challenges</span>
+            <span>Back to Challenge Arena</span>
           </button>
 
           <div className="flex items-center gap-2">
@@ -570,7 +734,6 @@ export default function TriviaChallengeLounge({
               onClick={handleCopyLink}
               className="px-3.5 py-1.5 rounded-xl border text-xs font-space font-bold flex items-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors shadow-xs"
               style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
-              title="Copy URL directly"
             >
               {copiedLink ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
               <span>{copiedLink ? "Link Copied!" : "Copy Link"}</span>
@@ -579,7 +742,6 @@ export default function TriviaChallengeLounge({
             <button
               onClick={handleShareWhatsApp}
               className="px-3.5 py-1.5 rounded-xl text-xs font-space font-bold flex items-center gap-1.5 cursor-pointer bg-[#25D366] text-white hover:opacity-90 transition-opacity shadow-xs"
-              title="Share challenge on WhatsApp"
             >
               <Share2 size={13} />
               <span className="hidden sm:inline">WhatsApp</span>
@@ -596,327 +758,94 @@ export default function TriviaChallengeLounge({
           </div>
         </div>
 
-        {/* Hero Tournament Banner Plaque */}
+        {/* Hero Plaque */}
         <div
-          className="rounded-2xl sm:rounded-3xl p-5 sm:p-6 border relative overflow-hidden shadow-sm flex flex-col gap-5"
+          className="rounded-3xl p-6 sm:p-7 surface border relative overflow-hidden"
           style={{
-            background: "linear-gradient(135deg, rgba(0, 135, 81, 0.12) 0%, rgba(166, 124, 30, 0.08) 100%)",
-            borderColor: "rgba(0, 135, 81, 0.3)",
+            borderColor: "var(--border)",
+            background: "linear-gradient(135deg, rgba(221, 161, 94, 0.08) 0%, rgba(92, 106, 54, 0.08) 100%)",
           }}
         >
-          {/* Challenge Identity & Title (Full Width) */}
-          <div className="space-y-2">
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--olive)]/15 text-[#008751] dark:text-emerald-400 border border-[var(--olive)]/30">
-                <Swords size={11} /> Invitational Challenge
-              </span>
-              <span className="text-[10px] font-mono capitalize px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)]">
-                {currentChallenge.difficulty} Mode
-              </span>
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--terra)]">
+                  Group Gauntlet
+                </span>
+                {currentChallenge.isPublic && (
+                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/30">
+                    Public Community Arena
+                  </span>
+                )}
+              </div>
+
+              <h2 className="font-space font-extrabold text-2xl sm:text-3xl text-[var(--text)] tracking-tight">
+                {currentChallenge.title}
+              </h2>
+
+              <p className="text-xs sm:text-sm text-[var(--text-dim)]">
+                Host: <strong>Scholar {currentChallenge.creatorName}</strong> • {currentChallenge.questionCount} Questions •{" "}
+                <span className="capitalize">{currentChallenge.difficulty}</span> pool
+              </p>
             </div>
 
-            <h2 className="font-space text-2xl sm:text-3xl font-extrabold tracking-tight break-words" style={{ color: "var(--text)" }}>
-              {currentChallenge.title}
-            </h2>
-
-            <p className="text-xs sm:text-sm text-[var(--text-dim)]">
-              Convened by <strong>Scholar {currentChallenge.creatorName}</strong> · {currentChallenge.questionCount} Questions · {scores.length} {scores.length === 1 ? "Scholar" : "Scholars"} Competing
-            </p>
-          </div>
-
-          {/* Tournament Controls: Live Countdown Clock & Play Action */}
-          <div className="pt-3 border-t border-[var(--border-dim)]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div className="w-full sm:w-auto">
-              <VisibleCountdownTimer challenge={currentChallenge} />
-            </div>
-
-            <button
-              onClick={() => onPlayChallenge(currentChallenge)}
-              className="px-6 py-3.5 rounded-2xl btn-terra font-space font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all whitespace-nowrap self-stretch sm:self-auto shrink-0"
-            >
-              <span>Play Challenge Deck</span>
-              <ArrowRight size={15} />
-            </button>
+            <VisibleCountdownTimer challenge={currentChallenge} />
           </div>
         </div>
 
-        {/* Contenders Standings Table */}
-        {(() => {
-          const challengeUserIndex = scores.findIndex((s) =>
-            Boolean(
-              (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
-              (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
-            )
-          );
-          const visibleScores = isExpandedScores ? scores : scores.slice(0, INITIAL_LIMIT);
-          const showScoreUserSeparately = !isExpandedScores && challengeUserIndex >= INITIAL_LIMIT;
-          const userScoreItem = challengeUserIndex >= 0 ? scores[challengeUserIndex] : null;
-
-          return (
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--text-mute)] flex items-center gap-1.5">
-                    <Trophy size={13} />
-                    <span>Scholar Standings ({scores.length})</span>
-                  </span>
-                  {scores.length > INITIAL_LIMIT && (
-                    <span className="text-[10px] px-2 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] font-mono">
-                      {isExpandedScores ? `All ${scores.length}` : `Top 10 of ${scores.length}`}
-                    </span>
-                  )}
-                </div>
-
-                <div className="flex items-center gap-2.5">
-                  {challengeUserIndex >= 0 && (
-                    <button
-                      type="button"
-                      onClick={handleJumpToUserInChallenge}
-                      className="text-[10px] font-space font-bold px-2.5 py-0.5 rounded-full bg-[var(--olive)]/15 text-[#008751] hover:bg-[var(--olive)]/25 transition-colors cursor-pointer flex items-center gap-1 border border-[var(--olive)]/30"
-                      title="Jump directly to your score"
-                    >
-                      <User size={10} />
-                      <span>View You (#{challengeUserIndex + 1})</span>
-                    </button>
-                  )}
-                  <span className="text-[11px] font-mono text-[var(--text-dim)] flex items-center gap-1">
-                    <span>🔒 1st Attempt Locked</span>
-                  </span>
-                </div>
-              </div>
-
-              {scores.length === 0 ? (
-                <div className="surface rounded-2xl p-8 border text-center space-y-3" style={{ borderColor: "var(--border-dim)" }}>
-                  <p className="font-space font-bold text-base text-[var(--text)]">
-                    The Board Awaits Its First Champion
-                  </p>
-                  <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
-                    No scholars have submitted runs for this challenge yet. Be the first to establish the baseline. Only your first attempt is posted to the tournament board.
-                  </p>
-                  <button
-                    onClick={() => onPlayChallenge(currentChallenge)}
-                    className="px-4 py-2 rounded-xl btn-terra font-space font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
-                  >
-                    <span>Play First Run</span>
-                    <ArrowRight size={13} />
-                  </button>
-                </div>
-              ) : (
-                <div className="surface rounded-2xl border overflow-hidden shadow-xs divide-y" style={{ borderColor: "var(--border-dim)" }}>
-                  {visibleScores.map((s, idx) => {
-                    const isCurrentUser = Boolean(
-                      (profile?.username && s.username.toLowerCase() === profile.username.toLowerCase()) ||
-                      (profile?.id && s.id && (s.id.includes(profile.id) || s.id === profile.id))
-                    );
-                    const displayName = isCurrentUser && profile?.username ? profile.username : s.username;
-                    const isHighlighted = isCurrentUser && highlightScoreId !== null;
-
-                    return (
-                      <div
-                        key={s.id || s.username}
-                        id={isCurrentUser ? "lounge-challenge-user-row" : undefined}
-                        className={cn(
-                          "p-4 flex items-center justify-between gap-3 transition-all",
-                          isCurrentUser ? "bg-[var(--olive)]/5" : "hover:bg-[var(--bg-input)]/50",
-                          isHighlighted && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
-                        )}
-                        style={{
-                          borderLeft: isCurrentUser ? "4px solid var(--olive)" : "4px solid transparent",
-                        }}
-                      >
-                        {/* Rank & Identity */}
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 text-center shrink-0">
-                            {idx === 0 ? (
-                              <span className="text-xl">🥇</span>
-                            ) : idx === 1 ? (
-                              <span className="text-xl">🥈</span>
-                            ) : idx === 2 ? (
-                              <span className="text-xl">🥉</span>
-                            ) : (
-                              <span className="font-space font-bold text-xs text-[var(--text-mute)]">
-                                #{idx + 1}
-                              </span>
-                            )}
-                          </div>
-
-                          <UserAvatar avatar={s.avatar} size="md" />
-
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                                {displayName}
-                              </span>
-                              {isCurrentUser && (
-                                <div className="flex items-center gap-1">
-                                  <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
-                                    You
-                                  </span>
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      setRenameDraft(profile?.username || displayName);
-                                      setShowRenameModal(true);
-                                    }}
-                                    className="text-[10px] text-[var(--olive)] hover:underline font-bold inline-flex items-center gap-0.5 cursor-pointer"
-                                    title="Click to rename yourself"
-                                  >
-                                    <Pencil size={9} />
-                                    <span>edit</span>
-                                  </button>
-                                </div>
-                              )}
-                            </div>
-                            <div className="text-xs truncate flex items-center gap-1.5" style={{ color: "var(--text-mute)" }}>
-                              <span className="font-semibold">{s.gradeLabel || "Scholar"}</span>
-                              <span>•</span>
-                              <span className="text-[10px] font-mono text-emerald-700 dark:text-emerald-400">1st run locked</span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Score & Accuracy */}
-                        <div className="flex items-center gap-4 text-right shrink-0">
-                          <div>
-                            <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
-                              {s.pct}%
-                            </div>
-                            <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                              {s.score}/{s.total} score
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-
-                  {/* Pinned user standing if outside Top 10 */}
-                  {showScoreUserSeparately && userScoreItem && (
-                    <>
-                      <div className="px-4 py-2 bg-[var(--bg-input)]/40 text-center text-[10px] font-mono text-[var(--text-dim)] flex items-center justify-center gap-3">
-                        <div className="h-px bg-[var(--border-dim)] flex-1" />
-                        <span>
-                          ··· {challengeUserIndex - INITIAL_LIMIT > 0 ? `${challengeUserIndex - INITIAL_LIMIT} more scholars · ` : ""}your rank (#{challengeUserIndex + 1}) ···
-                        </span>
-                        <div className="h-px bg-[var(--border-dim)] flex-1" />
-                      </div>
-
-                      <div
-                        id="lounge-challenge-user-row"
-                        className={cn(
-                          "p-4 flex items-center justify-between gap-3 bg-[var(--olive)]/5 transition-all",
-                          highlightScoreId !== null && "ring-2 ring-[#008751] bg-[var(--olive)]/20 shadow-md"
-                        )}
-                        style={{
-                          borderLeft: "4px solid var(--olive)",
-                        }}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <div className="w-8 text-center shrink-0">
-                            <span className="font-space font-bold text-xs text-[var(--text-mute)]">
-                              #{challengeUserIndex + 1}
-                            </span>
-                          </div>
-
-                          <UserAvatar avatar={userScoreItem.avatar} size="md" />
-
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-space font-bold text-sm truncate" style={{ color: "var(--text)" }}>
-                                {profile?.username || userScoreItem.username}
-                              </span>
-                              <span className="text-[9px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
-                                You
-                              </span>
-                            </div>
-                            <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
-                              {userScoreItem.gradeLabel || "Scholar"}
-                            </div>
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-4 text-right shrink-0">
-                          <div>
-                            <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
-                              {userScoreItem.pct}%
-                            </div>
-                            <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                              {userScoreItem.score}/{userScoreItem.total} score
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* View More / Show Top 10 Toggle */}
-                  {scores.length > INITIAL_LIMIT && (
-                    <button
-                      type="button"
-                      onClick={() => setIsExpandedScores((prev) => !prev)}
-                      className="w-full py-3 px-4 bg-[var(--bg-card)]/40 hover:bg-[var(--bg-input)] text-xs font-space font-bold text-[var(--text)] flex items-center justify-center gap-2 cursor-pointer transition-colors border-t border-[var(--border-dim)]"
-                    >
-                      {isExpandedScores ? (
-                        <>
-                          <ChevronUp size={14} />
-                          <span>Show Top 10 Only</span>
-                        </>
-                      ) : (
-                        <>
-                          <ChevronDown size={14} />
-                          <span>View More ({scores.length - INITIAL_LIMIT} more scholars)</span>
-                        </>
-                      )}
-                    </button>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })()}
-
-        {/* Share & Invite Strip */}
-        <div className="surface rounded-2xl p-4 border space-y-2.5" style={{ borderColor: "var(--border-dim)" }}>
+        {/* Leaderboard Table */}
+        <div className="space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-space font-bold flex items-center gap-1.5" style={{ color: "var(--text)" }}>
-              <Share2 size={13} className="text-[var(--terra)]" />
-              <span>Invite Scholars to This Challenge</span>
-            </span>
-            <span className="text-[10px] text-[var(--text-mute)] font-mono">
-              Direct challenge link
-            </span>
+            <h3 className="font-space font-bold text-sm text-[var(--text)] flex items-center gap-1.5">
+              <Trophy size={14} className="text-[var(--gold)]" /> Live Standings ({scores.length} Contenders)
+            </h3>
+            <button
+              onClick={() => setShowRenameModal(true)}
+              className="text-xs font-mono text-[var(--olive)] hover:underline flex items-center gap-1 cursor-pointer"
+            >
+              <Pencil size={11} /> Rename Profile
+            </button>
           </div>
 
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-            <div className="flex-1 flex items-center gap-2 px-3 py-2 rounded-xl border bg-[var(--bg-input)]/50 min-w-0" style={{ borderColor: "var(--border-dim)" }}>
-              <span className="text-[11px] font-mono text-[var(--text-dim)] truncate select-all flex-1">
-                {shareableUrl}
-              </span>
+          {scores.length === 0 ? (
+            <div className="py-12 text-center text-xs text-[var(--text-dim)] border border-dashed rounded-2xl" style={{ borderColor: "var(--border-dim)" }}>
+              No contenders have completed this gauntlet yet. Be the first to play!
             </div>
+          ) : (
+            <div className="rounded-2xl border overflow-hidden surface divide-y divide-[var(--border-dim)]" style={{ borderColor: "var(--border-dim)" }}>
+              {scores.map((sc, idx) => {
+                const isTop3 = idx < 3;
+                return (
+                  <div
+                    key={sc.id || idx}
+                    className={cn(
+                      "p-3.5 sm:p-4 flex items-center justify-between gap-3 text-xs",
+                      idx === 0 && "bg-amber-500/5"
+                    )}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <span className="font-mono font-bold w-6 text-center text-sm">
+                        {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : `#${idx + 1}`}
+                      </span>
+                      <UserAvatar alt={sc.username} avatar={sc.avatar} size="sm" />
+                      <div className="min-w-0">
+                        <div className="font-space font-bold truncate text-[var(--text)]">
+                          {sc.username}
+                        </div>
+                        <div className="text-[10px] text-[var(--text-dim)]">
+                          {sc.score}/{sc.total} correct ({sc.pct}%)
+                        </div>
+                      </div>
+                    </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="flex-1 sm:flex-initial px-4 py-2 rounded-xl border text-xs font-space font-bold flex items-center justify-center gap-1.5 cursor-pointer hover:bg-[var(--bg-card)] transition-colors shadow-xs"
-                style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
-                title="Copy pure URL directly"
-              >
-                {copiedLink ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
-                <span>{copiedLink ? "Link Copied!" : "Copy Link"}</span>
-              </button>
-
-              <button
-                type="button"
-                onClick={handleShareWhatsApp}
-                className="px-4 py-2 rounded-xl text-xs font-space font-bold flex items-center justify-center gap-1.5 cursor-pointer bg-[#25D366] text-white hover:opacity-90 transition-opacity shadow-xs"
-                title="Share formatted invite to WhatsApp"
-              >
-                <Share2 size={13} />
-                <span>WhatsApp</span>
-              </button>
+                    <div className="font-mono font-bold text-sm text-[var(--text)]">
+                      {sc.pct}%
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          </div>
+          )}
         </div>
 
         {/* Footer Actions */}
@@ -935,89 +864,43 @@ export default function TriviaChallengeLounge({
             style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
           >
             {copiedLink ? <Check size={13} className="text-green-600" /> : <Copy size={13} />}
-            <span>{copiedLink ? "Link Copied to Clipboard" : "Copy Invite Link"}</span>
+            <span>{copiedLink ? "Link Copied" : "Copy Invite Link"}</span>
           </button>
         </div>
-
-        {/* Rename Identity Modal */}
-        {showRenameModal && (
-          <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-            <div className="surface rounded-2xl p-6 max-w-sm w-full border shadow-xl space-y-4">
-              <h3 className="font-space font-bold text-base text-[var(--text)]">
-                Change Your Scholar Identity
-              </h3>
-              <p className="text-xs text-[var(--text-dim)]">
-                Update your name across tournaments, challenge boards, and past scores.
-              </p>
-              <input
-                type="text"
-                value={renameDraft}
-                onChange={(e) => setRenameDraft(e.target.value)}
-                placeholder="Enter your name..."
-                maxLength={24}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] text-sm font-space font-bold focus:outline-hidden focus:border-[var(--olive)]"
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveName();
-                }}
-              />
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowRenameModal(false)}
-                  className="px-3 py-1.5 rounded-xl text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] cursor-pointer"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveName}
-                  className="px-4 py-1.5 rounded-xl btn-terra text-xs font-bold cursor-pointer"
-                >
-                  Save Name
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     );
   }
 
-  // ── View 3: Create a Challenge Form ──
+  // ── View 3: Create Challenge Form ──
   return (
     <form onSubmit={handleCreateChallenge} className="surface rounded-3xl p-7 sm:p-9 border shadow-sm space-y-7">
-      {/* Top back button if challenges exist */}
-      {localChallenges.length > 0 && (
-        <button
-          type="button"
-          onClick={() => setView("list")}
-          className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer"
-        >
-          <ArrowLeft size={13} />
-          <span>Back to My Challenges</span>
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => setView("list")}
+        className="inline-flex items-center gap-1.5 text-xs font-mono font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer"
+      >
+        <ArrowLeft size={13} />
+        <span>Back to Challenges</span>
+      </button>
 
-      {/* Heading */}
       <div className="border-b pb-5" style={{ borderColor: "var(--border-dim)" }}>
         <div className="flex items-center gap-2 mb-1.5">
           <span className="w-8 h-8 rounded-xl bg-[var(--terra-bg)] border border-[var(--terra)]/20 text-[var(--terra)] flex items-center justify-center">
             <Swords size={16} />
           </span>
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--olive)]">
-            Tournament Creator
+            Gauntlet Creator
           </span>
         </div>
         <h2 className="font-space font-extrabold text-2xl sm:text-3xl tracking-tight" style={{ color: "var(--text)" }}>
-          Convene an Invitational Challenge
+          Convene a Trivia Gauntlet
         </h2>
         <p className="text-sm mt-1" style={{ color: "var(--text-dim)" }}>
           Set your duration window, question pool, and invite friends to compete on an identical challenge deck.
         </p>
       </div>
 
-      {/* Field 1: Challenge Title */}
+      {/* Field 1: Title */}
       <div>
         <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-mute)] mb-2">
           Challenge Title
@@ -1026,34 +909,50 @@ export default function TriviaChallengeLounge({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={`e.g. ${profile?.username || "Scholar"}'s Independence Challenge`}
+          placeholder={`e.g. ${profile?.username || "Scholar"}'s Naija History Gauntlet`}
           className="w-full px-4 py-3.5 rounded-2xl border text-sm bg-[var(--bg-base)] focus:outline-none focus:border-[var(--olive)] transition-colors shadow-xs"
           style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
         />
       </div>
 
-      {/* Field 2: Duration / Time Window */}
-      <div>
-        <div className="flex items-center justify-between mb-2">
-          <label className="text-xs font-bold uppercase tracking-wider text-[var(--text-mute)] flex items-center gap-1.5">
-            <Clock size={13} />
-            <span>Challenge Duration</span>
-          </label>
-          <span className="text-[11px] font-mono text-[var(--text-dim)]">
-            How long the challenge remains open
-          </span>
+      {/* Field 2: Visibility Toggle (Public Arena vs Private Link) */}
+      <div className="p-4 rounded-2xl surface border space-y-2" style={{ borderColor: "var(--border-dim)" }}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Globe size={16} className="text-[var(--olive)]" />
+            <span className="font-space font-bold text-xs text-[var(--text)]">
+              Feature on Public Community Arena
+            </span>
+          </div>
+          <input
+            type="checkbox"
+            checked={isPublic}
+            onChange={(e) => setIsPublic(e.target.checked)}
+            className="w-4 h-4 accent-[var(--terra)] cursor-pointer"
+          />
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2.5">
+        <p className="text-[11px] text-[var(--text-dim)]">
+          When checked, any scholar browsing the Fey Community Arena can discover and accept your gauntlet.
+        </p>
+      </div>
+
+      {/* Field 3: Duration */}
+      <div>
+        <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-mute)] mb-2 flex items-center gap-1.5">
+          <Clock size={13} />
+          <span>Challenge Duration</span>
+        </label>
+        <div className="grid grid-cols-2 sm:grid-cols-6 gap-2">
           {DURATION_CHOICES.map((opt) => (
             <button
               key={opt.hours}
               type="button"
               onClick={() => setDurationHours(opt.hours)}
               className={cn(
-                "p-3 rounded-2xl border-2 text-center transition-all cursor-pointer",
+                "p-3 rounded-2xl border text-center transition-all cursor-pointer",
                 durationHours === opt.hours
                   ? "border-[var(--terra)] bg-[var(--terra-bg)] shadow-xs"
-                  : "border-[var(--border-dim)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]"
+                  : "border-[var(--border-dim)] hover:bg-[var(--bg-card)]"
               )}
             >
               <div className="text-xs font-space font-bold" style={{ color: "var(--text)" }}>
@@ -1067,27 +966,27 @@ export default function TriviaChallengeLounge({
         </div>
       </div>
 
-      {/* Field 3: Deck Size & Difficulty */}
+      {/* Field 4: Discipline & Difficulty */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <div>
           <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-mute)] mb-2 flex items-center gap-1.5">
-            <Target size={13} />
-            <span>Questions in Deck</span>
+            <Compass size={13} />
+            <span>Category</span>
           </label>
           <div className="grid grid-cols-3 gap-2">
-            {[10, 15, 25].map((count) => (
+            {["all", "History", "Culture", "Geography", "Sports", "Politics"].map((cat) => (
               <button
-                key={count}
+                key={cat}
                 type="button"
-                onClick={() => setQuestionCount(count)}
+                onClick={() => setCategory(cat)}
                 className={cn(
-                  "py-2.5 px-3 rounded-xl border text-xs font-space font-bold transition-all cursor-pointer",
-                  questionCount === count
-                    ? "border-[var(--olive)] bg-[var(--olive)]/10 text-[var(--text)] shadow-xs"
+                  "py-2.5 px-2 rounded-xl border text-xs font-space font-bold transition-all cursor-pointer capitalize text-center",
+                  category === cat
+                    ? "border-[var(--olive)] bg-[var(--olive)]/15 text-[var(--text)] shadow-xs"
                     : "border-[var(--border-dim)] text-[var(--text-mute)] hover:text-[var(--text)]"
                 )}
               >
-                {count} Questions
+                {cat === "all" ? "Mixed" : cat}
               </button>
             ))}
           </div>
@@ -1107,7 +1006,7 @@ export default function TriviaChallengeLounge({
                 className={cn(
                   "py-2.5 px-2 rounded-xl border text-xs font-space capitalize transition-all cursor-pointer text-center",
                   difficulty === lvl
-                    ? "border-[var(--gold)] bg-[var(--gold)]/10 font-bold text-[var(--text)] shadow-xs"
+                    ? "border-[var(--gold)] bg-[var(--gold)]/15 font-bold text-[var(--text)] shadow-xs"
                     : "border-[var(--border-dim)] text-[var(--text-mute)] hover:text-[var(--text)]"
                 )}
               >
@@ -1118,13 +1017,37 @@ export default function TriviaChallengeLounge({
         </div>
       </div>
 
-      {/* Submit Action */}
+      {/* Field 5: Question Count */}
+      <div>
+        <label className="block text-xs font-bold uppercase tracking-wider text-[var(--text-mute)] mb-2 flex items-center gap-1.5">
+          <Target size={13} />
+          <span>Questions in Deck</span>
+        </label>
+        <div className="grid grid-cols-3 gap-2">
+          {[5, 10, 15].map((count) => (
+            <button
+              key={count}
+              type="button"
+              onClick={() => setQuestionCount(count)}
+              className={cn(
+                "py-2.5 px-3 rounded-xl border text-xs font-space font-bold transition-all cursor-pointer",
+                questionCount === count
+                  ? "border-[var(--olive)] bg-[var(--olive)]/15 text-[var(--text)] shadow-xs"
+                  : "border-[var(--border-dim)] text-[var(--text-mute)] hover:text-[var(--text)]"
+              )}
+            >
+              {count} Questions
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="pt-3">
         <button
           type="submit"
           className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all"
         >
-          <span>Create &amp; Launch Challenge</span>
+          <span>Create &amp; Launch Gauntlet</span>
           <ArrowRight size={16} />
         </button>
       </div>

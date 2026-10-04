@@ -221,7 +221,7 @@ function SetupScreen({
           )}
         >
           <span>⚔️</span>
-          <span>1v1</span>
+          <span>Challenges</span>
           {activeChallenge && (
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--terra)] animate-pulse shrink-0" />
           )}

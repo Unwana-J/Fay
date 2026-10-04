@@ -260,3 +260,129 @@ export function getQuestionsForLeagueDay(
 
   return questions;
 }
+
+/**
+ * Retrieve all leagues saved in this browser's localStorage.
+ */
+export function getAllLocalLeagues(): FriendshipLeague[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("fey_recent_leagues");
+    if (!raw) return [];
+    const parsed = JSON.parse(raw);
+    const leagues: FriendshipLeague[] = [];
+
+    // Handles array of codes or array of objects
+    if (Array.isArray(parsed)) {
+      for (const item of parsed) {
+        const code = typeof item === "string" ? item : item.code;
+        if (!code) continue;
+        const leagueRaw = localStorage.getItem(`fey_league_${code.toUpperCase()}`);
+        if (leagueRaw) {
+          try {
+            const leagueObj = JSON.parse(leagueRaw);
+            if (leagueObj && leagueObj.code) {
+              leagues.push(leagueObj);
+            }
+          } catch {}
+        } else if (typeof item === "object" && item.title) {
+          leagues.push(item as FriendshipLeague);
+        }
+      }
+    }
+    return leagues;
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Persist league locally.
+ */
+export function saveLocalLeague(league: FriendshipLeague) {
+  if (typeof window === "undefined" || !league?.code) return;
+  try {
+    const code = league.code.toUpperCase();
+    localStorage.setItem(`fey_league_${code}`, JSON.stringify(league));
+    const recentRaw = localStorage.getItem("fey_recent_leagues");
+    const recent: string[] = recentRaw ? JSON.parse(recentRaw) : [];
+    if (!recent.includes(code)) {
+      localStorage.setItem("fey_recent_leagues", JSON.stringify([code, ...recent].slice(0, 15)));
+    }
+  } catch {}
+}
+
+/**
+ * Remove league from local storage.
+ */
+export function removeLocalLeague(code: string) {
+  if (typeof window === "undefined" || !code) return;
+  try {
+    const cleanCode = code.toUpperCase();
+    localStorage.removeItem(`fey_league_${cleanCode}`);
+    localStorage.removeItem(`fey_league_scores_${cleanCode}`);
+    const recentRaw = localStorage.getItem("fey_recent_leagues");
+    if (recentRaw) {
+      const recent: any[] = JSON.parse(recentRaw);
+      const filtered = recent.filter((item) => (typeof item === "string" ? item : item.code) !== cleanCode);
+      localStorage.setItem("fey_recent_leagues", JSON.stringify(filtered));
+    }
+  } catch {}
+}
+
+/**
+ * Retrieve stored scores for a league from localStorage.
+ */
+export function getLocalLeagueScores(code: string): LeagueDailyScore[] {
+  if (typeof window === "undefined" || !code) return [];
+  try {
+    const raw = localStorage.getItem(`fey_league_scores_${code.toUpperCase()}`);
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Compute comprehensive status & user progress for a league.
+ */
+export function computeUserLeagueSummary(
+  league: FriendshipLeague,
+  userId: string,
+  username: string,
+  scoresOverride?: LeagueDailyScore[]
+) {
+  const status = getLeagueStatus(league.startDate, league.durationDays);
+  const scores = scoresOverride ?? getLocalLeagueScores(league.code);
+  const leaderboard = aggregateLeagueLeaderboard(scores, status.dayNumber);
+
+  const keyMatch = (s: LeagueDailyScore) =>
+    (s.userId && s.userId === userId) ||
+    (s.username && s.username.toLowerCase() === username.toLowerCase());
+
+  const userLeaderboardEntry = leaderboard.find(
+    (e) => (userId && e.userId === userId) || (username && e.username.toLowerCase() === username.toLowerCase())
+  );
+
+  const todayScoreRow = scores.find((s) => s.dayNumber === status.dayNumber && keyMatch(s));
+
+  const hasCompletedToday = !!todayScoreRow;
+  const userRank = userLeaderboardEntry?.rank ?? leaderboard.length + 1;
+  const userTotalPoints = userLeaderboardEntry?.totalPoints ?? 0;
+  const userTotalCorrect = userLeaderboardEntry?.totalCorrect ?? 0;
+  const userDaysCompleted = userLeaderboardEntry?.daysCompleted ?? 0;
+
+  return {
+    status,
+    scores,
+    leaderboard,
+    hasCompletedToday,
+    todayScore: todayScoreRow?.score,
+    todayPoints: todayScoreRow?.points,
+    todayTotalQuestions: todayScoreRow?.totalQuestions ?? league.questionsPerDay,
+    userRank,
+    userTotalPoints,
+    userTotalCorrect,
+    userDaysCompleted,
+  };
+}

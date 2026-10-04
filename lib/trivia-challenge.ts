@@ -20,6 +20,9 @@ export interface TriviaChallenge {
   questionIds: string[];
   questionCount: number;
   difficulty: TriviaDifficultyFilter;
+  isPublic?: boolean;
+  category?: string;
+  description?: string;
   creatorScore?: {
     score: number;
     total: number;
@@ -72,6 +75,52 @@ export const DURATION_CHOICES = [
   { hours: 24, label: "24 Hours", desc: "Standard day" },
   { hours: 48, label: "48 Hours", desc: "Weekend cup" },
   { hours: 168, label: "7 Days", desc: "Week-long clash" },
+  { hours: 0, label: "Permanent", desc: "Open forever" },
+];
+
+/**
+ * 3 Official Permanent Indefinite Challenges open to all Fey scholars.
+ */
+export const CURATED_PUBLIC_CHALLENGES: TriviaChallenge[] = [
+  {
+    id: "pub_founding_history",
+    title: "🇳🇬 The Founding Fathers & First Republic",
+    creatorName: "Fey Curators",
+    createdAt: 1727740800000, // Fixed anchor timestamp
+    durationHours: 0, // 0 = Indefinite / No expiry
+    difficulty: "medium",
+    questionCount: 10,
+    isPublic: true,
+    category: "History",
+    description: "Test your mastery of Nigeria's pivotal milestones: independence, founding fathers, constitutions, and regional autonomy.",
+    questionIds: ["h001", "h002", "h003", "h004", "h005", "h006", "h007", "h008", "h009", "h010"],
+  },
+  {
+    id: "pub_pop_culture_titans",
+    title: "🎬 Nollywood, Afrobeats & Golden Age Culture",
+    creatorName: "Lokin Arts",
+    createdAt: 1727740800000,
+    durationHours: 0, // 0 = Indefinite / No expiry
+    difficulty: "medium",
+    questionCount: 10,
+    isPublic: true,
+    category: "Pop Culture",
+    description: "From classic Nollywood VHS cinema and Alaba distribution to Grammy milestones and modern pop royalty.",
+    questionIds: ["p001", "p002", "p003", "p004", "p005", "p006", "p007", "p008", "p009", "p010"],
+  },
+  {
+    id: "pub_general_knowledge_master",
+    title: "💡 Grand Scholar Naija 101",
+    creatorName: "Scholar Council",
+    createdAt: 1727740800000,
+    durationHours: 0, // 0 = Indefinite / No expiry
+    difficulty: "hard",
+    questionCount: 10,
+    isPublic: true,
+    category: "General Knowledge",
+    description: "The ultimate trial across 36 states, landmarks, confluences, indigenous inventions, languages, and natural wonders.",
+    questionIds: ["g001", "g002", "g003", "g004", "g005", "g006", "g007", "g008", "g009", "g010"],
+  },
 ];
 
 /**
@@ -83,12 +132,22 @@ export function createTriviaChallenge(options: {
   durationHours: number;
   questionCount: number;
   difficulty: TriviaDifficultyFilter;
+  isPublic?: boolean;
+  category?: string;
+  description?: string;
   creatorScore?: TriviaChallenge["creatorScore"];
 }): TriviaChallenge {
-  const pool =
+  let pool =
     options.difficulty === "random"
       ? TRIVIA_QUESTIONS
       : TRIVIA_QUESTIONS.filter((q) => q.difficulty === options.difficulty);
+
+  if (options.category && options.category !== "all") {
+    const catPool = pool.filter((q) => q.category.toLowerCase() === options.category?.toLowerCase());
+    if (catPool.length >= options.questionCount) {
+      pool = catPool;
+    }
+  }
 
   // Shuffle and pick question IDs
   const shuffled = [...pool].sort(() => 0.5 - Math.random());
@@ -105,6 +164,9 @@ export function createTriviaChallenge(options: {
     questionIds: selectedIds,
     questionCount: selectedIds.length,
     difficulty: options.difficulty,
+    isPublic: options.isPublic ?? false,
+    category: options.category || "Mixed",
+    description: options.description,
     creatorScore: options.creatorScore,
   };
 }
@@ -333,6 +395,33 @@ export function getAllLocalChallenges(): TriviaChallenge[] {
     return Object.values(map).sort((a, b) => b.createdAt - a.createdAt);
   } catch (e) {
     return [];
+  }
+}
+
+export function getPublicChallenges(): TriviaChallenge[] {
+  const localList = getAllLocalChallenges().filter((c) => c.isPublic);
+  const map = new Map<string, TriviaChallenge>();
+  // Curated challenges first
+  for (const c of CURATED_PUBLIC_CHALLENGES) {
+    map.set(c.id, c);
+  }
+  // User/community public challenges
+  for (const c of localList) {
+    map.set(c.id, c);
+  }
+  return Array.from(map.values());
+}
+
+export function deleteLocalChallenge(id: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    const raw = localStorage.getItem(CHALLENGE_STORE_KEY);
+    if (!raw) return;
+    const map: Record<string, TriviaChallenge> = JSON.parse(raw);
+    delete map[id];
+    localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(map));
+  } catch (e) {
+    console.warn("Could not delete local challenge:", e);
   }
 }
 
