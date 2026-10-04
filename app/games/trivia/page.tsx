@@ -8,6 +8,7 @@
 import type { Metadata } from "next";
 import TriviaGameClient, { type ChallengerInfo } from "./TriviaGameClient";
 import { decodeChallengeFromUrl, type TriviaChallenge } from "@/lib/trivia-challenge";
+import FeatureGate from "@/components/ui/FeatureGate";
 
 export async function generateMetadata({
   searchParams,
@@ -169,5 +170,13 @@ export default async function TriviaPage({
     };
   }
 
-  return <TriviaGameClient challenger={challenger} initialChallenge={initialChallenge} />;
+  return (
+    <FeatureGate
+      flag="enableTrivia"
+      title="Naija Trivia is under revamp"
+      message="We're refreshing the question decks and arcade. Trivia will be back shortly."
+    >
+      <TriviaGameClient challenger={challenger} initialChallenge={initialChallenge} />
+    </FeatureGate>
+  );
 }

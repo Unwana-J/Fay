@@ -2,10 +2,17 @@
 
 import { motion } from "framer-motion";
 import Link from "next/link";
+import { useEffect } from "react";
 import { ChevronRight, Sparkles } from "lucide-react";
+import { useFeatureStore } from "@/store/useFeatureStore";
 
 export default function GamesHub() {
-  const games = [
+  const { features, fetchFeatures } = useFeatureStore();
+  useEffect(() => {
+    fetchFeatures();
+  }, [fetchFeatures]);
+
+  const allGames = [
     {
       id: "articulate",
       title: "Online Articulate",
@@ -16,7 +23,8 @@ export default function GamesHub() {
       href: "/play",
       color: "var(--terra)",
       tags: ["Multiplayer", "Word Game", "Party"],
-      isNew: false
+      isNew: false,
+      enabled: (features?.enableOnlineArticulate ?? true) || (features?.enablePassThePhone ?? true),
     },
     {
       id: "trivia",
@@ -28,7 +36,8 @@ export default function GamesHub() {
       href: "/games/trivia",
       color: "var(--olive)",
       tags: ["Trivia", "Culture", "Knowledge"],
-      isNew: true
+      isNew: true,
+      enabled: features?.enableTrivia ?? true,
     },
     {
       id: "podium",
@@ -40,9 +49,11 @@ export default function GamesHub() {
       href: "/podium",
       color: "var(--gold)",
       tags: ["Party", "Presentation", "Hot Takes"],
-      isNew: true
+      isNew: true,
+      enabled: features?.enablePodium ?? true,
     }
   ];
+  const games = allGames.filter((g) => g.enabled);
 
   return (
     <div className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto">
@@ -50,6 +61,13 @@ export default function GamesHub() {
         <h1 className="font-space text-4xl font-bold mb-3" style={{ color: "var(--text)" }}>Games</h1>
         <p style={{ color: "var(--text-dim)" }}>Take a break and challenge your mind with these games.</p>
       </div>
+
+      {games.length === 0 && (
+        <div className="surface rounded-3xl p-10 border text-center" style={{ borderColor: "var(--border-dim)" }}>
+          <p className="font-serif text-lg font-bold" style={{ color: "var(--text)" }}>The Parlor is being refurbished</p>
+          <p className="text-sm mt-1" style={{ color: "var(--text-dim)" }}>Our games are briefly under revamp. Check back soon.</p>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {games.map((game, i) => (

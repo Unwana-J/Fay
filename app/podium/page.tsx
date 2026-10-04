@@ -31,6 +31,7 @@ import { getShortenedUrl } from "@/lib/url-shortener";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import TopicSpinner from "@/components/podium/TopicSpinner";
 import FeyLogo from "@/components/ui/FeyLogo";
+import FeatureGate from "@/components/ui/FeatureGate";
 
 // Compresses client-side uploaded photos to a lightweight data URL for instant rendering & shareability
 function compressImageFile(file: File): Promise<string> {
@@ -74,6 +75,18 @@ function compressImageFile(file: File): Promise<string> {
 }
 
 export default function PodiumPage() {
+  return (
+    <FeatureGate
+      flag="enablePodium"
+      title="The Podium is under revamp"
+      message="We're rebuilding the stage for even spicier slide decks. The Podium will be back shortly."
+    >
+      <PodiumPageInner />
+    </FeatureGate>
+  );
+}
+
+function PodiumPageInner() {
   const {
     phase,
     setPhase,

@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect } from "react";
 import { useGameStore } from "@/store/useGameStore";
+import { useFeatureStore } from "@/store/useFeatureStore";
 import SetupScreen from "./SetupScreen";
 import HandoffScreen from "./HandoffScreen";
 import SpeakerView from "./SpeakerView";
@@ -22,6 +23,9 @@ const stageVariants = {
 
 export default function PlayPage() {
   const [overlayHidden, setOverlayHidden] = useState(false);
+  const { features } = useFeatureStore();
+  const enablePassThePhone = features?.enablePassThePhone ?? true;
+
   const {
     activeSpeaker,
     activeTeam,
@@ -42,15 +46,23 @@ export default function PlayPage() {
     getScore
   } = useGameStore();
 
+  // If pass-the-phone is disabled by admin, force reset any active local match to setup
+  useEffect(() => {
+    if (!enablePassThePhone && phase !== "setup") {
+      resetGame();
+    }
+  }, [enablePassThePhone, phase, resetGame]);
+
   const scoreA = getScore("A");
   const scoreB = getScore("B");
 
   const handleStartGame = useCallback(() => {
+    if (!enablePassThePhone) return;
     // Game store initialized via setup, triggers first handoff
     startTurn();
     setOverlayHidden(false);
     // setPhase("handoff") is handled by startGame()/startTurn() inside store
-  }, [startTurn]);
+  }, [startTurn, enablePassThePhone]);
 
   const handleTurnReady = useCallback(() => {
     setOverlayHidden(false);

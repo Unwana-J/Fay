@@ -29,6 +29,7 @@ import {
   type TriviaDifficultyFilter,
 } from "@/lib/trivia-questions";
 import { useAppStore } from "@/store/useAppStore";
+import { useFeatureStore } from "@/store/useFeatureStore";
 import { cn } from "@/lib/utils";
 import ShareTriviaModal from "@/components/games/ShareTriviaModal";
 import TriviaHistoryView from "@/components/games/TriviaHistoryView";
@@ -121,6 +122,27 @@ function SetupScreen({
   const [mode, setMode] = useState<ReviewMode>("instant");
   const [difficulty, setDifficulty] = useState<TriviaDifficultyFilter>("random");
 
+  // Admin feature flags for sub-menus (temporarily disable during revamps)
+  const { features, fetchFeatures } = useFeatureStore();
+  const enableChallenges = features?.enableTriviaChallenges ?? true;
+  const enableLeagues = features?.enableTriviaLeagues ?? true;
+  const enableLeaderboard = features?.enableTriviaLeaderboard ?? true;
+  const visibleTabCount = 2 + (enableChallenges ? 1 : 0) + (enableLeagues ? 1 : 0) + (enableLeaderboard ? 1 : 0);
+
+  useEffect(() => {
+    fetchFeatures();
+  }, [fetchFeatures]);
+
+  useEffect(() => {
+    if (
+      (activeTab === "challenge" && !enableChallenges) ||
+      (activeTab === "league" && !enableLeagues) ||
+      (activeTab === "leaderboard" && !enableLeaderboard)
+    ) {
+      onTabChange("solo");
+    }
+  }, [activeTab, enableChallenges, enableLeagues, enableLeaderboard, onTabChange]);
+
   const filteredPool =
     difficulty === "random"
       ? TRIVIA_QUESTIONS
@@ -157,8 +179,8 @@ function SetupScreen({
 
       {/* Navigation Tab Bar */}
       <div
-        className="grid grid-cols-5 gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
-        style={{ borderColor: "var(--border-dim)" }}
+        className="grid gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
+        style={{ borderColor: "var(--border-dim)", gridTemplateColumns: `repeat(${visibleTabCount}, minmax(0, 1fr))` }}
       >
         <button
           onClick={() => onTabChange("solo")}
@@ -173,6 +195,7 @@ function SetupScreen({
           <span className="hidden sm:inline">Play</span>
         </button>
 
+        {enableLeagues && (
         <button
           onClick={() => onTabChange("league")}
           className={cn(
@@ -185,7 +208,9 @@ function SetupScreen({
           <span>🏆</span>
           <span>Leagues</span>
         </button>
+        )}
 
+        {enableChallenges && (
         <button
           onClick={() => onTabChange("challenge")}
           className={cn(
@@ -201,7 +226,9 @@ function SetupScreen({
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--terra)] animate-pulse shrink-0" />
           )}
         </button>
+        )}
 
+        {enableLeaderboard && (
         <button
           onClick={() => onTabChange("leaderboard")}
           className={cn(
@@ -215,6 +242,7 @@ function SetupScreen({
           <span className="hidden sm:inline">Ranks</span>
           <span className="sm:hidden">Top</span>
         </button>
+        )}
 
         <button
           onClick={() => onTabChange("history")}
@@ -231,12 +259,12 @@ function SetupScreen({
       </div>
 
       {/* Tab: Friendship Leagues */}
-      {activeTab === "league" && (
+      {activeTab === "league" && enableLeagues && (
         <TriviaLeagueLounge />
       )}
 
       {/* Tab: Group Challenge Lounge */}
-      {activeTab === "challenge" && (
+      {activeTab === "challenge" && enableChallenges && (
         <TriviaChallengeLounge
           activeChallenge={activeChallenge}
           onSelectChallenge={onSelectChallenge}
@@ -253,7 +281,7 @@ function SetupScreen({
       )}
 
       {/* Tab: Leaderboard */}
-      {activeTab === "leaderboard" && (
+      {activeTab === "leaderboard" && enableLeaderboard && (
         <TriviaLeaderboardView
           onPlay={() => onTabChange("solo")}
         />
@@ -470,6 +498,7 @@ function SetupScreen({
             </button>
 
             {/* Squad tournament callout */}
+            {enableChallenges && (
             <div
               className="p-4 rounded-2xl border surface flex items-center justify-between gap-3 text-xs"
               style={{ borderColor: "var(--border-dim)" }}
@@ -490,6 +519,7 @@ function SetupScreen({
                 Start Challenge →
               </button>
             </div>
+            )}
           </div>
         </div>
       )}

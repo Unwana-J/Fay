@@ -3,9 +3,25 @@ import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sanitizeScholarName } from "@/lib/name-moderation";
 import { calculateLeaguePoints, getLeagueStatus, type FriendshipLeague } from "@/lib/trivia-league";
 import { todayStr } from "@/lib/utils";
+import {
+  getClientIp,
+  checkRateLimit,
+  isBotPattern,
+  isBannedIdentifier,
+  isPlausibleScore,
+} from "@/lib/security-guard";
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rateCheck = checkRateLimit(`league-score:${clientIp}`, 6, 60);
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: "Too many submissions. Please pace your rounds.", retryAfter: rateCheck.retryAfter },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json();
     const {
       leagueCode,
@@ -22,7 +38,20 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Invalid score payload." }, { status: 400 });
     }
 
+    if (isBotPattern(username) || isBannedIdentifier(username) || (userId && isBannedIdentifier(userId))) {
+      return NextResponse.json({ error: "Access prohibited." }, { status: 403 });
+    }
+
+    const scoreValidation = isPlausibleScore(score, totalQuestions);
+    if (!scoreValidation.valid) {
+      return NextResponse.json({ error: scoreValidation.reason || "Invalid score values." }, { status: 400 });
+    }
+
     const cleanUsername = sanitizeScholarName(username);
+    if (isBannedIdentifier(cleanUsername)) {
+      return NextResponse.json({ error: "Access prohibited." }, { status: 403 });
+    }
+
     const cleanLeagueCode = leagueCode.toUpperCase().trim();
     const today = todayStr();
 

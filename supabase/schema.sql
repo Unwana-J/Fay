@@ -301,3 +301,38 @@ alter table public.user_profiles
   add column if not exists is_banned boolean default false,
   add column if not exists ban_reason text default null,
   add column if not exists is_deactivated boolean default false;
+
+-- ==============================================================================
+-- FEY PLATFORM: SYSTEM FEATURE FLAGS & RUNTIME CONTROLS
+-- ==============================================================================
+
+-- 13. Create feature_flags table
+create table if not exists public.feature_flags (
+  key text primary key,
+  enabled boolean not null default true,
+  updated_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.feature_flags enable row level security;
+
+drop policy if exists "Allow public read access on feature_flags" on public.feature_flags;
+create policy "Allow public read access on feature_flags"
+  on public.feature_flags for select
+  using (true);
+
+drop policy if exists "Allow public insert/update on feature_flags" on public.feature_flags;
+create policy "Allow public insert/update on feature_flags"
+  on public.feature_flags for all
+  using (true)
+  with check (true);
+
+-- Seed default feature flags
+insert into public.feature_flags (key, enabled)
+values
+  ('enablePassThePhone', true),
+  ('enableOnlineArticulate', true),
+  ('enablePodium', true),
+  ('enableTrivia', true),
+  ('enableCommunitySalons', true)
+on conflict (key) do nothing;
+

@@ -20,6 +20,7 @@ import CreateRoomModal from "@/components/community/CreateRoomModal";
 import JoinRoomModal from "@/components/community/JoinRoomModal";
 import UserProfileModal from "@/components/community/UserProfileModal";
 import UserAvatar from "@/components/ui/UserAvatar";
+import FeatureGate from "@/components/ui/FeatureGate";
 
 const CATEGORY_COLORS: Record<string, string> = {
   "Artificial Intelligence": "#7A1C2E",
@@ -296,6 +297,20 @@ function RoomCard({
 type Tab = "feed" | "rooms" | "following" | "leaderboards";
 
 export default function CommunityPage() {
+  return (
+    <FeatureGate
+      flag="enableCommunitySalons"
+      title="Community Salons are under revamp"
+      message="We're redecorating the salons for better deliberation. Community rooms will reopen shortly."
+      backHref="/"
+      backLabel="Back to Dashboard"
+    >
+      <CommunityPageInner />
+    </FeatureGate>
+  );
+}
+
+function CommunityPageInner() {
   const [tab, setTab] = useState<Tab>("rooms");
   const [showCreate, setShowCreate] = useState(false);
   const [showJoin, setShowJoin] = useState(false);

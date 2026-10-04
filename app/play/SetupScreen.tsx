@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useAppStore, ArticulateHistoryItem } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
+import { useFeatureStore } from "@/store/useFeatureStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
 import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2, Volume2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -14,8 +15,20 @@ import BoardMap from "./BoardMap";
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const router = useRouter();
   const { profile, updateProfile, articulateHistory = [], removeArticulateRoom, saveArticulateRoom } = useAppStore();
+  const { features, fetchFeatures } = useFeatureStore();
+  const enablePassThePhone = features?.enablePassThePhone ?? true;
 
   const [playMode, setPlayMode] = useState<"online" | "local">("online");
+
+  useEffect(() => {
+    fetchFeatures();
+  }, [fetchFeatures]);
+
+  useEffect(() => {
+    if (!enablePassThePhone && playMode === "local") {
+      setPlayMode("online");
+    }
+  }, [enablePassThePhone, playMode]);
   const [isCreatingOnline, setIsCreatingOnline] = useState(false);
   const [onlineJoinCode, setOnlineJoinCode] = useState("");
   const [onlineJoinError, setOnlineJoinError] = useState<string | null>(null);
@@ -275,37 +288,44 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           </div>
         </div>
 
-        {/* Mode Selector Pill */}
-        <div className="flex p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-xs">
-          <button
-            type="button"
-            onClick={() => setPlayMode("online")}
-            className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
-              playMode === "online"
-                ? "bg-[var(--terra)] text-white shadow-sm"
-                : "text-[var(--text-dim)] hover:text-[var(--text)]"
-            }`}
-          >
+        {/* Mode Selector: Only rendered if Pass-the-Phone feature flag is enabled */}
+        {enablePassThePhone ? (
+          <div className="flex p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-xs">
+            <button
+              type="button"
+              onClick={() => setPlayMode("online")}
+              className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
+                playMode === "online"
+                  ? "bg-[var(--terra)] text-white shadow-sm"
+                  : "text-[var(--text-dim)] hover:text-[var(--text)]"
+              }`}
+            >
+              <Globe className="w-4 h-4" />
+              Online Room (Friends)
+            </button>
+            <button
+              type="button"
+              onClick={() => setPlayMode("local")}
+              className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
+                playMode === "local"
+                  ? "bg-[var(--olive)] text-white shadow-sm"
+                  : "text-[var(--text-dim)] hover:text-[var(--text)]"
+              }`}
+            >
+              <Smartphone className="w-4 h-4" />
+              Pass-the-Phone (Local)
+            </button>
+          </div>
+        ) : (
+          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--terra)]/10 text-[var(--terra)] border border-[var(--terra)]/20 text-xs font-bold font-space shadow-xs">
             <Globe className="w-4 h-4" />
-            Online Room (Friends)
-          </button>
-          <button
-            type="button"
-            onClick={() => setPlayMode("local")}
-            className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
-              playMode === "local"
-                ? "bg-[var(--olive)] text-white shadow-sm"
-                : "text-[var(--text-dim)] hover:text-[var(--text)]"
-            }`}
-          >
-            <Smartphone className="w-4 h-4" />
-            Pass-the-Phone (Local)
-          </button>
-        </div>
+            Online Match Hub
+          </div>
+        )}
       </div>
 
       {/* Online Room Mode Screen (Clean & Instant) */}
-      {playMode === "online" ? (
+      {playMode === "online" || !enablePassThePhone ? (
         <div className="space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {/* Host New Room Card */}

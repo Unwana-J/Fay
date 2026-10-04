@@ -22,21 +22,37 @@ import {
   MessageSquare,
   Copy,
   Check,
+  Sliders,
+  Smartphone,
+  Globe,
+  Radio,
+  RotateCcw,
+  Eye,
+  EyeOff,
+  Gamepad2,
+  ToggleLeft,
+  ToggleRight,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import { useFeatureStore } from "@/store/useFeatureStore";
+import { FEATURE_DEFINITIONS, type FeatureFlags } from "@/lib/feature-flags";
 import type { FeedbackItem, IncidentReportItem, AdminUserItem } from "@/lib/admin-data";
 
 export default function AdminPage() {
   const currentProfile = useAppStore((s) => s.profile);
   const updateProfile = useAppStore((s) => s.updateProfile);
 
+  const { features, setFeature, resetAllFeatures, fetchFeatures: fetchFeatureFlags } = useFeatureStore();
+  const [featureUpdatingKey, setFeatureUpdatingKey] = useState<string | null>(null);
+  const [featureToast, setFeatureToast] = useState<{ message: string; type: "success" | "info" } | null>(null);
+
   // Security Gate: Session-stored passkey
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [passcode, setPasscode] = useState("");
   const [authError, setAuthError] = useState("");
 
-  // Tabs: overview | feedback | safety | users
-  const [activeTab, setActiveTab] = useState<"overview" | "feedback" | "safety" | "users">("overview");
+  // Tabs: overview | feedback | safety | users | features
+  const [activeTab, setActiveTab] = useState<"overview" | "feedback" | "safety" | "users" | "features">("overview");
 
   // Data states
   const [loading, setLoading] = useState(false);
@@ -92,10 +108,43 @@ export default function AdminPage() {
         const u = await usersRes.json();
         if (u.success) setUserList(u.users);
       }
+      // Also sync feature flags from store/backend
+      await fetchFeatureFlags();
     } catch (err) {
       console.error("Admin fetch error:", err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleToggleFeature = async (key: keyof FeatureFlags, currentValue: boolean) => {
+    setFeatureUpdatingKey(key);
+    const nextVal = !currentValue;
+    const ok = await setFeature(key, nextVal);
+    setFeatureUpdatingKey(null);
+
+    if (ok) {
+      const def = FEATURE_DEFINITIONS.find((f) => f.key === key);
+      const label = def?.name || key;
+      setFeatureToast({
+        message: `${label} is now ${nextVal ? "ACTIVE (visible on platform)" : "DISABLED (hidden from users)"}.`,
+        type: "success",
+      });
+      setTimeout(() => setFeatureToast(null), 4000);
+    }
+  };
+
+  const handleResetFeatures = async () => {
+    if (!confirm("Reset all platform feature flags to system defaults?")) return;
+    setFeatureUpdatingKey("reset");
+    const ok = await resetAllFeatures();
+    setFeatureUpdatingKey(null);
+    if (ok) {
+      setFeatureToast({
+        message: "All feature flags reset to system defaults.",
+        type: "info",
+      });
+      setTimeout(() => setFeatureToast(null), 4000);
     }
   };
 
@@ -407,7 +456,54 @@ export default function AdminPage() {
               {userList.length}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("features")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-medium transition-colors cursor-pointer ${
+              activeTab === "features" ? "bg-[var(--bg-card)] shadow-sm font-bold border" : "text-[var(--text-dim)] hover:bg-[var(--bg-input)]"
+            }`}
+            style={activeTab === "features" ? { borderColor: "var(--border-dim)", color: "var(--gold)" } : {}}
+          >
+            <Sliders size={15} />
+            <span>Feature Controls</span>
+            <span
+              className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                features?.enablePassThePhone === false
+                  ? "bg-amber-900/40 text-amber-300 border border-amber-700/40"
+                  : "bg-[var(--bg-input)] text-[var(--text-dim)]"
+              }`}
+            >
+              {features?.enablePassThePhone === false ? "Local: OFF" : "Live"}
+            </span>
+          </button>
         </div>
+
+        {/* Global Toast / Feedback Banner for Feature Updates */}
+        <AnimatePresence>
+          {featureToast && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="mb-4 p-3.5 rounded-2xl border text-xs font-mono flex items-center justify-between shadow-sm bg-[var(--bg-card)]"
+              style={{
+                borderColor: featureToast.type === "success" ? "var(--olive)" : "var(--gold)",
+                color: "var(--text)",
+              }}
+            >
+              <div className="flex items-center gap-2.5">
+                <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: featureToast.type === "success" ? "var(--olive)" : "var(--gold)" }} />
+                <span>{featureToast.message}</span>
+              </div>
+              <button
+                onClick={() => setFeatureToast(null)}
+                className="text-[10px] uppercase font-bold text-[var(--text-mute)] hover:text-[var(--text)] ml-4"
+              >
+                Dismiss
+              </button>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* ── TAB 1: STRATEGIC OVERVIEW ── */}
         {activeTab === "overview" && (
@@ -1012,6 +1108,246 @@ export default function AdminPage() {
                     })}
                   </tbody>
                 </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ── TAB 5: FEATURE CONTROLS & RUNTIME TOGGLES ── */}
+        {activeTab === "features" && (
+          <div className="space-y-6">
+            {/* Top Overview Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div
+                className="surface border rounded-2xl p-5"
+                style={{
+                  borderColor:
+                    features?.enablePassThePhone === false ? "var(--terra)" : "var(--border-dim)",
+                }}
+              >
+                <div
+                  className="flex items-center justify-between text-xs font-mono uppercase mb-2"
+                  style={{ color: "var(--text-mute)" }}
+                >
+                  <span>Pass-the-Phone (Local Articulate)</span>
+                  <Smartphone
+                    size={14}
+                    className={
+                      features?.enablePassThePhone ? "text-[var(--olive)]" : "text-[var(--terra)]"
+                    }
+                  />
+                </div>
+                <div
+                  className="font-mono text-2xl font-bold flex items-center gap-2"
+                  style={{
+                    color:
+                      features?.enablePassThePhone ? "var(--olive)" : "var(--terra)",
+                  }}
+                >
+                  {features?.enablePassThePhone ? "ACTIVE" : "HIDDEN"}
+                </div>
+                <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                  {features?.enablePassThePhone
+                    ? "Visible on /play alongside Online Room"
+                    : "Hidden on /play (Users only see Online Rooms)"}
+                </div>
+              </div>
+
+              <div
+                className="surface border rounded-2xl p-5"
+                style={{ borderColor: "var(--border-dim)" }}
+              >
+                <div
+                  className="flex items-center justify-between text-xs font-mono uppercase mb-2"
+                  style={{ color: "var(--text-mute)" }}
+                >
+                  <span>Total Modules Active</span>
+                  <Sliders size={14} className="text-[var(--gold)]" />
+                </div>
+                <div className="font-mono text-2xl font-bold" style={{ color: "var(--gold)" }}>
+                  {Object.values(features || {}).filter(Boolean).length} / {FEATURE_DEFINITIONS.length}
+                </div>
+                <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                  {FEATURE_DEFINITIONS.length - Object.values(features || {}).filter(Boolean).length}{" "}
+                  module(s) currently restricted
+                </div>
+              </div>
+
+              <div
+                className="surface border rounded-2xl p-5 flex flex-col justify-between"
+                style={{ borderColor: "var(--border-dim)" }}
+              >
+                <div>
+                  <div
+                    className="flex items-center justify-between text-xs font-mono uppercase mb-2"
+                    style={{ color: "var(--text-mute)" }}
+                  >
+                    <span>Instant Client Sync</span>
+                    <RefreshCw size={14} className="text-[var(--olive)]" />
+                  </div>
+                  <div className="font-mono text-sm font-bold text-[var(--olive)] flex items-center gap-2">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    Multi-tab Broadcast Live
+                  </div>
+                  <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                    Flipping a toggle pushes real-time updates without redeployments
+                  </div>
+                </div>
+
+                <div className="pt-3 flex justify-end">
+                  <button
+                    onClick={handleResetFeatures}
+                    disabled={featureUpdatingKey === "reset"}
+                    className="px-3 py-1.5 rounded-xl border text-xs font-mono flex items-center gap-1.5 hover:bg-[var(--bg-input)] transition-colors text-[var(--text-dim)] cursor-pointer"
+                    style={{ borderColor: "var(--border-dim)" }}
+                  >
+                    <RotateCcw size={12} className={featureUpdatingKey === "reset" ? "animate-spin" : ""} />
+                    <span>Reset Defaults</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Explanatory Guidance Callout */}
+            <div
+              className="surface border rounded-2xl p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+              style={{
+                borderColor: "rgba(192, 156, 72, 0.3)",
+                background: "linear-gradient(135deg, rgba(192, 156, 72, 0.05) 0%, var(--bg-card) 100%)",
+              }}
+            >
+              <div className="flex items-start gap-3">
+                <div className="p-2.5 rounded-xl bg-[var(--gold)]/10 text-[var(--gold)] shrink-0 mt-0.5">
+                  <Smartphone size={20} />
+                </div>
+                <div>
+                  <h4 className="font-serif font-bold text-sm text-[var(--text)]">
+                    Pass-the-Phone (Local Articulate) Visibility Control
+                  </h4>
+                  <p className="text-xs text-[var(--text-dim)] mt-0.5 leading-relaxed">
+                    When you turn this switch off, scholars accessing <code className="font-mono text-[11px] bg-[var(--bg-input)] px-1.5 py-0.5 rounded">/play</code> will no longer see the <strong>Pass-the-Phone (Local)</strong> option. The mode selector is hidden and only <strong>Online Room (Friends)</strong> matches are permitted.
+                  </p>
+                </div>
+              </div>
+              <Link
+                href="/play"
+                target="_blank"
+                className="px-3.5 py-2 rounded-xl border text-xs font-mono font-bold flex items-center gap-1.5 hover:bg-[var(--bg-input)] text-[var(--gold)] shrink-0"
+                style={{ borderColor: "var(--gold)" }}
+              >
+                <span>Verify /play</span>
+                <ExternalLink size={12} />
+              </Link>
+            </div>
+
+            {/* Feature Controls List */}
+            <div className="surface border rounded-2xl overflow-hidden shadow-sm" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: "var(--border-dim)" }}>
+                <div>
+                  <h3 className="font-serif text-base font-bold" style={{ color: "var(--text)" }}>
+                    Platform Runtime Toggles
+                  </h3>
+                  <p className="text-xs" style={{ color: "var(--text-mute)" }}>
+                    Live switches governing game availability, local modes, and modular feature visibility
+                  </p>
+                </div>
+                <span className="font-mono text-[11px] px-2.5 py-1 rounded-full bg-[var(--bg-input)] text-[var(--text-dim)] border border-[var(--border-dim)]">
+                  Live Engine
+                </span>
+              </div>
+
+              <div className="divide-y" style={{ borderColor: "var(--border-dim)" }}>
+                {FEATURE_DEFINITIONS.map((def) => {
+                  const isEnabled = features?.[def.key] ?? true;
+                  const isUpdating = featureUpdatingKey === def.key;
+
+                  return (
+                    <div
+                      key={def.key}
+                      className={`p-5 transition-colors flex flex-col md:flex-row md:items-center justify-between gap-4 ${
+                        def.isPrimary ? "bg-[var(--gold)]/5" : ""
+                      }`}
+                    >
+                      <div className="flex items-start gap-4">
+                        <div
+                          className="w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 border"
+                          style={{
+                            background: isEnabled ? "rgba(68, 78, 44, 0.12)" : "rgba(122, 28, 46, 0.1)",
+                            borderColor: isEnabled ? "var(--olive)" : "var(--terra)",
+                            color: isEnabled ? "var(--olive)" : "var(--terra)",
+                          }}
+                        >
+                          {def.iconName === "smartphone" && <Smartphone size={22} />}
+                          {def.iconName === "globe" && <Globe size={22} />}
+                          {def.iconName === "presentation" && <Sparkles size={22} />}
+                          {def.iconName === "help-circle" && <Gamepad2 size={22} />}
+                          {def.iconName === "radio" && <Radio size={22} />}
+                        </div>
+
+                        <div className="space-y-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-serif font-bold text-base text-[var(--text)]">
+                              {def.name}
+                            </h4>
+                            {def.isPrimary && (
+                              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase tracking-wider bg-[var(--gold)]/20 text-[var(--gold)] border border-[var(--gold)]/30">
+                                Primary Switch
+                              </span>
+                            )}
+                            <span className="px-2 py-0.5 rounded text-[10px] font-mono bg-[var(--bg-input)] text-[var(--text-mute)]">
+                              {def.route}
+                            </span>
+                          </div>
+
+                          <p className="text-xs text-[var(--text-dim)] max-w-2xl leading-relaxed">
+                            {def.description}
+                          </p>
+                          <p className="text-[11px] font-mono mt-0.5" style={{ color: isEnabled ? "var(--olive)" : "var(--terra)" }}>
+                            {isEnabled ? `● ${def.userImpact}` : `○ FEATURE DISABLED: Hidden from end users.`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {/* Toggle Control */}
+                      <div className="flex items-center gap-3 self-end md:self-center shrink-0">
+                        <span
+                          className={`text-xs font-mono font-bold px-2.5 py-1 rounded-full border ${
+                            isEnabled
+                              ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20"
+                              : "bg-red-500/10 text-red-500 border-red-500/20"
+                          }`}
+                        >
+                          {isEnabled ? "ACTIVE (VISIBLE)" : "DISABLED (HIDDEN)"}
+                        </span>
+
+                        <button
+                          type="button"
+                          disabled={isUpdating}
+                          onClick={() => handleToggleFeature(def.key, isEnabled)}
+                          className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none focus:ring-2 focus:ring-[var(--gold)] focus:ring-offset-2 ${
+                            isEnabled ? "bg-[var(--olive)]" : "bg-neutral-600"
+                          } ${isUpdating ? "opacity-60 cursor-wait" : ""}`}
+                          aria-label={`Toggle ${def.name}`}
+                        >
+                          <span
+                            aria-hidden="true"
+                            className={`pointer-events-none inline-block h-7 w-7 transform rounded-full bg-white shadow-md ring-0 transition duration-200 ease-in-out flex items-center justify-center ${
+                              isEnabled ? "translate-x-6" : "translate-x-0"
+                            }`}
+                          >
+                            {isUpdating ? (
+                              <RefreshCw size={12} className="animate-spin text-neutral-600" />
+                            ) : isEnabled ? (
+                              <Check size={12} className="text-[var(--olive)] font-bold" />
+                            ) : (
+                              <EyeOff size={12} className="text-neutral-500" />
+                            )}
+                          </span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>

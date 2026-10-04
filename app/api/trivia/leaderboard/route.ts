@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sanitizeScholarName, isBlockedHateSpeech } from "@/lib/name-moderation";
+import { isBotPattern, isBannedIdentifier } from "@/lib/security-guard";
 
 export async function GET(req: NextRequest) {
   try {
@@ -27,8 +28,11 @@ export async function GET(req: NextRequest) {
     let query = supabase
       .from("trivia_scores")
       .select("id, created_at, username, avatar, score, total, pct, grade_label, xp_earned, challenge_id")
+      .neq("grade_label", "Load Test")
+      .not("username", "ilike", "LoadTest-%")
+      .not("username", "ilike", "DbLoad-%")
       .order("created_at", { ascending: false })
-      .limit(300);
+      .limit(1000);
 
     if (candidateIds.length === 1) {
       query = query.eq("challenge_id", candidateIds[0]);
@@ -52,7 +56,9 @@ export async function GET(req: NextRequest) {
 
       chrono.forEach((row) => {
         if (!row.username || isBlockedHateSpeech(row.username)) return;
+        if (isBotPattern(row.username, row.grade_label) || isBannedIdentifier(row.username)) return;
         const cleanName = sanitizeScholarName(row.username);
+        if (isBannedIdentifier(cleanName)) return;
         const key = cleanName.trim().toLowerCase();
         if (!selectedByPlayer.has(key)) {
           selectedByPlayer.set(key, {
@@ -97,7 +103,9 @@ export async function GET(req: NextRequest) {
 
     (data || []).forEach((row) => {
       if (!row.username || isBlockedHateSpeech(row.username)) return;
+      if (isBotPattern(row.username, row.grade_label) || isBannedIdentifier(row.username)) return;
       const cleanName = sanitizeScholarName(row.username);
+      if (isBannedIdentifier(cleanName)) return;
       const key = cleanName.trim().toLowerCase();
       const rowXp =
         typeof row.xp_earned === "number" && row.xp_earned > 0
