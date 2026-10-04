@@ -13,10 +13,12 @@ const KNOWN_BANNED_IDENTIFIERS = new Set<string>([
 
 // Bot / Load-Test Patterns
 const BOT_PATTERNS = [
-  /^(?:LoadTest|DbLoad|StressTest)[-_]?VU\d+/i,
+  /^(?:LoadTest|DbLoad|Crash|StressTest)[-_]?VU\d+/i,
+  /[-_]VU\d+/i,
   /^VU\d+[-_]I\d+/i,
   /LoadTest/i,
   /DbLoad/i,
+  /^Crash[-_]/i,
 ];
 
 // In-Memory Rate Limiter (sliding window per key)

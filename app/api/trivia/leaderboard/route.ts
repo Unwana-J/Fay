@@ -31,6 +31,8 @@ export async function GET(req: NextRequest) {
       .neq("grade_label", "Load Test")
       .not("username", "ilike", "LoadTest-%")
       .not("username", "ilike", "DbLoad-%")
+      .not("username", "ilike", "Crash-%")
+      .not("username", "ilike", "%VU%")
       .order("created_at", { ascending: false })
       .limit(1000);
 
