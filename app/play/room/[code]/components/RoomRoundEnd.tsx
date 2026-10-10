@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { ArticulateRoom, RoomPlayer, getNextSpeakerForTeam } from "@/lib/articulate-room";
+import { ArticulateRoom, RoomPlayer, getNextSpeakerForTeam, calculateMatchPlayTime } from "@/lib/articulate-room";
 import {
   Check,
   FastForward,
@@ -21,6 +21,7 @@ import {
   Crown,
   Mic,
   Clock,
+  Timer,
   Loader2,
   UserPlus,
   Zap,
@@ -118,6 +119,7 @@ export default function RoomRoundEnd({
   const [showRoadmap, setShowRoadmap] = React.useState<boolean>(true);
 
   // Score goal & match conclusion calculations
+  const playTime = calculateMatchPlayTime(room);
   const scoreGoal = room.settings?.scoreGoal || 20;
   const activeTeamsList: Array<{ key: "A" | "B" | "C" | "D"; team: typeof room.teams.teamA }> = [
     { key: "A", team: room.teams.teamA },
@@ -1164,12 +1166,19 @@ export default function RoomRoundEnd({
       <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4">
         {isGoalReached ? (
           <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)]">
+            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)] flex-wrap gap-2">
               <div className="flex items-center gap-2 text-xs font-bold text-[var(--gold)]">
                 <Crown className="w-4 h-4" />
                 <span>Match Deciding Phase</span>
               </div>
-              <span className="text-[11px] font-bold text-[var(--text-mute)]">Goal: {scoreGoal} pts</span>
+              <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-mute)]">
+                <span className="inline-flex items-center gap-1 font-mono text-[var(--text)]">
+                  <Timer className="w-3 h-3 text-[var(--gold)]" />
+                  {playTime.formatted} played
+                </span>
+                <span>•</span>
+                <span>Goal: {scoreGoal} pts</span>
+              </div>
             </div>
 
             {isHost ? (

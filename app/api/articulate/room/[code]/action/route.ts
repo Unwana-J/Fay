@@ -26,6 +26,8 @@ async function persistRoom(room: ArticulateRoom) {
         room_name: room.room_name || "",
         host_id: room.host_id,
         host_name: room.host_name,
+        match_started_at: room.match_started_at,
+        match_ended_at: room.match_ended_at,
         teamA: room.teams.teamA,
         teamB: room.teams.teamB,
         ...(room.teams.teamC ? { teamC: room.teams.teamC } : {}),
@@ -166,6 +168,8 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           player_details: rawTeams.player_details || {},
           last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
           last_speaker_ids: rawTeams.last_speaker_ids || {},
+          match_started_at: rawTeams.match_started_at || undefined,
+          match_ended_at: rawTeams.match_ended_at || undefined,
           version: typeof rawTeams._version === "number" ? rawTeams._version : 0,
           created_at: data.created_at,
           updated_at: data.updated_at,
@@ -745,6 +749,9 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         // LOCK ROOM & UPDATE STATUS
         room.status = "playing";
         room.locked = true; // LOCK ROOM: NO NEW PEOPLE CAN JOIN ACTIVE ROUND
+        if (!room.match_started_at) {
+          room.match_started_at = new Date().toISOString();
+        }
         room.round_words_scored = [];
         room.round_words_passed = [];
         const activeFieldPlayers: string[] = [];
@@ -1002,6 +1009,9 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
       case "declare_winner": {
         room.status = "game_over";
         room.locked = false;
+        if (!room.match_ended_at) {
+          room.match_ended_at = new Date().toISOString();
+        }
         await persistRoom(room);
         return actionResponse({ success: true, room });
       }
@@ -1012,6 +1022,8 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
       case "reset_game": {
         room.status = "lobby";
         room.locked = false;
+        room.match_started_at = undefined;
+        room.match_ended_at = undefined;
         room.teams.teamA.score = 0;
         room.teams.teamB.score = 0;
         if (room.teams.teamC) room.teams.teamC.score = 0;

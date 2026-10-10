@@ -1,8 +1,8 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Trophy, RotateCcw, Home, Crown, Share2, Copy, Check, Sparkles, Target, Clock, Users, Flame, ChevronRight, ShieldCheck } from "lucide-react";
+import { ArticulateRoom, RoomPlayer, calculateMatchPlayTime } from "@/lib/articulate-room";
+import { Trophy, RotateCcw, Home, Crown, Share2, Copy, Check, Sparkles, Target, Clock, Timer, Users, Flame, ChevronRight, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import canvasConfetti from "canvas-confetti";
 import Link from "next/link";
@@ -94,9 +94,11 @@ export default function RoomGameOver({
     return `Scholar (${pId.replace(/^guest-/, "").slice(0, 5)})`;
   };
 
+  const playTime = calculateMatchPlayTime(room);
+
   const handleCopyRecap = () => {
     const title = room.room_name ? `${room.room_name} (${room.room_code})` : `Room ${room.room_code}`;
-    const text = `🏆 Fey Articulate Match Results!\n${title}\n\n👑 ${winner.name}: ${winner.score} pts\n⚔️ ${runnerUp.name}: ${runnerUp.score} pts\n\nMargin: ${margin} pts lead • Target: ${room.settings.scoreGoal} pts\nPlay on Fey: https://fey.lokinlabs.com.ng/play`;
+    const text = `🏆 Fey Articulate Match Results!\n${title}\n\n👑 ${winner.name}: ${winner.score} pts\n⚔️ ${runnerUp.name}: ${runnerUp.score} pts\n\n⏱️ Play Time: ${playTime.formatted} • Final Round: Round ${room.current_turn?.roundNumber || 1}\nMargin: ${margin} pts lead • Target: ${room.settings.scoreGoal} pts\nPlay on Fey: https://fey.lokinlabs.com.ng/play`;
     navigator.clipboard.writeText(text);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
@@ -105,7 +107,7 @@ export default function RoomGameOver({
   const handleWhatsAppShare = () => {
     const title = room.room_name ? `${room.room_name} (${room.room_code})` : `Room ${room.room_code}`;
     const text = encodeURIComponent(
-      `🏆 Fey Articulate Match Result!\n${title}\n\n👑 ${winner.name}: ${winner.score} pts\n⚔️ ${runnerUp.name}: ${runnerUp.score} pts\n\nMargin: ${margin} pts lead! Play with us: https://fey.lokinlabs.com.ng/play/room/${room.room_code}`
+      `🏆 Fey Articulate Match Result!\n${title}\n\n👑 ${winner.name}: ${winner.score} pts\n⚔️ ${runnerUp.name}: ${runnerUp.score} pts\n\n⏱️ Play Time: ${playTime.formatted} • Final Round: Round ${room.current_turn?.roundNumber || 1}\nMargin: ${margin} pts lead! Play with us: https://fey.lokinlabs.com.ng/play/room/${room.room_code}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   };
@@ -139,6 +141,10 @@ export default function RoomGameOver({
             )}
             <span className="font-mono text-xs font-bold px-2.5 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-mute)]">
               {room.room_code}
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-mono text-xs font-bold px-3 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text)] shadow-2xs">
+              <Timer className="w-3.5 h-3.5 text-[var(--gold)]" />
+              <span>{playTime.formatted} Play Time</span>
             </span>
           </div>
 
@@ -223,8 +229,8 @@ export default function RoomGameOver({
         })}
       </div>
 
-      {/* Match 4-Stat Highlights Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 text-left">
+      {/* Match 5-Stat Highlights Grid */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2.5 text-left">
         <div className="surface rounded-2xl p-3.5 border border-[var(--border-dim)] space-y-1 shadow-2xs">
           <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
             <Target className="w-3.5 h-3.5 text-[var(--terra)]" /> Target Goal
@@ -258,6 +264,15 @@ export default function RoomGameOver({
           </div>
           <div className="text-base font-space font-extrabold text-[var(--text)]">
             Round {room.current_turn?.roundNumber || 1}
+          </div>
+        </div>
+
+        <div className="col-span-2 sm:col-span-1 surface rounded-2xl p-3.5 border border-[var(--border-dim)] space-y-1 shadow-2xs bg-[var(--gold)]/5">
+          <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
+            <Timer className="w-3.5 h-3.5 text-[var(--gold)]" /> Total Play Time
+          </div>
+          <div className="text-base font-space font-extrabold text-[var(--text)]">
+            {playTime.formatted}
           </div>
         </div>
       </div>

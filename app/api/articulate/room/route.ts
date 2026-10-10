@@ -45,6 +45,8 @@ export async function POST(req: NextRequest) {
 
     const teamsPayload = {
       room_name: newRoom.room_name || "",
+      match_started_at: newRoom.match_started_at,
+      match_ended_at: newRoom.match_ended_at,
       teamA: newRoom.teams.teamA,
       teamB: newRoom.teams.teamB,
       ...(newRoom.teams.teamC ? { teamC: newRoom.teams.teamC } : {}),
@@ -160,6 +162,8 @@ export async function GET(req: NextRequest) {
             player_details: rawTeams.player_details || {},
             last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
             last_speaker_ids: rawTeams.last_speaker_ids || {},
+            match_started_at: rawTeams.match_started_at || undefined,
+            match_ended_at: rawTeams.match_ended_at || undefined,
             version: typeof rawTeams._version === "number" ? rawTeams._version : 0,
             created_at: data.created_at,
             updated_at: data.updated_at,

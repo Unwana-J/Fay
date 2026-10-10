@@ -102,9 +102,60 @@ export interface ArticulateRoom {
   player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean; joinedAt?: number }>; // Persisted identity map
   last_speaker_indices?: { teamA?: number; teamB?: number; teamC?: number; teamD?: number }; // Track strict round-robin index per team
   last_speaker_ids?: { teamA?: string; teamB?: string; teamC?: string; teamD?: string }; // Track strict last speaker ID per team
+  match_started_at?: string; // ISO timestamp when first round started
+  match_ended_at?: string; // ISO timestamp when match concluded
   version?: number; // Monotonic revision counter, bumped on every persisted write (stale-snapshot rejection)
   created_at?: string;
   updated_at?: string;
+}
+
+/**
+ * Calculates total match play time in seconds and human-formatted string (e.g. "18m 42s").
+ */
+export function calculateMatchPlayTime(room: ArticulateRoom): { seconds: number; formatted: string } {
+  // 1. Explicit match timestamps
+  if (room.match_started_at) {
+    const startMs = new Date(room.match_started_at).getTime();
+    const endMs = room.match_ended_at
+      ? new Date(room.match_ended_at).getTime()
+      : room.updated_at
+      ? new Date(room.updated_at).getTime()
+      : Date.now();
+    const diffSec = Math.max(1, Math.round((endMs - startMs) / 1000));
+    return { seconds: diffSec, formatted: formatMatchDuration(diffSec) };
+  }
+
+  // 2. Room created_at and updated_at fallback (e.g. existing completed rooms)
+  if (room.created_at && room.updated_at) {
+    const startMs = new Date(room.created_at).getTime();
+    const endMs = new Date(room.updated_at).getTime();
+    const diffSec = Math.round((endMs - startMs) / 1000);
+
+    // If within realistic play window (10s to 6 hours)
+    if (diffSec > 10 && diffSec < 6 * 3600) {
+      return { seconds: diffSec, formatted: formatMatchDuration(diffSec) };
+    }
+  }
+
+  // 3. Fallback based on rounds played
+  const rounds = room.current_turn?.roundNumber || 1;
+  const turnSeconds = room.settings?.timerSeconds || 45;
+  const estimatedSeconds = Math.max(rounds * (turnSeconds + 15), turnSeconds);
+  return { seconds: estimatedSeconds, formatted: formatMatchDuration(estimatedSeconds) };
+}
+
+export function formatMatchDuration(totalSeconds: number): string {
+  if (totalSeconds < 60) {
+    return `${Math.max(1, totalSeconds)}s`;
+  }
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+
+  if (hours > 0) {
+    return seconds > 0 ? `${hours}h ${minutes}m ${seconds}s` : `${hours}h ${minutes}m`;
+  }
+  return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
 
 /** Number of upcoming words shipped to clients (clients only ever read deck[current_word_index]). */
