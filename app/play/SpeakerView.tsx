@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { useGameStore } from "@/store/useGameStore";
+import { useGameStore, type TeamId } from "@/store/useGameStore";
 import { CATEGORY_COLORS, CATEGORY_ICONS, buildDeck } from "@/lib/game-words";
 import { Check, FastForward, AlertCircle, Timer, Pause, Bot, Mic, Loader2 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -29,13 +29,21 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
     colorA,
     colorB,
     recordCorrectForTeam,
-    challengeRestriction
+    challengeRestriction,
+    buzzerSound,
+    teamNameA,
+    teamNameB,
+    getActiveTeams,
+    getTeamColor,
+    getTeamName,
+    pauseGame
   } = useGameStore();
 
   const totalSeconds = timerSeconds + (spinnerModifier === "extra-time" ? 15 : 0);
 
   const [timeLeft, setTimeLeft] = useState(totalSeconds);
   const [feedback, setFeedback] = useState<"correct" | "skip" | null>(null);
+  const [foulAlert, setFoulAlert] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
   const [violationText, setViolationText] = useState("");
   const [showViolationChecker, setShowViolationChecker] = useState(false);
@@ -92,6 +100,11 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
         }
         return;
       }
+      if (e.code === "KeyB") {
+        e.preventDefault();
+        handleOpponentBuzzer();
+        return;
+      }
       if (gameMode === "masterchef") {
         if (e.code === "ArrowLeft" || e.code === "KeyA") {
           e.preventDefault();
@@ -115,7 +128,7 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [currentWordIndex, isPaused, gameMode]);
+  }, [currentWordIndex, isPaused, gameMode, buzzerSound]);
 
   // Main countdown timer
   useEffect(() => {
@@ -131,13 +144,13 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
   // Handle timer completion side effects
   useEffect(() => {
     if (timeLeft === 0 && !isPaused) {
-      playBuzzerSound();
+      playBuzzerSound(buzzerSound);
       triggerConfetti();
-      const teamName = activeTeam === "A" ? "Alpha" : "Omega";
+      const teamName = activeTeam === "A" ? teamNameA : teamNameB;
       announce({ type: "turnEnd", wordCount: correctInCurrentTurn.length, teamName });
       onTimeUp(totalSeconds);
     }
-  }, [timeLeft, onTimeUp, totalSeconds, isPaused]);
+  }, [timeLeft, onTimeUp, totalSeconds, isPaused, buzzerSound, activeTeam, teamNameA, teamNameB]);
 
   // Voice time warnings (15s and 5s)
   useEffect(() => {
@@ -162,6 +175,16 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
     });
   };
 
+  const handleOpponentBuzzer = () => {
+    playBuzzerSound(buzzerSound);
+    try {
+      navigator.vibrate?.([200, 80, 200]);
+    } catch {}
+    setFoulAlert(true);
+    setTimeout(() => setFoulAlert(false), 2200);
+    handleSkip();
+  };
+
   const handleCorrect = () => {
     setFeedback("correct");
     setTimeout(() => setFeedback(null), 150);
@@ -169,7 +192,7 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
     recordCorrect();
   };
 
-  const handleCorrectForTeam = (team: "A" | "B") => {
+  const handleCorrectForTeam = (team: TeamId) => {
     setFeedback("correct");
     setTimeout(() => setFeedback(null), 150);
     announce({ type: "correct" });
@@ -200,6 +223,8 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
   const progressPercent = (timeLeft / totalSeconds) * 100;
   const isTimeCritical = timeLeft <= 10;
   const isAlpha = activeTeam === "A";
+  const activeTeamColor = activeTeam ? getTeamColor(activeTeam) : colorA;
+  const activeTeamName = activeTeam ? getTeamName(activeTeam) : teamNameA;
 
   return (
     <div className="max-w-2xl mx-auto flex flex-col justify-between min-h-[75vh] px-4 py-6 relative">
@@ -221,14 +246,51 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
             className="absolute inset-0 bg-amber-500 rounded-3xl pointer-events-none z-50"
           />
         )}
+        {foulAlert && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.25 }}
+            exit={{ opacity: 0 }}
+            className="absolute inset-0 bg-red-600 rounded-3xl pointer-events-none z-50 animate-pulse"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Foul Alert Notification */}
+      <AnimatePresence>
+        {foulAlert && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="w-full bg-red-600 text-white rounded-2xl py-2 px-4 flex items-center justify-center gap-2 font-space font-extrabold text-xs shadow-md z-40 mb-2"
+          >
+            <span>🚨</span>
+            <span>FOUL CALLED BY OPPONENT! CARD SKIPPED.</span>
+          </motion.div>
+        )}
       </AnimatePresence>
 
       {/* Header Info */}
       <div className="flex items-center justify-between border-b border-[var(--border-dim)] pb-4">
         <div>
-          <span className="text-[10px] uppercase tracking-wider font-extrabold text-[var(--text-mute)] block">
-            {gameMode === "masterchef" ? "Mode" : "Speaker"}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] uppercase tracking-wider font-extrabold text-[var(--text-mute)] block">
+              {gameMode === "masterchef" ? "Mode" : "Speaker"}
+            </span>
+            {gameMode !== "masterchef" && (
+              <span
+                className="text-[9px] font-space font-black uppercase px-2 py-0.5 rounded-full border"
+                style={{
+                  color: activeTeamColor,
+                  borderColor: `${activeTeamColor}40`,
+                  backgroundColor: `${activeTeamColor}15`
+                }}
+              >
+                {activeTeamName}
+              </span>
+            )}
+          </div>
           <span className="text-sm font-space font-bold text-[var(--text)]">
             {gameMode === "masterchef" ? "🎙️ Moderator (All-Play)" : activeSpeaker}
           </span>
@@ -330,6 +392,18 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
               >
                 End Turn Early
               </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  pauseGame();
+                }}
+                className="w-full py-2.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--border-dim)]/40 text-[var(--text)] font-space font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-xs"
+                title="Save match progress and return to menu"
+              >
+                <Pause className="w-3.5 h-3.5 text-[var(--olive)]" />
+                Pause & Save Match to Menu
+              </button>
               
               <button
                 type="button"
@@ -414,36 +488,62 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
         </AnimatePresence>
       </div>
 
+      {/* Opponent Rule Violation Buzzer Bar (Both Classic and Masterchef) */}
+      <div className="mb-3 flex items-center justify-between gap-2.5 p-2.5 sm:p-3 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400">
+        <div className="flex items-center gap-2 min-w-0">
+          <span className="text-base shrink-0 animate-pulse">🚨</span>
+          <p className="text-[11px] font-space font-bold leading-tight truncate">
+            {gameMode === "masterchef" ? (
+              <>Foul Referee: Did anyone break the rules?</>
+            ) : (
+              <>
+                <span className="text-[var(--text)] font-extrabold">{activeTeam === "A" ? teamNameB : teamNameA}</span>: Buzz if {activeSpeaker} said the word or rhymed!
+              </>
+            )}
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={handleOpponentBuzzer}
+          className="px-3.5 py-1.5 rounded-xl bg-red-600 hover:bg-red-700 active:scale-95 text-white font-space font-extrabold text-xs shadow-sm transition-all cursor-pointer shrink-0 flex items-center gap-1.5"
+          title="Opponent Foul Buzzer (Keyboard: B)"
+        >
+          <span>Foul!</span>
+          <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[9px] bg-red-800 rounded font-mono">B</kbd>
+        </button>
+      </div>
+
       {/* Control Buttons */}
       {gameMode === "masterchef" ? (
         <div className="flex flex-col gap-3 pb-4">
-          <div className="grid grid-cols-2 gap-3">
-            {/* Team Alpha Correct button */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleCorrectForTeam("A")}
-              className="py-4 rounded-2xl text-white font-space font-extrabold flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-sm hover:shadow-md transition-all text-xs"
-              style={{ backgroundColor: colorA }}
-            >
-              <div className="flex items-center gap-1.5">
-                <Check className="w-4 h-4 stroke-[3px]" /> Alpha Guessed
-              </div>
-              <span className="text-[9px] opacity-80 font-normal">Keyboard: A / ←</span>
-            </motion.button>
+          {(() => {
+            const activeTeams = getActiveTeams();
+            const gridClass =
+              activeTeams.length === 2
+                ? "grid-cols-2"
+                : activeTeams.length === 3
+                ? "grid-cols-3"
+                : "grid-cols-2 sm:grid-cols-4";
 
-            {/* Team Omega Correct button */}
-            <motion.button
-              whileTap={{ scale: 0.95 }}
-              onClick={() => handleCorrectForTeam("B")}
-              className="py-4 rounded-2xl text-white font-space font-extrabold flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-sm hover:shadow-md transition-all text-xs"
-              style={{ backgroundColor: colorB }}
-            >
-              <div className="flex items-center gap-1.5">
-                <Check className="w-4 h-4 stroke-[3px]" /> Omega Guessed
+            return (
+              <div className={`grid ${gridClass} gap-3`}>
+                {activeTeams.map((t) => (
+                  <motion.button
+                    key={t.id}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => handleCorrectForTeam(t.id)}
+                    className="py-3.5 sm:py-4 rounded-2xl text-white font-space font-extrabold flex flex-col items-center justify-center gap-0.5 cursor-pointer shadow-sm hover:shadow-md transition-all text-xs"
+                    style={{ backgroundColor: t.color }}
+                  >
+                    <div className="flex items-center gap-1.5 truncate max-w-full px-2">
+                      <Check className="w-4 h-4 stroke-[3px] shrink-0" /> <span className="truncate">{t.name} Guessed</span>
+                    </div>
+                    <span className="text-[9px] opacity-80 font-normal">Team {t.id}</span>
+                  </motion.button>
+                ))}
               </div>
-              <span className="text-[9px] opacity-80 font-normal">Keyboard: L / →</span>
-            </motion.button>
-          </div>
+            );
+          })()}
 
           {/* Skip button centered below */}
           <motion.button
@@ -473,7 +573,7 @@ export default function SpeakerView({ onTimeUp }: { onTimeUp: (elapsed: number) 
             whileTap={{ scale: 0.95 }}
             onClick={handleCorrect}
             className="py-4 rounded-2xl text-white font-space font-extrabold flex items-center justify-center gap-2 cursor-pointer shadow-sm hover:shadow-md transition-all"
-            style={{ backgroundColor: isAlpha ? "var(--terra)" : "var(--olive)" }}
+            style={{ backgroundColor: activeTeamColor }}
           >
             <Check className="w-5 h-5 stroke-[3px]" /> Correct
           </motion.button>

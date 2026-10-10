@@ -18,6 +18,7 @@ import {
   Sparkles,
   BookOpen,
   Share2,
+  HelpCircle,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -32,6 +33,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { useFeatureStore } from "@/store/useFeatureStore";
 import { cn } from "@/lib/utils";
 import ShareTriviaModal from "@/components/games/ShareTriviaModal";
+import TriviaGuideModal from "@/components/games/TriviaGuideModal";
 import TriviaHistoryView from "@/components/games/TriviaHistoryView";
 import TriviaLeaderboardView from "@/components/games/TriviaLeaderboardView";
 import TriviaChallengeLounge from "@/components/games/TriviaChallengeLounge";
@@ -105,6 +107,7 @@ function SetupScreen({
   activeChallenge,
   onSelectChallenge,
   onStartChallenge,
+  onOpenGuide,
 }: {
   activeTab: SetupTab;
   onTabChange: (tab: SetupTab) => void;
@@ -117,6 +120,7 @@ function SetupScreen({
   activeChallenge: TriviaChallenge | null;
   onSelectChallenge: (challenge: TriviaChallenge | null) => void;
   onStartChallenge: (challenge: TriviaChallenge) => void;
+  onOpenGuide?: () => void;
 }) {
   const [duration, setDuration] = useState<DurationOption>(DURATION_OPTIONS[1]);
   const [mode, setMode] = useState<ReviewMode>("instant");
@@ -154,14 +158,28 @@ function SetupScreen({
 
   return (
     <div className="min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-center">
-      {/* Back Link */}
-      <Link
-        href="/games"
-        className="flex items-center gap-1.5 text-xs font-semibold mb-6 w-fit hover:text-[var(--text)] transition-colors"
-        style={{ color: "var(--text-dim)" }}
-      >
-        <ArrowLeft size={13} /> Back to Games
-      </Link>
+      {/* Top Bar: Back Link & How to Play */}
+      <div className="flex items-center justify-between mb-6">
+        <Link
+          href="/games"
+          className="flex items-center gap-1.5 text-xs font-semibold w-fit hover:text-[var(--text)] transition-colors"
+          style={{ color: "var(--text-dim)" }}
+        >
+          <ArrowLeft size={13} /> Back to Games
+        </Link>
+
+        {onOpenGuide && (
+          <button
+            type="button"
+            onClick={onOpenGuide}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-panel)] text-[var(--text)] text-xs font-bold font-space transition cursor-pointer shadow-xs"
+            title="How to Play Naija Trivia"
+          >
+            <HelpCircle size={13} className="text-[var(--olive)]" />
+            <span>How to Play</span>
+          </button>
+        )}
+      </div>
 
       {/* Hero Header */}
       <div className="text-center mb-6">
@@ -1141,6 +1159,8 @@ export default function TriviaGameClient({
     triviaHistory = [],
     saveTriviaRound,
     triggerActivityFeedbackIfEligible,
+    hasSeenTriviaGuide,
+    dismissTriviaGuide,
   } = useAppStore();
 
   const [phase, setPhase] = useState<GamePhase>("setup");
@@ -1154,6 +1174,20 @@ export default function TriviaGameClient({
   const [xpEarned, setXpEarned] = useState(0);
   const [currentDifficulty, setCurrentDifficulty] = useState<TriviaDifficultyFilter>("random");
   const [lastChallengeResult, setLastChallengeResult] = useState<RecordScoreResult | null>(null);
+
+  const [showGuideModal, setShowGuideModal] = useState(false);
+
+  // Automatically display the How to Play guide for new users who have never played before
+  useEffect(() => {
+    if (!hasSeenTriviaGuide && (!triviaHistory || triviaHistory.length === 0)) {
+      setShowGuideModal(true);
+    }
+  }, [hasSeenTriviaGuide, triviaHistory]);
+
+  const handleCloseGuide = () => {
+    dismissTriviaGuide();
+    setShowGuideModal(false);
+  };
 
   // Read URL search params on client for challenge codes
   useEffect(() => {
@@ -1377,56 +1411,81 @@ export default function TriviaGameClient({
 
   if (phase === "playing") {
     return (
-      <GameScreen
-        questions={questions}
-        reviewMode={reviewMode}
-        totalSeconds={totalSeconds}
-        onComplete={handleComplete}
-      />
+      <>
+        <GameScreen
+          questions={questions}
+          reviewMode={reviewMode}
+          totalSeconds={totalSeconds}
+          onComplete={handleComplete}
+        />
+        <TriviaGuideModal
+          isOpen={showGuideModal}
+          onClose={handleCloseGuide}
+          onSkip={handleCloseGuide}
+          isFirstTime={!hasSeenTriviaGuide && (!triviaHistory || triviaHistory.length === 0)}
+        />
+      </>
     );
   }
 
   if (phase === "results") {
     return (
-      <ResultsScreen
-        questions={questions}
-        answers={answers}
-        reviewMode={reviewMode}
-        xpEarned={xpEarned}
-        difficultyMode={currentDifficulty}
-        onRetry={() => setPhase("setup")}
-        onViewHistory={() => {
-          setSetupTab("history");
-          setPhase("setup");
-        }}
-        onViewLeaderboard={() => {
-          setSetupTab("leaderboard");
-          setPhase("setup");
-        }}
-        challenger={challenger}
-        activeChallenge={activeChallenge}
-        challengeRecordResult={lastChallengeResult}
-        onViewChallengeBoard={() => {
-          setSetupTab("challenge");
-          setPhase("setup");
-        }}
-      />
+      <>
+        <ResultsScreen
+          questions={questions}
+          answers={answers}
+          reviewMode={reviewMode}
+          xpEarned={xpEarned}
+          difficultyMode={currentDifficulty}
+          onRetry={() => setPhase("setup")}
+          onViewHistory={() => {
+            setSetupTab("history");
+            setPhase("setup");
+          }}
+          onViewLeaderboard={() => {
+            setSetupTab("leaderboard");
+            setPhase("setup");
+          }}
+          challenger={challenger}
+          activeChallenge={activeChallenge}
+          challengeRecordResult={lastChallengeResult}
+          onViewChallengeBoard={() => {
+            setSetupTab("challenge");
+            setPhase("setup");
+          }}
+        />
+        <TriviaGuideModal
+          isOpen={showGuideModal}
+          onClose={handleCloseGuide}
+          onSkip={handleCloseGuide}
+          isFirstTime={!hasSeenTriviaGuide && (!triviaHistory || triviaHistory.length === 0)}
+        />
+      </>
     );
   }
 
   return (
-    <SetupScreen
-      activeTab={setupTab}
-      onTabChange={setSetupTab}
-      historyCount={triviaHistory.length}
-      onStartSolo={handleStartSolo}
-      onPlayDeck={handlePlayDeck}
-      seenQuestionIds={seenTriviaQuestionIds}
-      onResetSeen={resetSeenTriviaQuestions}
-      challenger={challenger}
-      activeChallenge={activeChallenge}
-      onSelectChallenge={setActiveChallenge}
-      onStartChallenge={handleStartChallenge}
-    />
+    <>
+      <SetupScreen
+        activeTab={setupTab}
+        onTabChange={setSetupTab}
+        historyCount={triviaHistory.length}
+        onStartSolo={handleStartSolo}
+        onPlayDeck={handlePlayDeck}
+        seenQuestionIds={seenTriviaQuestionIds}
+        onResetSeen={resetSeenTriviaQuestions}
+        challenger={challenger}
+        activeChallenge={activeChallenge}
+        onSelectChallenge={setActiveChallenge}
+        onStartChallenge={handleStartChallenge}
+        onOpenGuide={() => setShowGuideModal(true)}
+      />
+      <TriviaGuideModal
+        isOpen={showGuideModal}
+        onClose={handleCloseGuide}
+        onSkip={handleCloseGuide}
+        isFirstTime={!hasSeenTriviaGuide && (!triviaHistory || triviaHistory.length === 0)}
+      />
+    </>
   );
 }

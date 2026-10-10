@@ -2,30 +2,35 @@
 
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Play, Sparkles } from "lucide-react";
+import { Play, Sparkles, Pause } from "lucide-react";
 import { useFeyVoice } from "@/lib/useFeyVoice";
-import { useGameStore } from "@/store/useGameStore";
+import { useGameStore, type TeamId } from "@/store/useGameStore";
+import { playAudioTone } from "@/lib/sound";
 
 export default function HandoffScreen({
   speakerName,
+  team = "A",
   teamLabel,
   specialSpaceType,
   challengeRestriction,
   onReady,
   onMinimize,
+  onPause,
   gameMode = "classic"
 }: {
   speakerName: string;
-  teamLabel: "Alpha" | "Omega";
+  team?: TeamId;
+  teamLabel: string;
   specialSpaceType: "chance" | "double" | "challenge" | null;
   challengeRestriction: string | null;
   onReady: () => void;
   onMinimize?: () => void;
+  onPause?: () => void;
   gameMode?: "classic" | "masterchef";
 }) {
   const [countdown, setCountdown] = useState<number | null>(null);
   const { announce } = useFeyVoice();
-  const { timerSeconds } = useGameStore();
+  const { timerSeconds, getTeamColor } = useGameStore();
 
   // Announce who's up as soon as the handoff screen appears
   useEffect(() => {
@@ -38,7 +43,16 @@ export default function HandoffScreen({
 
   useEffect(() => {
     if (countdown === null) return;
-    if (countdown === 0) {
+    if (countdown > 0) {
+      playAudioTone(440, "sine", 0.08);
+      try {
+        navigator.vibrate?.(60);
+      } catch {}
+    } else if (countdown === 0) {
+      playAudioTone(880, "triangle", 0.2);
+      try {
+        navigator.vibrate?.(120);
+      } catch {}
       onReady();
       return;
     }
@@ -54,8 +68,9 @@ export default function HandoffScreen({
     setCountdown(3);
   };
 
-  const isAlpha = teamLabel === "Alpha";
+  const teamColor = getTeamColor(team);
   const isMasterchef = gameMode === "masterchef";
+  const teamIcon = team === "A" ? "🔥" : team === "B" ? "🌱" : team === "C" ? "⚡" : "🌟";
 
   return (
     <div className="max-w-md mx-auto text-center flex flex-col items-center px-4 py-6 gap-6">
@@ -74,9 +89,9 @@ export default function HandoffScreen({
                 animate={{ rotate: 360 }}
                 transition={{ repeat: Infinity, duration: 6, ease: "linear" }}
                 className="absolute inset-0 rounded-full border-4 border-dashed"
-                style={{ borderColor: isMasterchef ? "var(--text-mute)" : isAlpha ? "var(--terra)" : "var(--olive)" }}
+                style={{ borderColor: isMasterchef ? "var(--text-mute)" : teamColor }}
               />
-              <span className="text-4xl">{isMasterchef ? "🎬" : isAlpha ? "🔥" : "🌱"}</span>
+              <span className="text-4xl">{isMasterchef ? "🎬" : teamIcon}</span>
             </div>
 
             <div className="space-y-2">
@@ -85,12 +100,12 @@ export default function HandoffScreen({
                 <span
                   className="text-xs uppercase font-space font-extrabold tracking-widest px-3 py-1 rounded-full border"
                   style={{
-                    color: isAlpha ? "var(--terra)" : "var(--olive)",
-                    borderColor: isAlpha ? "var(--terra-dim)" : "var(--olive-dim)",
-                    backgroundColor: isAlpha ? "rgba(166,124,30,0.06)" : "rgba(68,78,44,0.06)"
+                    color: teamColor,
+                    borderColor: `${teamColor}40`,
+                    backgroundColor: `${teamColor}12`
                   }}
                 >
-                  Team {teamLabel}
+                  {teamLabel.toLowerCase().startsWith("team") ? teamLabel : `Team ${teamLabel}`}
                 </span>
               )}
               {isMasterchef && (
@@ -162,7 +177,7 @@ export default function HandoffScreen({
                 whileTap={{ scale: 0.95 }}
                 onClick={specialSpaceType === "chance" ? onReady : handleStartCountdown}
                 className="w-full py-4 px-6 rounded-2xl text-white font-space font-extrabold shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition-all"
-                style={{ backgroundColor: isMasterchef ? "#4E5460" : isAlpha ? "var(--terra)" : "var(--olive)" }}
+                style={{ backgroundColor: isMasterchef ? "#4E5460" : teamColor }}
               >
                 {specialSpaceType === "chance" ? (
                   <>Spin the Wheel 🎲</>
@@ -182,6 +197,18 @@ export default function HandoffScreen({
                   👁️ Peek at Board
                 </button>
               )}
+
+              {onPause && (
+                <button
+                  type="button"
+                  onClick={onPause}
+                  className="w-full py-2.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--border-dim)]/30 text-[var(--text-dim)] hover:text-[var(--text)] font-space font-bold text-xs transition-colors cursor-pointer flex items-center justify-center gap-1.5 shadow-2xs"
+                  title="Pause game and return to menu with match progress safely saved"
+                >
+                  <Pause className="w-3.5 h-3.5 text-[var(--olive)]" />
+                  Pause & Save Match
+                </button>
+              )}
             </div>
           </motion.div>
         ) : (
@@ -198,7 +225,7 @@ export default function HandoffScreen({
               animate={{ scale: 1, opacity: 1 }}
               transition={{ type: "spring", stiffness: 200, damping: 10 }}
               className="text-9xl font-space font-extrabold"
-              style={{ color: isAlpha ? "var(--terra)" : "var(--olive)" }}
+              style={{ color: teamColor }}
             >
               {countdown}
             </motion.div>

@@ -45,29 +45,41 @@ export default function SpectatorLounge({
 
   const scoreA = room.teams?.teamA?.score ?? 0;
   const scoreB = room.teams?.teamB?.score ?? 0;
+  const scoreC = room.teams?.teamC?.score ?? 0;
+  const scoreD = room.teams?.teamD?.score ?? 0;
   const pctA = Math.min(100, Math.round((scoreA / scoreGoal) * 100));
   const pctB = Math.min(100, Math.round((scoreB / scoreGoal) * 100));
 
   const isUrgent = secondsRemaining <= 10;
 
+  const activeTeamsList = [
+    { key: "A" as const, team: room.teams.teamA, players: room.teams?.teamA?.playerIds || [] },
+    { key: "B" as const, team: room.teams.teamB, players: room.teams?.teamB?.playerIds || [] },
+    ...(room.teams.teamC ? [{ key: "C" as const, team: room.teams.teamC, players: room.teams.teamC.playerIds }] : []),
+    ...(room.teams.teamD ? [{ key: "D" as const, team: room.teams.teamD, players: room.teams.teamD.playerIds }] : []),
+  ];
+
   const activeTeamKey = currentTurn?.activeTeam || "A";
-  const activeTeamName =
-    activeTeamKey === "B"
-      ? room.teams?.teamB?.name || "Team Omega"
-      : room.teams?.teamA?.name || "Team Alpha";
-  const activeTeamColor =
-    activeTeamKey === "B"
-      ? room.teams?.teamB?.color || "#3B82F6"
-      : room.teams?.teamA?.color || "#EF4444";
+  const activeTeamObj =
+    activeTeamKey === "A"
+      ? room.teams.teamA
+      : activeTeamKey === "B"
+      ? room.teams.teamB
+      : activeTeamKey === "C"
+      ? room.teams.teamC || room.teams.teamA
+      : room.teams.teamD || room.teams.teamA;
+  const activeTeamName = activeTeamObj.name;
+  const activeTeamColor = activeTeamObj.color;
 
   // Score differential / lead
-  const leadDiff = Math.abs(scoreA - scoreB);
-  const leadText =
-    scoreA > scoreB
-      ? `${room.teams?.teamA?.name || "Team Alpha"} leads by ${leadDiff} pts`
-      : scoreB > scoreA
-      ? `${room.teams?.teamB?.name || "Team Omega"} leads by ${leadDiff} pts`
-      : "Scores are tied!";
+  const sortedByScore = [...activeTeamsList].sort((a, b) => (b.team.score ?? 0) - (a.team.score ?? 0));
+  const leader = sortedByScore[0];
+  const second = sortedByScore[1];
+  const leadDiff = leader && second ? Math.abs((leader.team.score ?? 0) - (second.team.score ?? 0)) : 0;
+  const isTied = leader && second && leader.team.score === second.team.score;
+  const leadText = isTied
+    ? "Scores are tied!"
+    : `${leader.team.name} leads by ${leadDiff} pts`;
 
   const wordsScoredThisTurn = room.round_words_scored?.length || 0;
 
@@ -214,108 +226,70 @@ export default function SpectatorLounge({
           </div>
 
           {/* Team Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
-            {/* Team Alpha Card */}
-            <div
-              className={`p-4 rounded-2xl border space-y-2 transition-all ${
-                activeTeamKey === "A"
-                  ? "bg-[var(--bg)] shadow-xs ring-2 ring-red-500/30"
-                  : "bg-[var(--bg-card)] opacity-90"
-              }`}
-              style={{ borderColor: `${room.teams?.teamA?.color || "#EF4444"}40` }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full shadow-xs"
-                    style={{ backgroundColor: room.teams?.teamA?.color || "#EF4444" }}
-                  />
-                  <strong className="font-space font-bold text-sm text-[var(--text)]">
-                    {room.teams?.teamA?.name || "Team Alpha"}
-                  </strong>
-                  {activeTeamKey === "A" && (
-                    <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.2 rounded bg-red-500/15 text-red-600">
-                      Speaking
-                    </span>
-                  )}
-                </div>
+          <div className={`grid gap-3.5 ${
+            activeTeamsList.length === 4
+              ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+              : activeTeamsList.length === 3
+              ? "grid-cols-1 sm:grid-cols-3"
+              : "grid-cols-1 sm:grid-cols-2"
+          }`}>
+            {activeTeamsList.map(({ key, team }) => {
+              const score = team.score ?? 0;
+              const pct = Math.min(100, Math.round((score / scoreGoal) * 100));
+              const isSpeaking = activeTeamKey === key;
+              return (
                 <div
-                  className="font-space font-extrabold text-2xl"
-                  style={{ color: room.teams?.teamA?.color || "#EF4444" }}
+                  key={key}
+                  className={`p-4 rounded-2xl border space-y-2 transition-all ${
+                    isSpeaking
+                      ? "bg-[var(--bg)] shadow-xs ring-2 ring-[var(--olive)]/30"
+                      : "bg-[var(--bg-card)] opacity-90"
+                  }`}
+                  style={{ borderColor: `${team.color}40` }}
                 >
-                  {scoreA}{" "}
-                  <span className="text-xs font-normal text-[var(--text-dim)]">/ {scoreGoal}</span>
-                </div>
-              </div>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <span
+                        className="w-3 h-3 rounded-full shadow-xs"
+                        style={{ backgroundColor: team.color }}
+                      />
+                      <strong className="font-space font-bold text-sm text-[var(--text)] truncate max-w-[120px]">
+                        {team.name}
+                      </strong>
+                      {isSpeaking && (
+                        <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.2 rounded bg-emerald-500/15 text-emerald-600">
+                          Speaking
+                        </span>
+                      )}
+                    </div>
+                    <div
+                      className="font-space font-extrabold text-2xl"
+                      style={{ color: team.color }}
+                    >
+                      {score}{" "}
+                      <span className="text-xs font-normal text-[var(--text-dim)]">/ {scoreGoal}</span>
+                    </div>
+                  </div>
 
-              {/* Progress Bar */}
-              <div className="space-y-1">
-                <div className="w-full bg-[var(--border-dim)]/50 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500 ease-out"
-                    style={{
-                      width: `${pctA}%`,
-                      backgroundColor: room.teams?.teamA?.color || "#EF4444",
-                    }}
-                  />
+                  {/* Progress Bar */}
+                  <div className="space-y-1">
+                    <div className="w-full bg-[var(--border-dim)]/50 h-2.5 rounded-full overflow-hidden">
+                      <div
+                        className="h-full rounded-full transition-all duration-500 ease-out"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: team.color,
+                        }}
+                      />
+                    </div>
+                    <div className="flex justify-between text-[10px] text-[var(--text-mute)] font-mono">
+                      <span>{pct}% completed</span>
+                      <span>{Math.max(0, scoreGoal - score)} pts to win</span>
+                    </div>
+                  </div>
                 </div>
-                <div className="flex justify-between text-[10px] text-[var(--text-mute)] font-mono">
-                  <span>{pctA}% completed</span>
-                  <span>{Math.max(0, scoreGoal - scoreA)} pts to win</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Team Omega Card */}
-            <div
-              className={`p-4 rounded-2xl border space-y-2 transition-all ${
-                activeTeamKey === "B"
-                  ? "bg-[var(--bg)] shadow-xs ring-2 ring-blue-500/30"
-                  : "bg-[var(--bg-card)] opacity-90"
-              }`}
-              style={{ borderColor: `${room.teams?.teamB?.color || "#3B82F6"}40` }}
-            >
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full shadow-xs"
-                    style={{ backgroundColor: room.teams?.teamB?.color || "#3B82F6" }}
-                  />
-                  <strong className="font-space font-bold text-sm text-[var(--text)]">
-                    {room.teams?.teamB?.name || "Team Omega"}
-                  </strong>
-                  {activeTeamKey === "B" && (
-                    <span className="text-[10px] uppercase font-extrabold px-1.5 py-0.2 rounded bg-blue-500/15 text-blue-600">
-                      Speaking
-                    </span>
-                  )}
-                </div>
-                <div
-                  className="font-space font-extrabold text-2xl"
-                  style={{ color: room.teams?.teamB?.color || "#3B82F6" }}
-                >
-                  {scoreB}{" "}
-                  <span className="text-xs font-normal text-[var(--text-dim)]">/ {scoreGoal}</span>
-                </div>
-              </div>
-
-              {/* Progress Bar */}
-              <div className="space-y-1">
-                <div className="w-full bg-[var(--border-dim)]/50 h-2.5 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-500 ease-out"
-                    style={{
-                      width: `${pctB}%`,
-                      backgroundColor: room.teams?.teamB?.color || "#3B82F6",
-                    }}
-                  />
-                </div>
-                <div className="flex justify-between text-[10px] text-[var(--text-mute)] font-mono">
-                  <span>{pctB}% completed</span>
-                  <span>{Math.max(0, scoreGoal - scoreB)} pts to win</span>
-                </div>
-              </div>
-            </div>
+              );
+            })}
           </div>
         </div>
 
@@ -371,9 +345,17 @@ export default function SpectatorLounge({
               <BoardMap
                 scoreA={scoreA}
                 scoreB={scoreB}
+                scoreC={scoreC}
+                scoreD={scoreD}
                 scoreGoal={scoreGoal}
                 colorA={room.teams?.teamA?.color || "#EF4444"}
                 colorB={room.teams?.teamB?.color || "#3B82F6"}
+                colorC={room.teams?.teamC?.color || "#10B981"}
+                colorD={room.teams?.teamD?.color || "#F59E0B"}
+                nameA={room.teams?.teamA?.name || "Team Alpha"}
+                nameB={room.teams?.teamB?.name || "Team Omega"}
+                nameC={room.teams?.teamC?.name || "Team Delta"}
+                nameD={room.teams?.teamD?.name || "Team Sigma"}
                 activeTeam={activeTeamKey}
                 gameMode="classic"
               />
@@ -388,7 +370,7 @@ export default function SpectatorLounge({
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-[var(--olive)]" />
             <h4 className="font-space font-bold text-xs text-[var(--text)]">
-              Scholars on the Field ({teamAPlayers.length + teamBPlayers.length} total)
+              Scholars on the Field ({activeTeamsList.reduce((acc, t) => acc + (t.players?.length || 0), 0)} total)
             </h4>
           </div>
           <button
@@ -407,85 +389,59 @@ export default function SpectatorLounge({
               initial={{ opacity: 0, height: 0 }}
               animate={{ opacity: 1, height: "auto" }}
               exit={{ opacity: 0, height: 0 }}
-              className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2"
+              className={`grid grid-cols-1 sm:grid-cols-2 ${activeTeamsList.length > 2 ? "lg:grid-cols-4" : ""} gap-3 pt-2`}
             >
-              {/* Alpha Roster */}
-              <div className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] space-y-1.5">
-                <strong className="text-[11px] font-bold text-red-500 uppercase tracking-wider block">
-                  {room.teams?.teamA?.name || "Team Alpha"} ({teamAPlayers.length})
-                </strong>
-                <div className="space-y-1">
-                  {teamAPlayers.map((pId) => {
-                    const p = getPlayerDisplay(pId);
-                    const isDescribing = currentTurn?.speakerId === pId;
-                    const away = isPlayerInactive(pId);
-                    return (
-                      <div
-                        key={pId}
-                        className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)]/50"
-                      >
-                        <span className="truncate text-[var(--text)]">{p.name}</span>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {p.isHost && (
-                            <span className="text-[9px] font-bold text-amber-600 bg-amber-500/10 px-1 rounded">
-                              Host
-                            </span>
-                          )}
-                          {isDescribing && (
-                            <span className="text-[9px] font-bold text-emerald-600 bg-emerald-500/10 px-1 rounded inline-flex items-center gap-0.5">
-                              <Mic className="w-2.5 h-2.5" /> Mic
-                            </span>
-                          )}
-                          {away && (
-                            <span className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1 rounded">
-                              Away
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Omega Roster */}
-              <div className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] space-y-1.5">
-                <strong className="text-[11px] font-bold text-blue-500 uppercase tracking-wider block">
-                  {room.teams?.teamB?.name || "Team Omega"} ({teamBPlayers.length})
-                </strong>
-                <div className="space-y-1">
-                  {teamBPlayers.map((pId) => {
-                    const p = getPlayerDisplay(pId);
-                    const isDescribing = currentTurn?.speakerId === pId;
-                    const away = isPlayerInactive(pId);
-                    return (
-                      <div
-                        key={pId}
-                        className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)]/50"
-                      >
-                        <span className="truncate text-[var(--text)]">{p.name}</span>
-                        <div className="flex items-center gap-1 flex-shrink-0">
-                          {p.isHost && (
-                            <span className="text-[9px] font-bold text-amber-600 bg-amber-500/10 px-1 rounded">
-                              Host
-                            </span>
-                          )}
-                          {isDescribing && (
-                            <span className="text-[9px] font-bold text-emerald-600 bg-emerald-500/10 px-1 rounded inline-flex items-center gap-0.5">
-                              <Mic className="w-2.5 h-2.5" /> Mic
-                            </span>
-                          )}
-                          {away && (
-                            <span className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1 rounded">
-                              Away
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
+              {activeTeamsList.map((teamEntry) => {
+                const pList = teamEntry.players || [];
+                return (
+                  <div
+                    key={teamEntry.key}
+                    className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] space-y-1.5"
+                  >
+                    <strong
+                      className="text-[11px] font-bold uppercase tracking-wider block"
+                      style={{ color: teamEntry.team.color }}
+                    >
+                      {teamEntry.team.name} ({pList.length})
+                    </strong>
+                    <div className="space-y-1">
+                      {pList.map((pId) => {
+                        const p = getPlayerDisplay(pId);
+                        const isDescribing = currentTurn?.speakerId === pId;
+                        const away = isPlayerInactive(pId);
+                        return (
+                          <div
+                            key={pId}
+                            className="flex items-center justify-between text-xs p-1.5 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)]/50"
+                          >
+                            <span className="truncate text-[var(--text)]">{p.name}</span>
+                            <div className="flex items-center gap-1 flex-shrink-0">
+                              {p.isHost && (
+                                <span className="text-[9px] font-bold text-amber-600 bg-amber-500/10 px-1 rounded">
+                                  Host
+                                </span>
+                              )}
+                              {isDescribing && (
+                                <span className="text-[9px] font-bold text-emerald-600 bg-emerald-500/10 px-1 rounded inline-flex items-center gap-0.5">
+                                  <Mic className="w-2.5 h-2.5" /> Mic
+                                </span>
+                              )}
+                              {away && (
+                                <span className="text-[9px] font-medium text-amber-600 bg-amber-500/10 px-1 rounded">
+                                  Away
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })}
+                      {pList.length === 0 && (
+                        <p className="text-[11px] text-[var(--text-muted)] italic">No scholars assigned</p>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
             </motion.div>
           )}
         </AnimatePresence>

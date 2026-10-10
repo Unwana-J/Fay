@@ -6,7 +6,7 @@ export interface RoomPlayer {
   id: string;
   name: string;
   avatar: string;
-  team: "A" | "B" | null;
+  team: "A" | "B" | "C" | "D" | null;
   isHost: boolean;
   joinedAt: number;
 }
@@ -35,6 +35,7 @@ export interface RoomSettings {
   difficulty: GameDifficulty;
   gameMode?: "classic" | "masterchef";
   buzzerSound?: BuzzerSoundType;
+  teamCount?: number;
 }
 
 export interface RoomTeam {
@@ -46,7 +47,7 @@ export interface RoomTeam {
 
 export interface CurrentTurn {
   roundNumber: number;
-  activeTeam: "A" | "B";
+  activeTeam: "A" | "B" | "C" | "D";
   speakerId: string;
   speakerName: string;
   startedAt: number;
@@ -86,6 +87,8 @@ export interface ArticulateRoom {
   teams: {
     teamA: RoomTeam;
     teamB: RoomTeam;
+    teamC?: RoomTeam;
+    teamD?: RoomTeam;
   };
   current_turn: CurrentTurn | null;
   deck: GameWord[];
@@ -97,8 +100,8 @@ export interface ArticulateRoom {
   inactive_players?: string[]; // Player IDs toggled AFK / Inactive
   kicked_players?: string[]; // Player IDs ejected from match by host
   player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean; joinedAt?: number }>; // Persisted identity map
-  last_speaker_indices?: { teamA: number; teamB: number }; // Track strict round-robin index per team
-  last_speaker_ids?: { teamA?: string; teamB?: string }; // Track strict last speaker ID per team
+  last_speaker_indices?: { teamA?: number; teamB?: number; teamC?: number; teamD?: number }; // Track strict round-robin index per team
+  last_speaker_ids?: { teamA?: string; teamB?: string; teamC?: string; teamD?: string }; // Track strict last speaker ID per team
   created_at?: string;
   updated_at?: string;
 }
@@ -160,14 +163,23 @@ export function createInitialRoom(
   code: string,
   host: { id: string; name: string },
   settings: Partial<RoomSettings> = {},
-  options: { roomName?: string; teamAName?: string; teamBName?: string } = {}
+  options: {
+    roomName?: string;
+    teamAName?: string;
+    teamBName?: string;
+    teamCName?: string;
+    teamDName?: string;
+    teamCount?: number;
+  } = {}
 ): ArticulateRoom {
+  const mergedTeamCount = options.teamCount || settings.teamCount || 2;
   const mergedSettings: RoomSettings = {
     timerSeconds: settings.timerSeconds || 45,
     scoreGoal: settings.scoreGoal || 20,
     categories: settings.categories || ["Object", "Nature", "Person", "Action", "World", "Random"],
     difficulty: settings.difficulty || "mixed",
     buzzerSound: settings.buzzerSound || "classic",
+    teamCount: mergedTeamCount,
   };
 
   const deck = buildDeck(
@@ -175,6 +187,46 @@ export function createInitialRoom(
     mergedSettings.difficulty,
     Math.max(120, mergedSettings.scoreGoal * 3)
   );
+
+  const teams: ArticulateRoom["teams"] = {
+    teamA: {
+      name: options.teamAName?.trim() || "Team Alpha",
+      color: "#EF4444",
+      score: 0,
+      playerIds: [host.id],
+    },
+    teamB: {
+      name: options.teamBName?.trim() || "Team Omega",
+      color: "#3B82F6",
+      score: 0,
+      playerIds: [],
+    },
+  };
+
+  if (mergedTeamCount >= 3) {
+    teams.teamC = {
+      name: options.teamCName?.trim() || "Team Delta",
+      color: "#10B981",
+      score: 0,
+      playerIds: [],
+    };
+  }
+
+  if (mergedTeamCount >= 4) {
+    teams.teamD = {
+      name: options.teamDName?.trim() || "Team Sigma",
+      color: "#F59E0B",
+      score: 0,
+      playerIds: [],
+    };
+  }
+
+  const last_speaker_indices: Record<string, number> = {
+    teamA: -1,
+    teamB: -1,
+  };
+  if (mergedTeamCount >= 3) last_speaker_indices.teamC = -1;
+  if (mergedTeamCount >= 4) last_speaker_indices.teamD = -1;
 
   return {
     room_code: code.toUpperCase().trim(),
@@ -184,20 +236,7 @@ export function createInitialRoom(
     status: "lobby",
     locked: false,
     settings: mergedSettings,
-    teams: {
-      teamA: {
-        name: options.teamAName?.trim() || "Team Alpha",
-        color: "#EF4444",
-        score: 0,
-        playerIds: [host.id],
-      },
-      teamB: {
-        name: options.teamBName?.trim() || "Team Omega",
-        color: "#3B82F6",
-        score: 0,
-        playerIds: [],
-      },
-    },
+    teams,
     current_turn: null,
     deck,
     current_word_index: 0,
@@ -216,10 +255,7 @@ export function createInitialRoom(
         joinedAt: Date.now(),
       },
     },
-    last_speaker_indices: {
-      teamA: -1,
-      teamB: -1,
-    },
+    last_speaker_indices,
     created_at: new Date().toISOString(),
     updated_at: new Date().toISOString(),
   };
@@ -228,8 +264,8 @@ export function createInitialRoom(
 /**
  * Robustly sanitizes player rosters and identity maps across a room:
  * 1. Purges kicked player IDs from all rosters.
- * 2. Deduplicates player arrays in both teams.
- * 3. Ensures no ID exists in both Team Alpha and Team Omega.
+ * 2. Deduplicates player arrays in all active teams.
+ * 3. Ensures no ID exists in multiple teams.
  * 4. Ensures no team player is also in spectators.
  * 5. Re-syncs active_players with team rosters.
  * 6. Eliminates duplicate display names (ghost IDs from guest-to-registered transitions).
@@ -243,17 +279,27 @@ export function sanitizeRoomPlayers(room: ArticulateRoom): ArticulateRoom {
   }
   if (!room.teams.teamA.playerIds) room.teams.teamA.playerIds = [];
   if (!room.teams.teamB.playerIds) room.teams.teamB.playerIds = [];
+  if (room.teams.teamC && !room.teams.teamC.playerIds) room.teams.teamC.playerIds = [];
+  if (room.teams.teamD && !room.teams.teamD.playerIds) room.teams.teamD.playerIds = [];
   if (!room.active_players) room.active_players = [];
   if (!room.spectators) room.spectators = [];
   if (!room.inactive_players) room.inactive_players = [];
   if (!room.player_details) room.player_details = {};
   if (!room.kicked_players) room.kicked_players = [];
 
+  const allActiveTeamList = [
+    room.teams.teamA,
+    room.teams.teamB,
+    ...(room.teams.teamC ? [room.teams.teamC] : []),
+    ...(room.teams.teamD ? [room.teams.teamD] : []),
+  ];
+
   // 1. Remove kicked players from all lists
   if (room.kicked_players.length > 0) {
     const kickedSet = new Set(room.kicked_players);
-    room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((id) => !kickedSet.has(id));
-    room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((id) => !kickedSet.has(id));
+    for (const t of allActiveTeamList) {
+      t.playerIds = t.playerIds.filter((id) => !kickedSet.has(id));
+    }
     room.active_players = room.active_players.filter((id) => !kickedSet.has(id));
     room.spectators = room.spectators.filter((id) => !kickedSet.has(id));
     room.inactive_players = room.inactive_players.filter((id) => !kickedSet.has(id));
@@ -262,23 +308,27 @@ export function sanitizeRoomPlayers(room: ArticulateRoom): ArticulateRoom {
     }
   }
 
-  // 2. Deduplicate within teams
-  room.teams.teamA.playerIds = Array.from(new Set(room.teams.teamA.playerIds.filter(Boolean)));
-  room.teams.teamB.playerIds = Array.from(new Set(room.teams.teamB.playerIds.filter(Boolean)));
-
-  // 3. Prevent any player ID from existing in BOTH teamA and teamB
-  const setA = new Set(room.teams.teamA.playerIds);
-  room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((id) => !setA.has(id));
+  // 2. Deduplicate within teams and prevent any player ID from existing in multiple teams
+  const seenTeamPlayers = new Set<string>();
+  for (const t of allActiveTeamList) {
+    const uniqueTeamIds: string[] = [];
+    for (const id of t.playerIds) {
+      if (id && !seenTeamPlayers.has(id)) {
+        seenTeamPlayers.add(id);
+        uniqueTeamIds.push(id);
+      }
+    }
+    t.playerIds = uniqueTeamIds;
+  }
 
   // 4. Prevent any team player from existing in spectators
-  const teamPlayerSet = new Set([...room.teams.teamA.playerIds, ...room.teams.teamB.playerIds]);
-  room.spectators = Array.from(new Set(room.spectators.filter((id) => Boolean(id) && !teamPlayerSet.has(id))));
+  room.spectators = Array.from(new Set(room.spectators.filter((id) => Boolean(id) && !seenTeamPlayers.has(id))));
 
   // 5. Deduplicate and align active_players with actual team rosters
-  room.active_players = Array.from(new Set([...room.teams.teamA.playerIds, ...room.teams.teamB.playerIds]));
+  room.active_players = Array.from(seenTeamPlayers);
 
   // 6. Clean inactive_players so only existing players remain
-  const allExistingIds = new Set([...teamPlayerSet, ...room.spectators]);
+  const allExistingIds = new Set([...seenTeamPlayers, ...room.spectators]);
   room.inactive_players = Array.from(new Set(room.inactive_players.filter((id) => allExistingIds.has(id))));
 
   // 7. Resolve duplicate display names (e.g. from user registration/guest transition)
@@ -290,8 +340,8 @@ export function sanitizeRoomPlayers(room: ArticulateRoom): ArticulateRoom {
 
     if (nameToIdMap.has(norm)) {
       const existingId = nameToIdMap.get(norm)!;
-      const existingInTeam = teamPlayerSet.has(existingId);
-      const currentInTeam = teamPlayerSet.has(pId);
+      const existingInTeam = seenTeamPlayers.has(existingId);
+      const currentInTeam = seenTeamPlayers.has(pId);
 
       let keepId = existingId;
       let dropId = pId;
@@ -309,9 +359,10 @@ export function sanitizeRoomPlayers(room: ArticulateRoom): ArticulateRoom {
         }
       }
 
-      // Drop the ghost ID
-      room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((id) => id !== dropId);
-      room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((id) => id !== dropId);
+      // Drop the ghost ID across all teams
+      for (const t of allActiveTeamList) {
+        t.playerIds = t.playerIds.filter((id) => id !== dropId);
+      }
       room.active_players = room.active_players.filter((id) => id !== dropId);
       room.spectators = room.spectators.filter((id) => id !== dropId);
       room.inactive_players = room.inactive_players.filter((id) => id !== dropId);

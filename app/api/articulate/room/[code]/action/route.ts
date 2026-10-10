@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { memoryRooms, ArticulateRoom, getNextSpeakerForTeam, sanitizeRoomPlayers } from "@/lib/articulate-room";
+import { memoryRooms, ArticulateRoom, RoomTeam, getNextSpeakerForTeam, sanitizeRoomPlayers } from "@/lib/articulate-room";
 import { buildDeck } from "@/lib/game-words";
 
 async function persistRoom(room: ArticulateRoom) {
@@ -18,6 +18,8 @@ async function persistRoom(room: ArticulateRoom) {
         room_name: room.room_name || "",
         teamA: room.teams.teamA,
         teamB: room.teams.teamB,
+        ...(room.teams.teamC ? { teamC: room.teams.teamC } : {}),
+        ...(room.teams.teamD ? { teamD: room.teams.teamD } : {}),
         player_details: room.player_details,
         inactive_players: room.inactive_players,
         kicked_players: room.kicked_players || [],
@@ -48,6 +50,50 @@ async function persistRoom(room: ArticulateRoom) {
   }
 }
 
+function getActiveTeamKeys(room: ArticulateRoom): ("A" | "B" | "C" | "D")[] {
+  const keys: ("A" | "B" | "C" | "D")[] = ["A", "B"];
+  if (room.teams.teamC) keys.push("C");
+  if (room.teams.teamD) keys.push("D");
+  return keys;
+}
+
+function getTeamObj(room: ArticulateRoom, key: "A" | "B" | "C" | "D"): RoomTeam {
+  if (key === "B") return room.teams.teamB;
+  if (key === "C" && room.teams.teamC) return room.teams.teamC;
+  if (key === "D" && room.teams.teamD) return room.teams.teamD;
+  return room.teams.teamA;
+}
+
+function removePlayerFromAllTeams(room: ArticulateRoom, playerId: string) {
+  room.teams.teamA.playerIds = (room.teams.teamA.playerIds || []).filter((p) => p !== playerId);
+  room.teams.teamB.playerIds = (room.teams.teamB.playerIds || []).filter((p) => p !== playerId);
+  if (room.teams.teamC) {
+    room.teams.teamC.playerIds = (room.teams.teamC.playerIds || []).filter((p) => p !== playerId);
+  }
+  if (room.teams.teamD) {
+    room.teams.teamD.playerIds = (room.teams.teamD.playerIds || []).filter((p) => p !== playerId);
+  }
+}
+
+function replacePlayerInAllTeams(room: ArticulateRoom, oldId: string, newId: string) {
+  room.teams.teamA.playerIds = (room.teams.teamA.playerIds || []).map((p) => (p === oldId ? newId : p));
+  room.teams.teamB.playerIds = (room.teams.teamB.playerIds || []).map((p) => (p === oldId ? newId : p));
+  if (room.teams.teamC) {
+    room.teams.teamC.playerIds = (room.teams.teamC.playerIds || []).map((p) => (p === oldId ? newId : p));
+  }
+  if (room.teams.teamD) {
+    room.teams.teamD.playerIds = (room.teams.teamD.playerIds || []).map((p) => (p === oldId ? newId : p));
+  }
+}
+
+function isPlayerInAnyTeam(room: ArticulateRoom, playerId: string): boolean {
+  if ((room.teams.teamA.playerIds || []).includes(playerId)) return true;
+  if ((room.teams.teamB.playerIds || []).includes(playerId)) return true;
+  if (room.teams.teamC && (room.teams.teamC.playerIds || []).includes(playerId)) return true;
+  if (room.teams.teamD && (room.teams.teamD.playerIds || []).includes(playerId)) return true;
+  return false;
+}
+
 async function getRoom(code: string): Promise<ArticulateRoom | null> {
   const normalized = code.toUpperCase().trim();
   let room: ArticulateRoom | null = null;
@@ -74,6 +120,8 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           teams: {
             teamA: rawTeams.teamA || { name: "Team Alpha", color: "#EF4444", score: 0, playerIds: [] },
             teamB: rawTeams.teamB || { name: "Team Omega", color: "#3B82F6", score: 0, playerIds: [] },
+            ...(rawTeams.teamC ? { teamC: rawTeams.teamC } : {}),
+            ...(rawTeams.teamD ? { teamD: rawTeams.teamD } : {}),
           },
           current_turn: data.current_turn,
           deck: data.deck || [],
@@ -183,8 +231,7 @@ export async function POST(
               // Same user claiming/reconnecting: upgrade previous guest ID
               const oldId = conflictEntry.id;
               if (oldId !== id) {
-                room.teams.teamA.playerIds = room.teams.teamA.playerIds.map((p) => (p === oldId ? id : p));
-                room.teams.teamB.playerIds = room.teams.teamB.playerIds.map((p) => (p === oldId ? id : p));
+                replacePlayerInAllTeams(room, oldId, id);
                 room.active_players = room.active_players.map((p) => (p === oldId ? id : p));
                 room.spectators = room.spectators.map((p) => (p === oldId ? id : p));
                 if (room.inactive_players) {
@@ -212,8 +259,7 @@ export async function POST(
 
         // If explicit previousPlayerId was passed and is different from id, migrate old slot
         if (prevId && prevId !== id) {
-          room.teams.teamA.playerIds = room.teams.teamA.playerIds.map((p) => (p === prevId ? id : p));
-          room.teams.teamB.playerIds = room.teams.teamB.playerIds.map((p) => (p === prevId ? id : p));
+          replacePlayerInAllTeams(room, prevId, id);
           room.active_players = room.active_players.map((p) => (p === prevId ? id : p));
           room.spectators = room.spectators.map((p) => (p === prevId ? id : p));
           if (room.inactive_players) {
@@ -233,8 +279,7 @@ export async function POST(
         // CHECK LOCK CONDITION:
         const isReconnectingPlayer =
           room.active_players.includes(id) ||
-          room.teams.teamA.playerIds.includes(id) ||
-          room.teams.teamB.playerIds.includes(id);
+          isPlayerInAnyTeam(room, id);
 
         const isRoundPlaying = room.status === "playing" || room.locked;
 
@@ -243,8 +288,7 @@ export async function POST(
             room.spectators.push(id);
           }
           // Remove from teams if placed in spectator lounge
-          room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((p) => p !== id);
-          room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((p) => p !== id);
+          removePlayerFromAllTeams(room, id);
 
           const existingDetail = room.player_details?.[id];
           if (!room.player_details) room.player_details = {};
@@ -269,25 +313,26 @@ export async function POST(
         // Admitted to lobby / game
         room.spectators = room.spectators.filter((sId) => sId !== id);
 
-        const inA = room.teams.teamA.playerIds.includes(id);
-        const inB = room.teams.teamB.playerIds.includes(id);
+        const alreadyInAnyTeam = isPlayerInAnyTeam(room, id);
 
-        if (!inA && !inB) {
-          const countA = room.teams.teamA.playerIds.length;
-          const countB = room.teams.teamB.playerIds.length;
-
-          let assignTeam: "A" | "B" = "A";
-          if (preferredTeam === "B" || preferredTeam === "A") {
+        if (!alreadyInAnyTeam) {
+          const activeKeys = getActiveTeamKeys(room);
+          let assignTeam: "A" | "B" | "C" | "D" = "A";
+          if (preferredTeam && activeKeys.includes(preferredTeam)) {
             assignTeam = preferredTeam;
           } else {
-            assignTeam = countA <= countB ? "A" : "B";
+            // Pick active team with fewest players
+            let minCount = Infinity;
+            for (const key of activeKeys) {
+              const count = getTeamObj(room, key).playerIds?.length || 0;
+              if (count < minCount) {
+                minCount = count;
+                assignTeam = key;
+              }
+            }
           }
 
-          if (assignTeam === "A") {
-            room.teams.teamA.playerIds.push(id);
-          } else {
-            room.teams.teamB.playerIds.push(id);
-          }
+          getTeamObj(room, assignTeam).playerIds.push(id);
         }
 
         const existingDetail = room.player_details?.[id];
@@ -326,7 +371,8 @@ export async function POST(
       // -------------------------------------------------------------
       case "switch_team": {
         const id = String(playerId);
-        const toTeam = targetTeam === "B" ? "B" : "A";
+        const activeKeys = getActiveTeamKeys(room);
+        const toTeam: "A" | "B" | "C" | "D" = activeKeys.includes(targetTeam) ? targetTeam : "A";
 
         if (room.status === "playing" && room.locked) {
           return actionResponse(
@@ -335,15 +381,8 @@ export async function POST(
           );
         }
 
-        // Remove from both
-        room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((p) => p !== id);
-        room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((p) => p !== id);
-
-        if (toTeam === "A") {
-          room.teams.teamA.playerIds.push(id);
-        } else {
-          room.teams.teamB.playerIds.push(id);
-        }
+        removePlayerFromAllTeams(room, id);
+        getTeamObj(room, toTeam).playerIds.push(id);
 
         if (!room.active_players.includes(id)) {
           room.active_players.push(id);
@@ -358,21 +397,17 @@ export async function POST(
       // -------------------------------------------------------------
       case "admit_player": {
         const targetId = String(body.targetPlayerId || playerId);
-        const toTeam: "A" | "B" = body.targetTeam === "B" ? "B" : "A";
+        const activeKeys = getActiveTeamKeys(room);
+        const toTeam: "A" | "B" | "C" | "D" = activeKeys.includes(body.targetTeam) ? body.targetTeam : "A";
 
         // Remove from spectators
         room.spectators = (room.spectators || []).filter((sId) => sId !== targetId);
 
-        // Remove from both teams to prevent duplicate assignments
-        room.teams.teamA.playerIds = (room.teams.teamA.playerIds || []).filter((p) => p !== targetId);
-        room.teams.teamB.playerIds = (room.teams.teamB.playerIds || []).filter((p) => p !== targetId);
+        // Remove from all teams to prevent duplicate assignments
+        removePlayerFromAllTeams(room, targetId);
 
         // Add to designated team
-        if (toTeam === "A") {
-          room.teams.teamA.playerIds.push(targetId);
-        } else {
-          room.teams.teamB.playerIds.push(targetId);
-        }
+        getTeamObj(room, toTeam).playerIds.push(targetId);
 
         if (!room.active_players) room.active_players = [];
         if (!room.active_players.includes(targetId)) {
@@ -407,9 +442,7 @@ export async function POST(
           new Set([
             ...(room.spectators || []),
             ...Object.keys(room.player_details || {}).filter(
-              (pId) =>
-                !(room.teams.teamA.playerIds || []).includes(pId) &&
-                !(room.teams.teamB.playerIds || []).includes(pId)
+              (pId) => !isPlayerInAnyTeam(room, pId)
             ),
           ])
         );
@@ -421,16 +454,19 @@ export async function POST(
           return timeA - timeB;
         });
 
+        const activeKeys = getActiveTeamKeys(room);
         for (const waitId of waitingIds) {
-          const inA = (room.teams.teamA.playerIds || []).includes(waitId);
-          const inB = (room.teams.teamB.playerIds || []).includes(waitId);
-
-          if (!inA && !inB) {
-            if ((room.teams.teamA.playerIds?.length || 0) <= (room.teams.teamB.playerIds?.length || 0)) {
-              room.teams.teamA.playerIds.push(waitId);
-            } else {
-              room.teams.teamB.playerIds.push(waitId);
+          if (!isPlayerInAnyTeam(room, waitId)) {
+            let bestKey: "A" | "B" | "C" | "D" = activeKeys[0];
+            let minCount = Infinity;
+            for (const key of activeKeys) {
+              const count = getTeamObj(room, key).playerIds?.length || 0;
+              if (count < minCount) {
+                minCount = count;
+                bestKey = key;
+              }
             }
+            getTeamObj(room, bestKey).playerIds.push(waitId);
           }
 
           if (!room.active_players.includes(waitId)) {
@@ -458,10 +494,12 @@ export async function POST(
           );
         }
 
-        const allPlayers = [
-          ...room.teams.teamA.playerIds,
-          ...room.teams.teamB.playerIds,
-        ];
+        const activeKeys = getActiveTeamKeys(room);
+        const allPlayers: string[] = [];
+        for (const key of activeKeys) {
+          allPlayers.push(...(getTeamObj(room, key).playerIds || []));
+          getTeamObj(room, key).playerIds = [];
+        }
 
         // Fisher-Yates shuffle
         for (let i = allPlayers.length - 1; i > 0; i--) {
@@ -469,9 +507,11 @@ export async function POST(
           [allPlayers[i], allPlayers[j]] = [allPlayers[j], allPlayers[i]];
         }
 
-        const half = Math.ceil(allPlayers.length / 2);
-        room.teams.teamA.playerIds = allPlayers.slice(0, half);
-        room.teams.teamB.playerIds = allPlayers.slice(half);
+        // Distribute round-robin across active teams
+        allPlayers.forEach((pId, idx) => {
+          const teamKey = activeKeys[idx % activeKeys.length];
+          getTeamObj(room, teamKey).playerIds.push(pId);
+        });
 
         await persistRoom(room);
         return actionResponse({ success: true, room });
@@ -512,9 +552,12 @@ export async function POST(
           };
         }
 
-        // Must have at least 1 player on both teams (or at least 1 total if solo testing)
-        const totalPlayers =
-          (room.teams?.teamA?.playerIds?.length || 0) + (room.teams?.teamB?.playerIds?.length || 0);
+        // Must have at least 1 player total to start
+        const activeKeys = getActiveTeamKeys(room);
+        let totalPlayers = 0;
+        for (const key of activeKeys) {
+          totalPlayers += getTeamObj(room, key).playerIds?.length || 0;
+        }
         if (totalPlayers === 0) {
           return actionResponse(
             { error: "At least one player is required to start" },
@@ -524,25 +567,29 @@ export async function POST(
 
         const roundNumber = (room.current_turn?.roundNumber || 0) + 1;
 
-        // Alternate active team: Round 1 -> Team A, Round 2 -> Team B, etc.
-        let activeTeam: "A" | "B" = roundNumber % 2 === 1 ? "A" : "B";
-        // If the chosen team has 0 players, fallback to the other
-        if (activeTeam === "A" && (room.teams?.teamA?.playerIds?.length || 0) === 0) {
-          activeTeam = "B";
-        } else if (activeTeam === "B" && (room.teams?.teamB?.playerIds?.length || 0) === 0) {
-          activeTeam = "A";
+        // Cycle through active teams: Round 1 -> Team A, Round 2 -> Team B, Round 3 -> Team C, Round 4 -> Team D, etc.
+        const teamIndex = (roundNumber - 1) % activeKeys.length;
+        let activeTeam: "A" | "B" | "C" | "D" = activeKeys[teamIndex];
+
+        // If the chosen team has 0 players, fallback to the next active team with players
+        if ((getTeamObj(room, activeTeam).playerIds?.length || 0) === 0) {
+          for (let step = 1; step < activeKeys.length; step++) {
+            const nextCandidate = activeKeys[(teamIndex + step) % activeKeys.length];
+            if ((getTeamObj(room, nextCandidate).playerIds?.length || 0) > 0) {
+              activeTeam = nextCandidate;
+              break;
+            }
+          }
         }
 
-        const rawTeamPlayerIds =
-          activeTeam === "A"
-            ? (room.teams?.teamA?.playerIds || [])
-            : (room.teams?.teamB?.playerIds || []);
+        const rawTeamPlayerIds = getTeamObj(room, activeTeam).playerIds || [];
 
         if (!room.last_speaker_indices) room.last_speaker_indices = { teamA: -1, teamB: -1 };
         if (!room.last_speaker_ids) room.last_speaker_ids = {};
 
-        const lastSpeakerId = activeTeam === "A" ? room.last_speaker_ids.teamA : room.last_speaker_ids.teamB;
-        const lastSpeakerIndex = activeTeam === "A" ? room.last_speaker_indices.teamA : room.last_speaker_indices.teamB;
+        const teamKeyProp = activeTeam === "A" ? "teamA" : activeTeam === "B" ? "teamB" : activeTeam === "C" ? "teamC" : "teamD";
+        const lastSpeakerId = room.last_speaker_ids[teamKeyProp];
+        const lastSpeakerIndex = room.last_speaker_indices[teamKeyProp];
 
         let speakerId = "";
         let speakerIndex = -1;
@@ -570,13 +617,8 @@ export async function POST(
           speakerIndex = 0;
         }
 
-        if (activeTeam === "A") {
-          room.last_speaker_ids.teamA = speakerId;
-          room.last_speaker_indices.teamA = speakerIndex;
-        } else {
-          room.last_speaker_ids.teamB = speakerId;
-          room.last_speaker_indices.teamB = speakerIndex;
-        }
+        room.last_speaker_ids[teamKeyProp] = speakerId;
+        room.last_speaker_indices[teamKeyProp] = speakerIndex;
 
         const speakerDetails = room.player_details?.[speakerId];
         const speakerName =
@@ -608,10 +650,11 @@ export async function POST(
         room.locked = true; // LOCK ROOM: NO NEW PEOPLE CAN JOIN ACTIVE ROUND
         room.round_words_scored = [];
         room.round_words_passed = [];
-        room.active_players = [
-          ...(room.teams?.teamA?.playerIds || []),
-          ...(room.teams?.teamB?.playerIds || []),
-        ];
+        const activeFieldPlayers: string[] = [];
+        for (const key of activeKeys) {
+          activeFieldPlayers.push(...(getTeamObj(room, key).playerIds || []));
+        }
+        room.active_players = Array.from(new Set(activeFieldPlayers));
 
         const now = Date.now();
         const countdownMs = 3500; // 3.5s countdown before timer begins
@@ -648,9 +691,8 @@ export async function POST(
             disputeStatus: "none",
           });
 
-          const teamKey =
-            room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
-          room.teams[teamKey].score += 1;
+          const activeKey = room.current_turn?.activeTeam || "A";
+          getTeamObj(room, activeKey).score += 1;
         }
 
         room.current_word_index += 1;
@@ -692,7 +734,8 @@ export async function POST(
 
         const wordEntry = room.round_words_scored[wordIndex];
         const prevStatus = wordEntry.disputeStatus;
-        const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
+        const turnTeamKey = room.current_turn?.activeTeam || "A";
+        const turnTeamObj = getTeamObj(room, turnTeamKey);
 
         if (resolution === "concede") {
           // Maker-checker consensus reached: describing team confirms the foul (voided)
@@ -700,13 +743,13 @@ export async function POST(
           wordEntry.concededBy = String(resolverName || "Describing Team");
 
           if (prevStatus !== "conceded") {
-            room.teams[turnTeam].score = Math.max(0, room.teams[turnTeam].score - 1);
+            turnTeamObj.score = Math.max(0, turnTeamObj.score - 1);
           }
         } else if (resolution === "reject") {
           // Describing team contests the dispute / restores the point
           wordEntry.disputeStatus = "rejected";
           if (prevStatus === "conceded") {
-            room.teams[turnTeam].score += 1;
+            turnTeamObj.score += 1;
           }
         }
 
@@ -748,21 +791,22 @@ export async function POST(
 
         const passedEntry = room.round_words_passed[wordIndex];
         const prevStatus = passedEntry.claimStatus;
-        const turnTeam = room.current_turn?.activeTeam === "B" ? "teamB" : "teamA";
+        const turnTeamKey = room.current_turn?.activeTeam || "A";
+        const turnTeamObj = getTeamObj(room, turnTeamKey);
 
         if (resolution === "award") {
           passedEntry.claimStatus = "awarded";
           passedEntry.awardedBy = String(resolverName || "Opposing Team");
 
           if (prevStatus !== "awarded") {
-            room.teams[turnTeam].score += 1;
+            turnTeamObj.score += 1;
           }
         } else if (resolution === "reject") {
           passedEntry.claimStatus = "rejected";
           passedEntry.rejectedBy = String(resolverName || "Opposing Team");
 
           if (prevStatus === "awarded") {
-            room.teams[turnTeam].score = Math.max(0, room.teams[turnTeam].score - 1);
+            turnTeamObj.score = Math.max(0, turnTeamObj.score - 1);
           }
         }
 
@@ -823,16 +867,20 @@ export async function POST(
 
         // ADMIT WAITING SPECTATORS INTO TEAMS
         if (room.spectators && room.spectators.length > 0) {
+          const activeKeys = getActiveTeamKeys(room);
           for (const specId of room.spectators) {
-            const inA = room.teams.teamA.playerIds.includes(specId);
-            const inB = room.teams.teamB.playerIds.includes(specId);
-            if (!inA && !inB) {
+            if (!isPlayerInAnyTeam(room, specId)) {
               // Balance team distribution
-              if (room.teams.teamA.playerIds.length <= room.teams.teamB.playerIds.length) {
-                room.teams.teamA.playerIds.push(specId);
-              } else {
-                room.teams.teamB.playerIds.push(specId);
+              let bestKey: "A" | "B" | "C" | "D" = activeKeys[0];
+              let minCount = Infinity;
+              for (const key of activeKeys) {
+                const count = getTeamObj(room, key).playerIds?.length || 0;
+                if (count < minCount) {
+                  minCount = count;
+                  bestKey = key;
+                }
               }
+              getTeamObj(room, bestKey).playerIds.push(specId);
             }
             if (!room.active_players.includes(specId)) {
               room.active_players.push(specId);
@@ -869,6 +917,8 @@ export async function POST(
         room.locked = false;
         room.teams.teamA.score = 0;
         room.teams.teamB.score = 0;
+        if (room.teams.teamC) room.teams.teamC.score = 0;
+        if (room.teams.teamD) room.teams.teamD.score = 0;
         room.current_turn = null;
         room.current_word_index = 0;
         room.round_words_scored = [];
@@ -884,7 +934,7 @@ export async function POST(
       }
 
       // -------------------------------------------------------------
-      // 8. UPDATE SETTINGS (Host adjusts duration 30s/60s or score goal)
+      // 8. UPDATE SETTINGS (Host adjusts duration 30s/60s, score goal, or team count)
       // -------------------------------------------------------------
       case "update_settings": {
         const actingHostId = String(hostId || playerId);
@@ -916,6 +966,51 @@ export async function POST(
           }
         }
 
+        // Support dynamically expanding or adjusting team count in lobby (2, 3, or 4 teams)
+        const requestedTeamCount = typeof body.teamCount === "number" ? body.teamCount : typeof settings?.teamCount === "number" ? settings.teamCount : null;
+        if (requestedTeamCount && [2, 3, 4].includes(requestedTeamCount)) {
+          room.settings.teamCount = requestedTeamCount;
+          if (requestedTeamCount >= 3 && !room.teams.teamC) {
+            room.teams.teamC = {
+              name: "Team Delta",
+              color: "#10B981",
+              score: 0,
+              playerIds: [],
+            };
+            if (room.last_speaker_indices) room.last_speaker_indices.teamC = -1;
+          }
+          if (requestedTeamCount >= 4 && !room.teams.teamD) {
+            room.teams.teamD = {
+              name: "Team Sigma",
+              color: "#F59E0B",
+              score: 0,
+              playerIds: [],
+            };
+            if (room.last_speaker_indices) room.last_speaker_indices.teamD = -1;
+          }
+          if (requestedTeamCount < 4 && room.teams.teamD) {
+            const orphaned = room.teams.teamD.playerIds || [];
+            orphaned.forEach((id, idx) => {
+              if (idx % 2 === 0) room.teams.teamA.playerIds.push(id);
+              else room.teams.teamB.playerIds.push(id);
+            });
+            delete room.teams.teamD;
+            if (room.last_speaker_indices) delete room.last_speaker_indices.teamD;
+            if (room.last_speaker_ids) delete room.last_speaker_ids.teamD;
+          }
+          if (requestedTeamCount < 3 && room.teams.teamC) {
+            const orphaned = room.teams.teamC.playerIds || [];
+            orphaned.forEach((id, idx) => {
+              if (idx % 2 === 0) room.teams.teamA.playerIds.push(id);
+              else room.teams.teamB.playerIds.push(id);
+            });
+            delete room.teams.teamC;
+            if (room.last_speaker_indices) delete room.last_speaker_indices.teamC;
+            if (room.last_speaker_ids) delete room.last_speaker_ids.teamC;
+          }
+        }
+
+        sanitizeRoomPlayers(room);
         await persistRoom(room);
         return actionResponse({ success: true, room });
       }
@@ -958,9 +1053,8 @@ export async function POST(
       case "leave_room": {
         const id = String(playerId);
 
-        // Remove from team A & B
-        room.teams.teamA.playerIds = room.teams.teamA.playerIds.filter((p) => p !== id);
-        room.teams.teamB.playerIds = room.teams.teamB.playerIds.filter((p) => p !== id);
+        // Remove from all teams
+        removePlayerFromAllTeams(room, id);
 
         // Remove from active players, spectators, and inactive players
         room.active_players = room.active_players.filter((p) => p !== id);
@@ -971,11 +1065,13 @@ export async function POST(
 
         // If the host leaves, transfer host to the first available player
         if (room.host_id === id) {
-          const remainingPlayers = [
-            ...room.teams.teamA.playerIds,
-            ...room.teams.teamB.playerIds,
-            ...room.spectators,
-          ];
+          const activeKeys = getActiveTeamKeys(room);
+          const remainingPlayers: string[] = [];
+          for (const key of activeKeys) {
+            remainingPlayers.push(...(getTeamObj(room, key).playerIds || []));
+          }
+          remainingPlayers.push(...room.spectators);
+
           if (remainingPlayers.length > 0) {
             const newHostId = remainingPlayers[0];
             room.host_id = newHostId;
@@ -984,6 +1080,7 @@ export async function POST(
           }
         }
 
+        sanitizeRoomPlayers(room);
         await persistRoom(room);
         return actionResponse({ success: true, room });
       }
@@ -1059,8 +1156,7 @@ export async function POST(
         }
 
         // Remove from everywhere
-        room.teams.teamA.playerIds = (room.teams.teamA.playerIds || []).filter((p) => p !== targetId);
-        room.teams.teamB.playerIds = (room.teams.teamB.playerIds || []).filter((p) => p !== targetId);
+        removePlayerFromAllTeams(room, targetId);
         room.active_players = (room.active_players || []).filter((p) => p !== targetId);
         room.spectators = (room.spectators || []).filter((p) => p !== targetId);
         if (room.inactive_players) {
@@ -1121,10 +1217,12 @@ export async function POST(
             { status: 403 }
           );
         }
-        const targetTeamKey: "teamA" | "teamB" = (body.targetTeam === "B" || body.team === "B") ? "teamB" : "teamA";
+        const targetTeam = body.targetTeam || body.team;
+        const targetTeamKey: "teamA" | "teamB" | "teamC" | "teamD" =
+          targetTeam === "B" ? "teamB" : targetTeam === "C" ? "teamC" : targetTeam === "D" ? "teamD" : "teamA";
         const newTeamName = String(body.newTeamName || body.teamName || "").trim();
 
-        if (newTeamName) {
+        if (newTeamName && room.teams[targetTeamKey]) {
           room.teams[targetTeamKey].name = newTeamName;
         }
 

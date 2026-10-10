@@ -252,21 +252,28 @@ export interface ArticulateHistoryItem {
   roomCode: string;
   roomName?: string; // Custom match / group title e.g. "Lokin Labs Hangout", "Design vs Eng"
   hostName: string;
-  myTeam?: "A" | "B" | null;
+  myTeam?: "A" | "B" | "C" | "D" | null;
   status: "lobby" | "playing" | "round_end" | "game_over";
   scoreA: number;
   scoreB: number;
+  scoreC?: number;
+  scoreD?: number;
   scoreGoal: number;
   roundNumber: number;
   date: string;
   timestamp: number;
   durationSeconds?: number;
   totalParticipants?: number;
-  participants?: Array<{ id: string; name: string; avatar: string; team?: "A" | "B" | null; isHost?: boolean }>;
+  participants?: Array<{ id: string; name: string; avatar: string; team?: "A" | "B" | "C" | "D" | null; isHost?: boolean }>;
   teamAName?: string;
   teamBName?: string;
+  teamCName?: string;
+  teamDName?: string;
   teamAColor?: string;
   teamBColor?: string;
+  teamCColor?: string;
+  teamDColor?: string;
+  teamCount?: number;
   gameMode?: "classic" | "masterchef";
 }
 
@@ -361,6 +368,12 @@ export interface AppState {
   saveArticulateRoom: (item: ArticulateHistoryItem) => void;
   removeArticulateRoom: (roomCode: string) => void;
 
+  // Game Guides & How to Play
+  hasSeenArticulateGuide: boolean;
+  hasSeenTriviaGuide: boolean;
+  dismissArticulateGuide: () => void;
+  dismissTriviaGuide: () => void;
+
   // Unified streak & activity synchronization
   recordDailyActivity: (date?: string) => void;
   syncActivityDates: (dates: string[]) => void;
@@ -442,6 +455,8 @@ export const useAppStore = create<AppState>()(
       seenTriviaQuestionIds: [],
       triviaHistory: [],
       articulateHistory: [],
+      hasSeenArticulateGuide: false,
+      hasSeenTriviaGuide: false,
 
       feedbackSchedule: {
         lastPromptedAt: undefined,
@@ -1065,6 +1080,9 @@ export const useAppStore = create<AppState>()(
           ),
         })),
 
+      dismissArticulateGuide: () => set({ hasSeenArticulateGuide: true }),
+      dismissTriviaGuide: () => set({ hasSeenTriviaGuide: true }),
+
       recordDailyActivity: (date = todayStr()) => {
         const state = get();
         const updatedStreak = advanceStreakState(state.streak, date);
@@ -1194,7 +1212,7 @@ export const useAppStore = create<AppState>()(
 
     {
       name: "fey-app-store",
-      version: 10,
+      version: 11,
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.streak = reconcileStreakState(state);
@@ -1276,6 +1294,15 @@ export const useAppStore = create<AppState>()(
 
         // v9 → v10: Reconcile streak state from all historical activities
         state.streak = reconcileStreakState(state);
+
+        // v10 → v11: Ensure hasSeenArticulateGuide & hasSeenTriviaGuide exist
+        if (fromVersion === undefined || fromVersion < 11) {
+          state.hasSeenArticulateGuide = typeof state?.hasSeenArticulateGuide === "boolean" ? state.hasSeenArticulateGuide : false;
+          state.hasSeenTriviaGuide = typeof state?.hasSeenTriviaGuide === "boolean" ? state.hasSeenTriviaGuide : false;
+        }
+
+        state.hasSeenArticulateGuide = typeof state?.hasSeenArticulateGuide === "boolean" ? state.hasSeenArticulateGuide : false;
+        state.hasSeenTriviaGuide = typeof state?.hasSeenTriviaGuide === "boolean" ? state.hasSeenTriviaGuide : false;
 
         // Ensure profile has an id
         if (!state?.profile?.id) {

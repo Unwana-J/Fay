@@ -93,15 +93,17 @@ export default function RoomSpeakerView({
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [handleGotIt, handlePass]);
 
-  const activeTeamColor =
-    currentTurn?.activeTeam === "B"
-      ? room.teams?.teamB?.color || "#3B82F6"
-      : room.teams?.teamA?.color || "#EF4444";
+  const activeTeamObj =
+    currentTurn?.activeTeam === "A"
+      ? room.teams?.teamA
+      : currentTurn?.activeTeam === "B"
+      ? room.teams?.teamB
+      : currentTurn?.activeTeam === "C"
+      ? room.teams?.teamC
+      : room.teams?.teamD;
 
-  const activeTeamName =
-    currentTurn?.activeTeam === "B"
-      ? room.teams?.teamB?.name || "Team Omega"
-      : room.teams?.teamA?.name || "Team Alpha";
+  const activeTeamColor = activeTeamObj?.color || "#EF4444";
+  const activeTeamName = activeTeamObj?.name || "Team Alpha";
 
   const getWordFontSize = (wordText: string) => {
     const len = wordText.length;

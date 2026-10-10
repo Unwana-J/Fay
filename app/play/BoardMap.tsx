@@ -5,15 +5,34 @@ import { motion } from "framer-motion";
 import { CATEGORY_COLORS, CATEGORY_ICONS, type GameCategory } from "@/lib/game-words";
 import FeyLogo from "@/components/ui/FeyLogo";
 
+import { type TeamId } from "@/store/useGameStore";
+
+export interface TeamBoardData {
+  id: TeamId;
+  name: string;
+  score: number;
+  color: string;
+  symbol: string;
+}
+
 interface BoardMapProps {
   scoreA: number;
   scoreB: number;
+  scoreC?: number;
+  scoreD?: number;
   scoreGoal: number;
   colorA: string;
   colorB: string;
-  activeTeam: "A" | "B" | null;
+  colorC?: string;
+  colorD?: string;
+  nameA?: string;
+  nameB?: string;
+  nameC?: string;
+  nameD?: string;
+  activeTeam: TeamId | null;
   gameMode?: "classic" | "masterchef";
   compact?: boolean;
+  teams?: TeamBoardData[];
 }
 
 interface TileInfo {
@@ -91,12 +110,21 @@ const getTileInfo = (idx: number, totalTiles: number): TileInfo => {
 export default function BoardMap({
   scoreA,
   scoreB,
+  scoreC,
+  scoreD,
   scoreGoal,
   colorA,
   colorB,
+  colorC,
+  colorD,
+  nameA = "Team Alpha",
+  nameB = "Team Omega",
+  nameC = "Team Delta",
+  nameD = "Team Sigma",
   activeTeam,
   gameMode = "classic",
   compact = false,
+  teams,
 }: BoardMapProps) {
   const isMasterchef = gameMode === "masterchef";
   const tileCount = Math.max(10, scoreGoal);
@@ -104,10 +132,13 @@ export default function BoardMap({
   // Responsive column count (5 columns on mobile for 20/30 pts provides breathable grid sizing)
   const cols = 5;
 
-  const safeScoreA = Math.max(0, scoreA);
-  const safeScoreB = Math.max(0, scoreB);
-  const tileIndexA = Math.max(0, Math.min(tileCount - 1, safeScoreA));
-  const tileIndexB = Math.max(0, Math.min(tileCount - 1, safeScoreB));
+  // Build active teams list
+  const teamsList: TeamBoardData[] = teams || [
+    { id: "A", name: nameA, score: scoreA, color: colorA, symbol: "A" },
+    { id: "B", name: nameB, score: scoreB, color: colorB, symbol: "Ω" },
+    ...(scoreC !== undefined && colorC ? [{ id: "C" as TeamId, name: nameC, score: scoreC, color: colorC, symbol: "Δ" }] : []),
+    ...(scoreD !== undefined && colorD ? [{ id: "D" as TeamId, name: nameD, score: scoreD, color: colorD, symbol: "Σ" }] : []),
+  ];
 
   // Generate tiles array
   const tiles: TileInfo[] = Array.from({ length: tileCount }, (_, i) => getTileInfo(i, tileCount));
@@ -120,90 +151,70 @@ export default function BoardMap({
     return { row, col, isEvenRow };
   };
 
-  const pctA = Math.min(100, Math.round((safeScoreA / scoreGoal) * 100));
-  const pctB = Math.min(100, Math.round((safeScoreB / scoreGoal) * 100));
+  const gridColsClass =
+    teamsList.length === 2
+      ? "grid-cols-2"
+      : teamsList.length === 3
+      ? "grid-cols-3"
+      : "grid-cols-2 sm:grid-cols-4";
 
   return (
     <div className="w-full flex flex-col gap-3 max-w-2xl mx-auto">
       {/* Race Progress Bar & Score Overview Header */}
       {!compact && (
         <div className="space-y-2.5 pb-1">
-          <div className="grid grid-cols-2 gap-2.5">
-            {/* Team Alpha Score Card */}
-            <div
-              className="p-2.5 sm:p-3 rounded-2xl border flex flex-col justify-between shadow-2xs"
-              style={{
-                borderColor: `${colorA}35`,
-                backgroundColor: `${colorA}0C`,
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold font-space flex items-center gap-1.5" style={{ color: colorA }}>
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorA }} />
-                  Team Alpha
-                </span>
-                {(isMasterchef || activeTeam === "A") && (
-                  <span className="text-[9px] uppercase px-1.5 py-0.2 rounded font-black bg-red-500/15 text-red-600 dark:text-red-400">
-                    Active
-                  </span>
-                )}
-              </div>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="font-space font-black text-xl sm:text-2xl text-[var(--text)]">
-                  {safeScoreA}
-                  <span className="text-[10px] font-normal text-[var(--text-mute)] font-mono ml-1">/ {scoreGoal}</span>
-                </span>
-                <span className="text-[10px] font-mono font-bold text-[var(--text-dim)]">{pctA}%</span>
-              </div>
-              {/* Progress Line */}
-              <div className="w-full h-1.5 rounded-full bg-[var(--bg)] overflow-hidden mt-1.5 border border-[var(--border-dim)]/40">
-                <motion.div
-                  className="h-full rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pctA}%` }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                  style={{ backgroundColor: colorA }}
-                />
-              </div>
-            </div>
+          <div className={`grid ${gridColsClass} gap-2.5`}>
+            {teamsList.map((t) => {
+              const safeScore = Math.max(0, t.score);
+              const pct = Math.min(100, Math.round((safeScore / scoreGoal) * 100));
+              const isActive = isMasterchef || activeTeam === t.id;
 
-            {/* Team Omega Score Card */}
-            <div
-              className="p-2.5 sm:p-3 rounded-2xl border flex flex-col justify-between shadow-2xs"
-              style={{
-                borderColor: `${colorB}35`,
-                backgroundColor: `${colorB}0C`,
-              }}
-            >
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-bold font-space flex items-center gap-1.5" style={{ color: colorB }}>
-                  <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: colorB }} />
-                  Team Omega
-                </span>
-                {(isMasterchef || activeTeam === "B") && (
-                  <span className="text-[9px] uppercase px-1.5 py-0.2 rounded font-black bg-blue-500/15 text-blue-600 dark:text-blue-400">
-                    Active
-                  </span>
-                )}
-              </div>
-              <div className="flex items-baseline justify-between mt-1">
-                <span className="font-space font-black text-xl sm:text-2xl text-[var(--text)]">
-                  {safeScoreB}
-                  <span className="text-[10px] font-normal text-[var(--text-mute)] font-mono ml-1">/ {scoreGoal}</span>
-                </span>
-                <span className="text-[10px] font-mono font-bold text-[var(--text-dim)]">{pctB}%</span>
-              </div>
-              {/* Progress Line */}
-              <div className="w-full h-1.5 rounded-full bg-[var(--bg)] overflow-hidden mt-1.5 border border-[var(--border-dim)]/40">
-                <motion.div
-                  className="h-full rounded-full"
-                  initial={{ width: 0 }}
-                  animate={{ width: `${pctB}%` }}
-                  transition={{ duration: 0.6, ease: "easeOut" }}
-                  style={{ backgroundColor: colorB }}
-                />
-              </div>
-            </div>
+              return (
+                <div
+                  key={t.id}
+                  className="p-2.5 sm:p-3 rounded-2xl border flex flex-col justify-between shadow-2xs"
+                  style={{
+                    borderColor: `${t.color}35`,
+                    backgroundColor: `${t.color}0C`,
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-1">
+                    <span className="text-[11px] font-bold font-space flex items-center gap-1.5 truncate" style={{ color: t.color }}>
+                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                      <span className="truncate">{t.name}</span>
+                    </span>
+                    {isActive && (
+                      <span
+                        className="text-[9px] uppercase px-1.5 py-0.2 rounded font-black shrink-0"
+                        style={{
+                          backgroundColor: `${t.color}20`,
+                          color: t.color,
+                        }}
+                      >
+                        Active
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-baseline justify-between mt-1">
+                    <span className="font-space font-black text-lg sm:text-2xl text-[var(--text)]">
+                      {safeScore}
+                      <span className="text-[10px] font-normal text-[var(--text-mute)] font-mono ml-1">/ {scoreGoal}</span>
+                    </span>
+                    <span className="text-[10px] font-mono font-bold text-[var(--text-dim)]">{pct}%</span>
+                  </div>
+                  {/* Progress Line */}
+                  <div className="w-full h-1.5 rounded-full bg-[var(--bg)] overflow-hidden mt-1.5 border border-[var(--border-dim)]/40">
+                    <motion.div
+                      className="h-full rounded-full"
+                      initial={{ width: 0 }}
+                      animate={{ width: `${pct}%` }}
+                      transition={{ duration: 0.6, ease: "easeOut" }}
+                      style={{ backgroundColor: t.color }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -219,16 +230,19 @@ export default function BoardMap({
       >
         {tiles.map((tile) => {
           const { row, col } = getCoordinates(tile.index);
-          const hasA = tileIndexA === tile.index;
-          const hasB = tileIndexB === tile.index;
           const categoryColor = CATEGORY_COLORS[tile.category];
 
           const isStart = tile.type === "start";
           const isFinish = tile.type === "finish";
-          const isCurrent = hasA || hasB;
 
-          const isTraversedA = tile.index <= tileIndexA;
-          const isTraversedB = tile.index <= tileIndexB;
+          // Find teams on this tile
+          const teamsOnTile = teamsList.filter((t) => {
+            const safeScore = Math.max(0, t.score);
+            const tileIdx = Math.max(0, Math.min(tileCount - 1, safeScore));
+            return tileIdx === tile.index;
+          });
+
+          const isCurrent = teamsOnTile.length > 0;
 
           return (
             <div
@@ -246,11 +260,9 @@ export default function BoardMap({
                 gridColumnStart: col + 1,
                 gridRowStart: row + 1,
                 borderColor: isCurrent
-                  ? hasA && hasB
+                  ? teamsOnTile.length > 1
                     ? "var(--gold)"
-                    : hasA
-                    ? colorA
-                    : colorB
+                    : teamsOnTile[0].color
                   : isFinish
                   ? "#F59E0B"
                   : undefined,
@@ -288,45 +300,43 @@ export default function BoardMap({
               </div>
 
               {/* Pawn / Scholar Tokens Center Slot */}
-              <div className="flex items-center justify-center gap-1 w-full my-auto py-0.5 min-h-[22px]">
-                {hasA && (
+              <div className="flex items-center justify-center gap-1 w-full my-auto py-0.5 min-h-[22px] flex-wrap">
+                {teamsOnTile.map((t) => (
                   <motion.div
-                    layoutId="token-A"
+                    key={t.id}
+                    layoutId={`token-${t.id}`}
                     initial={{ scale: 0.6, y: -4 }}
                     animate={{ scale: [0.8, 1.15, 1], y: 0 }}
                     transition={{ type: "spring", stiffness: 300, damping: 20 }}
                     className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full shadow-md text-white font-space font-black text-[9px] sm:text-[10px] border-2 border-white dark:border-black shrink-0"
-                    style={{ backgroundColor: colorA }}
-                    title="Team Alpha Position"
+                    style={{ backgroundColor: t.color }}
+                    title={`${t.name} Position`}
                   >
-                    A
+                    {t.symbol}
                   </motion.div>
-                )}
-
-                {hasB && (
-                  <motion.div
-                    layoutId="token-B"
-                    initial={{ scale: 0.6, y: -4 }}
-                    animate={{ scale: [0.8, 1.15, 1], y: 0 }}
-                    transition={{ type: "spring", stiffness: 300, damping: 20 }}
-                    className="flex items-center justify-center w-5 h-5 sm:w-6 sm:h-6 rounded-full shadow-md text-white font-space font-black text-[9px] sm:text-[10px] border-2 border-white dark:border-black shrink-0"
-                    style={{ backgroundColor: colorB }}
-                    title="Team Omega Position"
-                  >
-                    Ω
-                  </motion.div>
-                )}
+                ))}
               </div>
 
               {/* Bottom Traversal Trace Dots (Shows who passed this tile) */}
               <div className="w-full flex items-center justify-between px-0.5 text-[8px] font-mono leading-none">
                 <div className="flex items-center gap-0.5">
-                  {isTraversedA && !hasA && (
-                    <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: colorA }} />
-                  )}
-                  {isTraversedB && !hasB && (
-                    <span className="w-1 h-1 rounded-full shrink-0" style={{ backgroundColor: colorB }} />
-                  )}
+                  {teamsList.map((t) => {
+                    const safeScore = Math.max(0, t.score);
+                    const tileIdx = Math.max(0, Math.min(tileCount - 1, safeScore));
+                    const isTraversed = tile.index <= tileIdx;
+                    const isOnTile = teamsOnTile.some((ot) => ot.id === t.id);
+                    if (isTraversed && !isOnTile) {
+                      return (
+                        <span
+                          key={t.id}
+                          className="w-1 h-1 rounded-full shrink-0"
+                          style={{ backgroundColor: t.color }}
+                          title={`${t.name} passed here`}
+                        />
+                      );
+                    }
+                    return null;
+                  })}
                 </div>
                 {!isStart && !isFinish && (
                   <span className="text-[7.5px] font-medium text-[var(--text-mute)] opacity-60 truncate max-w-[34px]">

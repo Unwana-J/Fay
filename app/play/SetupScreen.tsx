@@ -6,19 +6,41 @@ import { useAppStore, ArticulateHistoryItem } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
 import { useFeatureStore } from "@/store/useFeatureStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2, Volume2 } from "lucide-react";
+import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Pause, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2, Volume2, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BuzzerSoundType, BUZZER_OPTIONS } from "@/lib/articulate-room";
 import { playBuzzerSound } from "@/lib/sound";
 import BoardMap from "./BoardMap";
+import ArticulateGuideModal from "@/components/games/ArticulateGuideModal";
 
 export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const router = useRouter();
-  const { profile, updateProfile, articulateHistory = [], removeArticulateRoom, saveArticulateRoom } = useAppStore();
+  const {
+    profile,
+    updateProfile,
+    articulateHistory = [],
+    removeArticulateRoom,
+    saveArticulateRoom,
+    hasSeenArticulateGuide,
+    dismissArticulateGuide,
+  } = useAppStore();
   const { features, fetchFeatures } = useFeatureStore();
   const enablePassThePhone = features?.enablePassThePhone ?? true;
 
   const [playMode, setPlayMode] = useState<"online" | "local">("online");
+  const [showGuideModal, setShowGuideModal] = useState(false);
+
+  // Automatically display the How to Play guide for new users who have never played before
+  useEffect(() => {
+    if (!hasSeenArticulateGuide && (!articulateHistory || articulateHistory.length === 0)) {
+      setShowGuideModal(true);
+    }
+  }, [hasSeenArticulateGuide, articulateHistory]);
+
+  const handleCloseGuide = useCallback(() => {
+    dismissArticulateGuide();
+    setShowGuideModal(false);
+  }, [dismissArticulateGuide]);
 
   useEffect(() => {
     fetchFeatures();
@@ -36,8 +58,11 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const [onlineScoreGoal, setOnlineScoreGoal] = useState<number>(20);
   const [onlineBuzzerSound, setOnlineBuzzerSound] = useState<BuzzerSoundType>("classic");
   const [onlineRoomName, setOnlineRoomName] = useState("");
+  const [onlineTeamCount, setOnlineTeamCount] = useState<number>(2);
   const [onlineTeamAName, setOnlineTeamAName] = useState("");
   const [onlineTeamBName, setOnlineTeamBName] = useState("");
+  const [onlineTeamCName, setOnlineTeamCName] = useState("");
+  const [onlineTeamDName, setOnlineTeamDName] = useState("");
   const [showAdvancedNaming, setShowAdvancedNaming] = useState(false);
   const [selectedCompletedMatch, setSelectedCompletedMatch] = useState<ArticulateHistoryItem | null>(null);
   const [isLoadingMatchDetails, setIsLoadingMatchDetails] = useState(false);
@@ -63,6 +88,8 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
             new Set([
               ...(roomData.teams?.teamA?.playerIds || []),
               ...(roomData.teams?.teamB?.playerIds || []),
+              ...(roomData.teams?.teamC?.playerIds || []),
+              ...(roomData.teams?.teamD?.playerIds || []),
               ...(roomData.spectators || []),
               ...Object.keys(roomData.player_details || {}),
             ])
@@ -74,6 +101,10 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
               ? ("A" as const)
               : (roomData.teams?.teamB?.playerIds || []).includes(id)
               ? ("B" as const)
+              : (roomData.teams?.teamC?.playerIds || []).includes(id)
+              ? ("C" as const)
+              : (roomData.teams?.teamD?.playerIds || []).includes(id)
+              ? ("D" as const)
               : null;
             return {
               id,
@@ -100,7 +131,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           }
 
           if (!realDuration || realDuration <= 0) {
-            const totalScore = (match.scoreA || 0) + (match.scoreB || 0);
+            const totalScore = (match.scoreA || 0) + (match.scoreB || 0) + (match.scoreC || 0) + (match.scoreD || 0);
             const rounds = roomData.current_turn?.roundNumber || Math.max(1, Math.ceil(totalScore / 3.5));
             const timer = roomData.settings?.timerSeconds || 45;
             realDuration = rounds * timer + Math.round(rounds * 20);
@@ -111,11 +142,18 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
             roomName: roomData.room_name || roomData.teams?.room_name || match.roomName,
             scoreA: roomData.teams?.teamA?.score ?? match.scoreA,
             scoreB: roomData.teams?.teamB?.score ?? match.scoreB,
+            scoreC: roomData.teams?.teamC?.score ?? match.scoreC,
+            scoreD: roomData.teams?.teamD?.score ?? match.scoreD,
             scoreGoal: roomData.settings?.scoreGoal || match.scoreGoal || 20,
             teamAColor: roomData.teams?.teamA?.color || match.teamAColor || "#EF4444",
             teamBColor: roomData.teams?.teamB?.color || match.teamBColor || "#3B82F6",
+            teamCColor: roomData.teams?.teamC?.color || match.teamCColor || "#10B981",
+            teamDColor: roomData.teams?.teamD?.color || match.teamDColor || "#F59E0B",
             teamAName: roomData.teams?.teamA?.name || match.teamAName || "Team Alpha",
             teamBName: roomData.teams?.teamB?.name || match.teamBName || "Team Omega",
+            teamCName: roomData.teams?.teamC?.name || match.teamCName || "Team Delta",
+            teamDName: roomData.teams?.teamD?.name || match.teamDName || "Team Sigma",
+            teamCount: roomData.teams?.teamD ? 4 : roomData.teams?.teamC ? 3 : 2,
             gameMode: roomData.settings?.gameMode || match.gameMode || "classic",
             durationSeconds: realDuration,
             totalParticipants: realParticipants.length > 0 ? realParticipants.length : match.totalParticipants || 2,
@@ -160,17 +198,37 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
     selectedCategories, toggleCategory, setSelectedCategories,
     difficulty, setDifficulty,
     numberOfRounds, setNumberOfRounds,
-    playersA, playersB, setPlayers,
-    colorA, colorB, setColors,
+    teamCount, setTeamCount,
+    playersA, playersB, playersC, playersD, setPlayers,
+    colorA, colorB, colorC, colorD, setColors,
     scoreGoal, setScoreGoal,
     gameMode, setGameMode,
     feyVoiceEnabled, setFeyVoiceEnabled,
     aiRefereeEnabled, setAiRefereeEnabled,
-    startGame
+    teamNameA, teamNameB, teamNameC, teamNameD, setTeamNames,
+    shufflePlayers,
+    buzzerSound, setBuzzerSound,
+    startGame,
+    gameTitle, setGameTitle,
+    isGamePaused, savedPhase,
+    resumeGame, discardSavedGame,
+    turnOrder, currentRoundIndex, currentTurnIndex,
+    activeSpeaker, getScore, getActiveTeams, getTeamName, getTeamColor
   } = useGameStore();
+
+  const hasResumableGame = Boolean(isGamePaused || savedPhase) && (turnOrder?.length || 0) > 0;
+
+  // Auto-switch to local mode if an in-progress match was paused
+  useEffect(() => {
+    if (hasResumableGame && enablePassThePhone) {
+      setPlayMode("local");
+    }
+  }, [hasResumableGame, enablePassThePhone]);
 
   const [inputA, setInputA] = useState("");
   const [inputB, setInputB] = useState("");
+  const [inputC, setInputC] = useState("");
+  const [inputD, setInputD] = useState("");
 
   const activeRooms = (articulateHistory || []).filter((r) => r.status !== "game_over");
   const completedRooms = (articulateHistory || []).filter((r) => r.status === "game_over");
@@ -179,33 +237,91 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
     { name: "Red", hex: "#EF4444" },
     { name: "Blue", hex: "#3B82F6" },
     { name: "Green", hex: "#10B981" },
-    { name: "Orange", hex: "#F97316" },
+    { name: "Gold", hex: "#F59E0B" },
     { name: "Purple", hex: "#8B5CF6" },
-    { name: "Gold", hex: "#F59E0B" }
+    { name: "Orange", hex: "#F97316" },
+    { name: "Teal", hex: "#14B8A6" },
+    { name: "Rose", hex: "#F43F5E" }
   ];
 
   const addPlayerA = () => {
     if (inputA.trim()) {
-      setPlayers([...playersA, inputA.trim()], playersB);
+      const isDefault = playersA.length === 1 && (playersA[0] === "Player A1" || playersA[0] === "Player A");
+      const base = isDefault ? [] : playersA;
+      setPlayers([...base, inputA.trim()], playersB, playersC, playersD);
       setInputA("");
     }
   };
 
   const addPlayerB = () => {
     if (inputB.trim()) {
-      setPlayers(playersA, [...playersB, inputB.trim()]);
+      const isDefault = playersB.length === 1 && (playersB[0] === "Player B1" || playersB[0] === "Player B");
+      const base = isDefault ? [] : playersB;
+      setPlayers(playersA, [...base, inputB.trim()], playersC, playersD);
       setInputB("");
     }
   };
 
+  const addPlayerC = () => {
+    if (inputC.trim()) {
+      const isDefault = playersC.length === 1 && (playersC[0] === "Player C1" || playersC[0] === "Player C");
+      const base = isDefault ? [] : playersC;
+      setPlayers(playersA, playersB, [...base, inputC.trim()], playersD);
+      setInputC("");
+    }
+  };
+
+  const addPlayerD = () => {
+    if (inputD.trim()) {
+      const isDefault = playersD.length === 1 && (playersD[0] === "Player D1" || playersD[0] === "Player D");
+      const base = isDefault ? [] : playersD;
+      setPlayers(playersA, playersB, playersC, [...base, inputD.trim()]);
+      setInputD("");
+    }
+  };
+
+  const updatePlayerA = (idx: number, newName: string) => {
+    const updated = [...playersA];
+    updated[idx] = newName;
+    setPlayers(updated, playersB, playersC, playersD);
+  };
+
+  const updatePlayerB = (idx: number, newName: string) => {
+    const updated = [...playersB];
+    updated[idx] = newName;
+    setPlayers(playersA, updated, playersC, playersD);
+  };
+
+  const updatePlayerC = (idx: number, newName: string) => {
+    const updated = [...playersC];
+    updated[idx] = newName;
+    setPlayers(playersA, playersB, updated, playersD);
+  };
+
+  const updatePlayerD = (idx: number, newName: string) => {
+    const updated = [...playersD];
+    updated[idx] = newName;
+    setPlayers(playersA, playersB, playersC, updated);
+  };
+
   const removePlayerA = (idx: number) => {
     const updated = playersA.filter((_, i) => i !== idx);
-    setPlayers(updated, playersB);
+    setPlayers(updated, playersB, playersC, playersD);
   };
 
   const removePlayerB = (idx: number) => {
     const updated = playersB.filter((_, i) => i !== idx);
-    setPlayers(playersA, updated);
+    setPlayers(playersA, updated, playersC, playersD);
+  };
+
+  const removePlayerC = (idx: number) => {
+    const updated = playersC.filter((_, i) => i !== idx);
+    setPlayers(playersA, playersB, updated, playersD);
+  };
+
+  const removePlayerD = (idx: number) => {
+    const updated = playersD.filter((_, i) => i !== idx);
+    setPlayers(playersA, playersB, playersC, updated);
   };
 
   const handleCreateOnlineRoom = async () => {
@@ -232,12 +348,16 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           roomName: onlineRoomName.trim() || undefined,
           teamAName: onlineTeamAName.trim() || undefined,
           teamBName: onlineTeamBName.trim() || undefined,
+          teamCName: onlineTeamCount >= 3 ? (onlineTeamCName.trim() || undefined) : undefined,
+          teamDName: onlineTeamCount >= 4 ? (onlineTeamDName.trim() || undefined) : undefined,
+          teamCount: onlineTeamCount,
           settings: {
             timerSeconds: onlineTimerSeconds,
             scoreGoal: onlineScoreGoal,
             categories: selectedCategories,
             difficulty,
             buzzerSound: onlineBuzzerSound,
+            teamCount: onlineTeamCount,
           },
         }),
       });
@@ -266,10 +386,51 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   };
 
   const handleLaunch = () => {
-    if (playersA.length === 0 || playersB.length === 0) {
-      alert("Both teams need at least one player to begin!");
+    let finalA = [...playersA];
+    let finalB = [...playersB];
+    let finalC = [...playersC];
+    let finalD = [...playersD];
+
+    // If the user typed a name into inputA but didn't press Enter/Plus, auto-commit it
+    if (inputA.trim()) {
+      const isDefaultA = finalA.length === 1 && (finalA[0] === "Player A1" || finalA[0] === "Player A");
+      finalA = isDefaultA ? [inputA.trim()] : [...finalA, inputA.trim()];
+    }
+
+    // If the user typed a name into inputB but didn't press Enter/Plus, auto-commit it
+    if (inputB.trim()) {
+      const isDefaultB = finalB.length === 1 && (finalB[0] === "Player B1" || finalB[0] === "Player B");
+      finalB = isDefaultB ? [inputB.trim()] : [...finalB, inputB.trim()];
+    }
+
+    // If the user typed a name into inputC but didn't press Enter/Plus, auto-commit it
+    if (teamCount >= 3 && inputC.trim()) {
+      const isDefaultC = finalC.length === 1 && (finalC[0] === "Player C1" || finalC[0] === "Player C");
+      finalC = isDefaultC ? [inputC.trim()] : [...finalC, inputC.trim()];
+    }
+
+    // If the user typed a name into inputD but didn't press Enter/Plus, auto-commit it
+    if (teamCount >= 4 && inputD.trim()) {
+      const isDefaultD = finalD.length === 1 && (finalD[0] === "Player D1" || finalD[0] === "Player D");
+      finalD = isDefaultD ? [inputD.trim()] : [...finalD, inputD.trim()];
+    }
+
+    finalA = finalA.filter((p) => p.trim() !== "");
+    finalB = finalB.filter((p) => p.trim() !== "");
+    finalC = finalC.filter((p) => p.trim() !== "");
+    finalD = finalD.filter((p) => p.trim() !== "");
+
+    if (
+      finalA.length === 0 ||
+      finalB.length === 0 ||
+      (teamCount >= 3 && finalC.length === 0) ||
+      (teamCount >= 4 && finalD.length === 0)
+    ) {
+      alert(`All ${teamCount} active teams need at least one player to begin!`);
       return;
     }
+
+    setPlayers(finalA, finalB, finalC, finalD);
     startGame();
     onStart();
   };
@@ -288,40 +449,52 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           </div>
         </div>
 
-        {/* Mode Selector: Only rendered if Pass-the-Phone feature flag is enabled */}
-        {enablePassThePhone ? (
-          <div className="flex p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-xs">
-            <button
-              type="button"
-              onClick={() => setPlayMode("online")}
-              className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
-                playMode === "online"
-                  ? "bg-[var(--terra)] text-white shadow-sm"
-                  : "text-[var(--text-dim)] hover:text-[var(--text)]"
-              }`}
-            >
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <button
+            type="button"
+            onClick={() => setShowGuideModal(true)}
+            className="py-2 px-3.5 rounded-2xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-panel)] text-[var(--text)] text-xs font-bold font-space flex items-center gap-1.5 transition-colors cursor-pointer shadow-xs"
+            title="Game rules and voice call guide"
+          >
+            <HelpCircle className="w-4 h-4 text-[var(--terra)]" />
+            <span>How to Play</span>
+          </button>
+
+          {/* Mode Selector: Only rendered if Pass-the-Phone feature flag is enabled */}
+          {enablePassThePhone ? (
+            <div className="flex p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-xs">
+              <button
+                type="button"
+                onClick={() => setPlayMode("online")}
+                className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
+                  playMode === "online"
+                    ? "bg-[var(--terra)] text-white shadow-sm"
+                    : "text-[var(--text-dim)] hover:text-[var(--text)]"
+                }`}
+              >
+                <Globe className="w-4 h-4" />
+                Online Room (Friends)
+              </button>
+              <button
+                type="button"
+                onClick={() => setPlayMode("local")}
+                className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
+                  playMode === "local"
+                    ? "bg-[var(--olive)] text-white shadow-sm"
+                    : "text-[var(--text-dim)] hover:text-[var(--text)]"
+                }`}
+              >
+                <Smartphone className="w-4 h-4" />
+                Pass-the-Phone (Local)
+              </button>
+            </div>
+          ) : (
+            <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--terra)]/10 text-[var(--terra)] border border-[var(--terra)]/20 text-xs font-bold font-space shadow-xs">
               <Globe className="w-4 h-4" />
-              Online Room (Friends)
-            </button>
-            <button
-              type="button"
-              onClick={() => setPlayMode("local")}
-              className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
-                playMode === "local"
-                  ? "bg-[var(--olive)] text-white shadow-sm"
-                  : "text-[var(--text-dim)] hover:text-[var(--text)]"
-              }`}
-            >
-              <Smartphone className="w-4 h-4" />
-              Pass-the-Phone (Local)
-            </button>
-          </div>
-        ) : (
-          <div className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-[var(--terra)]/10 text-[var(--terra)] border border-[var(--terra)]/20 text-xs font-bold font-space shadow-xs">
-            <Globe className="w-4 h-4" />
-            Online Match Hub
-          </div>
-        )}
+              Online Match Hub
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Online Room Mode Screen (Clean & Instant) */}
@@ -377,6 +550,35 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     />
                   </div>
 
+                  {/* Number of Teams Selector (2, 3, or 4 teams) */}
+                  <div className="space-y-1.5">
+                    <div className="flex items-center justify-between text-[11px]">
+                      <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
+                        <Users className="w-3 h-3 text-[var(--text-mute)]" />
+                        Number of Competing Teams
+                      </span>
+                      <span className="font-mono font-bold text-[var(--terra)]">
+                        {onlineTeamCount} Teams
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[2, 3, 4].map((count) => (
+                        <button
+                          key={count}
+                          type="button"
+                          onClick={() => setOnlineTeamCount(count)}
+                          className={`py-2 px-2 rounded-xl text-xs font-space font-bold border transition-all cursor-pointer text-center ${
+                            onlineTeamCount === count
+                              ? "bg-[var(--terra)] border-[var(--terra)] text-white shadow-xs"
+                              : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
+                          }`}
+                        >
+                          {count === 2 ? "2 Teams" : count === 3 ? "3 Teams" : "4 Teams"}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   {/* Custom Team Names (Expandable) */}
                   <div className="space-y-1.5">
                     <button
@@ -390,7 +592,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         <div>
                           <label className="text-[10px] font-semibold text-[var(--text-mute)] block mb-1">
-                            Team 1 Name
+                            Team 1 (Alpha) Name
                           </label>
                           <input
                             type="text"
@@ -403,7 +605,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         </div>
                         <div>
                           <label className="text-[10px] font-semibold text-[var(--text-mute)] block mb-1">
-                            Team 2 Name
+                            Team 2 (Omega) Name
                           </label>
                           <input
                             type="text"
@@ -414,6 +616,36 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             className="w-full px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-[var(--olive)] focus:outline-none placeholder:text-[var(--text-mute)]"
                           />
                         </div>
+                        {onlineTeamCount >= 3 && (
+                          <div>
+                            <label className="text-[10px] font-semibold text-[var(--text-mute)] block mb-1">
+                              Team 3 (Delta) Name
+                            </label>
+                            <input
+                              type="text"
+                              value={onlineTeamCName}
+                              onChange={(e) => setOnlineTeamCName(e.target.value)}
+                              placeholder="Team Delta"
+                              maxLength={24}
+                              className="w-full px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-emerald-500 focus:outline-none placeholder:text-[var(--text-mute)]"
+                            />
+                          </div>
+                        )}
+                        {onlineTeamCount >= 4 && (
+                          <div>
+                            <label className="text-[10px] font-semibold text-[var(--text-mute)] block mb-1">
+                              Team 4 (Sigma) Name
+                            </label>
+                            <input
+                              type="text"
+                              value={onlineTeamDName}
+                              onChange={(e) => setOnlineTeamDName(e.target.value)}
+                              placeholder="Team Sigma"
+                              maxLength={24}
+                              className="w-full px-3 py-2 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-amber-500 focus:outline-none placeholder:text-[var(--text-mute)]"
+                            />
+                          </div>
+                        )}
                       </div>
                     )}
                   </div>
@@ -836,13 +1068,126 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           )}
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Left Column: Game Rules & Settings */}
-          <div className="md:col-span-2 space-y-6">
-            <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] space-y-6">
-            <h2 className="font-space font-bold text-lg text-[var(--text)] flex items-center gap-2 pb-3 border-b border-[var(--border-dim)]">
-              <Settings className="w-4 h-4 text-[var(--olive)]" /> Match Setup
-            </h2>
+        <div className="space-y-6">
+          {/* Paused / In-Progress Match Card */}
+          {hasResumableGame && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="surface rounded-3xl p-6 sm:p-7 border-2 border-[var(--olive)]/35 bg-gradient-to-br from-[var(--olive)]/10 via-[var(--bg-card)] to-[var(--bg)] space-y-4 shadow-sm"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-[var(--olive)] text-white shadow-xs">
+                    <Pause className="w-5 h-5 fill-current" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="font-space font-extrabold text-xl text-[var(--text)]">
+                        {gameTitle || "Fey Game Night"}
+                      </h2>
+                      <span className="text-[10px] uppercase font-bold tracking-wider px-2.5 py-0.5 rounded-full bg-[var(--olive)]/15 text-[var(--olive)] border border-[var(--olive)]/30">
+                        In-Progress Match Paused
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-dim)] mt-0.5">
+                      Round {currentRoundIndex + 1}{numberOfRounds !== 999 ? ` of ${numberOfRounds}` : ""} • Next Speaker:{" "}
+                      <strong className="text-[var(--text)]">
+                        {activeSpeaker || turnOrder[currentTurnIndex]?.name || "Scholar"}
+                      </strong>{" "}
+                      ({turnOrder[currentTurnIndex] ? getTeamName(turnOrder[currentTurnIndex].team) : ""})
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (confirm("Discard this in-progress game? Match progress will be cleared.")) {
+                        discardSavedGame();
+                      }
+                    }}
+                    className="px-3.5 py-2.5 rounded-xl border border-red-500/20 hover:bg-red-500/10 text-red-500 text-xs font-space font-bold transition cursor-pointer"
+                  >
+                    Discard Match
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={() => {
+                      resumeGame();
+                    }}
+                    className="px-5 py-2.5 bg-[var(--olive)] text-white rounded-xl font-space font-extrabold text-xs shadow-md hover:shadow-lg flex items-center gap-2 cursor-pointer transition"
+                  >
+                    <Play className="w-3.5 h-3.5 fill-current" />
+                    Resume Match
+                    <ArrowRight className="w-4 h-4 ml-1" />
+                  </motion.button>
+                </div>
+              </div>
+
+              {/* Scoreboard Preview Bar */}
+              <div className="p-3 sm:p-4 rounded-2xl bg-[var(--bg)] border border-[var(--border-dim)] flex items-center justify-between text-xs font-space flex-wrap gap-2">
+                {getActiveTeams().map((t) => (
+                  <div key={t.id} className="flex items-center gap-2">
+                    <span className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                    <span className="font-bold text-[var(--text)] truncate max-w-[120px]">{t.name}</span>
+                    <span className="font-extrabold text-sm" style={{ color: t.color }}>{getScore(t.id)} pts</span>
+                  </div>
+                ))}
+                <div className="text-[11px] font-medium text-[var(--text-mute)] px-3 text-center">
+                  Target: {scoreGoal} pts
+                </div>
+              </div>
+            </motion.div>
+          )}
+
+          {/* Pass-the-Phone Quick Helper Banner */}
+          <div className="surface rounded-2xl p-4 border border-[var(--olive)]/20 bg-[var(--olive)]/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-xl bg-[var(--olive)]/15 text-[var(--olive)] shrink-0">
+                <Smartphone className="w-4 h-4" />
+              </div>
+              <div>
+                <span className="font-space font-bold text-[var(--text)]">Playing in the same room?</span>{" "}
+                <span className="text-[var(--text-dim)]">Only 1 device needed. Pass the phone to each speaker when their turn comes up.</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setShowGuideModal(true)}
+              className="text-xs font-space font-bold text-[var(--olive)] hover:underline flex items-center gap-1 shrink-0 cursor-pointer self-end sm:self-auto"
+            >
+              <span>How Pass-the-Phone Works</span>
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Left Column: Game Rules & Settings */}
+            <div className="md:col-span-2 space-y-6">
+              <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] space-y-6">
+              <h2 className="font-space font-bold text-lg text-[var(--text)] flex items-center gap-2 pb-3 border-b border-[var(--border-dim)]">
+                <Settings className="w-4 h-4 text-[var(--olive)]" /> Match Setup
+              </h2>
+
+              {/* Match Title Input */}
+              <div className="space-y-1.5">
+                <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)] flex items-center justify-between">
+                  <span>Match Title (Optional)</span>
+                  <span className="text-[10px] text-[var(--text-dim)] font-normal">e.g. Friday Hangout</span>
+                </label>
+                <input
+                  type="text"
+                  value={gameTitle}
+                  onChange={(e) => setGameTitle(e.target.value)}
+                  placeholder="e.g. Fey Game Night, Family Feud, Team Social"
+                  maxLength={40}
+                  className="w-full px-4 py-3 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-[var(--olive)] focus:outline-none placeholder:text-[var(--text-mute)]"
+                />
+              </div>
 
             {/* Game Mode Selector */}
             <div className="space-y-2">
@@ -898,7 +1243,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                 <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)]">Number of Rounds</label>
                 <span className="text-[10px] text-[var(--text-dim)]">Game ends when rounds complete or target score is reached</span>
               </div>
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
                 {[
                   { value: 3, label: "3 Rounds" },
                   { value: 5, label: "5 Rounds" },
@@ -976,6 +1321,53 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
               </div>
             </div>
 
+            {/* Buzzer Sound Effect Selector */}
+            <div className="space-y-2">
+              <div className="flex justify-between items-center">
+                <label className="text-xs uppercase tracking-wider font-bold text-[var(--text-mute)] flex items-center gap-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-[var(--terra)]" /> Buzzer Sound Effect
+                </label>
+                <button
+                  type="button"
+                  onClick={() => playBuzzerSound(buzzerSound)}
+                  className="text-[11px] font-bold text-[var(--olive)] hover:underline flex items-center gap-1 cursor-pointer"
+                  title="Preview buzzer sound"
+                >
+                  Preview ({BUZZER_OPTIONS.find((b) => b.id === buzzerSound)?.icon || "🚨"})
+                </button>
+              </div>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {BUZZER_OPTIONS.map((opt) => {
+                  const isSelected = buzzerSound === opt.id;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      onClick={() => {
+                        setBuzzerSound(opt.id);
+                        playBuzzerSound(opt.id);
+                      }}
+                      className={`p-2.5 rounded-2xl border text-left transition flex items-center gap-2 cursor-pointer ${
+                        isSelected
+                          ? "bg-[var(--olive)] text-white border-[var(--olive)] shadow-xs"
+                          : "bg-[var(--bg-card)] border-[var(--border-dim)] hover:border-[var(--border-strong)] text-[var(--text)]"
+                      }`}
+                    >
+                      <span className="text-lg shrink-0">{opt.icon}</span>
+                      <div className="min-w-0">
+                        <div className={`text-xs font-space font-bold truncate ${isSelected ? "text-white" : "text-[var(--text)]"}`}>
+                          {opt.label}
+                        </div>
+                        <div className={`text-[10px] truncate ${isSelected ? "text-white/80" : "text-[var(--text-mute)]"}`}>
+                          {opt.description}
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Categories Selection */}
             <div className="space-y-3">
               <div className="flex justify-between items-center">
@@ -1030,15 +1422,70 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
         {/* Right Column: Teams roster setting */}
         <div className="space-y-6">
           <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] flex flex-col gap-6">
-            <h2 className="font-space font-bold text-lg text-[var(--text)] flex items-center gap-2 pb-3 border-b border-[var(--border-dim)]">
-              <Users className="w-4 h-4 text-[var(--terra)]" /> Team Rosters
-            </h2>
+            <div className="flex justify-between items-center pb-3 border-b border-[var(--border-dim)]">
+              <h2 className="font-space font-bold text-base text-[var(--text)] flex items-center gap-2">
+                <Users className="w-4 h-4 text-[var(--terra)]" /> Team Rosters
+              </h2>
+
+              <button
+                type="button"
+                onClick={shufflePlayers}
+                disabled={
+                  playersA.length +
+                    playersB.length +
+                    (teamCount >= 3 ? playersC.length : 0) +
+                    (teamCount >= 4 ? playersD.length : 0) <
+                  teamCount
+                }
+                className="text-xs font-space font-bold px-3 py-1.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--border-dim)]/40 text-[var(--text)] transition cursor-pointer flex items-center gap-1.5 disabled:opacity-40"
+                title="Randomly divide players evenly between all active teams"
+              >
+                🎲 Shuffle Teams
+              </button>
+            </div>
+
+            {/* 2, 3, or 4 Teams Selector */}
+            <div className="space-y-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-[var(--text-mute)] uppercase tracking-wider text-[10px]">
+                  Competing Teams
+                </span>
+                <span className="font-mono font-bold text-xs text-[var(--terra)]">
+                  {teamCount} Teams
+                </span>
+              </div>
+              <div className="grid grid-cols-3 gap-1.5 p-1 bg-[var(--bg-card)] rounded-2xl border border-[var(--border-dim)]">
+                {[2, 3, 4].map((count) => (
+                  <button
+                    key={count}
+                    type="button"
+                    onClick={() => setTeamCount(count)}
+                    className={`py-2 rounded-xl text-xs font-space font-bold transition-all cursor-pointer text-center ${
+                      teamCount === count
+                        ? "bg-[var(--olive)] text-white shadow-xs"
+                        : "text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg)]"
+                    }`}
+                  >
+                    {count === 2 ? "2 Teams" : count === 3 ? "3 Teams" : "4 Teams"}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Team A */}
             <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-[var(--terra)]" style={{ color: colorA }}>Team Alpha</span>
-                <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: colorA }} />
+              <div className="flex justify-between items-center gap-2">
+                <input
+                  type="text"
+                  value={teamNameA}
+                  onChange={(e) => setTeamNames(e.target.value, teamNameB, teamNameC, teamNameD)}
+                  placeholder="Team Alpha"
+                  maxLength={24}
+                  className="text-xs font-bold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none transition-colors max-w-[180px]"
+                  style={{ color: colorA, "--active-color": colorA } as React.CSSProperties}
+                  title="Click to rename Team A"
+                />
+                <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: colorA }} />
               </div>
               <div className="flex gap-2">
                 <input
@@ -1053,7 +1500,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                 <button
                   type="button"
                   onClick={addPlayerA}
-                  className="p-2 text-white rounded-xl hover:opacity-90"
+                  className="p-2 text-white rounded-xl hover:opacity-90 cursor-pointer"
                   style={{ backgroundColor: colorA }}
                 >
                   <Plus className="w-4 h-4" />
@@ -1066,13 +1513,14 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                 <div className="flex gap-2">
                   {AVAILABLE_COLORS.map((c) => {
                     const isSelected = colorA === c.hex;
-                    const isTaken = colorB === c.hex;
+                    const otherColorsA = [colorB, teamCount >= 3 ? colorC : null, teamCount >= 4 ? colorD : null].filter(Boolean);
+                    const isTaken = otherColorsA.includes(c.hex);
                     return (
                       <button
                         key={c.hex}
                         type="button"
                         disabled={isTaken}
-                        onClick={() => setColors(c.hex, colorB)}
+                        onClick={() => setColors(c.hex, colorB, colorC, colorD)}
                         className={`w-5.5 h-5.5 rounded-full border transition-all relative ${
                           isSelected ? "scale-110 shadow-sm border-[var(--text)]" : "opacity-80 border-transparent hover:opacity-100"
                         }`}
@@ -1089,26 +1537,50 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
               </div>
 
               <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
-                {playersA.map((p, i) => (
-                  <div key={i} className="flex justify-between items-center bg-[var(--bg-card)]/60 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-xs">
-                    <span className="text-[var(--text)] font-medium">{p}</span>
-                    <button
-                      type="button"
-                      onClick={() => removePlayerA(i)}
-                      className="text-[var(--text-mute)] hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                {playersA.length === 0 ? (
+                  <p className="text-[10px] text-[var(--text-mute)] italic py-2 text-center">
+                    No players added yet. Type a name above!
+                  </p>
+                ) : (
+                  playersA.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center bg-[var(--bg-card)]/60 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-xs">
+                      <input
+                        type="text"
+                        value={p}
+                        onChange={(e) => updatePlayerA(i, e.target.value)}
+                        placeholder="Player name..."
+                        className="text-[var(--text)] font-medium bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none flex-1 py-0.5 text-xs mr-2"
+                        style={{ "--active-color": colorA } as React.CSSProperties}
+                        title="Click to rename player"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePlayerA(i)}
+                        className="text-[var(--text-mute)] hover:text-red-500 transition-colors cursor-pointer"
+                        title="Remove player"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
             {/* Team B */}
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="text-xs font-bold uppercase tracking-wider text-[var(--olive)]" style={{ color: colorB }}>Team Omega</span>
-                <div className="w-3.5 h-3.5 rounded-full" style={{ backgroundColor: colorB }} />
+            <div className="space-y-3 pt-3 border-t border-[var(--border-dim)]/60">
+              <div className="flex justify-between items-center gap-2">
+                <input
+                  type="text"
+                  value={teamNameB}
+                  onChange={(e) => setTeamNames(teamNameA, e.target.value, teamNameC, teamNameD)}
+                  placeholder="Team Omega"
+                  maxLength={24}
+                  className="text-xs font-bold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none transition-colors max-w-[180px]"
+                  style={{ color: colorB, "--active-color": colorB } as React.CSSProperties}
+                  title="Click to rename Team B"
+                />
+                <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: colorB }} />
               </div>
               <div className="flex gap-2">
                 <input
@@ -1123,7 +1595,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                 <button
                   type="button"
                   onClick={addPlayerB}
-                  className="p-2 text-white rounded-xl hover:opacity-90"
+                  className="p-2 text-white rounded-xl hover:opacity-90 cursor-pointer"
                   style={{ backgroundColor: colorB }}
                 >
                   <Plus className="w-4 h-4" />
@@ -1136,13 +1608,14 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                 <div className="flex gap-2">
                   {AVAILABLE_COLORS.map((c) => {
                     const isSelected = colorB === c.hex;
-                    const isTaken = colorA === c.hex;
+                    const otherColorsB = [colorA, teamCount >= 3 ? colorC : null, teamCount >= 4 ? colorD : null].filter(Boolean);
+                    const isTaken = otherColorsB.includes(c.hex);
                     return (
                       <button
                         key={c.hex}
                         type="button"
                         disabled={isTaken}
-                        onClick={() => setColors(colorA, c.hex)}
+                        onClick={() => setColors(colorA, c.hex, colorC, colorD)}
                         className={`w-5.5 h-5.5 rounded-full border transition-all relative ${
                           isSelected ? "scale-110 shadow-sm border-[var(--text)]" : "opacity-80 border-transparent hover:opacity-100"
                         }`}
@@ -1159,84 +1632,229 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
               </div>
 
               <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
-                {playersB.map((p, i) => (
-                  <div key={i} className="flex justify-between items-center bg-[var(--bg-card)]/60 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-xs">
-                    <span className="text-[var(--text)] font-medium">{p}</span>
-                    <button
-                      type="button"
-                      onClick={() => removePlayerB(i)}
-                      className="text-[var(--text-mute)] hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
+                {playersB.length === 0 ? (
+                  <p className="text-[10px] text-[var(--text-mute)] italic py-2 text-center">
+                    No players added yet. Type a name above!
+                  </p>
+                ) : (
+                  playersB.map((p, i) => (
+                    <div key={i} className="flex justify-between items-center bg-[var(--bg-card)]/60 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-xs">
+                      <input
+                        type="text"
+                        value={p}
+                        onChange={(e) => updatePlayerB(i, e.target.value)}
+                        placeholder="Player name..."
+                        className="text-[var(--text)] font-medium bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none flex-1 py-0.5 text-xs mr-2"
+                        style={{ "--active-color": colorB } as React.CSSProperties}
+                        title="Click to rename player"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removePlayerB(i)}
+                        className="text-[var(--text-mute)] hover:text-red-500 transition-colors cursor-pointer"
+                        title="Remove player"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
-          </div>
 
-          {/* AI Features — Opt-in */}
-          <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] space-y-4">
-            <h2 className="font-space font-bold text-base text-[var(--text)] flex items-center gap-2 pb-3 border-b border-[var(--border-dim)]">
-              <Bot className="w-4 h-4 text-[var(--olive)]" /> Fey AI Features
-              <span className="ml-auto text-[10px] uppercase font-bold text-[var(--text-mute)] border border-[var(--border-dim)] rounded-full px-2 py-0.5">Optional</span>
-            </h2>
+            {/* Team C (Team Delta) */}
+            {teamCount >= 3 && (
+              <div className="space-y-3 pt-3 border-t border-[var(--border-dim)]/60">
+                <div className="flex justify-between items-center gap-2">
+                  <input
+                    type="text"
+                    value={teamNameC}
+                    onChange={(e) => setTeamNames(teamNameA, teamNameB, e.target.value, teamNameD)}
+                    placeholder="Team Delta"
+                    maxLength={24}
+                    className="text-xs font-bold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none transition-colors max-w-[180px]"
+                    style={{ color: colorC, "--active-color": colorC } as React.CSSProperties}
+                    title="Click to rename Team C"
+                  />
+                  <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: colorC }} />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Player name..."
+                    value={inputC}
+                    onChange={(e) => setInputC(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addPlayerC()}
+                    className="flex-1 px-4 py-2 text-xs rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text)] focus:outline-none focus:border-[var(--active-color)]"
+                    style={{ "--active-color": colorC } as React.CSSProperties}
+                  />
+                  <button
+                    type="button"
+                    onClick={addPlayerC}
+                    className="p-2 text-white rounded-xl hover:opacity-90 cursor-pointer"
+                    style={{ backgroundColor: colorC }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
 
-            {/* Voice Host toggle */}
-            <button
-              type="button"
-              onClick={() => setFeyVoiceEnabled(!feyVoiceEnabled)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer text-left ${
-                feyVoiceEnabled
-                  ? "bg-[var(--olive)]/10 border-[var(--olive)]/40"
-                  : "bg-[var(--bg-card)] border-[var(--border-dim)] hover:border-[var(--olive)]/30"
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                feyVoiceEnabled ? "bg-[var(--olive)] text-white" : "bg-[var(--bg)] text-[var(--text-mute)]"
-              }`}>
-                <Mic className="w-5 h-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-space font-bold text-sm text-[var(--text)]">🎤 Fey Voice Host</p>
-                <p className="text-[11px] text-[var(--text-dim)] leading-snug mt-0.5">Fey announces round starts, countdowns, correct answers and game results out loud.</p>
-              </div>
-              <div className={`w-10 h-6 rounded-full transition-all flex items-center px-0.5 flex-shrink-0 ${
-                feyVoiceEnabled ? "bg-[var(--olive)]" : "bg-[var(--border-dim)]"
-              }`}>
-                <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                  feyVoiceEnabled ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </div>
-            </button>
+                {/* Team C Color Picker */}
+                <div className="space-y-1.5 pb-2">
+                  <label className="text-[9px] uppercase font-bold tracking-wider text-[var(--text-mute)] block">Team Color</label>
+                  <div className="flex gap-2">
+                    {AVAILABLE_COLORS.map((c) => {
+                      const isSelected = colorC === c.hex;
+                      const otherColorsC = [colorA, colorB, teamCount >= 4 ? colorD : null].filter(Boolean);
+                      const isTaken = otherColorsC.includes(c.hex);
+                      return (
+                        <button
+                          key={c.hex}
+                          type="button"
+                          disabled={isTaken}
+                          onClick={() => setColors(colorA, colorB, c.hex, colorD)}
+                          className={`w-5.5 h-5.5 rounded-full border transition-all relative ${
+                            isSelected ? "scale-110 shadow-sm border-[var(--text)]" : "opacity-80 border-transparent hover:opacity-100"
+                          }`}
+                          style={{
+                            backgroundColor: c.hex,
+                            cursor: isTaken ? "not-allowed" : "pointer",
+                            opacity: isTaken ? 0.15 : 1
+                          }}
+                          title={isTaken ? `${c.name} (Taken)` : c.name}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
 
-            {/* AI Referee toggle */}
-            <button
-              type="button"
-              onClick={() => setAiRefereeEnabled(!aiRefereeEnabled)}
-              className={`w-full flex items-center gap-4 p-4 rounded-2xl border transition-all cursor-pointer text-left ${
-                aiRefereeEnabled
-                  ? "bg-[var(--olive)]/10 border-[var(--olive)]/40"
-                  : "bg-[var(--bg-card)] border-[var(--border-dim)] hover:border-[var(--olive)]/30"
-              }`}
-            >
-              <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${
-                aiRefereeEnabled ? "bg-[var(--olive)] text-white" : "bg-[var(--bg)] text-[var(--text-mute)]"
-              }`}>
-                <Bot className="w-5 h-5" />
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                  {playersC.length === 0 ? (
+                    <p className="text-[10px] text-[var(--text-mute)] italic py-2 text-center">
+                      No players added yet. Type a name above!
+                    </p>
+                  ) : (
+                    playersC.map((p, i) => (
+                      <div key={i} className="flex justify-between items-center bg-[var(--bg-card)]/60 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-xs">
+                        <input
+                          type="text"
+                          value={p}
+                          onChange={(e) => updatePlayerC(i, e.target.value)}
+                          placeholder="Player name..."
+                          className="text-[var(--text)] font-medium bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none flex-1 py-0.5 text-xs mr-2"
+                          style={{ "--active-color": colorC } as React.CSSProperties}
+                          title="Click to rename player"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePlayerC(i)}
+                          className="text-[var(--text-mute)] hover:text-red-500 transition-colors cursor-pointer"
+                          title="Remove player"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-space font-bold text-sm text-[var(--text)]">🤖 AI Referee</p>
-                <p className="text-[11px] text-[var(--text-dim)] leading-snug mt-0.5">Fey validates borderline guesses and flags rule violations automatically during play.</p>
+            )}
+
+            {/* Team D (Team Sigma) */}
+            {teamCount >= 4 && (
+              <div className="space-y-3 pt-3 border-t border-[var(--border-dim)]/60">
+                <div className="flex justify-between items-center gap-2">
+                  <input
+                    type="text"
+                    value={teamNameD}
+                    onChange={(e) => setTeamNames(teamNameA, teamNameB, teamNameC, e.target.value)}
+                    placeholder="Team Sigma"
+                    maxLength={24}
+                    className="text-xs font-bold uppercase tracking-wider bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none transition-colors max-w-[180px]"
+                    style={{ color: colorD, "--active-color": colorD } as React.CSSProperties}
+                    title="Click to rename Team D"
+                  />
+                  <div className="w-3.5 h-3.5 rounded-full shrink-0" style={{ backgroundColor: colorD }} />
+                </div>
+                <div className="flex gap-2">
+                  <input
+                    type="text"
+                    placeholder="Player name..."
+                    value={inputD}
+                    onChange={(e) => setInputD(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && addPlayerD()}
+                    className="flex-1 px-4 py-2 text-xs rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text)] focus:outline-none focus:border-[var(--active-color)]"
+                    style={{ "--active-color": colorD } as React.CSSProperties}
+                  />
+                  <button
+                    type="button"
+                    onClick={addPlayerD}
+                    className="p-2 text-white rounded-xl hover:opacity-90 cursor-pointer"
+                    style={{ backgroundColor: colorD }}
+                  >
+                    <Plus className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Team D Color Picker */}
+                <div className="space-y-1.5 pb-2">
+                  <label className="text-[9px] uppercase font-bold tracking-wider text-[var(--text-mute)] block">Team Color</label>
+                  <div className="flex gap-2">
+                    {AVAILABLE_COLORS.map((c) => {
+                      const isSelected = colorD === c.hex;
+                      const otherColorsD = [colorA, colorB, colorC].filter(Boolean);
+                      const isTaken = otherColorsD.includes(c.hex);
+                      return (
+                        <button
+                          key={c.hex}
+                          type="button"
+                          disabled={isTaken}
+                          onClick={() => setColors(colorA, colorB, colorC, c.hex)}
+                          className={`w-5.5 h-5.5 rounded-full border transition-all relative ${
+                            isSelected ? "scale-110 shadow-sm border-[var(--text)]" : "opacity-80 border-transparent hover:opacity-100"
+                          }`}
+                          style={{
+                            backgroundColor: c.hex,
+                            cursor: isTaken ? "not-allowed" : "pointer",
+                            opacity: isTaken ? 0.15 : 1
+                          }}
+                          title={isTaken ? `${c.name} (Taken)` : c.name}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="space-y-1.5 max-h-[140px] overflow-y-auto pr-1">
+                  {playersD.length === 0 ? (
+                    <p className="text-[10px] text-[var(--text-mute)] italic py-2 text-center">
+                      No players added yet. Type a name above!
+                    </p>
+                  ) : (
+                    playersD.map((p, i) => (
+                      <div key={i} className="flex justify-between items-center bg-[var(--bg-card)]/60 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-xs">
+                        <input
+                          type="text"
+                          value={p}
+                          onChange={(e) => updatePlayerD(i, e.target.value)}
+                          placeholder="Player name..."
+                          className="text-[var(--text)] font-medium bg-transparent border-b border-transparent hover:border-[var(--border-dim)] focus:border-[var(--active-color)] focus:outline-none flex-1 py-0.5 text-xs mr-2"
+                          style={{ "--active-color": colorD } as React.CSSProperties}
+                          title="Click to rename player"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => removePlayerD(i)}
+                          className="text-[var(--text-mute)] hover:text-red-500 transition-colors cursor-pointer"
+                          title="Remove player"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-              <div className={`w-10 h-6 rounded-full transition-all flex items-center px-0.5 flex-shrink-0 ${
-                aiRefereeEnabled ? "bg-[var(--olive)]" : "bg-[var(--border-dim)]"
-              }`}>
-                <div className={`w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
-                  aiRefereeEnabled ? "translate-x-4" : "translate-x-0"
-                }`} />
-              </div>
-            </button>
+            )}
           </div>
 
           {/* Launch Button */}
@@ -1249,6 +1867,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
             Start Game <ArrowRight className="w-5 h-5" />
           </motion.button>
         </div>
+      </div>
       </div>
       )}
 
@@ -1502,6 +2121,15 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
           </div>
         )}
       </AnimatePresence>
+
+      {/* How to Play Guide Modal */}
+      <ArticulateGuideModal
+        isOpen={showGuideModal}
+        onClose={handleCloseGuide}
+        onSkip={handleCloseGuide}
+        isFirstTime={!hasSeenArticulateGuide && (!articulateHistory || articulateHistory.length === 0)}
+        initialMode={playMode}
+      />
     </div>
   );
 }

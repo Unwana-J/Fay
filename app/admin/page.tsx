@@ -32,6 +32,8 @@ import {
   Gamepad2,
   ToggleLeft,
   ToggleRight,
+  Swords,
+  Trophy,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useFeatureStore } from "@/store/useFeatureStore";
@@ -1282,6 +1284,9 @@ export default function AdminPage() {
                           {def.iconName === "presentation" && <Sparkles size={22} />}
                           {def.iconName === "help-circle" && <Gamepad2 size={22} />}
                           {def.iconName === "radio" && <Radio size={22} />}
+                          {def.iconName === "swords" && <Swords size={22} />}
+                          {def.iconName === "trophy" && <Trophy size={22} />}
+                          {def.iconName === "bar-chart" && <BarChart3 size={22} />}
                         </div>
 
                         <div className="space-y-1">

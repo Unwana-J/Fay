@@ -29,14 +29,18 @@ export default function RoomGameOver({
   const [copied, setCopied] = useState(false);
   const [showBoard, setShowBoard] = useState(true);
 
-  const teamA = room.teams.teamA;
-  const teamB = room.teams.teamB;
+  const activeTeamsList: Array<{ key: "A" | "B" | "C" | "D"; team: typeof room.teams.teamA }> = [
+    { key: "A", team: room.teams.teamA },
+    { key: "B", team: room.teams.teamB },
+    ...(room.teams.teamC ? [{ key: "C" as const, team: room.teams.teamC }] : []),
+    ...(room.teams.teamD ? [{ key: "D" as const, team: room.teams.teamD }] : []),
+  ];
 
-  const isTie = teamA.score === teamB.score;
-  const isWinnerA = teamA.score > teamB.score;
-  const winner = isWinnerA ? teamA : teamB;
-  const runnerUp = isWinnerA ? teamB : teamA;
-  const margin = Math.abs(teamA.score - teamB.score);
+  const rankedTeams = [...activeTeamsList].sort((a, b) => (b.team.score ?? 0) - (a.team.score ?? 0));
+  const winner = rankedTeams[0].team;
+  const runnerUp = rankedTeams[1]?.team || rankedTeams[0].team;
+  const isTie = rankedTeams.length > 1 && rankedTeams[0].team.score === rankedTeams[1].team.score;
+  const margin = Math.abs(winner.score - runnerUp.score);
 
   useEffect(() => {
     try {
@@ -142,107 +146,73 @@ export default function RoomGameOver({
         </div>
       </div>
 
-      {/* Duel Podium Scoreboard Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        {/* Team 1 (Winner or Team A) */}
-        <div
-          className={`p-5 rounded-3xl border text-left shadow-sm space-y-3 relative overflow-hidden transition-all ${
-            isWinnerA && !isTie ? "ring-2 ring-[var(--gold)]/50 shadow-md" : ""
-          }`}
-          style={{
-            borderColor: `${teamA.color}50`,
-            backgroundColor: `${teamA.color}0D`,
-          }}
-        >
-          {isWinnerA && !isTie && (
-            <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--gold)] text-black text-[10px] font-space font-black uppercase tracking-wider shadow-sm">
-              <Crown className="w-3 h-3 fill-current" /> Winner
-            </div>
-          )}
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: teamA.color }}>
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamA.color }} />
-              {teamA.name}
-            </span>
-            <div className="font-space font-black text-4xl sm:text-5xl mt-1 text-[var(--text)] flex items-baseline gap-1.5">
-              {teamA.score}
-              <span className="text-xs font-normal text-[var(--text-dim)]">/ {room.settings.scoreGoal} pts</span>
-            </div>
-          </div>
-
-          {/* Roster of Scholars */}
-          <div className="pt-2 border-t border-[var(--border-dim)]/50 space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-[var(--text-mute)] block">
-              Scholars ({teamA.playerIds.length})
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {teamA.playerIds.map((pId) => (
-                <span
-                  key={pId}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text)] truncate max-w-[130px]"
-                >
-                  {getPlayerName(pId)}
-                  {pId === room.host_id && (
-                    <Crown className="w-2.5 h-2.5 text-[var(--gold)] shrink-0" />
-                  )}
-                </span>
-              ))}
-              {teamA.playerIds.length === 0 && (
-                <span className="text-[11px] text-[var(--text-mute)] italic">No assigned scholars</span>
+      {/* Multi-Team Podium Scoreboard Cards */}
+      <div className={`grid gap-4 ${
+        rankedTeams.length === 4
+          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+          : rankedTeams.length === 3
+          ? "grid-cols-1 sm:grid-cols-3"
+          : "grid-cols-1 sm:grid-cols-2"
+      }`}>
+        {rankedTeams.map(({ key, team }, rankIdx) => {
+          const isCurrentWinner = rankIdx === 0 && !isTie;
+          const rankLabel = rankIdx === 0 ? "1st" : rankIdx === 1 ? "2nd" : rankIdx === 2 ? "3rd" : "4th";
+          return (
+            <div
+              key={key}
+              className={`p-5 rounded-3xl border text-left shadow-sm space-y-3 relative overflow-hidden transition-all ${
+                isCurrentWinner ? "ring-2 ring-[var(--gold)]/50 shadow-md" : ""
+              }`}
+              style={{
+                borderColor: `${team.color}50`,
+                backgroundColor: `${team.color}0D`,
+              }}
+            >
+              {isCurrentWinner ? (
+                <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--gold)] text-black text-[10px] font-space font-black uppercase tracking-wider shadow-sm">
+                  <Crown className="w-3 h-3 fill-current" /> Winner
+                </div>
+              ) : (
+                <div className="absolute top-3 right-3 flex items-center gap-1 px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-mute)] text-[10px] font-space font-bold uppercase tracking-wider">
+                  {rankLabel} Place
+                </div>
               )}
-            </div>
-          </div>
-        </div>
-
-        {/* Team 2 (Runner Up or Team B) */}
-        <div
-          className={`p-5 rounded-3xl border text-left shadow-sm space-y-3 relative overflow-hidden transition-all ${
-            !isWinnerA && !isTie ? "ring-2 ring-[var(--gold)]/50 shadow-md" : ""
-          }`}
-          style={{
-            borderColor: `${teamB.color}50`,
-            backgroundColor: `${teamB.color}0D`,
-          }}
-        >
-          {!isWinnerA && !isTie && (
-            <div className="absolute top-3 right-3 flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[var(--gold)] text-black text-[10px] font-space font-black uppercase tracking-wider shadow-sm">
-              <Crown className="w-3 h-3 fill-current" /> Winner
-            </div>
-          )}
-          <div>
-            <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: teamB.color }}>
-              <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: teamB.color }} />
-              {teamB.name}
-            </span>
-            <div className="font-space font-black text-4xl sm:text-5xl mt-1 text-[var(--text)] flex items-baseline gap-1.5">
-              {teamB.score}
-              <span className="text-xs font-normal text-[var(--text-dim)]">/ {room.settings.scoreGoal} pts</span>
-            </div>
-          </div>
-
-          {/* Roster of Scholars */}
-          <div className="pt-2 border-t border-[var(--border-dim)]/50 space-y-1.5">
-            <span className="text-[10px] uppercase font-bold text-[var(--text-mute)] block">
-              Scholars ({teamB.playerIds.length})
-            </span>
-            <div className="flex flex-wrap gap-1">
-              {teamB.playerIds.map((pId) => (
-                <span
-                  key={pId}
-                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text)] truncate max-w-[130px]"
-                >
-                  {getPlayerName(pId)}
-                  {pId === room.host_id && (
-                    <Crown className="w-2.5 h-2.5 text-[var(--gold)] shrink-0" />
-                  )}
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5" style={{ color: team.color }}>
+                  <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: team.color }} />
+                  {team.name}
                 </span>
-              ))}
-              {teamB.playerIds.length === 0 && (
-                <span className="text-[11px] text-[var(--text-mute)] italic">No assigned scholars</span>
-              )}
+                <div className="font-space font-black text-4xl sm:text-5xl mt-1 text-[var(--text)] flex items-baseline gap-1.5">
+                  {team.score}
+                  <span className="text-xs font-normal text-[var(--text-dim)]">/ {room.settings.scoreGoal} pts</span>
+                </div>
+              </div>
+
+              {/* Roster of Scholars */}
+              <div className="pt-2 border-t border-[var(--border-dim)]/50 space-y-1.5">
+                <span className="text-[10px] uppercase font-bold text-[var(--text-mute)] block">
+                  Scholars ({team.playerIds.length})
+                </span>
+                <div className="flex flex-wrap gap-1">
+                  {team.playerIds.map((pId) => (
+                    <span
+                      key={pId}
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text)] truncate max-w-[130px]"
+                    >
+                      {getPlayerName(pId)}
+                      {pId === room.host_id && (
+                        <Crown className="w-2.5 h-2.5 text-[var(--gold)] shrink-0" />
+                      )}
+                    </span>
+                  ))}
+                  {team.playerIds.length === 0 && (
+                    <span className="text-[11px] text-[var(--text-mute)] italic">No assigned scholars</span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        </div>
+          );
+        })}
       </div>
 
       {/* Match 4-Stat Highlights Grid */}
@@ -270,7 +240,7 @@ export default function RoomGameOver({
             <Users className="w-3.5 h-3.5 text-[var(--olive)]" /> Total Scholars
           </div>
           <div className="text-base font-space font-extrabold text-[var(--text)]">
-            {teamA.playerIds.length + teamB.playerIds.length} players
+            {activeTeamsList.reduce((acc, t) => acc + (t.team.playerIds?.length || 0), 0)} players
           </div>
         </div>
 
@@ -304,11 +274,19 @@ export default function RoomGameOver({
 
         {showBoard && (
           <BoardMap
-            scoreA={teamA.score}
-            scoreB={teamB.score}
+            scoreA={room.teams.teamA.score}
+            scoreB={room.teams.teamB.score}
+            scoreC={room.teams.teamC?.score}
+            scoreD={room.teams.teamD?.score}
             scoreGoal={room.settings.scoreGoal}
-            colorA={teamA.color}
-            colorB={teamB.color}
+            colorA={room.teams.teamA.color}
+            colorB={room.teams.teamB.color}
+            colorC={room.teams.teamC?.color || "#10B981"}
+            colorD={room.teams.teamD?.color || "#F59E0B"}
+            nameA={room.teams.teamA.name}
+            nameB={room.teams.teamB.name}
+            nameC={room.teams.teamC?.name || "Team Delta"}
+            nameD={room.teams.teamD?.name || "Team Sigma"}
             activeTeam={null}
             gameMode={room.settings.gameMode || "classic"}
           />

@@ -11,7 +11,7 @@ import {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json().catch(() => ({}));
-    const { hostId, hostName, settings, roomName, teamAName, teamBName } = body;
+    const { hostId, hostName, settings, roomName, teamAName, teamBName, teamCName, teamDName, teamCount } = body;
 
     const effectiveHostId = (hostId && String(hostId).trim()) || `host-${Math.random().toString(36).slice(2, 9)}`;
     const effectiveHostName = (hostName && String(hostName).trim()) || "Scholar Host";
@@ -33,6 +33,9 @@ export async function POST(req: NextRequest) {
         roomName: typeof roomName === "string" ? roomName.trim() : undefined,
         teamAName: typeof teamAName === "string" ? teamAName.trim() : undefined,
         teamBName: typeof teamBName === "string" ? teamBName.trim() : undefined,
+        teamCName: typeof teamCName === "string" ? teamCName.trim() : undefined,
+        teamDName: typeof teamDName === "string" ? teamDName.trim() : undefined,
+        teamCount: typeof teamCount === "number" ? teamCount : settings?.teamCount,
       }
     );
 
@@ -43,6 +46,8 @@ export async function POST(req: NextRequest) {
       room_name: newRoom.room_name || "",
       teamA: newRoom.teams.teamA,
       teamB: newRoom.teams.teamB,
+      ...(newRoom.teams.teamC ? { teamC: newRoom.teams.teamC } : {}),
+      ...(newRoom.teams.teamD ? { teamD: newRoom.teams.teamD } : {}),
       player_details: newRoom.player_details || {},
       inactive_players: newRoom.inactive_players || [],
       kicked_players: newRoom.kicked_players || [],
@@ -137,6 +142,8 @@ export async function GET(req: NextRequest) {
             teams: {
               teamA: rawTeams.teamA || { name: "Team Alpha", color: "#EF4444", score: 0, playerIds: [] },
               teamB: rawTeams.teamB || { name: "Team Omega", color: "#3B82F6", score: 0, playerIds: [] },
+              ...(rawTeams.teamC ? { teamC: rawTeams.teamC } : {}),
+              ...(rawTeams.teamD ? { teamD: rawTeams.teamD } : {}),
             },
             current_turn: data.current_turn,
             deck: data.deck || [],

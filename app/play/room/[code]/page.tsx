@@ -510,12 +510,18 @@ export default function ArticulateRoomPage({
       ? "A"
       : (room.teams?.teamB?.playerIds || []).includes(myPlayerId)
       ? "B"
+      : (room.teams?.teamC?.playerIds || []).includes(myPlayerId)
+      ? "C"
+      : (room.teams?.teamD?.playerIds || []).includes(myPlayerId)
+      ? "D"
       : null;
 
     const allParticipantIds = Array.from(
       new Set([
         ...(room.teams?.teamA?.playerIds || []),
         ...(room.teams?.teamB?.playerIds || []),
+        ...(room.teams?.teamC?.playerIds || []),
+        ...(room.teams?.teamD?.playerIds || []),
         ...(room.spectators || []),
         ...Object.keys(room.player_details || {}),
       ])
@@ -527,6 +533,10 @@ export default function ArticulateRoomPage({
         ? ("A" as const)
         : (room.teams?.teamB?.playerIds || []).includes(pId)
         ? ("B" as const)
+        : (room.teams?.teamC?.playerIds || []).includes(pId)
+        ? ("C" as const)
+        : (room.teams?.teamD?.playerIds || []).includes(pId)
+        ? ("D" as const)
         : null;
       return {
         id: pId,
@@ -557,6 +567,9 @@ export default function ArticulateRoomPage({
       status: room.status,
       scoreA: room.teams?.teamA?.score ?? 0,
       scoreB: room.teams?.teamB?.score ?? 0,
+      scoreC: room.teams?.teamC?.score,
+      scoreD: room.teams?.teamD?.score,
+      teamCount: room.settings?.teamCount || (room.teams?.teamD ? 4 : room.teams?.teamC ? 3 : 2),
       scoreGoal: room.settings?.scoreGoal || 20,
       roundNumber: room.current_turn?.roundNumber || 1,
       date: new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" }),
@@ -566,8 +579,12 @@ export default function ArticulateRoomPage({
       participants: participantsList,
       teamAName: room.teams?.teamA?.name || "Team Alpha",
       teamBName: room.teams?.teamB?.name || "Team Omega",
+      teamCName: room.teams?.teamC?.name,
+      teamDName: room.teams?.teamD?.name,
       teamAColor: room.teams?.teamA?.color || "#EF4444",
       teamBColor: room.teams?.teamB?.color || "#3B82F6",
+      teamCColor: room.teams?.teamC?.color,
+      teamDColor: room.teams?.teamD?.color,
       gameMode: room.settings?.gameMode || "classic",
     });
   }, [
@@ -923,7 +940,7 @@ export default function ArticulateRoomPage({
     });
   };
 
-  const handleSwitchTeam = (targetTeam: "A" | "B") => {
+  const handleSwitchTeam = (targetTeam: "A" | "B" | "C" | "D") => {
     dispatchAction({
       action: "switch_team",
       playerId: myPlayerId,
@@ -1019,7 +1036,7 @@ export default function ArticulateRoomPage({
     });
   };
 
-  const handleAdmitPlayer = (targetPlayerId: string, targetTeam: "A" | "B") => {
+  const handleAdmitPlayer = (targetPlayerId: string, targetTeam: "A" | "B" | "C" | "D") => {
     dispatchAction({
       action: "admit_player",
       playerId: myPlayerId,
@@ -1043,7 +1060,7 @@ export default function ArticulateRoomPage({
     });
   };
 
-  const handleRenameTeam = (team: "A" | "B", newName: string) => {
+  const handleRenameTeam = (team: "A" | "B" | "C" | "D", newName: string) => {
     dispatchAction({
       action: "rename_team",
       hostId: myPlayerId,
@@ -1059,7 +1076,7 @@ export default function ArticulateRoomPage({
     });
   };
 
-  const handleSwitchPlayerTeam = (targetPlayerId: string, targetTeam: "A" | "B") => {
+  const handleSwitchPlayerTeam = (targetPlayerId: string, targetTeam: "A" | "B" | "C" | "D") => {
     dispatchAction({
       action: "switch_team",
       playerId: targetPlayerId,
@@ -1228,8 +1245,38 @@ export default function ArticulateRoomPage({
     )
   );
 
-  const isInMatch = isPlayerInTeamA || isPlayerInTeamB;
-  const myTeam: "A" | "B" | null = isPlayerInTeamA ? "A" : isPlayerInTeamB ? "B" : null;
+  const isPlayerInTeamC = Boolean(
+    (room.teams?.teamC?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamC?.playerIds || []).some(
+      (pid) =>
+        room.player_details?.[pid]?.id === myPlayerId ||
+        (myPlayerNameNormalized &&
+          myPlayerNameNormalized !== "scholar" &&
+          room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
+    )
+  );
+
+  const isPlayerInTeamD = Boolean(
+    (room.teams?.teamD?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamD?.playerIds || []).some(
+      (pid) =>
+        room.player_details?.[pid]?.id === myPlayerId ||
+        (myPlayerNameNormalized &&
+          myPlayerNameNormalized !== "scholar" &&
+          room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
+    )
+  );
+
+  const isInMatch = isPlayerInTeamA || isPlayerInTeamB || isPlayerInTeamC || isPlayerInTeamD;
+  const myTeam: "A" | "B" | "C" | "D" | null = isPlayerInTeamA
+    ? "A"
+    : isPlayerInTeamB
+    ? "B"
+    : isPlayerInTeamC
+    ? "C"
+    : isPlayerInTeamD
+    ? "D"
+    : null;
 
   // Decide if this user must view Spectator Lounge:
   // ONLY show spectator lounge if they are not in the match, not the speaker, and explicitly marked spectator or room is locked
@@ -1246,7 +1293,9 @@ export default function ArticulateRoomPage({
   const waitingScholarsCount = allKnownParticipantIds.filter(
     (id) =>
       !(room.teams?.teamA?.playerIds || []).includes(id) &&
-      !(room.teams?.teamB?.playerIds || []).includes(id)
+      !(room.teams?.teamB?.playerIds || []).includes(id) &&
+      !(room.teams?.teamC?.playerIds || []).includes(id) &&
+      !(room.teams?.teamD?.playerIds || []).includes(id)
   ).length;
 
   const speakerId = room.current_turn?.speakerId;
@@ -1276,7 +1325,7 @@ export default function ArticulateRoomPage({
       : rawSpeakerName || "Scholar";
 
   return (
-    <div className="min-h-screen p-4 sm:p-8 max-w-4xl mx-auto flex flex-col justify-center relative overflow-hidden">
+    <div className="min-h-screen p-3.5 sm:p-6 md:p-8 max-w-6xl mx-auto flex flex-col justify-center relative overflow-hidden">
       {/* Floating Animated Reactions */}
       <div className="fixed inset-0 pointer-events-none z-50 overflow-hidden">
         <AnimatePresence>
@@ -1297,7 +1346,7 @@ export default function ArticulateRoomPage({
       </div>
 
       {/* Top Navigation Bar */}
-      <div className="flex items-center justify-between pb-4 mb-4 border-b border-[var(--border-dim)]/50">
+      <div className="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-[var(--border-dim)]/50 flex-wrap gap-2">
         <Link
           href="/play"
           className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition"
@@ -1578,14 +1627,22 @@ export default function ArticulateRoomPage({
             roundNumber={room.current_turn.roundNumber}
             speakerName={activeSpeakerName}
             activeTeamName={
-              room.current_turn.activeTeam === "B"
+              room.current_turn.activeTeam === "A"
+                ? room.teams.teamA.name
+                : room.current_turn.activeTeam === "B"
                 ? room.teams.teamB.name
-                : room.teams.teamA.name
+                : room.current_turn.activeTeam === "C"
+                ? room.teams.teamC?.name || "Team Delta"
+                : room.teams.teamD?.name || "Team Sigma"
             }
             activeTeamColor={
-              room.current_turn.activeTeam === "B"
+              room.current_turn.activeTeam === "A"
+                ? room.teams.teamA.color
+                : room.current_turn.activeTeam === "B"
                 ? room.teams.teamB.color
-                : room.teams.teamA.color
+                : room.current_turn.activeTeam === "C"
+                ? room.teams.teamC?.color || "#10B981"
+                : room.teams.teamD?.color || "#F59E0B"
             }
             isSpeaker={isSpeaker}
             myTeam={myTeam}

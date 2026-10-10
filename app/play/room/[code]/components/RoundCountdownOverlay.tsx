@@ -11,8 +11,8 @@ interface RoundCountdownOverlayProps {
   activeTeamName: string;
   activeTeamColor: string;
   isSpeaker: boolean;
-  myTeam?: "A" | "B" | null;
-  activeTeam: "A" | "B";
+  myTeam?: "A" | "B" | "C" | "D" | null;
+  activeTeam: "A" | "B" | "C" | "D";
   onDismiss?: () => void;
 }
 

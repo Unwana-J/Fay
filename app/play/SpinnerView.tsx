@@ -4,11 +4,12 @@ import React, { useState } from "react";
 import { motion, useAnimation, AnimatePresence } from "framer-motion";
 import { HelpCircle, RefreshCcw } from "lucide-react";
 import { useFeyVoice } from "@/lib/useFeyVoice";
+import { type TeamId } from "@/store/useGameStore";
 
 interface SpinnerViewProps {
-  activeTeam: "A" | "B";
+  activeTeam: TeamId;
   teamColor: string;
-  onComplete: (modifier: "none" | "double" | "extra-time", targetTeam: "A" | "B", spaces: number, label: string) => void;
+  onComplete: (modifier: "none" | "double" | "extra-time", targetTeam: TeamId, spaces: number, label: string) => void;
 }
 
 interface SpinnerOption {
@@ -16,7 +17,7 @@ interface SpinnerOption {
   color: string;
   textColor: string;
   icon: string;
-  action: (team: "A" | "B") => { modifier: "none" | "double" | "extra-time"; targetTeam: "A" | "B"; spaces: number; label: string };
+  action: (team: TeamId) => { modifier: "none" | "double" | "extra-time"; targetTeam: TeamId; spaces: number; label: string };
 }
 
 export default function SpinnerView({ activeTeam, teamColor, onComplete }: SpinnerViewProps) {

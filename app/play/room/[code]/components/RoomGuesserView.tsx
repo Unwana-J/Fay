@@ -11,7 +11,7 @@ interface RoomGuesserViewProps {
   room: ArticulateRoom;
   secondsRemaining: number;
   myPlayerId: string;
-  myTeam?: "A" | "B" | null;
+  myTeam?: "A" | "B" | "C" | "D" | null;
   onSendReaction: (emoji: string) => void;
   speakerName?: string;
   presencePlayers?: RoomPlayer[];
@@ -81,17 +81,23 @@ export default function RoomGuesserView({
       ? myTeam === currentTurn?.activeTeam
       : currentTurn?.activeTeam === "A"
       ? (room.teams?.teamA?.playerIds || []).includes(myPlayerId)
-      : (room.teams?.teamB?.playerIds || []).includes(myPlayerId);
+      : currentTurn?.activeTeam === "B"
+      ? (room.teams?.teamB?.playerIds || []).includes(myPlayerId)
+      : currentTurn?.activeTeam === "C"
+      ? (room.teams?.teamC?.playerIds || []).includes(myPlayerId)
+      : (room.teams?.teamD?.playerIds || []).includes(myPlayerId);
 
-  const activeTeamName =
-    currentTurn?.activeTeam === "B"
-      ? room.teams?.teamB?.name || "Team Omega"
-      : room.teams?.teamA?.name || "Team Alpha";
+  const activeTeamObj =
+    currentTurn?.activeTeam === "A"
+      ? room.teams?.teamA
+      : currentTurn?.activeTeam === "B"
+      ? room.teams?.teamB
+      : currentTurn?.activeTeam === "C"
+      ? room.teams?.teamC
+      : room.teams?.teamD;
 
-  const activeTeamColor =
-    currentTurn?.activeTeam === "B"
-      ? room.teams?.teamB?.color || "#3B82F6"
-      : room.teams?.teamA?.color || "#EF4444";
+  const activeTeamName = activeTeamObj?.name || "Team Alpha";
+  const activeTeamColor = activeTeamObj?.color || "#EF4444";
 
   return (
     <div className="max-w-md mx-auto space-y-5 text-center relative">
@@ -174,20 +180,25 @@ export default function RoomGuesserView({
           </div>
         </div>
 
-        {/* Minimal Scoreboard */}
-        <div className="grid grid-cols-2 gap-3 pt-3 border-t border-[var(--border-dim)]/50">
-          <div className="p-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)]">
-            <div className="text-[10px] font-bold text-[var(--text-mute)] uppercase">{room.teams?.teamA?.name || "Team Alpha"}</div>
-            <div className="font-space font-extrabold text-xl mt-0.5" style={{ color: room.teams?.teamA?.color || "#EF4444" }}>
-              {room.teams?.teamA?.score ?? 0} pts
+        {/* Dynamic Scoreboard */}
+        <div className={`grid gap-2 pt-3 border-t border-[var(--border-dim)]/50 ${
+          room.teams.teamD ? "grid-cols-2 sm:grid-cols-4" : room.teams.teamC ? "grid-cols-3" : "grid-cols-2"
+        }`}>
+          {[
+            { key: "A", t: room.teams?.teamA },
+            { key: "B", t: room.teams?.teamB },
+            ...(room.teams?.teamC ? [{ key: "C", t: room.teams.teamC }] : []),
+            ...(room.teams?.teamD ? [{ key: "D", t: room.teams.teamD }] : []),
+          ].map(({ key, t }) => (
+            <div key={key} className="p-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)]">
+              <div className="text-[10px] font-bold text-[var(--text-mute)] uppercase truncate">
+                {t?.name || `Team ${key}`}
+              </div>
+              <div className="font-space font-extrabold text-xl mt-0.5" style={{ color: t?.color || "#EF4444" }}>
+                {t?.score ?? 0} pts
+              </div>
             </div>
-          </div>
-          <div className="p-2.5 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)]">
-            <div className="text-[10px] font-bold text-[var(--text-mute)] uppercase">{room.teams?.teamB?.name || "Team Omega"}</div>
-            <div className="font-space font-extrabold text-xl mt-0.5" style={{ color: room.teams?.teamB?.color || "#3B82F6" }}>
-              {room.teams?.teamB?.score ?? 0} pts
-            </div>
-          </div>
+          ))}
         </div>
 
         {/* Expandable Board Map Peek */}
@@ -212,9 +223,17 @@ export default function RoomGuesserView({
                 <BoardMap
                   scoreA={room.teams?.teamA?.score ?? 0}
                   scoreB={room.teams?.teamB?.score ?? 0}
+                  scoreC={room.teams?.teamC?.score}
+                  scoreD={room.teams?.teamD?.score}
                   scoreGoal={room.settings?.scoreGoal || 20}
                   colorA={room.teams?.teamA?.color || "#EF4444"}
                   colorB={room.teams?.teamB?.color || "#3B82F6"}
+                  colorC={room.teams?.teamC?.color || "#10B981"}
+                  colorD={room.teams?.teamD?.color || "#F59E0B"}
+                  nameA={room.teams?.teamA?.name || "Team Alpha"}
+                  nameB={room.teams?.teamB?.name || "Team Omega"}
+                  nameC={room.teams?.teamC?.name || "Team Delta"}
+                  nameD={room.teams?.teamD?.name || "Team Sigma"}
                   activeTeam={currentTurn?.activeTeam || "A"}
                   gameMode="classic"
                 />

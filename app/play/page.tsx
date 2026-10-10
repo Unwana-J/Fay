@@ -10,6 +10,7 @@ import RoundResults from "./RoundResults";
 import GameOver from "./GameOver";
 import SpinnerView from "./SpinnerView";
 import { motion, AnimatePresence } from "framer-motion";
+import { Pause } from "lucide-react";
 
 import BoardMap from "./BoardMap";
 import { type GamePhase } from "@/store/useGameStore";
@@ -35,6 +36,8 @@ export default function PlayPage() {
     numberOfRounds,
     colorA,
     colorB,
+    colorC,
+    colorD,
     scoreGoal,
     phase,
     setPhase,
@@ -43,7 +46,16 @@ export default function PlayPage() {
     applyImmediateSpinnerAdvance,
     challengeRestriction,
     gameMode,
-    getScore
+    getScore,
+    teamNameA,
+    teamNameB,
+    teamNameC,
+    teamNameD,
+    teamCount,
+    getTeamName,
+    getTeamColor,
+    gameTitle,
+    pauseGame
   } = useGameStore();
 
   // If pass-the-phone is disabled by admin, force reset any active local match to setup
@@ -55,6 +67,8 @@ export default function PlayPage() {
 
   const scoreA = getScore("A");
   const scoreB = getScore("B");
+  const scoreC = teamCount >= 3 ? getScore("C") : undefined;
+  const scoreD = teamCount >= 4 ? getScore("D") : undefined;
 
   const handleStartGame = useCallback(() => {
     if (!enablePassThePhone) return;
@@ -108,6 +122,11 @@ export default function PlayPage() {
     resetGame();
   }, [resetGame]);
 
+  const handlePauseGame = useCallback(() => {
+    pauseGame();
+    setOverlayHidden(false);
+  }, [pauseGame]);
+
   return (
     <div className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto flex flex-col justify-center gap-6 relative">
       {phase === "setup" ? (
@@ -115,21 +134,40 @@ export default function PlayPage() {
       ) : (
         <div className="space-y-6">
           {/* Header */}
-          <div className="flex justify-between items-center border-b border-[var(--border-dim)]/40 pb-3">
+          <div className="flex justify-between items-center border-b border-[var(--border-dim)]/40 pb-3 flex-wrap gap-3">
             <div>
-              <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">Fey Journey Map</h2>
-              <p className="text-xs text-[var(--text-dim)]">Track your team's progress to the finish line!</p>
+              <div className="flex items-center gap-2">
+                <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">
+                  {gameTitle || "Fey Game Night"}
+                </h2>
+                <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--olive)]/10 text-[var(--olive)] border border-[var(--olive)]/20 font-bold">
+                  Pass-the-Phone
+                </span>
+              </div>
+              <p className="text-xs text-[var(--text-dim)]">
+                Round {currentRoundIndex + 1}{numberOfRounds !== 999 ? ` of ${numberOfRounds}` : ""} • Winning Goal: {scoreGoal} pts
+              </p>
             </div>
-            <button
-              onClick={() => {
-                if (confirm("End this game session? All progress will be reset.")) {
-                  resetGame();
-                }
-              }}
-              className="px-3.5 py-2 rounded-xl border border-red-500/20 hover:bg-red-500/10 text-red-500 text-xs font-space font-bold transition-all cursor-pointer"
-            >
-              End Session
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={handlePauseGame}
+                className="px-3.5 py-2 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--border-dim)]/40 text-[var(--text)] text-xs font-space font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-xs"
+                title="Pause match and return to menu. State is saved."
+              >
+                <Pause className="w-3.5 h-3.5 text-[var(--olive)]" />
+                <span>Pause & Save</span>
+              </button>
+              <button
+                onClick={() => {
+                  if (confirm("End this game session? All progress will be reset.")) {
+                    resetGame();
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl border border-red-500/20 hover:bg-red-500/10 text-red-500 text-xs font-space font-bold transition-all cursor-pointer"
+              >
+                End Session
+              </button>
+            </div>
           </div>
 
           {/* Persistent Journey Board and Left Guide */}
@@ -210,9 +248,17 @@ export default function PlayPage() {
               <BoardMap
                 scoreA={scoreA}
                 scoreB={scoreB}
-                scoreGoal={scoreGoal}
+                scoreC={scoreC}
+                scoreD={scoreD}
                 colorA={colorA}
                 colorB={colorB}
+                colorC={colorC}
+                colorD={colorD}
+                nameA={teamNameA}
+                nameB={teamNameB}
+                nameC={teamNameC}
+                nameD={teamNameD}
+                scoreGoal={scoreGoal}
                 activeTeam={activeTeam}
                 gameMode={gameMode}
               />
@@ -222,17 +268,16 @@ export default function PlayPage() {
           {/* Focused Popups / Overlays */}
           <AnimatePresence>
             {!overlayHidden && phase === "handoff" && activeSpeaker && (
-              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40" onClick={() => setOverlayHidden(true)}>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40">
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20 }}
                   className="w-full max-w-md bg-[var(--bg)] rounded-3xl p-6 border border-[var(--border-dim)] shadow-xl relative overflow-y-auto max-h-[90vh]"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   {(() => {
-                    const currentTeamScore = activeTeam === "A" ? scoreA : scoreB;
+                    const currentTeamScore = activeTeam ? getScore(activeTeam) : 0;
                     const isChance = currentTeamScore > 0 && currentTeamScore < scoreGoal - 1 && currentTeamScore % 7 === 4;
                     const isDouble = currentTeamScore > 0 && currentTeamScore < scoreGoal - 1 && currentTeamScore % 7 === 2;
                     const isChallenge = currentTeamScore > 0 && currentTeamScore < scoreGoal - 1 && currentTeamScore % 7 === 5;
@@ -241,11 +286,13 @@ export default function PlayPage() {
                     return (
                       <HandoffScreen
                         speakerName={activeSpeaker}
-                        teamLabel={activeTeam === "A" ? "Alpha" : "Omega"}
+                        team={activeTeam ?? "A"}
+                        teamLabel={activeTeam ? getTeamName(activeTeam) : teamNameA}
                         specialSpaceType={specialSpaceType}
                         challengeRestriction={challengeRestriction}
                         onReady={handleTurnReady}
                         onMinimize={() => setOverlayHidden(true)}
+                        onPause={handlePauseGame}
                         gameMode={gameMode}
                       />
                     );
@@ -255,18 +302,17 @@ export default function PlayPage() {
             )}
 
             {!overlayHidden && phase === "spinner" && activeTeam && (
-              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40" onClick={() => setOverlayHidden(true)}>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40">
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20 }}
                   className="w-full max-w-md bg-[var(--bg)] rounded-3xl p-6 border border-[var(--border-dim)] shadow-xl relative overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <SpinnerView
                     activeTeam={activeTeam}
-                    teamColor={activeTeam === "A" ? colorA : colorB}
+                    teamColor={getTeamColor(activeTeam)}
                     onComplete={(modifier, targetTeam, spaces, label) => {
                       if (modifier !== "none") {
                         setSpinnerModifier(modifier);
@@ -289,14 +335,13 @@ export default function PlayPage() {
             )}
 
             {!overlayHidden && phase === "playing" && (
-              <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 z-40" onClick={() => setOverlayHidden(true)}>
+              <div className="fixed inset-0 bg-black/45 backdrop-blur-xs flex items-center justify-center p-4 z-40">
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20 }}
                   className="w-full max-w-2xl bg-[var(--bg)] rounded-[32px] p-6 border border-[var(--border-dim)] shadow-xl relative overflow-hidden"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <SpeakerView onTimeUp={handleTimeUp} />
                 </motion.div>
@@ -304,33 +349,32 @@ export default function PlayPage() {
             )}
 
             {!overlayHidden && phase === "results" && (
-              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40" onClick={() => setOverlayHidden(true)}>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40">
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20 }}
                   className="w-full max-w-3xl bg-[var(--bg)] rounded-[32px] p-6 border border-[var(--border-dim)] shadow-xl relative overflow-hidden max-h-[90vh] overflow-y-auto"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <RoundResults
                     onNextTurn={handleNextTurn}
                     onGameOver={handleGameOver}
                     onMinimize={() => setOverlayHidden(true)}
+                    onPause={handlePauseGame}
                   />
                 </motion.div>
               </div>
             )}
 
             {!overlayHidden && phase === "gameover" && (
-              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40" onClick={() => setOverlayHidden(true)}>
+              <div className="fixed inset-0 bg-black/40 backdrop-blur-xs flex items-center justify-center p-4 z-40">
                 <motion.div
                   initial={{ scale: 0.9, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0.9, opacity: 0 }}
                   transition={{ type: "spring", stiffness: 220, damping: 20 }}
                   className="w-full max-w-3xl bg-[var(--bg)] rounded-[32px] p-6 border border-[var(--border-dim)] shadow-xl relative overflow-hidden max-h-[90vh] overflow-y-auto"
-                  onClick={(e) => e.stopPropagation()}
                 >
                   <GameOver
                     onRestart={handleRestart}
