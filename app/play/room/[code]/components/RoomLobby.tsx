@@ -22,6 +22,9 @@ interface RoomLobbyProps {
   onToggleInactive?: (targetPlayerId?: string) => void;
   onKickPlayer?: (targetPlayerId: string) => void;
   onLeaveRoom?: () => void;
+  onTransferHost?: (targetPlayerId: string) => void;
+  onClaimHost?: () => void;
+  isHostOnline?: boolean;
   onEditName?: () => void;
   onOpenLobbyQueue?: () => void;
   onAdmitPlayer?: (targetPlayerId: string, targetTeam: "A" | "B" | "C" | "D") => void;
@@ -44,6 +47,9 @@ export default function RoomLobby({
   onToggleInactive,
   onKickPlayer,
   onLeaveRoom,
+  onTransferHost,
+  onClaimHost,
+  isHostOnline = true,
   onEditName,
   onOpenLobbyQueue,
   onAdmitPlayer,
@@ -318,6 +324,17 @@ export default function RoomLobby({
               <Share2 className="w-3.5 h-3.5" />
               WhatsApp
             </button>
+            {onLeaveRoom && (
+              <button
+                type="button"
+                onClick={onLeaveRoom}
+                className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-red-500/25 bg-red-500/10 text-red-600 dark:text-red-400 hover:bg-red-500/20 transition cursor-pointer shadow-2xs"
+                title="Leave room"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Leave</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -646,6 +663,17 @@ export default function RoomLobby({
                             ))}
                           </div>
                         )}
+                        {isHost && onTransferHost && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
+                          <button
+                            type="button"
+                            onClick={() => onTransferHost(scholar.id)}
+                            className="text-[11px] font-space font-bold px-2 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                            title={`Transfer host privileges to ${scholar.name}`}
+                          >
+                            <Crown className="w-3 h-3" />
+                            <span className="hidden sm:inline">Make Host</span>
+                          </button>
+                        )}
                         {isHost && onKickPlayer && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
                           <button
                             type="button"
@@ -867,6 +895,17 @@ export default function RoomLobby({
                                 )}
                               </button>
                             )}
+                            {isHost && onTransferHost && pId !== myPlayerId && pId !== room.host_id && (
+                              <button
+                                type="button"
+                                onClick={() => onTransferHost(pId)}
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer flex items-center gap-0.5 shadow-2xs"
+                                title={`Transfer host privileges to ${p.name}`}
+                              >
+                                <Crown className="w-2.5 h-2.5" />
+                                <span className="hidden sm:inline">Make Host</span>
+                              </button>
+                            )}
                             {isHost && onKickPlayer && pId !== myPlayerId && pId !== room.host_id && (
                               <button
                                 type="button"
@@ -925,6 +964,26 @@ export default function RoomLobby({
               🔒 When you click start, the room locks for Round 1. Any friends who join while the round is in progress will wait in the Spectator Lounge until this round ends.
             </p>
           </>
+        ) : !isHostOnline ? (
+          <div className="py-2 space-y-3">
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Host ({room.host_name || "Host"}) appears offline or has left
+            </div>
+            {onClaimHost && (
+              <button
+                type="button"
+                onClick={onClaimHost}
+                className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
+              >
+                <Crown className="w-4 h-4" />
+                Claim Host Privileges & Start Match
+              </button>
+            )}
+            <p className="text-xs text-[var(--text-dim)]">
+              The original host left or disconnected. You can claim host controls to start and run the match.
+            </p>
+          </div>
         ) : (
           <div className="py-2 space-y-1">
             <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">

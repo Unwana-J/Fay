@@ -182,25 +182,25 @@ export default function ArticulateGuideModal({
       >
         {/* Header Bar */}
         <div
-          className="px-5 py-4 sm:px-7 sm:py-5 border-b flex items-center justify-between"
+          className="px-4 py-3.5 sm:px-7 sm:py-5 border-b flex items-center justify-between gap-2"
           style={{ borderColor: "var(--border-dim)", background: "var(--bg-panel)" }}
         >
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0 flex-1">
             <div className="w-10 h-10 rounded-2xl bg-[var(--terra)]/15 border border-[var(--terra)]/25 flex items-center justify-center text-xl shrink-0 shadow-xs">
               🎭
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <span className="text-[10px] font-space font-extrabold uppercase tracking-wider text-[var(--terra)]">
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-[10px] font-space font-extrabold uppercase tracking-wider text-[var(--terra)] shrink-0">
                   Fey Articulate
                 </span>
-                <span className="text-[10px] px-2 py-0.5 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] font-bold text-[var(--text-mute)]">
+                <span className="text-[9px] font-space font-bold px-2 py-0.5 rounded-full bg-[var(--terra)]/10 text-[var(--terra)] border border-[var(--terra)]/25 whitespace-nowrap shrink-0">
                   How to Play
                 </span>
               </div>
               <h2
                 id="articulate-guide-title"
-                className="font-space font-extrabold text-lg sm:text-xl leading-tight"
+                className="font-space font-extrabold text-base sm:text-xl leading-tight truncate mt-0.5"
                 style={{ color: "var(--text)" }}
               >
                 {guideMode === "local" ? "Pass-the-Phone Guide" : "Online Room Guide"}
@@ -208,21 +208,22 @@ export default function ArticulateGuideModal({
             </div>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 shrink-0">
             {isFirstTime && (
               <button
                 type="button"
                 onClick={handleSkip}
-                className="text-xs font-space font-bold px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-card)] transition-colors cursor-pointer"
+                className="text-xs font-space font-bold px-2.5 py-1.5 rounded-xl border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-card)] transition-colors cursor-pointer whitespace-nowrap touch-manipulation select-none active:scale-95"
               >
-                Skip Guide
+                <span className="sm:hidden">Skip</span>
+                <span className="hidden sm:inline">Skip Guide</span>
               </button>
             )}
             <button
               type="button"
               onClick={onClose}
               aria-label="Close guide"
-              className="p-2 rounded-xl text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-card)] transition-colors cursor-pointer"
+              className="p-2 rounded-xl text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-card)] transition-colors cursor-pointer touch-manipulation select-none active:scale-95"
             >
               <X size={18} />
             </button>

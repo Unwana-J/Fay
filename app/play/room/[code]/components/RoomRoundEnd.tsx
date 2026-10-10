@@ -47,6 +47,9 @@ interface RoomRoundEndProps {
   onFinishGame?: () => void;
   onToggleInactive?: (targetPlayerId?: string) => void;
   onLeaveRoom?: () => void;
+  onTransferHost?: (targetPlayerId: string) => void;
+  onClaimHost?: () => void;
+  isHostOnline?: boolean;
   onOpenLobbyQueue?: () => void;
   onAdmitPlayer?: (targetPlayerId: string, targetTeam: "A" | "B" | "C" | "D") => void;
   onAutoAdmitAll?: () => void;
@@ -68,6 +71,9 @@ export default function RoomRoundEnd({
   onFinishGame,
   onToggleInactive,
   onLeaveRoom,
+  onTransferHost,
+  onClaimHost,
+  isHostOnline = true,
   onOpenLobbyQueue,
   onAdmitPlayer,
   onAutoAdmitAll,
@@ -427,7 +433,7 @@ export default function RoomRoundEnd({
             <button
               type="button"
               onClick={() => setShowWordAudit((v) => !v)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
               title={showWordAudit ? "Collapse Word List" : "Expand Word List"}
             >
               {showWordAudit ? (
@@ -445,7 +451,7 @@ export default function RoomRoundEnd({
           </div>
         </div>
 
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {showWordAudit && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -754,7 +760,7 @@ export default function RoomRoundEnd({
             <button
               type="button"
               onClick={() => setShowTeamRosters((v) => !v)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
               title={showTeamRosters ? "Collapse team rosters" : "View team rosters"}
             >
               {showTeamRosters ? (
@@ -772,7 +778,7 @@ export default function RoomRoundEnd({
           </div>
         </div>
 
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {showTeamRosters && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -854,6 +860,17 @@ export default function RoomRoundEnd({
                             <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/15 text-emerald-600 font-bold border border-emerald-500/30">
                               <Mic className="w-2.5 h-2.5" /> Speaker
                             </span>
+                          )}
+                          {isHost && onTransferHost && pId !== myPlayerId && pId !== room.host_id && (
+                            <button
+                              type="button"
+                              onClick={() => onTransferHost(pId)}
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer inline-flex items-center gap-0.5 shadow-2xs"
+                              title={`Transfer host privileges to ${p.name}`}
+                            >
+                              <Crown className="w-2.5 h-2.5" />
+                              <span className="hidden sm:inline">Make Host</span>
+                            </button>
                           )}
                           {isHost && onToggleInactive && (
                             <button
@@ -991,7 +1008,7 @@ export default function RoomRoundEnd({
               <button
                 type="button"
                 onClick={() => setShowWaitingQueue((v) => !v)}
-                className="p-1.5 rounded-lg border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer"
+                className="p-1.5 rounded-lg border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer touch-manipulation select-none active:scale-95"
                 title={showWaitingQueue ? "Collapse waiting queue" : "Expand waiting queue"}
               >
                 {showWaitingQueue ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
@@ -999,7 +1016,7 @@ export default function RoomRoundEnd({
             </div>
           </div>
 
-          <AnimatePresence>
+          <AnimatePresence initial={false}>
             {showWaitingQueue && (
               <motion.div
                 initial={{ opacity: 0, height: 0 }}
@@ -1078,7 +1095,7 @@ export default function RoomRoundEnd({
           <button
             type="button"
             onClick={() => setShowRoadmap((v) => !v)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
             title={showRoadmap ? "Collapse Roadmap Progression" : "Expand Roadmap Progression"}
           >
             {showRoadmap ? (
@@ -1095,7 +1112,7 @@ export default function RoomRoundEnd({
           </button>
         </div>
 
-        <AnimatePresence>
+        <AnimatePresence initial={false}>
           {showRoadmap && (
             <motion.div
               initial={{ opacity: 0, height: 0 }}
@@ -1269,6 +1286,26 @@ export default function RoomRoundEnd({
                 </motion.button>
                 <p className="text-xs text-[var(--text-dim)]">
                   👑 You can launch as Host, or wait for {nextSpeakerDisplay?.name || nextTeamName} to start when ready.
+                </p>
+              </div>
+            ) : !isHostOnline ? (
+              <div className="py-2 space-y-3">
+                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                  Host ({room.host_name || "Host"}) appears offline or has left
+                </div>
+                {onClaimHost && (
+                  <button
+                    type="button"
+                    onClick={onClaimHost}
+                    className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
+                  >
+                    <Crown className="w-4 h-4" />
+                    Claim Host & Start Round {nextRoundNumber}
+                  </button>
+                )}
+                <p className="text-xs text-[var(--text-dim)]">
+                  The original host left or lost connection. You can claim host controls to launch Round {nextRoundNumber}.
                 </p>
               </div>
             ) : myTeam === nextActiveTeamKey ? (

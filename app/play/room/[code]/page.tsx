@@ -15,7 +15,7 @@ import PlayerIdentityModal from "./components/PlayerIdentityModal";
 import RoundCountdownOverlay from "./components/RoundCountdownOverlay";
 import RoomErrorBoundary from "./components/RoomErrorBoundary";
 import LobbyQueueModal from "./components/LobbyQueueModal";
-import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2, Edit2, RotateCw, Users } from "lucide-react";
+import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2, Edit2, RotateCw, Users, Crown, X, AlertTriangle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -131,6 +131,10 @@ export default function ArticulateRoomPage({
   const [identityModalMode, setIdentityModalMode] = useState<"join" | "edit">("join");
   const [hasJoinedRoom, setHasJoinedRoom] = useState(false);
   const [showLeaveConfirmModal, setShowLeaveConfirmModal] = useState(false);
+  const [selectedSuccessorId, setSelectedSuccessorId] = useState<string>("");
+  const [isLeaving, setIsLeaving] = useState(false);
+  const [hostNotification, setHostNotification] = useState<string | null>(null);
+  const prevHostIdRef = useRef<string | null>(null);
   const [showLobbyQueueModal, setShowLobbyQueueModal] = useState(false);
   const [isStartingRound, setIsStartingRound] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
@@ -175,6 +179,22 @@ export default function ArticulateRoomPage({
   useEffect(() => {
     warmUpAudio();
   }, []);
+
+  // Track room host transitions and display announcement
+  useEffect(() => {
+    if (!room?.host_id) return;
+    if (prevHostIdRef.current && prevHostIdRef.current !== room.host_id) {
+      if (room.host_id === myPlayerId) {
+        setHostNotification("👑 You are now the Host! You have control of game rounds and settings.");
+      } else {
+        const newHostName = room.player_details?.[room.host_id]?.name || room.host_name || "A scholar";
+        setHostNotification(`👑 Host privilege was transferred to ${newHostName}.`);
+      }
+      const t = setTimeout(() => setHostNotification(null), 5000);
+      return () => clearTimeout(t);
+    }
+    prevHostIdRef.current = room.host_id;
+  }, [room?.host_id, myPlayerId, room?.player_details, room?.host_name]);
 
   // Synchronize known player names to persistent local cache
   useEffect(() => {
@@ -1199,17 +1219,192 @@ export default function ArticulateRoomPage({
     }
   }, [room, hasJoinedRoom, myPlayerId, router]);
 
+  const isHost = Boolean(room && room.host_id === myPlayerId);
+
+  const otherScholars = useMemo(() => {
+    const ids = new Set<string>();
+
+    (room?.teams?.teamA?.playerIds || []).forEach((id) => ids.add(id));
+    (room?.teams?.teamB?.playerIds || []).forEach((id) => ids.add(id));
+    (room?.teams?.teamC?.playerIds || []).forEach((id) => ids.add(id));
+    (room?.teams?.teamD?.playerIds || []).forEach((id) => ids.add(id));
+    (room?.spectators || []).forEach((id) => ids.add(id));
+    (room?.active_players || []).forEach((id) => ids.add(id));
+    Object.keys(room?.player_details || {}).forEach((id) => ids.add(id));
+    presencePlayers.forEach((p) => ids.add(p.id));
+
+    ids.delete(myPlayerId);
+    (room?.kicked_players || []).forEach((id) => ids.delete(id));
+
+    return Array.from(ids)
+      .map((id) => {
+        const detail = room?.player_details?.[id];
+        const pres = presencePlayers.find((p) => p.id === id);
+        const known = knownNames[id];
+        const cleanId = id.replace(/^guest-/, "");
+        const name =
+          detail?.name && detail.name !== "Scholar" && detail.name !== "Learner"
+            ? detail.name
+            : pres?.name && pres.name !== "Scholar" && pres.name !== "Learner"
+            ? pres.name
+            : known?.name && known.name !== "Scholar" && known.name !== "Learner"
+            ? known.name
+            : detail?.name || pres?.name || `Scholar (${cleanId.slice(0, 5)})`;
+        const avatar =
+          detail?.avatar || pres?.avatar || known?.avatar || "/avatars/avatar-scholar.svg";
+        const isOnline = Boolean(pres);
+        const isInactive = Boolean(room?.inactive_players?.includes(id));
+
+        let teamKey: "A" | "B" | "C" | "D" | "Spectator" | "Waiting" = "Waiting";
+        let teamLabel = "Waiting";
+        if (room?.teams?.teamA?.playerIds?.includes(id)) {
+          teamKey = "A";
+          teamLabel = room.teams.teamA.name || "Team A";
+        } else if (room?.teams?.teamB?.playerIds?.includes(id)) {
+          teamKey = "B";
+          teamLabel = room.teams.teamB.name || "Team B";
+        } else if (room?.teams?.teamC?.playerIds?.includes(id)) {
+          teamKey = "C";
+          teamLabel = room.teams.teamC.name || "Team C";
+        } else if (room?.teams?.teamD?.playerIds?.includes(id)) {
+          teamKey = "D";
+          teamLabel = room.teams.teamD.name || "Team D";
+        } else if (room?.spectators?.includes(id)) {
+          teamKey = "Spectator";
+          teamLabel = "Spectator Lounge";
+        }
+
+        return {
+          id,
+          name,
+          avatar,
+          isOnline,
+          isInactive,
+          teamKey,
+          teamLabel,
+        };
+      })
+      .sort((a, b) => {
+        if (a.isOnline !== b.isOnline) return a.isOnline ? -1 : 1;
+        if (a.isInactive !== b.isInactive) return a.isInactive ? 1 : -1;
+        return a.name.localeCompare(b.name);
+      });
+  }, [room, presencePlayers, myPlayerId, knownNames]);
+
+  const isHostOnline = useMemo(() => {
+    if (!room?.host_id) return true;
+    if (room.host_id === myPlayerId) return true;
+    if (!isSupabaseConfigured) return true;
+    if (presencePlayers.length === 0) return true;
+    return presencePlayers.some((p) => p.id === room.host_id);
+  }, [room?.host_id, myPlayerId, presencePlayers]);
+
+  useEffect(() => {
+    if (!isHost || otherScholars.length === 0) return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "You are currently the host of this match. Please transfer host privilege before leaving.";
+      return e.returnValue;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [isHost, otherScholars.length]);
+
+  const handleTransferHost = useCallback(
+    async (targetPlayerId: string) => {
+      const targetName =
+        room?.player_details?.[targetPlayerId]?.name ||
+        presencePlayers.find((p) => p.id === targetPlayerId)?.name ||
+        "this scholar";
+
+      if (
+        !window.confirm(
+          `Transfer room host privileges to ${targetName}? They will be able to control game settings, player admittance, and round starts.`
+        )
+      ) {
+        return;
+      }
+
+      const updated = await dispatchAction({
+        action: "transfer_host",
+        hostId: myPlayerId,
+        targetPlayerId,
+      });
+
+      if (channelRef.current && updated) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "room_action",
+          payload: { action: "transfer_host", room: updated, previousHostId: myPlayerId, newHostId: targetPlayerId },
+        });
+      }
+    },
+    [dispatchAction, myPlayerId, presencePlayers, room?.player_details]
+  );
+
+  const handleClaimHost = useCallback(async () => {
+    if (
+      !window.confirm(
+        "The current host appears offline or has left. Would you like to claim host privileges for this match?"
+      )
+    ) {
+      return;
+    }
+    const updated = await dispatchAction({
+      action: "claim_host",
+      playerId: myPlayerId,
+      playerName: effectivePlayerName,
+    });
+    if (channelRef.current && updated) {
+      channelRef.current.send({
+        type: "broadcast",
+        event: "room_action",
+        payload: { action: "claim_host", room: updated, previousHostId: room?.host_id, newHostId: myPlayerId },
+      });
+    }
+  }, [dispatchAction, effectivePlayerName, myPlayerId, room?.host_id]);
+
   const handleLeaveRoom = () => {
+    if (isHost && otherScholars.length > 0) {
+      const firstCandidate = otherScholars.find((s) => s.isOnline && !s.isInactive) || otherScholars[0];
+      setSelectedSuccessorId(firstCandidate?.id || "");
+    }
     setShowLeaveConfirmModal(true);
   };
 
-  const handleConfirmLeave = async () => {
-    setShowLeaveConfirmModal(false);
-    await dispatchAction({
-      action: "leave_room",
-      playerId: myPlayerId,
-    });
-    router.push("/play");
+  const handleConfirmLeave = async (customSuccessorId?: string) => {
+    if (isLeaving) return;
+    setIsLeaving(true);
+    try {
+      const successor = customSuccessorId || selectedSuccessorId;
+      setShowLeaveConfirmModal(false);
+      const updated = await dispatchAction({
+        action: "leave_room",
+        playerId: myPlayerId,
+        newHostId: isHost && otherScholars.length > 0 ? successor : undefined,
+      });
+
+      if (channelRef.current && updated) {
+        channelRef.current.send({
+          type: "broadcast",
+          event: "room_action",
+          payload: {
+            action: "leave_room",
+            room: updated,
+            leftPlayerId: myPlayerId,
+            newHostId: isHost ? successor : undefined,
+          },
+        });
+      }
+
+      router.push("/play");
+    } finally {
+      setIsLeaving(false);
+    }
   };
 
   const handleManualRefresh = async () => {
@@ -1260,7 +1455,6 @@ export default function ArticulateRoomPage({
     );
   }
 
-  const isHost = room.host_id === myPlayerId;
   const isPlaying = room.status === "playing";
 
   const myPlayerNameNormalized = (effectivePlayerName || "").trim().toLowerCase();
@@ -1405,52 +1599,72 @@ export default function ArticulateRoomPage({
         </AnimatePresence>
       </div>
 
+      {/* Host Privilege Toast / Notification */}
+      <AnimatePresence>
+        {hostNotification && (
+          <motion.div
+            initial={{ opacity: 0, y: -20, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -20, scale: 0.95 }}
+            className="fixed top-4 left-1/2 -translate-x-1/2 z-50 bg-[var(--bg-card)] border border-[var(--gold)]/50 text-[var(--text)] px-4 py-2.5 rounded-2xl shadow-2xl flex items-center gap-2.5 text-xs font-space font-bold"
+          >
+            <span>{hostNotification}</span>
+            <button
+              type="button"
+              onClick={() => setHostNotification(null)}
+              className="text-[var(--text-mute)] hover:text-[var(--text)] ml-1 cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Top Navigation Bar */}
       <div className="flex items-center justify-between pb-3 sm:pb-4 mb-3 sm:mb-4 border-b border-[var(--border-dim)]/50 flex-wrap gap-2">
-        <Link
-          href="/play"
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition"
+        <button
+          type="button"
+          onClick={handleLeaveRoom}
+          className="inline-flex items-center gap-1.5 text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer"
         >
           <ArrowLeft className="w-3.5 h-3.5" /> Back to Parlor
-        </Link>
+        </button>
 
         <div className="flex items-center gap-2 sm:gap-3">
           {isInMatch && (
-            <>
-              <button
-                type="button"
-                onClick={() => handleToggleInactive()}
-                className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border ${
-                  isMeInactive
-                    ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
-                    : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
-                }`}
-                title={isMeInactive ? "You are marked Away. Click to mark Active." : "Click to mark Away / Inactive."}
-              >
-                {isMeInactive ? (
-                  <>
-                    <Moon className="w-3 h-3 text-amber-500" />
-                    <span className="hidden sm:inline">Away</span>
-                  </>
-                ) : (
-                  <>
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span className="hidden sm:inline">Active</span>
-                  </>
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={handleLeaveRoom}
-                className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/25 transition flex items-center gap-1 cursor-pointer shadow-2xs"
-                title="Leave room"
-              >
-                <LogOut className="w-3 h-3" />
-                <span className="hidden sm:inline">Leave</span>
-              </button>
-            </>
+            <button
+              type="button"
+              onClick={() => handleToggleInactive()}
+              className={`px-2.5 py-1 rounded-lg text-xs font-bold transition flex items-center gap-1.5 cursor-pointer shadow-2xs border ${
+                isMeInactive
+                  ? "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                  : "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/20"
+              }`}
+              title={isMeInactive ? "You are marked Away. Click to mark Active." : "Click to mark Away / Inactive."}
+            >
+              {isMeInactive ? (
+                <>
+                  <Moon className="w-3 h-3 text-amber-500" />
+                  <span className="hidden sm:inline">Away</span>
+                </>
+              ) : (
+                <>
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                  <span className="hidden sm:inline">Active</span>
+                </>
+              )}
+            </button>
           )}
+
+          <button
+            type="button"
+            onClick={handleLeaveRoom}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/25 transition flex items-center gap-1 cursor-pointer shadow-2xs"
+            title="Leave room"
+          >
+            <LogOut className="w-3 h-3" />
+            <span className="hidden sm:inline">Leave</span>
+          </button>
 
           {/* Manual Refresh / Sync Button */}
           <button
@@ -1505,6 +1719,24 @@ export default function ArticulateRoomPage({
         </div>
       </div>
 
+      {/* Offline Host Recovery Banner */}
+      {!isHost && !isHostOnline && (
+        <div className="mb-4 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-3 text-xs shadow-xs">
+          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 font-space font-medium">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
+            <span>The host ({room.host_name || "Host"}) appears offline. Claim host privileges to keep the match running!</span>
+          </div>
+          <button
+            type="button"
+            onClick={handleClaimHost}
+            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+          >
+            <Crown className="w-3.5 h-3.5" />
+            Claim Host
+          </button>
+        </div>
+      )}
+
       {/* Dynamic View Router */}
       <RoomErrorBoundary onReset={() => fetchRoomState()}>
         <AnimatePresence mode="popLayout">
@@ -1545,6 +1777,9 @@ export default function ArticulateRoomPage({
                 onToggleInactive={handleToggleInactive}
                 onKickPlayer={handleKickPlayer}
                 onLeaveRoom={handleLeaveRoom}
+                onTransferHost={handleTransferHost}
+                onClaimHost={handleClaimHost}
+                isHostOnline={isHostOnline}
                 onEditName={() => {
                   setIdentityModalMode("edit");
                   setShowIdentityModal(true);
@@ -1614,6 +1849,9 @@ export default function ArticulateRoomPage({
                 onFinishGame={handleFinishGame}
                 onToggleInactive={handleToggleInactive}
                 onLeaveRoom={handleLeaveRoom}
+                onTransferHost={handleTransferHost}
+                onClaimHost={handleClaimHost}
+                isHostOnline={isHostOnline}
                 onOpenLobbyQueue={() => setShowLobbyQueueModal(true)}
                 onAdmitPlayer={handleAdmitPlayer}
                 onAutoAdmitAll={handleAutoAdmitAll}
@@ -1633,6 +1871,9 @@ export default function ArticulateRoomPage({
                 presencePlayers={presencePlayers}
                 knownNames={knownNames}
                 onResetGame={handleResetGame}
+                onClaimHost={handleClaimHost}
+                isHostOnline={isHostOnline}
+                onLeaveRoom={handleLeaveRoom}
               />
             </motion.div>
           ) : (
@@ -1660,6 +1901,7 @@ export default function ArticulateRoomPage({
         onSwitchPlayerTeam={handleSwitchPlayerTeam}
         onToggleInactive={handleToggleInactive}
         onKickPlayer={handleKickPlayer}
+        onTransferHost={handleTransferHost}
       />
 
       {/* Player Identity Name Gate & In-Match Rename Modal */}
@@ -1717,53 +1959,220 @@ export default function ArticulateRoomPage({
         )}
       </AnimatePresence>
 
-      {/* Leave & Away Prompt Modal */}
+      {/* Leave & Host Transfer Modal */}
       {showLeaveConfirmModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="surface rounded-3xl p-6 max-w-sm w-full border border-[var(--border-dim)] shadow-2xl space-y-4 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto text-xl">
-              <Moon className="w-6 h-6" />
-            </div>
+        <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="surface rounded-3xl p-6 max-w-md w-full border border-[var(--border-dim)] shadow-2xl space-y-4 text-center animate-in fade-in zoom-in-95 duration-200">
+            {isHost && otherScholars.length > 0 ? (
+              <>
+                <div className="w-14 h-14 rounded-2xl bg-amber-500/15 text-amber-500 flex items-center justify-center mx-auto text-2xl shadow-inner border border-amber-500/30">
+                  <Crown className="w-7 h-7" />
+                </div>
 
-            <div className="space-y-1">
-              <h3 className="font-space font-extrabold text-lg text-[var(--text)]">
-                Stepping Away?
-              </h3>
-              <p className="text-xs text-[var(--text-dim)]">
-                If you just need a short break, set your status to <strong>Away</strong> so your team keeps your slot. You can also leave the match completely.
-              </p>
-            </div>
+                <div className="space-y-1">
+                  <h3 className="font-space font-extrabold text-xl text-[var(--text)]">
+                    Transfer Host Privileges
+                  </h3>
+                  <p className="text-xs text-[var(--text-dim)] leading-relaxed">
+                    You are the room host. Before leaving, please select someone to become the new host so other scholars can continue playing.
+                  </p>
+                </div>
 
-            <div className="space-y-2 pt-2">
-              <button
-                type="button"
-                onClick={() => {
-                  handleToggleInactive();
-                  setShowLeaveConfirmModal(false);
-                }}
-                className="w-full py-3 px-4 rounded-xl font-space font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
-              >
-                <Moon className="w-4 h-4" />
-                <span>Set Status to Away (Keep Slot)</span>
-              </button>
+                {/* Candidate Selection List */}
+                <div className="space-y-1.5 text-left pt-1">
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-mute)] px-1">
+                    Select New Host:
+                  </span>
+                  <div className="max-h-56 overflow-y-auto space-y-2 pr-1">
+                    {otherScholars.map((scholar) => {
+                      const isSelected = selectedSuccessorId === scholar.id;
+                      return (
+                        <button
+                          key={scholar.id}
+                          type="button"
+                          onClick={() => setSelectedSuccessorId(scholar.id)}
+                          className={`w-full p-2.5 rounded-2xl border transition flex items-center justify-between gap-3 cursor-pointer text-left ${
+                            isSelected
+                              ? "bg-amber-500/15 border-amber-500 text-[var(--text)] shadow-xs ring-1 ring-amber-500/50"
+                              : "bg-[var(--bg-card)] border-[var(--border-dim)] hover:border-[var(--text-dim)] text-[var(--text)]"
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <img
+                              src={scholar.avatar}
+                              alt={scholar.name}
+                              className="w-8 h-8 rounded-full border border-[var(--border-dim)] shrink-0 object-cover bg-white/10"
+                            />
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-space font-bold text-xs truncate">
+                                  {scholar.name}
+                                </span>
+                                {scholar.isOnline ? (
+                                  <span
+                                    className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shrink-0"
+                                    title="Online in room"
+                                  />
+                                ) : (
+                                  <span className="text-[9px] text-[var(--text-mute)] shrink-0">
+                                    (offline)
+                                  </span>
+                                )}
+                              </div>
+                              <div className="flex items-center gap-1 mt-0.5">
+                                <span className="text-[10px] text-[var(--text-dim)] font-medium">
+                                  {scholar.teamLabel}
+                                </span>
+                                {scholar.isInactive && (
+                                  <span className="text-[9px] text-amber-500 font-bold flex items-center gap-0.5">
+                                    • Away
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
 
-              <button
-                type="button"
-                onClick={handleConfirmLeave}
-                className="w-full py-2.5 px-4 rounded-xl font-space font-bold text-xs bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
-              >
-                <LogOut className="w-4 h-4" />
-                <span>Leave Match Completely</span>
-              </button>
+                          <div
+                            className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${
+                              isSelected
+                                ? "border-amber-500 bg-amber-500 text-black"
+                                : "border-[var(--border-dim)] bg-transparent"
+                            }`}
+                          >
+                            {isSelected && <Crown className="w-3 h-3" />}
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
 
-              <button
-                type="button"
-                onClick={() => setShowLeaveConfirmModal(false)}
-                className="w-full py-2 text-xs font-bold text-[var(--text-mute)] hover:text-[var(--text)] transition cursor-pointer"
-              >
-                Stay in Match
-              </button>
-            </div>
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    disabled={!selectedSuccessorId || isLeaving}
+                    onClick={() => handleConfirmLeave()}
+                    className="w-full py-3 px-4 rounded-xl font-space font-extrabold text-xs bg-amber-500 hover:bg-amber-600 disabled:opacity-50 text-black shadow-md transition flex items-center justify-center gap-2 cursor-pointer touch-manipulation select-none active:scale-[0.98]"
+                  >
+                    {isLeaving ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Transferring Host & Leaving...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Crown className="w-4 h-4" />
+                        <span>
+                          Transfer to{" "}
+                          {otherScholars.find((s) => s.id === selectedSuccessorId)?.name || "Selected Scholar"}{" "}
+                          & Leave
+                        </span>
+                      </>
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleToggleInactive();
+                      setShowLeaveConfirmModal(false);
+                    }}
+                    className="w-full py-2.5 px-4 rounded-xl font-space font-bold text-xs bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] border border-[var(--border-dim)] transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <Moon className="w-4 h-4 text-amber-500" />
+                    <span>Set Status to Away (Keep Slot & Stay in Room)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLeaveConfirmModal(false)}
+                    className="w-full py-2 text-xs font-bold text-[var(--text-mute)] hover:text-[var(--text)] transition cursor-pointer"
+                  >
+                    Stay in Match
+                  </button>
+                </div>
+              </>
+            ) : isHost ? (
+              <>
+                <div className="w-12 h-12 rounded-2xl bg-red-500/10 text-red-600 flex items-center justify-center mx-auto text-xl">
+                  <LogOut className="w-6 h-6" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="font-space font-extrabold text-lg text-[var(--text)]">
+                    Leave Match?
+                  </h3>
+                  <p className="text-xs text-[var(--text-dim)]">
+                    You are the host and only scholar currently in this room. Leaving will end your session.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmLeave()}
+                    className="w-full py-3 px-4 rounded-xl font-space font-bold text-xs bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-400 border border-red-500/30 transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Leave Match</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLeaveConfirmModal(false)}
+                    className="w-full py-2 text-xs font-bold text-[var(--text-mute)] hover:text-[var(--text)] transition cursor-pointer"
+                  >
+                    Stay in Match
+                  </button>
+                </div>
+              </>
+            ) : (
+              <>
+                <div className="w-12 h-12 rounded-2xl bg-amber-500/10 text-amber-600 flex items-center justify-center mx-auto text-xl">
+                  <Moon className="w-6 h-6" />
+                </div>
+
+                <div className="space-y-1">
+                  <h3 className="font-space font-extrabold text-lg text-[var(--text)]">
+                    Stepping Away?
+                  </h3>
+                  <p className="text-xs text-[var(--text-dim)]">
+                    If you just need a short break, set your status to <strong>Away</strong> so your team keeps your slot. You can also leave the match completely.
+                  </p>
+                </div>
+
+                <div className="space-y-2 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      handleToggleInactive();
+                      setShowLeaveConfirmModal(false);
+                    }}
+                    className="w-full py-3 px-4 rounded-xl font-space font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                  >
+                    <Moon className="w-4 h-4" />
+                    <span>Set Status to Away (Keep Slot)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmLeave()}
+                    className="w-full py-2.5 px-4 rounded-xl font-space font-bold text-xs bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/25 transition flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <LogOut className="w-4 h-4" />
+                    <span>Leave Match Completely</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setShowLeaveConfirmModal(false)}
+                    className="w-full py-2 text-xs font-bold text-[var(--text-mute)] hover:text-[var(--text)] transition cursor-pointer"
+                  >
+                    Stay in Match
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

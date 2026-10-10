@@ -235,7 +235,7 @@ export default function BoardMap({
           <button
             type="button"
             onClick={() => setIsGridCollapsed((v) => !v)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
             title={isGridCollapsed ? "Expand board tile grid" : "Collapse board tile grid"}
           >
             {isGridCollapsed ? (
@@ -254,7 +254,7 @@ export default function BoardMap({
       )}
 
       {/* Snake Game Board Grid */}
-      <AnimatePresence>
+      <AnimatePresence initial={false}>
         {(!collapsibleGrid || !isGridCollapsed) && (
           <motion.div
             initial={{ opacity: 0, height: 0 }}

@@ -30,6 +30,7 @@ interface LobbyQueueModalProps {
   onSwitchPlayerTeam?: (targetPlayerId: string, targetTeam: "A" | "B" | "C" | "D") => void;
   onToggleInactive?: (targetPlayerId: string) => void;
   onKickPlayer?: (targetPlayerId: string) => void;
+  onTransferHost?: (targetPlayerId: string) => void;
 }
 
 export default function LobbyQueueModal({
@@ -45,6 +46,7 @@ export default function LobbyQueueModal({
   onSwitchPlayerTeam,
   onToggleInactive,
   onKickPlayer,
+  onTransferHost,
 }: LobbyQueueModalProps) {
   if (!isOpen) return null;
 
@@ -335,6 +337,18 @@ export default function LobbyQueueModal({
                         </button>
                       ))}
 
+                      {isHost && onTransferHost && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
+                        <button
+                          type="button"
+                          onClick={() => onTransferHost(scholar.id)}
+                          className="text-xs font-space font-bold px-2 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                          title={`Transfer host privileges to ${scholar.name}`}
+                        >
+                          <Crown className="w-3.5 h-3.5" />
+                          <span className="hidden sm:inline">Make Host</span>
+                        </button>
+                      )}
+
                       {isHost && onKickPlayer && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
                         <button
                           type="button"
@@ -430,6 +444,17 @@ export default function LobbyQueueModal({
                                       </button>
                                     ))}
                                 </div>
+                              )}
+                              {isHost && onTransferHost && pId !== myPlayerId && pId !== room.host_id && (
+                                <button
+                                  type="button"
+                                  onClick={() => onTransferHost(pId)}
+                                  className="text-[10px] font-bold px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 cursor-pointer flex items-center gap-0.5"
+                                  title={`Transfer host privileges to ${p.name}`}
+                                >
+                                  <Crown className="w-2.5 h-2.5" />
+                                  <span className="hidden sm:inline">Make Host</span>
+                                </button>
                               )}
                               {isHost && onKickPlayer && pId !== myPlayerId && pId !== room.host_id && (
                                 <button

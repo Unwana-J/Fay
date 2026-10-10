@@ -1133,6 +1133,7 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
       // -------------------------------------------------------------
       case "leave_room": {
         const id = String(playerId);
+        const chosenNewHost = body.newHostId || body.targetPlayerId;
 
         // Remove from all teams
         removePlayerFromAllTeams(room, id);
@@ -1144,20 +1145,60 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
           room.inactive_players = room.inactive_players.filter((p) => p !== id);
         }
 
-        // If the host leaves, transfer host to the first available player
-        if (room.host_id === id) {
-          const activeKeys = getActiveTeamKeys(room);
-          const remainingPlayers: string[] = [];
-          for (const key of activeKeys) {
-            remainingPlayers.push(...(getTeamObj(room, key).playerIds || []));
-          }
-          remainingPlayers.push(...room.spectators);
+        if (room.player_details?.[id]) {
+          room.player_details[id].isHost = false;
+        }
 
-          if (remainingPlayers.length > 0) {
-            const newHostId = remainingPlayers[0];
+        // If the host leaves, transfer host to designated successor or best available player
+        if (room.host_id === id) {
+          let newHostId: string | null = null;
+          let newHostName = "Scholar";
+
+          // If a specific successor was chosen by the host
+          if (chosenNewHost && chosenNewHost !== id) {
+            newHostId = String(chosenNewHost);
+            newHostName =
+              room.player_details?.[newHostId]?.name ||
+              body.newHostName ||
+              body.targetPlayerName ||
+              "Scholar";
+          } else {
+            // Fallback: search remaining players, prioritizing non-inactive team members
+            const activeKeys = getActiveTeamKeys(room);
+            const teamPlayers: string[] = [];
+            for (const key of activeKeys) {
+              teamPlayers.push(...(getTeamObj(room, key).playerIds || []));
+            }
+            const nonInactiveTeamPlayers = teamPlayers.filter(
+              (p) => !(room.inactive_players || []).includes(p)
+            );
+            const remainingPlayers = [
+              ...nonInactiveTeamPlayers,
+              ...teamPlayers.filter((p) => (room.inactive_players || []).includes(p)),
+              ...room.spectators,
+            ].filter((p) => p !== id);
+
+            if (remainingPlayers.length > 0) {
+              newHostId = remainingPlayers[0];
+              newHostName = room.player_details?.[newHostId]?.name || "Scholar";
+            }
+          }
+
+          if (newHostId) {
             room.host_id = newHostId;
-            const newHostName = room.player_details?.[newHostId]?.name || "Scholar";
             room.host_name = newHostName;
+            if (!room.player_details) room.player_details = {};
+            if (room.player_details[newHostId]) {
+              room.player_details[newHostId].isHost = true;
+            } else {
+              room.player_details[newHostId] = {
+                id: newHostId,
+                name: newHostName,
+                avatar: "/avatars/avatar-scholar.svg",
+                isHost: true,
+                joinedAt: Date.now(),
+              };
+            }
           }
         }
 
@@ -1309,6 +1350,122 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
 
         await persistRoom(room);
         return actionResponse({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 14. TRANSFER HOST
+      // -------------------------------------------------------------
+      case "transfer_host": {
+        const callerId = String(hostId || playerId);
+        const targetId = String(body.targetPlayerId || body.newHostId);
+
+        if (!targetId) {
+          return actionResponse({ error: "Target player ID is required" }, { status: 400 });
+        }
+
+        if (callerId !== room.host_id) {
+          return actionResponse({ error: "Only the current host can transfer host privileges" }, { status: 403 });
+        }
+
+        if (targetId === room.host_id) {
+          return actionResponse({ error: "Player is already the host" }, { status: 400 });
+        }
+
+        // Verify target exists in room
+        const targetDetail = room.player_details?.[targetId];
+        const allRoomPlayers = [
+          ...room.active_players,
+          ...room.spectators,
+          ...(room.teams?.teamA?.playerIds || []),
+          ...(room.teams?.teamB?.playerIds || []),
+          ...(room.teams?.teamC?.playerIds || []),
+          ...(room.teams?.teamD?.playerIds || []),
+          ...Object.keys(room.player_details || {}),
+        ];
+
+        if (!allRoomPlayers.includes(targetId) && !targetDetail) {
+          return actionResponse({ error: "Target player not found in this room" }, { status: 404 });
+        }
+
+        const newHostName =
+          targetDetail?.name ||
+          body.targetPlayerName ||
+          body.newHostName ||
+          "Scholar";
+
+        const previousHostId = room.host_id;
+        room.host_id = targetId;
+        room.host_name = newHostName;
+
+        if (!room.player_details) room.player_details = {};
+        if (room.player_details[previousHostId]) {
+          room.player_details[previousHostId].isHost = false;
+        }
+
+        if (room.player_details[targetId]) {
+          room.player_details[targetId].isHost = true;
+          room.player_details[targetId].name = newHostName;
+        } else {
+          room.player_details[targetId] = {
+            id: targetId,
+            name: newHostName,
+            avatar: "/avatars/avatar-scholar.svg",
+            isHost: true,
+            joinedAt: Date.now(),
+          };
+        }
+
+        sanitizeRoomPlayers(room);
+        await persistRoom(room);
+        return actionResponse({ success: true, room, previousHostId, newHostId: targetId });
+      }
+
+      // -------------------------------------------------------------
+      // 15. CLAIM HOST (Safety recovery if host disconnected or went away)
+      // -------------------------------------------------------------
+      case "claim_host": {
+        const claimantId = String(playerId);
+        const claimantName = String(playerName || body.claimantName || "Scholar");
+
+        const allRoomPlayers = [
+          ...room.active_players,
+          ...room.spectators,
+          ...(room.teams?.teamA?.playerIds || []),
+          ...(room.teams?.teamB?.playerIds || []),
+          ...(room.teams?.teamC?.playerIds || []),
+          ...(room.teams?.teamD?.playerIds || []),
+          ...Object.keys(room.player_details || {}),
+        ];
+
+        if (!allRoomPlayers.includes(claimantId)) {
+          return actionResponse({ error: "Claimant is not part of this room" }, { status: 403 });
+        }
+
+        const previousHostId = room.host_id;
+        room.host_id = claimantId;
+        room.host_name = claimantName;
+
+        if (!room.player_details) room.player_details = {};
+        if (room.player_details[previousHostId]) {
+          room.player_details[previousHostId].isHost = false;
+        }
+
+        if (room.player_details[claimantId]) {
+          room.player_details[claimantId].isHost = true;
+          room.player_details[claimantId].name = claimantName;
+        } else {
+          room.player_details[claimantId] = {
+            id: claimantId,
+            name: claimantName,
+            avatar: "/avatars/avatar-scholar.svg",
+            isHost: true,
+            joinedAt: Date.now(),
+          };
+        }
+
+        sanitizeRoomPlayers(room);
+        await persistRoom(room);
+        return actionResponse({ success: true, room, previousHostId, newHostId: claimantId });
       }
 
       default:

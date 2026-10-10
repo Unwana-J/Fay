@@ -17,6 +17,9 @@ interface RoomGameOverProps {
   presencePlayers?: RoomPlayer[];
   knownNames?: Record<string, { name: string; avatar: string }>;
   onResetGame: () => void;
+  onLeaveRoom?: () => void;
+  onClaimHost?: () => void;
+  isHostOnline?: boolean;
 }
 
 export default function RoomGameOver({
@@ -26,6 +29,9 @@ export default function RoomGameOver({
   presencePlayers = [],
   knownNames = {},
   onResetGame,
+  onLeaveRoom,
+  onClaimHost,
+  isHostOnline = true,
 }: RoomGameOverProps) {
   const { profile, openClaimAccountPrompt } = useAppStore();
   const [copied, setCopied] = useState(false);
@@ -403,6 +409,26 @@ export default function RoomGameOver({
             <RotateCcw className="w-5 h-5" />
             Rematch (Play Again)
           </motion.button>
+        ) : !isHostOnline ? (
+          <div className="py-2 space-y-3">
+            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
+              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+              Host appears offline or has left
+            </div>
+            {onClaimHost && (
+              <button
+                type="button"
+                onClick={onClaimHost}
+                className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
+              >
+                <Crown className="w-4 h-4" />
+                Claim Host Privileges & Start Rematch
+              </button>
+            )}
+            <p className="text-xs text-[var(--text-dim)]">
+              The original host left or disconnected. You can claim host controls to initiate a rematch.
+            </p>
+          </div>
         ) : (
           <div className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] flex items-center justify-center gap-2.5 text-xs text-[var(--text-dim)] font-space font-bold">
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse" />
@@ -411,13 +437,24 @@ export default function RoomGameOver({
         )}
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/play"
-            className="flex-1 inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-bold border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text)] transition cursor-pointer"
-          >
-            <Home className="w-4 h-4" />
-            Back to Parlor
-          </Link>
+          {onLeaveRoom ? (
+            <button
+              type="button"
+              onClick={onLeaveRoom}
+              className="flex-1 inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-bold border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text)] transition cursor-pointer"
+            >
+              <Home className="w-4 h-4" />
+              Back to Parlor
+            </button>
+          ) : (
+            <Link
+              href="/play"
+              className="flex-1 inline-flex items-center justify-center gap-2 py-3.5 rounded-2xl text-xs font-bold border border-[var(--border-dim)] hover:border-[var(--olive)] bg-[var(--bg-card)] text-[var(--text)] transition cursor-pointer"
+            >
+              <Home className="w-4 h-4" />
+              Back to Parlor
+            </Link>
+          )}
           <Link
             href="/"
             className="inline-flex items-center justify-center gap-1.5 px-4 py-3.5 rounded-2xl text-xs font-bold border border-[var(--border-dim)] hover:bg-[var(--border-dim)]/20 text-[var(--text-mute)] hover:text-[var(--text)] transition cursor-pointer"
