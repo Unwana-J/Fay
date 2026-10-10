@@ -24,6 +24,8 @@ async function persistRoom(room: ArticulateRoom) {
     try {
       const teamsPayload = {
         room_name: room.room_name || "",
+        host_id: room.host_id,
+        host_name: room.host_name,
         teamA: room.teams.teamA,
         teamB: room.teams.teamB,
         ...(room.teams.teamC ? { teamC: room.teams.teamC } : {}),
@@ -39,6 +41,8 @@ async function persistRoom(room: ArticulateRoom) {
       let query = supabase
         .from("articulate_rooms")
         .update({
+          host_id: room.host_id,
+          host_name: room.host_name,
           status: room.status,
           locked: room.locked,
           settings: room.settings,
@@ -133,12 +137,14 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
 
       if (!error && data) {
         const rawTeams = data.teams || {};
+        const effectiveHostId = rawTeams.host_id || data.host_id;
+        const effectiveHostName = rawTeams.host_name || data.host_name;
         room = {
           id: data.id,
           room_code: data.room_code,
           room_name: rawTeams.room_name || data.room_name || undefined,
-          host_id: data.host_id,
-          host_name: data.host_name,
+          host_id: effectiveHostId,
+          host_name: effectiveHostName,
           status: data.status,
           locked: data.locked,
           settings: data.settings,
@@ -165,15 +171,25 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           updated_at: data.updated_at,
         };
 
-        if (!room.player_details) room.player_details = {};
-        if (room.host_id && !room.player_details[room.host_id]) {
-          room.player_details[room.host_id] = {
-            id: room.host_id,
-            name: room.host_name,
-            avatar: "/avatars/avatar-scholar.svg",
-            isHost: true,
-            joinedAt: Date.now(),
-          };
+        const currentRoom = room;
+        if (!currentRoom.player_details) currentRoom.player_details = {};
+        if (currentRoom.host_id) {
+          const activeHostId = currentRoom.host_id;
+          const details = currentRoom.player_details;
+          Object.keys(details).forEach((pId) => {
+            if (details[pId]) {
+              details[pId].isHost = pId === activeHostId;
+            }
+          });
+          if (!details[activeHostId]) {
+            details[activeHostId] = {
+              id: activeHostId,
+              name: currentRoom.host_name,
+              avatar: "/avatars/avatar-scholar.svg",
+              isHost: true,
+              joinedAt: Date.now(),
+            };
+          }
         }
 
         room = sanitizeRoomPlayers(room);
@@ -1188,6 +1204,11 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
             room.host_id = newHostId;
             room.host_name = newHostName;
             if (!room.player_details) room.player_details = {};
+            Object.keys(room.player_details).forEach((pId) => {
+              if (room.player_details![pId]) {
+                room.player_details![pId].isHost = pId === newHostId;
+              }
+            });
             if (room.player_details[newHostId]) {
               room.player_details[newHostId].isHost = true;
             } else {
@@ -1398,9 +1419,11 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         room.host_name = newHostName;
 
         if (!room.player_details) room.player_details = {};
-        if (room.player_details[previousHostId]) {
-          room.player_details[previousHostId].isHost = false;
-        }
+        Object.keys(room.player_details).forEach((pId) => {
+          if (room.player_details![pId]) {
+            room.player_details![pId].isHost = pId === targetId;
+          }
+        });
 
         if (room.player_details[targetId]) {
           room.player_details[targetId].isHost = true;
@@ -1427,18 +1450,8 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         const claimantId = String(playerId);
         const claimantName = String(playerName || body.claimantName || "Scholar");
 
-        const allRoomPlayers = [
-          ...room.active_players,
-          ...room.spectators,
-          ...(room.teams?.teamA?.playerIds || []),
-          ...(room.teams?.teamB?.playerIds || []),
-          ...(room.teams?.teamC?.playerIds || []),
-          ...(room.teams?.teamD?.playerIds || []),
-          ...Object.keys(room.player_details || {}),
-        ];
-
-        if (!allRoomPlayers.includes(claimantId)) {
-          return actionResponse({ error: "Claimant is not part of this room" }, { status: 403 });
+        if (!claimantId || claimantId === "undefined" || claimantId === "null") {
+          return actionResponse({ error: "Claimant player ID is required" }, { status: 400 });
         }
 
         const previousHostId = room.host_id;
@@ -1446,9 +1459,11 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         room.host_name = claimantName;
 
         if (!room.player_details) room.player_details = {};
-        if (room.player_details[previousHostId]) {
-          room.player_details[previousHostId].isHost = false;
-        }
+        Object.keys(room.player_details).forEach((pId) => {
+          if (room.player_details![pId]) {
+            room.player_details![pId].isHost = pId === claimantId;
+          }
+        });
 
         if (room.player_details[claimantId]) {
           room.player_details[claimantId].isHost = true;
@@ -1457,10 +1472,18 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
           room.player_details[claimantId] = {
             id: claimantId,
             name: claimantName,
-            avatar: "/avatars/avatar-scholar.svg",
+            avatar: body.avatar || "/avatars/avatar-scholar.svg",
             isHost: true,
             joinedAt: Date.now(),
           };
+        }
+
+        if (!room.active_players.includes(claimantId) && !room.spectators.includes(claimantId)) {
+          room.active_players.push(claimantId);
+        }
+
+        if (room.inactive_players) {
+          room.inactive_players = room.inactive_players.filter((p) => p !== claimantId);
         }
 
         sanitizeRoomPlayers(room);

@@ -865,7 +865,7 @@ export default function RoomRoundEnd({
                             <button
                               type="button"
                               onClick={() => onTransferHost(pId)}
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer inline-flex items-center gap-0.5 shadow-2xs"
+                              className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-950 transition cursor-pointer inline-flex items-center gap-0.5 shadow-2xs"
                               title={`Transfer host privileges to ${p.name}`}
                             >
                               <Crown className="w-2.5 h-2.5" />
@@ -955,6 +955,21 @@ export default function RoomRoundEnd({
                     <Moon className="w-3.5 h-3.5" /> Step Away (Mark Inactive)
                   </>
                 )}
+              </button>
+            )}
+
+            {isHost && onFinishGame && !isGoalReached && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (window.confirm("Conclude this match and show the final podium leaderboard now?")) {
+                    onFinishGame();
+                  }
+                }}
+                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[var(--terra)]/10 hover:bg-[var(--terra)]/20 text-[var(--terra)] border border-[var(--terra)]/30 transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
+                title="Conclude match early and reveal final match podium"
+              >
+                <Trophy className="w-3.5 h-3.5" /> End Match Early
               </button>
             )}
 
@@ -1193,7 +1208,7 @@ export default function RoomRoundEnd({
                 </p>
               </div>
             ) : (
-              <div className="py-4 space-y-2 text-center">
+              <div className="py-4 space-y-3 text-center">
                 <div className="inline-flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
                   <Trophy className="w-4 h-4 text-[var(--gold)] animate-bounce" />
                   <span>Victory Threshold Reached by <strong>{winningTeamName}</strong>!</span>
@@ -1201,6 +1216,42 @@ export default function RoomRoundEnd({
                 <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
                   Review the words above and dispute any fouls. Host ({room.host_name}) will announce the official match winner when review is concluded.
                 </p>
+
+                {!isHostOnline && (
+                  <div className="pt-2 space-y-2.5">
+                    <div className="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center gap-2 text-xs font-bold text-amber-950">
+                      <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
+                      Host ({room.host_name || "Host"}) appears offline or has left
+                    </div>
+                    {onClaimHost && (
+                      <button
+                        type="button"
+                        onClick={onClaimHost}
+                        className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
+                      >
+                        <Crown className="w-4 h-4 text-neutral-950" />
+                        Claim Host Privileges to Conclude Match
+                      </button>
+                    )}
+                    {onFinishGame && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Declare ${winningTeamName} the official winner and conclude the match now?`)) {
+                            onFinishGame();
+                          }
+                        }}
+                        className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-3.5 rounded-2xl font-space font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition cursor-pointer touch-manipulation select-none active:scale-[0.98]"
+                      >
+                        <Trophy className="w-4 h-4 text-[var(--gold)]" />
+                        Announce Winner & Finish Match ({winningTeamName})
+                      </button>
+                    )}
+                    <p className="text-xs text-[var(--text-dim)]">
+                      The original host is unavailable. Any active scholar can claim host privileges or conclude the match.
+                    </p>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -1290,17 +1341,17 @@ export default function RoomRoundEnd({
               </div>
             ) : !isHostOnline ? (
               <div className="py-2 space-y-3">
-                <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
-                  <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+                <div className="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center gap-2 text-xs font-bold text-amber-950">
+                  <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
                   Host ({room.host_name || "Host"}) appears offline or has left
                 </div>
                 {onClaimHost && (
                   <button
                     type="button"
                     onClick={onClaimHost}
-                    className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
+                    className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
                   >
-                    <Crown className="w-4 h-4" />
+                    <Crown className="w-4 h-4 text-neutral-950" />
                     Claim Host & Start Round {nextRoundNumber}
                   </button>
                 )}

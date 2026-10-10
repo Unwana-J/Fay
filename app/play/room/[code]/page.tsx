@@ -1721,18 +1721,20 @@ export default function ArticulateRoomPage({
 
       {/* Offline Host Recovery Banner */}
       {!isHost && !isHostOnline && (
-        <div className="mb-4 p-3 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-between gap-3 text-xs shadow-xs">
-          <div className="flex items-center gap-2 text-amber-800 dark:text-amber-200 font-space font-medium">
-            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-500" />
-            <span>The host ({room.host_name || "Host"}) appears offline. Claim host privileges to keep the match running!</span>
+        <div className="mb-4 p-3 sm:p-3.5 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-between gap-3 text-xs shadow-xs">
+          <div className="flex items-center gap-2.5 text-amber-950 font-space font-bold">
+            <AlertTriangle className="w-4 h-4 shrink-0 text-amber-700" />
+            <span className="text-amber-950 font-bold">
+              The host (<span className="text-amber-900 font-extrabold">{room.host_name || "Host"}</span>) appears offline. Claim host privileges to keep the match running!
+            </span>
           </div>
           <button
             type="button"
             onClick={handleClaimHost}
-            className="px-3 py-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-xs whitespace-nowrap shrink-0"
+            className="px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-600 active:scale-95 text-neutral-950 font-space font-extrabold text-xs flex items-center gap-1.5 transition cursor-pointer shadow-sm whitespace-nowrap shrink-0"
           >
-            <Crown className="w-3.5 h-3.5" />
-            Claim Host
+            <Crown className="w-4 h-4 text-neutral-950" />
+            <span>Claim Host</span>
           </button>
         </div>
       )}
@@ -2148,7 +2150,7 @@ export default function ArticulateRoomPage({
                       handleToggleInactive();
                       setShowLeaveConfirmModal(false);
                     }}
-                    className="w-full py-3 px-4 rounded-xl font-space font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-700 dark:text-amber-300 border border-amber-500/30 transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
+                    className="w-full py-3 px-4 rounded-xl font-space font-bold text-xs bg-amber-500/15 hover:bg-amber-500/25 text-amber-950 border border-amber-500/40 transition flex items-center justify-center gap-2 cursor-pointer shadow-xs"
                   >
                     <Moon className="w-4 h-4" />
                     <span>Set Status to Away (Keep Slot)</span>

@@ -131,12 +131,14 @@ export async function GET(req: NextRequest) {
 
         if (!error && data) {
           const rawTeams = data.teams || {};
+          const effectiveHostId = rawTeams.host_id || data.host_id;
+          const effectiveHostName = rawTeams.host_name || data.host_name;
           room = {
             id: data.id,
             room_code: data.room_code,
             room_name: rawTeams.room_name || data.room_name || undefined,
-            host_id: data.host_id,
-            host_name: data.host_name,
+            host_id: effectiveHostId,
+            host_name: effectiveHostName,
             status: data.status,
             locked: data.locked,
             settings: data.settings,
@@ -163,14 +165,24 @@ export async function GET(req: NextRequest) {
             updated_at: data.updated_at,
           };
 
-          if (!room.player_details) room.player_details = {};
-          if (room.host_id && !room.player_details[room.host_id]) {
-            room.player_details[room.host_id] = {
-              id: room.host_id,
-              name: room.host_name,
-              avatar: "/avatars/avatar-scholar.svg",
-              isHost: true,
-            };
+          const currentRoom = room;
+          if (!currentRoom.player_details) currentRoom.player_details = {};
+          if (currentRoom.host_id) {
+            const activeHostId = currentRoom.host_id;
+            const details = currentRoom.player_details;
+            Object.keys(details).forEach((pId) => {
+              if (details[pId]) {
+                details[pId].isHost = pId === activeHostId;
+              }
+            });
+            if (!details[activeHostId]) {
+              details[activeHostId] = {
+                id: activeHostId,
+                name: currentRoom.host_name,
+                avatar: "/avatars/avatar-scholar.svg",
+                isHost: true,
+              };
+            }
           }
 
           room = sanitizeRoomPlayers(room);

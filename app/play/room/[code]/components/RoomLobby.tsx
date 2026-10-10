@@ -667,7 +667,7 @@ export default function RoomLobby({
                           <button
                             type="button"
                             onClick={() => onTransferHost(scholar.id)}
-                            className="text-[11px] font-space font-bold px-2 py-1 rounded-lg border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer flex items-center gap-1 shadow-2xs"
+                            className="text-[11px] font-space font-bold px-2 py-1 rounded-lg border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-950 transition cursor-pointer flex items-center gap-1 shadow-2xs"
                             title={`Transfer host privileges to ${scholar.name}`}
                           >
                             <Crown className="w-3 h-3" />
@@ -899,7 +899,7 @@ export default function RoomLobby({
                               <button
                                 type="button"
                                 onClick={() => onTransferHost(pId)}
-                                className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition cursor-pointer flex items-center gap-0.5 shadow-2xs"
+                                className="text-[9px] font-bold px-1.5 py-0.5 rounded-md border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-950 transition cursor-pointer flex items-center gap-0.5 shadow-2xs"
                                 title={`Transfer host privileges to ${p.name}`}
                               >
                                 <Crown className="w-2.5 h-2.5" />
@@ -966,17 +966,17 @@ export default function RoomLobby({
           </>
         ) : !isHostOnline ? (
           <div className="py-2 space-y-3">
-            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <div className="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center gap-2 text-xs font-bold text-amber-950">
+              <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
               Host ({room.host_name || "Host"}) appears offline or has left
             </div>
             {onClaimHost && (
               <button
                 type="button"
                 onClick={onClaimHost}
-                className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
+                className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
               >
-                <Crown className="w-4 h-4" />
+                <Crown className="w-4 h-4 text-neutral-950" />
                 Claim Host Privileges & Start Match
               </button>
             )}

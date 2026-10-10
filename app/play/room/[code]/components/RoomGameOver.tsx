@@ -411,17 +411,17 @@ export default function RoomGameOver({
           </motion.button>
         ) : !isHostOnline ? (
           <div className="py-2 space-y-3">
-            <div className="p-3 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center gap-2 text-xs font-bold text-amber-700 dark:text-amber-300">
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-pulse" />
+            <div className="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center gap-2 text-xs font-bold text-amber-950">
+              <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
               Host appears offline or has left
             </div>
             {onClaimHost && (
               <button
                 type="button"
                 onClick={onClaimHost}
-                className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-black font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
+                className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
               >
-                <Crown className="w-4 h-4" />
+                <Crown className="w-4 h-4 text-neutral-950" />
                 Claim Host Privileges & Start Rematch
               </button>
             )}
