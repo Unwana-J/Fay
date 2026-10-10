@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ArticulateRoom, RoomPlayer, BuzzerSoundType, BUZZER_OPTIONS } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X, UserX, Volume2, HelpCircle, Headphones } from "lucide-react";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X, UserX, Volume2, HelpCircle, Headphones, ShieldCheck, Flame } from "lucide-react";
 import { motion } from "framer-motion";
 import { playBuzzerSound } from "@/lib/sound";
 import { useAppStore } from "@/store/useAppStore";
@@ -52,9 +52,11 @@ export default function RoomLobby({
   onRenameTeam,
 }: RoomLobbyProps) {
   const {
+    profile,
     articulateHistory = [],
     hasSeenArticulateGuide,
     dismissArticulateGuide,
+    openClaimAccountPrompt,
   } = useAppStore();
   const [showGuideModal, setShowGuideModal] = useState(false);
 
@@ -279,6 +281,17 @@ export default function RoomLobby({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {!profile?.hasClaimedAccount && (
+              <button
+                type="button"
+                onClick={openClaimAccountPrompt}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition cursor-pointer shadow-2xs"
+                title="Link free account to track your daily streak & articulate rank"
+              >
+                <Flame className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+                <span>Track Streak</span>
+              </button>
+            )}
             <button
               type="button"
               onClick={() => setShowGuideModal(true)}
@@ -468,6 +481,33 @@ export default function RoomLobby({
           </div>
         </div>
       </div>
+
+      {/* Guest Notice Banner */}
+      {!profile?.hasClaimedAccount && (
+        <div className="surface rounded-2xl p-3.5 sm:p-4 border border-amber-500/30 bg-amber-500/5 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+              <Flame size={18} className="text-amber-500 animate-pulse" />
+            </div>
+            <div>
+              <span className="font-space font-bold text-amber-700 dark:text-amber-300 block">
+                Playing as a Guest ({profile?.username || "Scholar"}) · Streak Not Tracked
+              </span>
+              <span className="text-[11px] text-[var(--text-dim)]">
+                Link a free scholar account so this match counts toward your daily streak and your match honors persist across all devices.
+              </span>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={openClaimAccountPrompt}
+            className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-space font-bold text-xs transition cursor-pointer shrink-0 self-start sm:self-auto shadow-xs flex items-center gap-1"
+          >
+            <Flame size={13} className="text-amber-200" />
+            <span>Track Streak →</span>
+          </button>
+        </div>
+      )}
 
       {/* Voice Call & Rules Banner */}
       <div className="surface rounded-2xl p-3.5 sm:p-4 border border-[var(--terra)]/25 bg-[var(--terra-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">

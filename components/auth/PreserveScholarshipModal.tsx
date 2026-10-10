@@ -1,24 +1,35 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Flame, ShieldCheck, Check, Sparkles, X, ArrowRight, Lock, Eye, EyeOff, Smartphone, Laptop, Loader2 } from "lucide-react";
+import { Flame, ShieldCheck, Check, Sparkles, X, ArrowRight, Lock, Eye, EyeOff, Smartphone, Laptop, Loader2, User } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { analytics } from "@/lib/analytics";
 import confetti from "canvas-confetti";
 
 export default function PreserveScholarshipModal() {
+  const pathname = usePathname();
   const {
     streak,
     profile,
     sessions,
+    triviaHistory = [],
+    articulateHistory = [],
     registerWithCloud,
     loginWithCloud,
     dismissClaimAccountPrompt,
     claimPromptDismissed,
+    isClaimAccountModalOpen,
+    closeClaimAccountPrompt,
   } = useAppStore();
 
   const [mode, setMode] = useState<"register" | "login">("register");
+  const [username, setUsername] = useState(
+    profile?.username && profile.username !== "Scholar" && profile.username !== "Learner"
+      ? profile.username
+      : ""
+  );
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -26,10 +37,44 @@ export default function PreserveScholarshipModal() {
   const [isLoading, setIsLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
 
-  const shouldShow =
-    streak.current >= 3 &&
+  useEffect(() => {
+    if (!username && typeof window !== "undefined") {
+      const localName = localStorage.getItem("fey_player_name");
+      if (localName && localName !== "Scholar" && localName !== "Learner") {
+        setUsername(localName);
+      } else if (profile?.username && profile.username !== "Scholar" && profile.username !== "Learner") {
+        setUsername(profile.username);
+      }
+    }
+  }, [profile?.username, username]);
+
+  const hasExistingUsername = Boolean(
+    (profile?.username && profile.username !== "Scholar" && profile.username !== "Learner") ||
+    (typeof window !== "undefined" && localStorage.getItem("fey_player_name") && localStorage.getItem("fey_player_name") !== "Scholar" && localStorage.getItem("fey_player_name") !== "Learner")
+  );
+
+  const triviaCount = triviaHistory?.length ?? 0;
+  const articulateCount = articulateHistory?.length ?? 0;
+  const sessionsCount = sessions?.length ?? 0;
+  const userXP = profile?.xp ?? 0;
+
+  const isInLiveRoom = pathname?.startsWith("/play/room/");
+
+  const isEligibleAutomatically =
+    !isInLiveRoom &&
     !profile.hasClaimedAccount &&
-    !claimPromptDismissed;
+    !claimPromptDismissed &&
+    (streak.current >= 3 || triviaCount >= 2 || articulateCount >= 1 || userXP >= 100);
+
+  const shouldShow = Boolean(isClaimAccountModalOpen || isEligibleAutomatically);
+
+  const handleDismiss = () => {
+    if (isClaimAccountModalOpen) {
+      closeClaimAccountPrompt();
+    } else {
+      dismissClaimAccountPrompt();
+    }
+  };
 
   useEffect(() => {
     if (shouldShow) {
@@ -44,6 +89,16 @@ export default function PreserveScholarshipModal() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "register") {
+      if (!username.trim()) {
+        setError("Please enter or confirm your scholar name.");
+        return;
+      }
+      if (username.trim().length > 25) {
+        setError("Scholar name must be 25 characters or fewer.");
+        return;
+      }
+    }
     if (!email.trim() || !email.includes("@") || !email.includes(".")) {
       setError("Please enter a valid email address.");
       return;
@@ -58,7 +113,7 @@ export default function PreserveScholarshipModal() {
 
     try {
       if (mode === "register") {
-        const result = await registerWithCloud(email.trim(), password);
+        const result = await registerWithCloud(email.trim(), password, username.trim());
         if (!result.success) {
           setError(result.error || "Failed to create cloud account.");
           setIsLoading(false);
@@ -88,13 +143,26 @@ export default function PreserveScholarshipModal() {
       }
 
       setTimeout(() => {
-        dismissClaimAccountPrompt();
+        handleDismiss();
       }, 2400);
     } catch (err: any) {
       setIsLoading(false);
       setError(err.message || "An unexpected error occurred.");
     }
   }
+
+  const isArticulateCentric = articulateCount > 0 && sessionsCount === 0 && triviaCount === 0;
+  const isTriviaCentric = triviaCount > 0 && sessionsCount === 0;
+  const milestoneLabel =
+    streak.current >= 3
+      ? `${streak.current}-Day Streak Milestone Reached`
+      : articulateCount >= 1
+      ? "Articulate Orator Milestone Reached"
+      : triviaCount >= 2
+      ? "Trivia Competitor Milestone Reached"
+      : userXP >= 100
+      ? `${userXP} Scholarly XP Milestone Reached`
+      : "Preserve Your Progress";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 surface-modal backdrop-blur-md">
@@ -114,8 +182,8 @@ export default function PreserveScholarshipModal() {
 
         {/* Close / Dismiss */}
         <button
-          onClick={dismissClaimAccountPrompt}
-          className="absolute top-4 right-4 p-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--bg-input)]"
+          onClick={handleDismiss}
+          className="absolute top-4 right-4 p-2 text-[var(--text-muted)] hover:text-[var(--text)] transition-colors rounded-lg hover:bg-[var(--bg-input)] cursor-pointer"
           aria-label="Dismiss modal"
         >
           <X size={18} />
@@ -145,10 +213,14 @@ export default function PreserveScholarshipModal() {
                 <div>
                   <div className="text-[11px] font-mono uppercase tracking-widest text-[var(--text-muted)] flex items-center gap-1.5">
                     <Sparkles size={12} className="text-[var(--gold)]" />
-                    3-Day Streak Milestone Reached
+                    {milestoneLabel}
                   </div>
                   <h2 className="font-serif text-2xl font-bold tracking-tight" style={{ color: "var(--text)" }}>
-                    {mode === "register" ? "Seal Your Scholarship" : "Sign In to Scholar Account"}
+                    {mode === "register"
+                      ? hasExistingUsername
+                        ? `Track Streak as @${username || "Scholar"}`
+                        : "Track Your Streak & Progress"
+                      : "Sign In to Scholar Account"}
                   </h2>
                 </div>
               </div>
@@ -163,15 +235,17 @@ export default function PreserveScholarshipModal() {
               >
                 <div>
                   <div className="font-mono font-bold text-lg" style={{ color: "var(--terra)" }}>
-                    {streak.current} Days
+                    {streak.current} {streak.current === 1 ? "Day" : "Days"}
                   </div>
                   <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Active Streak</div>
                 </div>
                 <div className="border-x" style={{ borderColor: "var(--border-dim)" }}>
                   <div className="font-mono font-bold text-lg" style={{ color: "var(--olive)" }}>
-                    {sessions.length}
+                    {isArticulateCentric ? articulateCount : isTriviaCentric ? triviaCount : sessions.length}
                   </div>
-                  <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">Topics Mastered</div>
+                  <div className="text-[10px] uppercase font-bold tracking-wider text-[var(--text-muted)]">
+                    {isArticulateCentric ? "Articulate Matches" : isTriviaCentric ? "Trivia Matches" : "Topics Mastered"}
+                  </div>
                 </div>
                 <div>
                   <div className="font-mono font-bold text-lg" style={{ color: "var(--gold)" }}>
@@ -195,7 +269,7 @@ export default function PreserveScholarshipModal() {
                   <Laptop size={15} />
                 </div>
                 <p className="leading-relaxed">
-                  <strong>Sync across all your devices:</strong> Set up your email & password to preserve your streak, audio recordings, and notes safely in the cloud and log in anywhere.
+                  <strong>Sync across all your devices:</strong> Set up your email &amp; password to preserve your streak, {isArticulateCentric ? "Articulate match history, and parlor stats" : isTriviaCentric ? "trivia scores, and leaderboard rank" : "audio recordings, and notes"} safely in the cloud and log in anywhere.
                 </p>
               </div>
 
@@ -233,19 +307,62 @@ export default function PreserveScholarshipModal() {
 
               {/* Form */}
               <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+                {mode === "register" && (
+                  <div>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-label">Scholar Name / Handle</label>
+                      {hasExistingUsername ? (
+                        <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                          <Check size={11} /> Confirming your player name
+                        </span>
+                      ) : (
+                        <span className="text-[10px] text-[var(--text-mute)] font-medium">
+                          Your public display name
+                        </span>
+                      )}
+                    </div>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={username}
+                        onChange={(e) => {
+                          setUsername(e.target.value);
+                          if (error) setError("");
+                        }}
+                        placeholder="e.g. Amina, Chidi, Kelechi"
+                        maxLength={25}
+                        className="w-full px-4 py-2.5 rounded-xl border text-sm font-medium focus:outline-none transition-colors surface-input pr-10"
+                        style={{
+                          borderColor: error && !username.trim() ? "var(--red)" : "var(--border)",
+                          color: "var(--text)",
+                        }}
+                      />
+                      <User size={15} className="absolute right-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] pointer-events-none" />
+                    </div>
+                    <p className="text-[11px] text-[var(--text-muted)] mt-1">
+                      {hasExistingUsername
+                        ? "We found your player name. Confirm or edit it before linking to your cloud account."
+                        : "This handle will represent your scores, trivia rank, and party room honors."}
+                    </p>
+                  </div>
+                )}
+
                 <div>
                   <label className="text-label mb-1.5 block">Email address</label>
                   <input
                     type="email"
                     value={email}
-                    onChange={(e) => setEmail(e.target.value)}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      if (error) setError("");
+                    }}
                     placeholder="scholar@university.edu"
                     className="w-full px-4 py-2.5 rounded-xl border text-sm focus:outline-none transition-colors surface-input"
                     style={{
                       borderColor: error ? "var(--red)" : "var(--border)",
                       color: "var(--text)",
                     }}
-                    autoFocus
+                    autoFocus={hasExistingUsername}
                   />
                 </div>
 
@@ -277,11 +394,11 @@ export default function PreserveScholarshipModal() {
                 <div className="flex items-center justify-between gap-3 pt-2">
                   <button
                     type="button"
-                    onClick={dismissClaimAccountPrompt}
-                    className="btn-ghost text-xs"
+                    onClick={handleDismiss}
+                    className="btn-ghost text-xs cursor-pointer"
                     disabled={isLoading}
                   >
-                    Remind me tomorrow
+                    {isClaimAccountModalOpen ? "Close for now" : "Remind me tomorrow"}
                   </button>
                   <button
                     type="submit"
@@ -294,11 +411,11 @@ export default function PreserveScholarshipModal() {
                       </>
                     ) : mode === "register" ? (
                       <>
-                        <ShieldCheck size={14} /> Seal My Progress <ArrowRight size={13} />
+                        <Flame size={14} className="text-amber-300" /> Track Streak &amp; Save <ArrowRight size={13} />
                       </>
                     ) : (
                       <>
-                        <ShieldCheck size={14} /> Log In & Sync <ArrowRight size={13} />
+                        <ShieldCheck size={14} /> Log In &amp; Sync Streak <ArrowRight size={13} />
                       </>
                     )}
                   </button>

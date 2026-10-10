@@ -293,13 +293,16 @@ export interface AppState {
   claimAccount: (email: string) => void;
   dismissClaimAccountPrompt: () => void;
   claimPromptDismissed: boolean;
+  isClaimAccountModalOpen: boolean;
+  openClaimAccountPrompt: () => void;
+  closeClaimAccountPrompt: () => void;
 
   // Cloud Authentication & Sync (Supabase)
   authEmail: string | null;
   authUserId: string | null;
   isCloudSynced: boolean;
   lastCloudSyncAt: number | null;
-  registerWithCloud: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+  registerWithCloud: (email: string, password: string, confirmedUsername?: string) => Promise<{ success: boolean; error?: string }>;
   loginWithCloud: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logoutFromCloud: () => Promise<void>;
   syncToCloud: () => Promise<void>;
@@ -469,11 +472,17 @@ export const useAppStore = create<AppState>()(
       isSafetyModalOpen: false,
       safetyModalContext: undefined,
 
-      registerWithCloud: async (email, password) => {
+      registerWithCloud: async (email, password, confirmedUsername) => {
         const state = get();
         const trimmed = email.trim().toLowerCase();
+        const chosenUsername = confirmedUsername?.trim() || state.profile.username || "Scholar";
+        const updatedProfile = {
+          ...state.profile,
+          username: chosenUsername,
+        };
+
         const res = await signUpWithEmail(trimmed, password, {
-          profile: state.profile,
+          profile: updatedProfile,
           streak: state.streak,
           settings: state.settings,
           sessions: state.sessions,
@@ -490,17 +499,24 @@ export const useAppStore = create<AppState>()(
               ...s.profile,
               id: res.user!.id,
               email: trimmed,
+              username: chosenUsername,
               hasClaimedAccount: true,
             },
             claimPromptDismissed: true,
+            isClaimAccountModalOpen: false,
           }));
+
+          if (typeof window !== "undefined") {
+            localStorage.setItem("fey_player_name", chosenUsername);
+            localStorage.setItem("fey_device_player_id", res.user!.id);
+          }
 
           analytics.identify(res.user.id, {
             email: trimmed,
-            username: state.profile.username,
+            username: chosenUsername,
             hasClaimedAccount: true,
           });
-          analytics.track("account_registered_cloud", { email: trimmed });
+          analytics.track("account_registered_cloud", { email: trimmed, username: chosenUsername });
           return { success: true };
         } else {
           return { success: false, error: res.error || "Failed to seal scholarship in the cloud." };
@@ -674,10 +690,15 @@ export const useAppStore = create<AppState>()(
           triviaHistory: [],
           customTopics: [],
           claimPromptDismissed: false,
+          isClaimAccountModalOpen: false,
         });
       },
 
       claimPromptDismissed: false,
+      isClaimAccountModalOpen: false,
+
+      openClaimAccountPrompt: () => set({ isClaimAccountModalOpen: true }),
+      closeClaimAccountPrompt: () => set({ isClaimAccountModalOpen: false }),
 
       claimAccount: (email: string) => {
         const trimmed = email.trim().toLowerCase();
@@ -688,6 +709,7 @@ export const useAppStore = create<AppState>()(
             hasClaimedAccount: true,
           },
           claimPromptDismissed: true,
+          isClaimAccountModalOpen: false,
         }));
         const state = get();
         analytics.identify(state.profile.id, {
@@ -703,7 +725,7 @@ export const useAppStore = create<AppState>()(
       },
 
       dismissClaimAccountPrompt: () => {
-        set({ claimPromptDismissed: true });
+        set({ claimPromptDismissed: true, isClaimAccountModalOpen: false });
         analytics.trackAccountClaimPrompt({
           streakCount: get().streak.current,
           action: "dismissed",

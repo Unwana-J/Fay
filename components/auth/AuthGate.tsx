@@ -20,6 +20,7 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
 
   const isPublicNote = pathname?.startsWith("/note/");
   const isAdmin = pathname?.startsWith("/admin");
+  const isPlayRoom = pathname?.startsWith("/play/room/");
 
   return (
     <>
@@ -46,8 +47,8 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
           </div>
         </div>
       )}
-      {mounted && !isSuspended && !isOnboarded && !isPublicNote && !isAdmin && <OnboardingModal isOpen={true} />}
-      {mounted && !isSuspended && isOnboarded && !isPublicNote && !isAdmin && <PreserveScholarshipModal />}
+      {mounted && !isSuspended && !isOnboarded && !isPublicNote && !isAdmin && !isPlayRoom && <OnboardingModal isOpen={true} />}
+      {mounted && !isSuspended && (isOnboarded || isPlayRoom) && !isPublicNote && !isAdmin && <PreserveScholarshipModal />}
     </>
   );
 }

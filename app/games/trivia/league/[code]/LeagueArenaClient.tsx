@@ -53,7 +53,7 @@ export default function LeagueArenaClient({
   initialScores,
   initialLeaderboard,
 }: LeagueArenaClientProps) {
-  const { profile, addXP, saveTriviaRound } = useAppStore();
+  const { profile, addXP, saveTriviaRound, openClaimAccountPrompt } = useAppStore();
 
   const [league, setLeague] = useState<FriendshipLeague>(initialLeague);
   const [scores, setScores] = useState<LeagueDailyScore[]>(initialScores);
@@ -401,6 +401,16 @@ export default function LeagueArenaClient({
           ← Back to Trivia Arcade
         </Link>
         <div className="flex items-center gap-2">
+          {!profile?.hasClaimedAccount && (
+            <button
+              onClick={openClaimAccountPrompt}
+              className="text-[11px] font-space font-bold px-3 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              title="Link free account to track your daily streak & protect tournament scores"
+            >
+              <Flame size={12} className="text-amber-500 animate-pulse" />
+              <span>Track Streak</span>
+            </button>
+          )}
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-full border bg-[var(--bg-input)]" style={{ borderColor: "var(--border-dim)" }}>
             Code: <strong>{league.code}</strong>
           </span>
@@ -417,6 +427,35 @@ export default function LeagueArenaClient({
             exit={{ opacity: 0, y: -15 }}
             className="space-y-6"
           >
+            {/* Guest Tournament Standing Notice */}
+            {!profile?.hasClaimedAccount && (
+              <div
+                className="rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs"
+                style={{
+                  background: "rgba(166, 124, 30, 0.08)",
+                  borderColor: "rgba(166, 124, 30, 0.3)",
+                  color: "var(--text)",
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <Flame size={16} className="text-amber-500 shrink-0 animate-pulse" />
+                  <div>
+                    <span className="font-space font-bold text-xs" style={{ color: "var(--text)" }}>Competing as Guest (@{profile?.username || "Scholar"}):</span>{" "}
+                    <span className="text-[11px] text-[var(--text-dim)]">
+                      Link a free account to track your daily streak and ensure your tournament standing syncs across devices.
+                    </span>
+                  </div>
+                </div>
+                <button
+                  onClick={openClaimAccountPrompt}
+                  className="btn-terra px-3 py-1.5 rounded-xl text-xs font-space font-bold whitespace-nowrap self-start sm:self-auto cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
+                >
+                  <Flame size={12} className="text-amber-300" />
+                  <span>Track Streak →</span>
+                </button>
+              </div>
+            )}
+
             {/* League Hero Banner */}
             <div
               className="rounded-3xl p-6 sm:p-8 surface border relative overflow-hidden shadow-sm"

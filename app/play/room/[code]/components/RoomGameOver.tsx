@@ -2,12 +2,13 @@
 
 import React, { useEffect, useState } from "react";
 import { ArticulateRoom, RoomPlayer } from "@/lib/articulate-room";
-import { Trophy, RotateCcw, Home, Crown, Share2, Copy, Check, Sparkles, Target, Clock, Users, Flame, ChevronRight } from "lucide-react";
+import { Trophy, RotateCcw, Home, Crown, Share2, Copy, Check, Sparkles, Target, Clock, Users, Flame, ChevronRight, ShieldCheck } from "lucide-react";
 import { motion } from "framer-motion";
 import canvasConfetti from "canvas-confetti";
 import Link from "next/link";
 import BoardMap from "@/app/play/BoardMap";
 import ScholarTrophy from "@/components/ui/ScholarTrophy";
+import { useAppStore } from "@/store/useAppStore";
 
 interface RoomGameOverProps {
   room: ArticulateRoom;
@@ -26,6 +27,7 @@ export default function RoomGameOver({
   knownNames = {},
   onResetGame,
 }: RoomGameOverProps) {
+  const { profile, openClaimAccountPrompt } = useAppStore();
   const [copied, setCopied] = useState(false);
   const [showBoard, setShowBoard] = useState(true);
 
@@ -354,6 +356,40 @@ export default function RoomGameOver({
           {copied ? "Recap Copied!" : "Copy Summary"}
         </button>
       </div>
+
+      {/* Unsaved Guest Account Conversion Callout */}
+      {!profile?.hasClaimedAccount && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-3xl p-5 border text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, rgba(166, 124, 30, 0.12) 0%, rgba(122, 28, 46, 0.08) 100%)",
+            borderColor: "rgba(166, 124, 30, 0.35)",
+          }}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-bold text-amber-600 dark:text-amber-400">
+              <Flame className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
+              <span>Playing as Guest · Streak Unsaved</span>
+            </div>
+            <div className="text-base font-space font-bold text-[var(--text)]">
+              Track your daily streak &amp; match MVP record
+            </div>
+            <p className="text-xs text-[var(--text-dim)] max-w-md leading-relaxed">
+              Link a free account in 10 seconds so this match counts toward your daily streak and keeps your Articulate match honors safe across all devices.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={openClaimAccountPrompt}
+            className="btn-terra px-4 py-2.5 rounded-xl font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 shadow-md self-start sm:self-auto"
+          >
+            <Flame className="w-3.5 h-3.5 text-amber-300" />
+            <span>Track Streak →</span>
+          </button>
+        </motion.div>
+      )}
 
       {/* Host Rematch vs Guest Status Actions */}
       <div className="space-y-3 pt-2">

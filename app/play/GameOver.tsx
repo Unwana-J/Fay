@@ -2,7 +2,8 @@
 
 import React from "react";
 import { useGameStore } from "@/store/useGameStore";
-import { Trophy, ArrowLeft, RotateCcw, Medal, Brain } from "lucide-react";
+import { useAppStore } from "@/store/useAppStore";
+import { Trophy, ArrowLeft, RotateCcw, Medal, Brain, ShieldCheck, Flame } from "lucide-react";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import ScholarTrophy from "@/components/ui/ScholarTrophy";
@@ -15,6 +16,7 @@ export default function GameOver({
   onMinimize?: () => void;
 }) {
   const { turnsHistory, resetGame, getActiveTeams, getScore } = useGameStore();
+  const { profile, openClaimAccountPrompt } = useAppStore();
 
   const activeTeams = getActiveTeams();
 
@@ -158,6 +160,38 @@ export default function GameOver({
             </div>
           </div>
         </div>
+
+        {/* Guest Conversion Card */}
+        {!profile?.hasClaimedAccount && (
+          <div className="surface rounded-3xl p-5 border border-amber-500/40 bg-gradient-to-r from-amber-500/10 via-[var(--bg-card)] to-amber-500/5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm">
+            <div className="flex items-center gap-3.5">
+              <div className="w-10 h-10 rounded-2xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <Flame size={22} className="text-amber-500 animate-pulse" />
+              </div>
+              <div className="space-y-0.5">
+                <div className="flex items-center gap-2">
+                  <span className="font-space font-black text-sm text-[var(--text)]">
+                    Track Your Match Streak &amp; Honors
+                  </span>
+                  <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-700 dark:text-amber-300">
+                    Streak Unsaved
+                  </span>
+                </div>
+                <p className="text-xs text-[var(--text-dim)]">
+                  Link a free scholar account so this match counts toward your daily streak and your MVP honors persist across all devices.
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={openClaimAccountPrompt}
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-space font-extrabold text-xs transition cursor-pointer shrink-0 shadow-sm flex items-center justify-center gap-1.5"
+            >
+              <Flame size={14} className="text-amber-200" />
+              <span>Track Streak →</span>
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Sticky Footer Action Buttons */}

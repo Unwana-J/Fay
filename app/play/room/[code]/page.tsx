@@ -326,9 +326,9 @@ export default function ArticulateRoomPage({
         serverName !== "Learner"
       );
 
-      if (hasKnownName || hasServerName) {
-        // Player already has established name or is existing participant: auto-join
-        const nameToUse = hasKnownName ? storedUsername : serverName!;
+      if (alreadyInRoom && (hasKnownName || hasServerName)) {
+        // Player is already registered in this active room: reconnect silently
+        const nameToUse = hasServerName ? serverName! : storedUsername;
 
         const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
           method: "POST",
@@ -349,7 +349,6 @@ export default function ArticulateRoomPage({
               setError(joinData.error || "You were removed from this room by the host.");
               return;
             }
-            // Name was occupied by another scholar: prompt for unique name
             setIdentityModalMode("join");
             setShowIdentityModal(true);
             return;
@@ -360,7 +359,8 @@ export default function ArticulateRoomPage({
             setHasJoinedRoom(true);
           }
         }
-      } else if (alreadyInRoom && serverName) {
+      } else if (profile?.hasClaimedAccount && hasKnownName) {
+        // Verified cloud account scholar: auto-join with verified credentials
         const res = await fetch(`/api/articulate/room/${roomCode}/action`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -368,7 +368,7 @@ export default function ArticulateRoomPage({
             action: "join",
             playerId: myPlayerId,
             previousPlayerId: previousPlayerId || undefined,
-            playerName: serverName,
+            playerName: storedUsername,
             avatar: myAvatar,
           }),
         });
@@ -391,7 +391,7 @@ export default function ArticulateRoomPage({
           }
         }
       } else {
-        // Guest user opening WhatsApp link without a profile name: show Name Entry Gate
+        // Guest player opening match link (with or without past username): show Name & Team Confirmation Gate
         setIdentityModalMode("join");
         setShowIdentityModal(true);
       }

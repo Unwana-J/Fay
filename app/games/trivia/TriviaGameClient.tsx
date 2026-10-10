@@ -19,6 +19,8 @@ import {
   BookOpen,
   Share2,
   HelpCircle,
+  ShieldCheck,
+  Flame,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -126,6 +128,9 @@ function SetupScreen({
   const [mode, setMode] = useState<ReviewMode>("instant");
   const [difficulty, setDifficulty] = useState<TriviaDifficultyFilter>("random");
 
+  const profile = useAppStore((s) => s.profile);
+  const openClaimAccountPrompt = useAppStore((s) => s.openClaimAccountPrompt);
+
   // Admin feature flags for sub-menus (temporarily disable during revamps)
   const { features, fetchFeatures } = useFeatureStore();
   const enableChallenges = features?.enableTriviaChallenges ?? true;
@@ -168,17 +173,31 @@ function SetupScreen({
           <ArrowLeft size={13} /> Back to Games
         </Link>
 
-        {onOpenGuide && (
-          <button
-            type="button"
-            onClick={onOpenGuide}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-panel)] text-[var(--text)] text-xs font-bold font-space transition cursor-pointer shadow-xs"
-            title="How to Play Naija Trivia"
-          >
-            <HelpCircle size={13} className="text-[var(--olive)]" />
-            <span>How to Play</span>
-          </button>
-        )}
+        <div className="flex items-center gap-2">
+          {!profile.hasClaimedAccount && (
+            <button
+              type="button"
+              onClick={openClaimAccountPrompt}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold font-space transition cursor-pointer shadow-xs"
+              title="Link a free account to track your daily streak & ranking across devices"
+            >
+              <Flame size={13} className="text-amber-500 animate-pulse" />
+              <span>Track Streak</span>
+            </button>
+          )}
+
+          {onOpenGuide && (
+            <button
+              type="button"
+              onClick={onOpenGuide}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-panel)] text-[var(--text)] text-xs font-bold font-space transition cursor-pointer shadow-xs"
+              title="How to Play Naija Trivia"
+            >
+              <HelpCircle size={13} className="text-[var(--olive)]" />
+              <span>How to Play</span>
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Hero Header */}
@@ -800,6 +819,8 @@ function ResultsScreen({
   challengeRecordResult?: RecordScoreResult | null;
 }) {
   const [showShareModal, setShowShareModal] = useState(false);
+  const profile = useAppStore((s) => s.profile);
+  const openClaimAccountPrompt = useAppStore((s) => s.openClaimAccountPrompt);
   const correct = answers.filter((a, i) => a === questions[i].answer).length;
   const total = questions.length;
   const pct = Math.round((correct / total) * 100);
@@ -1009,6 +1030,40 @@ function ResultsScreen({
           </button>
         </div>
       </div>
+
+      {/* Save Score & Create Account Callout for Guest Players */}
+      {!profile.hasClaimedAccount && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="rounded-3xl p-5 border mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4 shadow-sm relative overflow-hidden"
+          style={{
+            background: "linear-gradient(135deg, rgba(166, 124, 30, 0.12) 0%, rgba(122, 28, 46, 0.08) 100%)",
+            borderColor: "rgba(166, 124, 30, 0.35)",
+          }}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-bold text-amber-600 dark:text-amber-400">
+              <Flame size={13} className="text-amber-500 animate-pulse" />
+              <span>Guest Scholar · Streak Not Tracked</span>
+            </div>
+            <div className="text-base font-space font-bold text-[var(--text)]">
+              Track your daily streak &amp; lock your rank
+            </div>
+            <p className="text-xs text-[var(--text-dim)] max-w-md leading-relaxed">
+              Link a free account in 10 seconds so today&apos;s trivia match counts towards your daily streak and keeps your +{xpEarned} XP and score ({pct}%) safe across devices.
+            </p>
+          </div>
+          <button
+            onClick={openClaimAccountPrompt}
+            className="btn-terra px-4 py-2.5 rounded-xl font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 shadow-md self-start sm:self-auto"
+          >
+            <Flame size={14} className="text-amber-300" />
+            <span>Track Streak →</span>
+          </button>
+        </motion.div>
+      )}
 
       {/* Category Breakdown */}
       <div className="surface rounded-3xl border p-6 mb-6 shadow-xs">

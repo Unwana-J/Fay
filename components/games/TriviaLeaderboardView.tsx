@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowLeft, ChevronDown, ChevronUp, User } from "lucide-react";
+import { ChevronRight, ArrowLeft, ChevronDown, ChevronUp, User, ShieldCheck, Sparkles, Flame } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { getTriviaLeaderboard, type CloudTriviaScore } from "@/lib/trivia-leaderboard";
 import {
@@ -20,7 +20,7 @@ interface TriviaLeaderboardViewProps {
 }
 
 export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewProps) {
-  const { profile, triviaHistory = [] } = useAppStore();
+  const { profile, triviaHistory = [], openClaimAccountPrompt } = useAppStore();
   const [tab, setTab] = useState<"global" | "challenges" | "bests">("global");
   const [cloudScores, setCloudScores] = useState<CloudTriviaScore[]>([]);
   const [isLiveSync, setIsLiveSync] = useState(false);
@@ -159,13 +159,22 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
               </div>
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
                   {userEntry.name}
                 </h3>
                 <span className="text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider bg-[var(--olive)]/20 text-[#008751]">
                   You
                 </span>
+                {!profile?.hasClaimedAccount && (
+                  <button
+                    onClick={openClaimAccountPrompt}
+                    className="text-[10px] px-2.5 py-0.5 rounded-full font-mono font-bold uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors cursor-pointer flex items-center gap-1"
+                    title="Link free account to track your daily streak & ranking across devices"
+                  >
+                    <Flame size={11} className="text-amber-500 animate-pulse" /> Track Streak →
+                  </button>
+                )}
               </div>
               <p className="text-xs" style={{ color: "var(--text-dim)" }}>
                 {userEntry.title}
@@ -202,6 +211,37 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
           </div>
         </div>
       </div>
+
+      {/* Guest Leaderboard Notice */}
+      {!profile?.hasClaimedAccount && (
+        <div
+          className="rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-xs"
+          style={{
+            background: "rgba(166, 124, 30, 0.08)",
+            borderColor: "rgba(166, 124, 30, 0.3)",
+            color: "var(--text)",
+          }}
+        >
+          <div className="flex items-start sm:items-center gap-2.5">
+            <span className="text-base shrink-0">⚠️</span>
+            <div className="space-y-0.5">
+              <div className="font-space font-bold text-xs" style={{ color: "var(--text)" }}>
+                Track Your Daily Streak &amp; Rank
+              </div>
+              <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
+                Your standing as @{profile?.username || "Scholar"} is saved only in this browser. Link a free account to track your daily streak and lock your position on the Titan Leaderboard.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={openClaimAccountPrompt}
+            className="btn-terra px-3.5 py-2 rounded-xl text-xs font-space font-bold whitespace-nowrap self-start sm:self-auto cursor-pointer shadow-xs shrink-0 flex items-center gap-1.5"
+          >
+            <Flame size={13} className="text-amber-300 animate-pulse" />
+            <span>Track Streak →</span>
+          </button>
+        </div>
+      )}
 
       {/* Live sync indicator & Refresh */}
       <div className="flex items-center justify-between text-xs px-1">
