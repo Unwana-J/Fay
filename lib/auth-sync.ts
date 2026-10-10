@@ -42,6 +42,11 @@ export async function signUpWithEmail(
 
   try {
     const trimmedEmail = email.trim().toLowerCase();
+    const redirectOrigin =
+      typeof window !== "undefined"
+        ? window.location.origin
+        : "https://fey.lokinlabs.com.ng";
+
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: trimmedEmail,
       password,
@@ -50,6 +55,7 @@ export async function signUpWithEmail(
           username: localState.profile.username || "Scholar",
           avatar: localState.profile.avatar,
         },
+        emailRedirectTo: redirectOrigin,
       },
     });
 
@@ -60,6 +66,15 @@ export async function signUpWithEmail(
     const user = authData.user;
     if (!user) {
       return { success: false, error: "Failed to initialize user session." };
+    }
+
+    // If signUp didn't create an active session (e.g. if email confirmation was still enabled),
+    // attempt immediate login so user is not stranded waiting for emails
+    if (!authData.session) {
+      await supabase.auth.signInWithPassword({
+        email: trimmedEmail,
+        password,
+      }).catch(() => {});
     }
 
     // Upsert user profile to Supabase

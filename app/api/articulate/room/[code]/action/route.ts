@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { memoryRooms, ArticulateRoom, RoomTeam, getNextSpeakerForTeam, sanitizeRoomPlayers } from "@/lib/articulate-room";
+import { memoryRooms, ArticulateRoom, RoomTeam, getNextSpeakerForTeam, sanitizeRoomPlayers, toClientRoom } from "@/lib/articulate-room";
 import { buildDeck } from "@/lib/game-words";
 
+/** Thrown when another request modified the room between our read and write. */
+class RoomConflictError extends Error {}
+
+/** Rooms (request-scoped objects) that should be written unconditionally on the final retry attempt. */
+const forceWriteRooms = new WeakSet<ArticulateRoom>();
+
 async function persistRoom(room: ArticulateRoom) {
+  const expectedUpdatedAt = room.updated_at;
+  const forceUnconditionalWrite = forceWriteRooms.has(room);
   room = sanitizeRoomPlayers(room);
   room.updated_at = new Date().toISOString();
+  room.version = (room.version || 0) + 1;
   if (!room.inactive_players) room.inactive_players = [];
   if (!room.player_details) room.player_details = {};
   if (!room.last_speaker_indices) room.last_speaker_indices = { teamA: -1, teamB: -1 };
   if (!room.last_speaker_ids) room.last_speaker_ids = {};
-  memoryRooms.set(room.room_code, room);
 
   if (isSupabaseConfigured && supabase) {
     try {
@@ -25,9 +33,10 @@ async function persistRoom(room: ArticulateRoom) {
         kicked_players: room.kicked_players || [],
         last_speaker_indices: room.last_speaker_indices,
         last_speaker_ids: room.last_speaker_ids,
+        _version: room.version,
       };
 
-      await supabase
+      let query = supabase
         .from("articulate_rooms")
         .update({
           status: room.status,
@@ -44,10 +53,26 @@ async function persistRoom(room: ArticulateRoom) {
           updated_at: room.updated_at,
         })
         .eq("room_code", room.room_code);
+
+      // Compare-and-swap: only write if nobody else wrote since we read
+      if (expectedUpdatedAt && !forceUnconditionalWrite) {
+        query = query.eq("updated_at", expectedUpdatedAt);
+      }
+
+      const { data, error } = await query.select("id");
+      if (!error && Array.isArray(data) && data.length === 0 && expectedUpdatedAt && !forceUnconditionalWrite) {
+        throw new RoomConflictError("Room was modified concurrently");
+      }
+      if (error) {
+        console.warn("Error updating room in Supabase:", error);
+      }
     } catch (err) {
+      if (err instanceof RoomConflictError) throw err;
       console.warn("Error updating room in Supabase:", err);
     }
   }
+
+  memoryRooms.set(room.room_code, room);
 }
 
 function getActiveTeamKeys(room: ArticulateRoom): ("A" | "B" | "C" | "D")[] {
@@ -135,6 +160,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           player_details: rawTeams.player_details || {},
           last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
           last_speaker_ids: rawTeams.last_speaker_ids || {},
+          version: typeof rawTeams._version === "number" ? rawTeams._version : 0,
           created_at: data.created_at,
           updated_at: data.updated_at,
         };
@@ -174,23 +200,78 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
 
 function actionResponse(payload: Record<string, any>, init?: number | ResponseInit) {
   const options = typeof init === "number" ? { status: init } : init;
-  return NextResponse.json({ ...payload, serverTime: Date.now() }, options);
+  const wirePayload = payload.room ? { ...payload, room: toClientRoom(payload.room as ArticulateRoom) } : payload;
+  return NextResponse.json({ ...wirePayload, serverTime: Date.now() }, options);
 }
+
+const MAX_WRITE_ATTEMPTS = 4;
+const TURN_SCOPED_ACTIONS = new Set(["score_word", "pass_word", "end_round"]);
+/** Grace window after the turn deadline during which in-flight score/pass taps are still honoured. */
+const LATE_TAP_GRACE_MS = 2000;
 
 export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
-  try {
-    const { code } = await params;
-    const room = await getRoom(code);
+  const { code } = await params;
+  const body = await req.json().catch(() => ({}));
 
-    if (!room) {
-      return actionResponse({ error: "Room not found" }, { status: 404 });
+  for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
+    try {
+      const room = await getRoom(code);
+      if (!room) {
+        return actionResponse({ error: "Room not found" }, { status: 404 });
+      }
+      if (attempt === MAX_WRITE_ATTEMPTS) {
+        // Last resort: never leave a player's action unapplied because of contention
+        forceWriteRooms.add(room);
+      }
+      return await handleAction(room, body);
+    } catch (error) {
+      if (error instanceof RoomConflictError && attempt < MAX_WRITE_ATTEMPTS) {
+        // Small jittered backoff, then re-read the latest state and re-apply the action
+        await new Promise((r) => setTimeout(r, 25 + Math.random() * 75 * attempt));
+        continue;
+      }
+      console.error("Error performing room action:", error);
+      return actionResponse(
+        { error: "Internal server error" },
+        { status: 500 }
+      );
     }
+  }
 
-    const body = await req.json().catch(() => ({}));
+  return actionResponse({ error: "Room is busy, please retry" }, { status: 503 });
+}
+
+async function handleAction(room: ArticulateRoom, body: any): Promise<NextResponse> {
+  {
     const { action, playerId, playerName, preferredTeam, targetTeam, settings, hostId, previousPlayerId } = body;
+
+    // ---------------------------------------------------------------
+    // TURN GUARDS: reject delayed packets that belong to a previous turn
+    // ---------------------------------------------------------------
+    if (TURN_SCOPED_ACTIONS.has(action) && room.current_turn) {
+      if (
+        typeof body.roundNumber === "number" &&
+        body.roundNumber !== room.current_turn.roundNumber
+      ) {
+        return actionResponse({ success: true, room, ignored: "stale_turn" });
+      }
+
+      const turnEndsAt = room.current_turn.turnEndsAt || 0;
+      const nowMs = Date.now();
+
+      if ((action === "score_word" || action === "pass_word") && turnEndsAt && nowMs > turnEndsAt + LATE_TAP_GRACE_MS) {
+        return actionResponse({ success: true, room, ignored: "turn_expired" });
+      }
+
+      // Automatic (timer-driven) end requests are only honoured once the SERVER clock says time is up,
+      // so a device with a fast clock can never cut a round short.
+      if (action === "end_round" && body.auto && turnEndsAt && nowMs < turnEndsAt - 750) {
+        return actionResponse({ success: true, room, ignored: "too_early" });
+      }
+    }
 
     switch (action) {
       // -------------------------------------------------------------
@@ -1233,11 +1314,5 @@ export async function POST(
       default:
         return actionResponse({ error: "Unknown action" }, { status: 400 });
     }
-  } catch (error) {
-    console.error("Error performing room action:", error);
-    return actionResponse(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
   }
 }

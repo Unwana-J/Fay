@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, use } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { ArticulateRoom, RoomPlayer, BuzzerSoundType } from "@/lib/articulate-room";
+import { ArticulateRoom, RoomPlayer, BuzzerSoundType, isRoomSnapshotFresh } from "@/lib/articulate-room";
 import { playBuzzerSound, warmUpAudio } from "@/lib/sound";
 import RoomLobby from "./components/RoomLobby";
 import SpectatorLounge from "./components/SpectatorLounge";
@@ -24,6 +24,51 @@ interface FloatingReaction {
   id: string;
   emoji: string;
   x: number;
+}
+
+/**
+ * Single source of truth for applying any inbound room snapshot (poll, action response, broadcast).
+ * 1. Drops snapshots older than what we already hold (out-of-order network delivery).
+ * 2. Within the same live turn, never lets a lagging snapshot rewind optimistic word progress.
+ */
+function mergeIncomingRoom(prev: ArticulateRoom | null, incoming: ArticulateRoom): ArticulateRoom {
+  if (!prev) return incoming;
+  if (!isRoomSnapshotFresh(prev, incoming)) return prev;
+
+  // Merge deck windows so sparse arrays preserve known upcoming words during fast taps
+  let mergedDeck = incoming.deck;
+  if (prev.deck && incoming.deck) {
+    const combined = [...prev.deck];
+    incoming.deck.forEach((w, i) => {
+      if (w) combined[i] = w;
+    });
+    mergedDeck = combined;
+  }
+
+  if (
+    prev.status === "playing" &&
+    incoming.status === "playing" &&
+    prev.current_turn?.roundNumber === incoming.current_turn?.roundNumber &&
+    (incoming.current_word_index || 0) < (prev.current_word_index || 0)
+  ) {
+    return {
+      ...incoming,
+      deck: mergedDeck || prev.deck,
+      current_word_index: prev.current_word_index,
+      round_words_scored:
+        (incoming.round_words_scored?.length || 0) >= (prev.round_words_scored?.length || 0)
+          ? incoming.round_words_scored
+          : prev.round_words_scored,
+      round_words_passed:
+        (incoming.round_words_passed?.length || 0) >= (prev.round_words_passed?.length || 0)
+          ? incoming.round_words_passed
+          : prev.round_words_passed,
+    };
+  }
+  return {
+    ...incoming,
+    deck: mergedDeck || incoming.deck,
+  };
 }
 
 export default function ArticulateRoomPage({
@@ -103,21 +148,27 @@ export default function ArticulateRoomPage({
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const hasJoinedRef = useRef(false);
   const hasDispatchedEndRoundRef = useRef<number | null>(null);
+  const endRoundAttemptRef = useRef<{ round: number; at: number }>({ round: -1, at: 0 });
   const hasBuzzedTurnRef = useRef<string | null>(null);
   const dismissedCountdownsRef = useRef<Set<string>>(new Set());
   const [isRealtimeConnected, setIsRealtimeConnected] = useState(false);
   const serverOffsetRef = useRef<number>(0);
+  const clockSamplesRef = useRef<{ offset: number; rtt: number }[]>([]);
 
-  // Cristian's Algorithm: Synchronize client clock with server clock across all peers
+  // NTP-style clock sync: keep the last N samples and trust the one with the lowest round-trip time.
+  // Slow responses carry up to RTT/2 of error, so averaging them in (the old approach) drifted timers apart.
   const recordServerTimeOffset = useCallback((serverTime: number | undefined, reqStart: number, reqEnd: number) => {
     if (typeof serverTime !== "number" || isNaN(serverTime)) return;
-    const measuredOffset = Math.round(serverTime - (reqStart + reqEnd) / 2);
-    if (serverOffsetRef.current === 0) {
-      serverOffsetRef.current = measuredOffset;
-    } else {
-      // Smoothed exponential moving average filter to reject network latency jitter
-      serverOffsetRef.current = Math.round(serverOffsetRef.current * 0.7 + measuredOffset * 0.3);
+    const rtt = Math.max(0, reqEnd - reqStart);
+    const offset = Math.round(serverTime - (reqStart + reqEnd) / 2);
+    const samples = clockSamplesRef.current;
+    samples.push({ offset, rtt });
+    if (samples.length > 10) samples.shift();
+    let best = samples[0];
+    for (const s of samples) {
+      if (s.rtt < best.rtt) best = s;
     }
+    serverOffsetRef.current = best.offset;
   }, []);
 
   // Pre-warm audio engine on page mount to eliminate cold-start hardware latency
@@ -167,7 +218,10 @@ export default function ArticulateRoomPage({
   const fetchRoomState = useCallback(async (isInitial = false) => {
     try {
       const reqStart = Date.now();
-      const res = await fetch(`/api/articulate/room?code=${roomCode}`);
+      const res = await fetch(`/api/articulate/room?code=${roomCode}`, {
+        cache: "no-store",
+        signal: AbortSignal.timeout(8000),
+      });
       const reqEnd = Date.now();
       if (!res.ok) {
         // ONLY trigger fatal full-page error on initial load if room has never been loaded
@@ -181,30 +235,7 @@ export default function ArticulateRoomPage({
         recordServerTimeOffset(data.serverTime, reqStart, reqEnd);
       }
       if (data.room) {
-        setRoom((prev) => {
-          if (!prev) return data.room;
-          // If we are currently in an active round, don't let a stale lower word index revert optimistic progress
-          if (
-            prev.status === "playing" &&
-            data.room.status === "playing" &&
-            prev.current_turn?.roundNumber === data.room.current_turn?.roundNumber &&
-            (data.room.current_word_index || 0) < (prev.current_word_index || 0)
-          ) {
-            return {
-              ...data.room,
-              current_word_index: prev.current_word_index,
-              round_words_scored:
-                (data.room.round_words_scored?.length || 0) >= (prev.round_words_scored?.length || 0)
-                  ? data.room.round_words_scored
-                  : prev.round_words_scored,
-              round_words_passed:
-                (data.room.round_words_passed?.length || 0) >= (prev.round_words_passed?.length || 0)
-                  ? data.room.round_words_passed
-                  : prev.round_words_passed,
-            };
-          }
-          return data.room;
-        });
+        setRoom((prev) => mergeIncomingRoom(prev, data.room));
         setError(null);
         return data.room as ArticulateRoom;
       }
@@ -228,6 +259,7 @@ export default function ArticulateRoomPage({
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(actionPayload),
+          signal: AbortSignal.timeout(10000),
         });
         const reqEnd = Date.now();
         const data = await res.json();
@@ -235,34 +267,12 @@ export default function ArticulateRoomPage({
           recordServerTimeOffset(data.serverTime, reqStart, reqEnd);
         }
         if (data.room) {
-          setRoom((prev) => {
-            if (!prev) return data.room;
-            if (
-              prev.status === "playing" &&
-              data.room.status === "playing" &&
-              prev.current_turn?.roundNumber === data.room.current_turn?.roundNumber &&
-              (data.room.current_word_index || 0) < (prev.current_word_index || 0)
-            ) {
-              return {
-                ...data.room,
-                current_word_index: prev.current_word_index,
-                round_words_scored:
-                  (data.room.round_words_scored?.length || 0) >= (prev.round_words_scored?.length || 0)
-                    ? data.room.round_words_scored
-                    : prev.round_words_scored,
-                round_words_passed:
-                  (data.room.round_words_passed?.length || 0) >= (prev.round_words_passed?.length || 0)
-                    ? data.room.round_words_passed
-                    : prev.round_words_passed,
-              };
-            }
-            return data.room;
-          });
+          setRoom((prev) => mergeIncomingRoom(prev, data.room));
           if (typeof data.isSpectator === "boolean") {
             setIsSpectator(data.isSpectator);
           }
-          // Broadcast action to peers via Supabase
-          if (channelRef.current) {
+          // Broadcast action to peers via Supabase (skip no-op responses to ignored stale/early actions)
+          if (channelRef.current && !data.ignored) {
             channelRef.current.send({
               type: "broadcast",
               event: "room_action",
@@ -593,7 +603,21 @@ export default function ArticulateRoomPage({
     saveArticulateRoom,
   ]);
 
-  // 4. Supabase Realtime Channel (Presence + Broadcast)
+  // Live refs so the realtime channel never needs to be torn down when these change
+  const roomRef = useRef<ArticulateRoom | null>(null);
+  const identityRef = useRef({ name: effectivePlayerName, avatar: myAvatar, isHost: false });
+  useEffect(() => {
+    roomRef.current = room;
+  }, [room]);
+  useEffect(() => {
+    identityRef.current = {
+      name: effectivePlayerName,
+      avatar: myAvatar,
+      isHost: room?.host_id === myPlayerId,
+    };
+  }, [effectivePlayerName, myAvatar, myPlayerId, room?.host_id]);
+
+  // 4. Supabase Realtime Channel (Presence + Broadcast) — created once per room/player
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase) return;
 
@@ -637,34 +661,15 @@ export default function ArticulateRoomPage({
 
         if (event.payload?.room) {
           const incomingRoom = event.payload.room as ArticulateRoom;
-          setRoom((prev) => {
-            if (!prev) return incomingRoom;
-            if (
-              prev.status === "playing" &&
-              incomingRoom.status === "playing" &&
-              prev.current_turn?.roundNumber === incomingRoom.current_turn?.roundNumber &&
-              (incomingRoom.current_word_index || 0) < (prev.current_word_index || 0)
-            ) {
-              return {
-                ...incomingRoom,
-                current_word_index: prev.current_word_index,
-                round_words_scored:
-                  (incomingRoom.round_words_scored?.length || 0) >= (prev.round_words_scored?.length || 0)
-                    ? incomingRoom.round_words_scored
-                    : prev.round_words_scored,
-                round_words_passed:
-                  (incomingRoom.round_words_passed?.length || 0) >= (prev.round_words_passed?.length || 0)
-                    ? incomingRoom.round_words_passed
-                    : prev.round_words_passed,
-              };
-            }
-            return incomingRoom;
-          });
+          // Ignore delayed broadcasts entirely (no state change, no stale buzzer)
+          if (!isRoomSnapshotFresh(roomRef.current, incomingRoom)) return;
+
+          setRoom((prev) => mergeIncomingRoom(prev, incomingRoom));
           // If room transitioned to round_end or lobby, update spectator state and ensure buzzer has sounded
-          if (event.payload.room.status === "round_end" || event.payload.room.status === "lobby") {
+          if (incomingRoom.status === "round_end" || incomingRoom.status === "lobby") {
             setIsSpectator(false);
           }
-          if (event.payload.action === "end_round" || event.payload.room.status === "round_end") {
+          if (incomingRoom.status === "round_end") {
             const canonicalKey = `r${incomingRoom.current_turn?.roundNumber || "round"}_${incomingRoom.current_turn?.speakerId || "turn"}`;
             if (hasBuzzedTurnRef.current !== canonicalKey) {
               hasBuzzedTurnRef.current = canonicalKey;
@@ -677,8 +682,11 @@ export default function ArticulateRoomPage({
       })
       .on("broadcast", { event: "instant_buzzer" }, (event) => {
         const canonicalKey = event.payload?.turnKey;
-        const sound = event.payload?.buzzerSound || room?.settings?.buzzerSound || "classic";
-        if (canonicalKey && hasBuzzedTurnRef.current !== canonicalKey) {
+        const sound = event.payload?.buzzerSound || roomRef.current?.settings?.buzzerSound || "classic";
+        const live = roomRef.current?.current_turn;
+        const liveKey = live ? `r${live.roundNumber}_${live.speakerId}` : null;
+        // Only buzz for the turn we're actually showing
+        if (canonicalKey && canonicalKey === liveKey && hasBuzzedTurnRef.current !== canonicalKey) {
           hasBuzzedTurnRef.current = canonicalKey;
           playBuzzerSound(sound);
         }
@@ -697,11 +705,13 @@ export default function ArticulateRoomPage({
       .subscribe(async (status) => {
         if (status === "SUBSCRIBED") {
           setIsRealtimeConnected(true);
+          // Catch up on anything missed while (re)connecting
+          fetchRoomState();
           await channel.track({
             id: myPlayerId,
-            name: effectivePlayerName,
-            avatar: myAvatar,
-            isHost: room?.host_id === myPlayerId,
+            name: identityRef.current.name,
+            avatar: identityRef.current.avatar,
+            isHost: identityRef.current.isHost,
             joinedAt: Date.now(),
           });
         } else if (status === "CLOSED" || status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
@@ -714,17 +724,47 @@ export default function ArticulateRoomPage({
       channelRef.current = null;
       setIsRealtimeConnected(false);
     };
-  }, [effectivePlayerName, fetchRoomState, myAvatar, myPlayerId, room?.host_id, roomCode]);
+  }, [fetchRoomState, myPlayerId, roomCode, router]);
 
-  // 5. Smart Polling Fallback (25s sanity check when Realtime WebSocket is connected, 3s if disconnected)
+  // Re-announce presence when identity changes, without reconnecting the socket
   useEffect(() => {
-    const pollInterval = isRealtimeConnected ? 25000 : 3000;
+    if (!isRealtimeConnected || !channelRef.current) return;
+    channelRef.current.track({
+      id: myPlayerId,
+      name: effectivePlayerName,
+      avatar: myAvatar,
+      isHost: room?.host_id === myPlayerId,
+      joinedAt: Date.now(),
+    });
+  }, [effectivePlayerName, isRealtimeConnected, myAvatar, myPlayerId, room?.host_id]);
+
+  // 5. Adaptive Polling Fallback
+  // Broadcasts are fire-and-forget, so during live play we sanity-poll every 5s even when connected.
+  const isLivePlay = room?.status === "playing";
+  useEffect(() => {
+    const pollInterval = !isRealtimeConnected ? 3000 : isLivePlay ? 5000 : 25000;
     const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       fetchRoomState();
     }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [fetchRoomState, isRealtimeConnected]);
+  }, [fetchRoomState, isRealtimeConnected, isLivePlay]);
+
+  // Instant resync when a phone wakes / tab regains focus / network returns
+  useEffect(() => {
+    const resync = () => {
+      if (document.visibilityState === "visible") fetchRoomState();
+    };
+    document.addEventListener("visibilitychange", resync);
+    window.addEventListener("online", resync);
+    window.addEventListener("focus", resync);
+    return () => {
+      document.removeEventListener("visibilitychange", resync);
+      window.removeEventListener("online", resync);
+      window.removeEventListener("focus", resync);
+    };
+  }, [fetchRoomState]);
 
   const currentTurnStartedAt = room?.current_turn?.startedAt;
   const currentTurnRound = room?.current_turn?.roundNumber;
@@ -802,22 +842,34 @@ export default function ArticulateRoomPage({
           }
         }
 
-        if (hasDispatchedEndRoundRef.current !== activeTurnRound) {
+        // Self-healing end-of-turn: keep nudging the server until the round actually closes.
+        // Speaker/host fire immediately; every other player joins in after a 3s grace period so a
+        // sleeping or offline speaker phone can never leave the whole room frozen on 0s.
+        const overdueMs = -msRemaining;
+        const isSpeakerOrHost =
+          myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
+        const eligible = isSpeakerOrHost || overdueMs >= 3000;
+        const nowMs = Date.now();
+        const lastAttempt = endRoundAttemptRef.current;
+        const isNewTurn = lastAttempt.round !== activeTurnRound;
+        if (eligible && (isNewTurn || nowMs - lastAttempt.at >= 2500)) {
+          endRoundAttemptRef.current = { round: activeTurnRound, at: nowMs };
           hasDispatchedEndRoundRef.current = activeTurnRound;
-          const isSpeakerOrHost =
-            myPlayerId === currentSpeakerId || myPlayerId === currentHostId;
-          if (isSpeakerOrHost) {
-            dispatchAction({
-              action: "end_round",
-              speakerId: myPlayerId,
-            });
-          }
+          dispatchAction({
+            action: "end_round",
+            speakerId: myPlayerId,
+            roundNumber: activeTurnRound,
+            auto: true,
+          }).then((updated) => {
+            // If the action failed or was ignored, a fresh poll guarantees we converge on server truth
+            if (!updated || updated.status === "playing") fetchRoomState();
+          });
         }
       }
     };
 
     updateTimer();
-    const timer = setInterval(updateTimer, 50);
+    const timer = setInterval(updateTimer, 100);
 
     return () => {
       clearInterval(timer);
@@ -833,6 +885,7 @@ export default function ArticulateRoomPage({
     currentSpeakerId,
     currentHostId,
     dispatchAction,
+    fetchRoomState,
     myPlayerId,
     room?.settings?.buzzerSound,
   ]);
@@ -876,6 +929,7 @@ export default function ArticulateRoomPage({
   };
 
   const handleScoreWord = () => {
+    const curRound = room?.current_turn?.roundNumber;
     if (room) {
       const currentWord = room.deck?.[room.current_word_index];
       if (currentWord) {
@@ -896,10 +950,12 @@ export default function ArticulateRoomPage({
     dispatchAction({
       action: "score_word",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
+      roundNumber: curRound,
     });
   };
 
   const handlePassWord = () => {
+    const curRound = room?.current_turn?.roundNumber;
     if (room) {
       const currentWord = room.deck?.[room.current_word_index];
       if (currentWord) {
@@ -920,11 +976,13 @@ export default function ArticulateRoomPage({
     dispatchAction({
       action: "pass_word",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
+      roundNumber: curRound,
     });
   };
 
   const handleEndRound = () => {
-    const canonicalKey = `r${room?.current_turn?.roundNumber || 0}_${room?.current_turn?.speakerId || myPlayerId}`;
+    const curRound = room?.current_turn?.roundNumber;
+    const canonicalKey = `r${curRound || 0}_${room?.current_turn?.speakerId || myPlayerId}`;
     hasBuzzedTurnRef.current = canonicalKey;
     playBuzzerSound(room?.settings?.buzzerSound || "classic");
     if (channelRef.current) {
@@ -937,6 +995,8 @@ export default function ArticulateRoomPage({
     dispatchAction({
       action: "end_round",
       speakerId: room?.current_turn?.speakerId || myPlayerId,
+      roundNumber: curRound,
+      manualEnd: true,
     });
   };
 

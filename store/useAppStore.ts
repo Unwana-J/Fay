@@ -1238,6 +1238,16 @@ export const useAppStore = create<AppState>()(
       onRehydrateStorage: () => (state) => {
         if (state) {
           state.streak = reconcileStreakState(state);
+          if (
+            state.authUserId ||
+            state.authEmail ||
+            state.isCloudSynced ||
+            (state.profile?.email && state.profile.email.includes("@"))
+          ) {
+            if (state.profile) {
+              state.profile.hasClaimedAccount = true;
+            }
+          }
         }
       },
       // eslint-disable-next-line @typescript-eslint/no-explicit-any

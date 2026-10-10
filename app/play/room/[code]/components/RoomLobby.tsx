@@ -2,8 +2,8 @@
 
 import React, { useState, useEffect } from "react";
 import { ArticulateRoom, RoomPlayer, BuzzerSoundType, BUZZER_OPTIONS } from "@/lib/articulate-room";
-import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X, UserX, Volume2, HelpCircle, Headphones, ShieldCheck, Flame } from "lucide-react";
-import { motion } from "framer-motion";
+import { Copy, Check, Share2, Play, Users, Crown, ArrowLeftRight, Clock, Target, Layers, Dices, Moon, LogOut, UserPlus, Zap, Loader2, Edit2, X, UserX, Volume2, HelpCircle, Headphones, ShieldCheck, Flame, ChevronDown, ChevronUp } from "lucide-react";
+import { motion, AnimatePresence } from "framer-motion";
 import { playBuzzerSound } from "@/lib/sound";
 import { useAppStore } from "@/store/useAppStore";
 import ArticulateGuideModal from "@/components/games/ArticulateGuideModal";
@@ -77,6 +77,8 @@ export default function RoomLobby({
   const [roomNameInput, setRoomNameInput] = useState(room.room_name || "");
   const [editingTeam, setEditingTeam] = useState<"A" | "B" | "C" | "D" | null>(null);
   const [teamNameInput, setTeamNameInput] = useState("");
+  const [showLobbyQueue, setShowLobbyQueue] = useState<boolean>(true);
+  const [showAudioBanner, setShowAudioBanner] = useState<boolean>(true);
 
   const shareUrl = typeof window !== "undefined"
     ? `${window.location.origin}/play/room/${room.room_code}`
@@ -510,28 +512,40 @@ export default function RoomLobby({
       )}
 
       {/* Voice Call & Rules Banner */}
-      <div className="surface rounded-2xl p-3.5 sm:p-4 border border-[var(--terra)]/25 bg-[var(--terra-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 rounded-xl bg-[var(--terra)] text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Headphones size={16} />
+      {showAudioBanner && (
+        <div className="surface rounded-2xl p-3.5 sm:p-4 border border-[var(--terra)]/25 bg-[var(--terra-bg)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs shadow-2xs relative">
+          <div className="flex items-center gap-3 pr-6 sm:pr-0">
+            <div className="w-8 h-8 rounded-xl bg-[var(--terra)] text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Headphones size={16} />
+            </div>
+            <div>
+              <span className="font-space font-bold text-[var(--terra)] block">
+                Hop on a Group Audio Call With Your Friends!
+              </span>
+              <span className="text-[11px] text-[var(--text-dim)]">
+                Fey syncs cards, timers, and buzzers, but you need WhatsApp, Discord, Meet, or FaceTime so everyone can hear guesses.
+              </span>
+            </div>
           </div>
-          <div>
-            <span className="font-space font-bold text-[var(--terra)] block">
-              Hop on a Group Audio Call With Your Friends!
-            </span>
-            <span className="text-[11px] text-[var(--text-dim)]">
-              Fey syncs cards, timers, and buzzers, but you need WhatsApp, Discord, Meet, or FaceTime so everyone can hear guesses.
-            </span>
+          <div className="flex items-center gap-2 self-start sm:self-auto shrink-0">
+            <button
+              type="button"
+              onClick={() => setShowGuideModal(true)}
+              className="px-3.5 py-1.5 rounded-xl border border-[var(--terra)]/30 hover:bg-[var(--terra)] hover:text-white font-space font-bold text-xs text-[var(--terra)] transition cursor-pointer shrink-0"
+            >
+              View Game Rules →
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowAudioBanner(false)}
+              className="p-1 rounded-lg text-[var(--terra)]/60 hover:text-[var(--terra)] hover:bg-[var(--terra)]/10 transition cursor-pointer"
+              title="Dismiss banner"
+            >
+              <X size={14} />
+            </button>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setShowGuideModal(true)}
-          className="px-3.5 py-1.5 rounded-xl border border-[var(--terra)]/30 hover:bg-[var(--terra)] hover:text-white font-space font-bold text-xs text-[var(--terra)] transition cursor-pointer shrink-0 self-start sm:self-auto"
-        >
-          View Game Rules →
-        </button>
-      </div>
+      )}
 
       {/* Waiting Lobby Queue (Ordered by arrival time) */}
       {sortedWaitingScholars.length > 0 && (
@@ -566,69 +580,89 @@ export default function RoomLobby({
                   View Roster
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setShowLobbyQueue((v) => !v)}
+                className="p-1.5 rounded-lg border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer"
+                title={showLobbyQueue ? "Collapse waiting queue" : "Expand waiting queue"}
+              >
+                {showLobbyQueue ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {sortedWaitingScholars.map((scholar, idx) => (
-              <div
-                key={scholar.id}
-                className="surface rounded-2xl p-3 border border-[var(--border-dim)] flex items-center justify-between gap-2 shadow-2xs"
+          <AnimatePresence>
+            {showLobbyQueue && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="overflow-hidden"
               >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-5 h-5 rounded-md bg-[var(--bg)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
-                    #{idx + 1}
-                  </span>
-                  {scholar.avatar?.startsWith("/") || scholar.avatar?.includes(".svg") ? (
-                    <img src={scholar.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
-                  ) : (
-                    <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
-                  )}
-                  <div className="min-w-0">
-                    <div className="font-space font-bold text-xs text-[var(--text)] truncate">
-                      {scholar.name}
-                    </div>
-                    <div className="text-[9px] text-[var(--text-dim)]">
-                      {idx === 0 ? "First to join" : `Joined #${idx + 1}`}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {onAdmitPlayer && (
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {activeTeamsList.map((t) => (
-                        <button
-                          key={t.key}
-                          type="button"
-                          onClick={() => onAdmitPlayer(scholar.id, t.key)}
-                          className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
-                          style={{
-                            backgroundColor: `${t.teamObj.color}15`,
-                            color: t.teamObj.color,
-                            borderColor: `${t.teamObj.color}40`,
-                          }}
-                          title={`Admit ${scholar.name} into ${t.teamObj.name}`}
-                        >
-                          <UserPlus className="w-3 h-3" /> + {t.teamObj.name.replace("Team ", "")}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                  {isHost && onKickPlayer && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
-                    <button
-                      type="button"
-                      onClick={() => onKickPlayer(scholar.id)}
-                      className="p-1 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer flex items-center justify-center"
-                      title={`Kick ${scholar.name} out of room`}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+                  {sortedWaitingScholars.map((scholar, idx) => (
+                    <div
+                      key={scholar.id}
+                      className="surface rounded-2xl p-3 border border-[var(--border-dim)] flex items-center justify-between gap-2 shadow-2xs"
                     >
-                      <UserX className="w-3.5 h-3.5" />
-                    </button>
-                  )}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-md bg-[var(--bg)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
+                          #{idx + 1}
+                        </span>
+                        {scholar.avatar?.startsWith("/") || scholar.avatar?.includes(".svg") ? (
+                          <img src={scholar.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-space font-bold text-xs text-[var(--text)] truncate">
+                            {scholar.name}
+                          </div>
+                          <div className="text-[9px] text-[var(--text-dim)]">
+                            {idx === 0 ? "First to join" : `Joined #${idx + 1}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {onAdmitPlayer && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {activeTeamsList.map((t) => (
+                              <button
+                                key={t.key}
+                                type="button"
+                                onClick={() => onAdmitPlayer(scholar.id, t.key)}
+                                className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
+                                style={{
+                                  backgroundColor: `${t.teamObj.color}15`,
+                                  color: t.teamObj.color,
+                                  borderColor: `${t.teamObj.color}40`,
+                                }}
+                                title={`Admit ${scholar.name} into ${t.teamObj.name}`}
+                              >
+                                <UserPlus className="w-3 h-3" /> + {t.teamObj.name.replace("Team ", "")}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                        {isHost && onKickPlayer && scholar.id !== myPlayerId && scholar.id !== room.host_id && (
+                          <button
+                            type="button"
+                            onClick={() => onKickPlayer(scholar.id)}
+                            className="p-1 rounded-lg border border-red-500/30 bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 transition cursor-pointer flex items-center justify-center"
+                            title={`Kick ${scholar.name} out of room`}
+                          >
+                            <UserX className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
-              </div>
-            ))}
-          </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 

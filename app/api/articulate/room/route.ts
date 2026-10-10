@@ -6,6 +6,7 @@ import {
   memoryRooms,
   ArticulateRoom,
   sanitizeRoomPlayers,
+  toClientRoom,
 } from "@/lib/articulate-room";
 
 export async function POST(req: NextRequest) {
@@ -157,6 +158,7 @@ export async function GET(req: NextRequest) {
             player_details: rawTeams.player_details || {},
             last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
             last_speaker_ids: rawTeams.last_speaker_ids || {},
+            version: typeof rawTeams._version === "number" ? rawTeams._version : 0,
             created_at: data.created_at,
             updated_at: data.updated_at,
           };
@@ -194,7 +196,7 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({
       success: true,
       exists: true,
-      room,
+      room: toClientRoom(room),
       serverTime: Date.now(),
     });
   } catch (error) {

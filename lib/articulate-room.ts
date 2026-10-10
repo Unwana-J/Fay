@@ -102,8 +102,43 @@ export interface ArticulateRoom {
   player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean; joinedAt?: number }>; // Persisted identity map
   last_speaker_indices?: { teamA?: number; teamB?: number; teamC?: number; teamD?: number }; // Track strict round-robin index per team
   last_speaker_ids?: { teamA?: string; teamB?: string; teamC?: string; teamD?: string }; // Track strict last speaker ID per team
+  version?: number; // Monotonic revision counter, bumped on every persisted write (stale-snapshot rejection)
   created_at?: string;
   updated_at?: string;
+}
+
+/** Number of upcoming words shipped to clients (clients only ever read deck[current_word_index]). */
+const CLIENT_DECK_WINDOW = 12;
+
+/**
+ * Produces a lightweight wire copy of the room: the full 120-200 word deck is replaced by a
+ * sparse array containing only the current word and a small look-ahead window, so indices
+ * stay valid (`deck[current_word_index]`) while payloads shrink dramatically.
+ */
+export function toClientRoom(room: ArticulateRoom): ArticulateRoom {
+  const deck = room.deck || [];
+  const idx = room.current_word_index || 0;
+  const end = Math.min(deck.length, idx + CLIENT_DECK_WINDOW);
+  const windowed: (GameWord | null)[] = new Array(Math.max(0, end)).fill(null);
+  for (let i = idx; i < end; i++) windowed[i] = deck[i];
+  return { ...room, deck: windowed as unknown as GameWord[] };
+}
+
+/**
+ * Client-side ordering guard: returns true when `incoming` should replace `prev`.
+ * Rejects snapshots carrying an older version (late poll responses, delayed broadcasts),
+ * which is what caused previous turns to flash back onto screens.
+ */
+export function isRoomSnapshotFresh(prev: ArticulateRoom | null, incoming: ArticulateRoom): boolean {
+  if (!prev) return true;
+  if (typeof prev.version === "number" && typeof incoming.version === "number") {
+    return incoming.version >= prev.version;
+  }
+  // Legacy rooms without versions: fall back to updated_at ordering
+  if (prev.updated_at && incoming.updated_at) {
+    return new Date(incoming.updated_at).getTime() >= new Date(prev.updated_at).getTime();
+  }
+  return true;
 }
 
 /**

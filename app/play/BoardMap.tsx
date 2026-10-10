@@ -1,10 +1,11 @@
 "use client";
 
 import React from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { CATEGORY_COLORS, CATEGORY_ICONS, type GameCategory } from "@/lib/game-words";
 import FeyLogo from "@/components/ui/FeyLogo";
 
+import { ChevronDown, ChevronUp, MapPin } from "lucide-react";
 import { type TeamId } from "@/store/useGameStore";
 
 export interface TeamBoardData {
@@ -33,6 +34,8 @@ interface BoardMapProps {
   gameMode?: "classic" | "masterchef";
   compact?: boolean;
   teams?: TeamBoardData[];
+  collapsibleGrid?: boolean;
+  defaultGridCollapsed?: boolean;
 }
 
 interface TileInfo {
@@ -125,7 +128,10 @@ export default function BoardMap({
   gameMode = "classic",
   compact = false,
   teams,
+  collapsibleGrid = true,
+  defaultGridCollapsed = false,
 }: BoardMapProps) {
+  const [isGridCollapsed, setIsGridCollapsed] = React.useState<boolean>(defaultGridCollapsed);
   const isMasterchef = gameMode === "masterchef";
   const tileCount = Math.max(10, scoreGoal);
 
@@ -219,15 +225,52 @@ export default function BoardMap({
         </div>
       )}
 
+      {/* Race Track Header & Grid Toggle */}
+      {!compact && collapsibleGrid && (
+        <div className="flex items-center justify-between px-1 pt-0.5">
+          <span className="text-[11px] font-space font-bold text-[var(--text-dim)] flex items-center gap-1.5">
+            <MapPin className="w-3.5 h-3.5 text-[var(--olive)]" />
+            <span>Articulate Board Track ({tileCount} Tiles)</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setIsGridCollapsed((v) => !v)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+            title={isGridCollapsed ? "Expand board tile grid" : "Collapse board tile grid"}
+          >
+            {isGridCollapsed ? (
+              <>
+                <ChevronDown className="w-3.5 h-3.5 text-[var(--olive)]" />
+                <span>Peek Track ({tileCount} Tiles)</span>
+              </>
+            ) : (
+              <>
+                <ChevronUp className="w-3.5 h-3.5 text-[var(--olive)]" />
+                <span>Hide Track</span>
+              </>
+            )}
+          </button>
+        </div>
+      )}
+
       {/* Snake Game Board Grid */}
-      <div
-        className="w-full relative select-none p-1"
-        style={{
-          display: "grid",
-          gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
-          gap: "0.375rem",
-        }}
-      >
+      <AnimatePresence>
+        {(!collapsibleGrid || !isGridCollapsed) && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.22, ease: "easeInOut" }}
+            className="overflow-hidden"
+          >
+            <div
+              className="w-full relative select-none p-1"
+              style={{
+                display: "grid",
+                gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+                gap: "0.375rem",
+              }}
+            >
         {tiles.map((tile) => {
           const { row, col } = getCoordinates(tile.index);
           const categoryColor = CATEGORY_COLORS[tile.category];
@@ -347,7 +390,10 @@ export default function BoardMap({
             </div>
           );
         })}
-      </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

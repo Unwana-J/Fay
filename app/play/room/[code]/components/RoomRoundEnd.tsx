@@ -24,8 +24,11 @@ import {
   Loader2,
   UserPlus,
   Zap,
+  ChevronDown,
+  ChevronUp,
+  Map,
 } from "lucide-react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import BoardMap from "@/app/play/BoardMap";
 
 interface RoomRoundEndProps {
@@ -97,6 +100,16 @@ export default function RoomRoundEnd({
 
   const isDescribingTeam = myTeam === turnTeamKey;
   const isOpposingTeam = myTeam !== null && !isDescribingTeam;
+
+  // Collapsible section states to eliminate excessive scrolling on mobile
+  const hasActiveDisputes =
+    (room.round_words_scored || []).some((w) => w.disputeStatus === "disputed") ||
+    (room.round_words_passed || []).some((w) => w.claimStatus === "claimed");
+
+  const [showWordAudit, setShowWordAudit] = React.useState<boolean>(true);
+  const [showTeamRosters, setShowTeamRosters] = React.useState<boolean>(false);
+  const [showWaitingQueue, setShowWaitingQueue] = React.useState<boolean>(true);
+  const [showRoadmap, setShowRoadmap] = React.useState<boolean>(true);
 
   // Score goal & match conclusion calculations
   const scoreGoal = room.settings?.scoreGoal || 20;
@@ -401,11 +414,47 @@ export default function RoomRoundEnd({
       {/* Words Scored & Maker-Checker Disputes */}
       <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4 text-left">
         <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)]">
-          <h3 className="font-space font-bold text-sm text-[var(--text)]">Word Audit & Disputes</h3>
-          <span className="text-xs font-bold text-emerald-600">+{netPoints} Confirmed</span>
+          <div className="flex items-center gap-2">
+            <h3 className="font-space font-bold text-sm text-[var(--text)]">Word Audit &amp; Disputes</h3>
+            {hasActiveDisputes && (
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 border border-amber-500/30 animate-pulse">
+                Action Needed
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-bold text-emerald-600">+{netPoints} Confirmed</span>
+            <button
+              type="button"
+              onClick={() => setShowWordAudit((v) => !v)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+              title={showWordAudit ? "Collapse Word List" : "Expand Word List"}
+            >
+              {showWordAudit ? (
+                <>
+                  <ChevronUp size={13} />
+                  <span>Hide Words</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={13} />
+                  <span>View Words ({scoredWords.length + passedWords.length})</span>
+                </>
+              )}
+            </button>
+          </div>
         </div>
 
-        {scoredWords.length > 0 ? (
+        <AnimatePresence>
+          {showWordAudit && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="space-y-4 overflow-hidden"
+            >
+              {scoredWords.length > 0 ? (
           <div className="space-y-3">
             {scoredWords.map((w, idx) => {
               const isDisputed = w.disputeStatus === "disputed";
@@ -681,6 +730,9 @@ export default function RoomRoundEnd({
             </div>
           </div>
         )}
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Team Rosters & Player Availability */}
@@ -695,12 +747,41 @@ export default function RoomRoundEnd({
               Check who is active before launching Round {nextRoundNumber}. Away scholars are skipped for speaking.
             </p>
           </div>
-          <div className="text-[11px] font-mono text-[var(--text-mute)]">
-            Total: {teamRosterList.reduce((acc, t) => acc + t.players.length, 0)} players
+          <div className="flex items-center gap-2">
+            <span className="text-[11px] font-mono text-[var(--text-mute)]">
+              {teamRosterList.reduce((acc, t) => acc + t.players.length, 0)} scholars
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowTeamRosters((v) => !v)}
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+              title={showTeamRosters ? "Collapse team rosters" : "View team rosters"}
+            >
+              {showTeamRosters ? (
+                <>
+                  <ChevronUp size={13} />
+                  <span>Hide Rosters</span>
+                </>
+              ) : (
+                <>
+                  <ChevronDown size={13} />
+                  <span>View Rosters</span>
+                </>
+              )}
+            </button>
           </div>
         </div>
 
-        <div className={`grid grid-cols-1 ${teamRosterList.length > 2 ? "sm:grid-cols-2" : "md:grid-cols-2"} gap-4`}>
+        <AnimatePresence>
+          {showTeamRosters && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <div className={`grid grid-cols-1 ${teamRosterList.length > 2 ? "sm:grid-cols-2" : "md:grid-cols-2"} gap-4`}>
           {teamRosterList.map(({ key, team, players, activeCount, inactiveCount }) => (
             <div
               key={key}
@@ -806,7 +887,10 @@ export default function RoomRoundEnd({
               </div>
             </div>
           ))}
-        </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Your Match Status & Availability Controls */}
@@ -904,15 +988,32 @@ export default function RoomRoundEnd({
                   View Roster
                 </button>
               )}
+              <button
+                type="button"
+                onClick={() => setShowWaitingQueue((v) => !v)}
+                className="p-1.5 rounded-lg border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer"
+                title={showWaitingQueue ? "Collapse waiting queue" : "Expand waiting queue"}
+              >
+                {showWaitingQueue ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
             </div>
           </div>
 
-          <p className="text-xs text-[var(--text-dim)]">
-            These scholars joined during the sprint. Admit them into Team Alpha or Team Omega before launching Round {nextRoundNumber} to balance the teams.
-          </p>
+          <AnimatePresence>
+            {showWaitingQueue && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="space-y-4 overflow-hidden"
+              >
+                <p className="text-xs text-[var(--text-dim)]">
+                  These scholars joined during the sprint. Admit them into Team Alpha or Team Omega before launching Round {nextRoundNumber} to balance the teams.
+                </p>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            {sortedWaitingScholars.map((scholar, idx) => (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {sortedWaitingScholars.map((scholar, idx) => (
               <div
                 key={scholar.id}
                 className="surface rounded-2xl p-3 border border-[var(--border-dim)] flex items-center justify-between gap-2 shadow-2xs"
@@ -960,32 +1061,71 @@ export default function RoomRoundEnd({
                 </div>
               </div>
             ))}
-          </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
       {/* Articulate Board Map Progression (Roadmap from Start to Finish) */}
       <div className="space-y-2 text-left">
-        <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-mute)] block px-1">
-          Articulate Roadmap Progression
-        </span>
-        <BoardMap
-          scoreA={room.teams.teamA.score}
-          scoreB={room.teams.teamB.score}
-          scoreC={room.teams.teamC?.score}
-          scoreD={room.teams.teamD?.score}
-          scoreGoal={room.settings.scoreGoal || 20}
-          colorA={room.teams.teamA.color}
-          colorB={room.teams.teamB.color}
-          colorC={room.teams.teamC?.color || "#10B981"}
-          colorD={room.teams.teamD?.color || "#F59E0B"}
-          nameA={room.teams.teamA.name}
-          nameB={room.teams.teamB.name}
-          nameC={room.teams.teamC?.name || "Team Delta"}
-          nameD={room.teams.teamD?.name || "Team Sigma"}
-          activeTeam={nextActiveTeamKey}
-          gameMode="classic"
-        />
+        <div className="flex items-center justify-between px-1">
+          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-mute)] flex items-center gap-1.5">
+            <Map className="w-3.5 h-3.5 text-[var(--olive)]" />
+            <span>Articulate Roadmap Progression</span>
+          </span>
+          <button
+            type="button"
+            onClick={() => setShowRoadmap((v) => !v)}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+            title={showRoadmap ? "Collapse Roadmap Progression" : "Expand Roadmap Progression"}
+          >
+            {showRoadmap ? (
+              <>
+                <ChevronUp className="w-3.5 h-3.5 text-[var(--olive)]" />
+                <span>Hide Roadmap</span>
+              </>
+            ) : (
+              <>
+                <ChevronDown className="w-3.5 h-3.5 text-[var(--olive)]" />
+                <span>View Roadmap</span>
+              </>
+            )}
+          </button>
+        </div>
+
+        <AnimatePresence>
+          {showRoadmap && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: "auto" }}
+              exit={{ opacity: 0, height: 0 }}
+              transition={{ duration: 0.2 }}
+              className="overflow-hidden"
+            >
+              <BoardMap
+                scoreA={room.teams.teamA.score}
+                scoreB={room.teams.teamB.score}
+                scoreC={room.teams.teamC?.score}
+                scoreD={room.teams.teamD?.score}
+                scoreGoal={room.settings.scoreGoal || 20}
+                colorA={room.teams.teamA.color}
+                colorB={room.teams.teamB.color}
+                colorC={room.teams.teamC?.color || "#10B981"}
+                colorD={room.teams.teamD?.color || "#F59E0B"}
+                nameA={room.teams.teamA.name}
+                nameB={room.teams.teamB.name}
+                nameC={room.teams.teamC?.name || "Team Delta"}
+                nameD={room.teams.teamD?.name || "Team Sigma"}
+                activeTeam={nextActiveTeamKey}
+                gameMode="classic"
+                collapsibleGrid={true}
+                defaultGridCollapsed={true}
+              />
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Next Round CTA / Match Victory Controls */}
