@@ -14,6 +14,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const openFeedbackPrompt = useAppStore((s) => s.openFeedbackPrompt);
   const openSafetyModal = useAppStore((s) => s.openSafetyModal);
 
+  // Vatar / Lagos Life embedded games: complete isolation from AuthGate, sidebars, and widgets
+  const isVatar = pathname?.startsWith("/vatar");
+  if (isVatar) {
+    return <main className="min-h-screen flex flex-col w-full">{children}</main>;
+  }
+
   // Standalone routes (public shared notes & dedicated admin portal)
   const isStandalone = pathname?.startsWith("/note/") || pathname?.startsWith("/admin");
 
