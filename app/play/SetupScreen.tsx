@@ -69,6 +69,13 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
   const formatMatchDuration = (seconds?: number): string => {
     if (!seconds || seconds <= 0) return "15 mins";
+    const hours = Math.floor(seconds / 3600);
+    if (hours > 0) {
+      const roundedMins = Math.round((seconds % 3600) / 60);
+      const displayHours = hours + Math.floor(roundedMins / 60);
+      const displayMins = roundedMins % 60;
+      return displayMins > 0 ? `${displayHours}h ${displayMins}m` : `${displayHours}h`;
+    }
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
     if (mins === 0) return `${secs}s`;

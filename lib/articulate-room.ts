@@ -149,12 +149,14 @@ export function formatMatchDuration(totalSeconds: number): string {
     return `${Math.max(1, totalSeconds)}s`;
   }
   const hours = Math.floor(totalSeconds / 3600);
-  const minutes = Math.floor((totalSeconds % 3600) / 60);
-  const seconds = totalSeconds % 60;
-
   if (hours > 0) {
-    return seconds > 0 ? `${hours}h ${minutes}m ${seconds}s` : `${hours}h ${minutes}m`;
+    const roundedMins = Math.round((totalSeconds % 3600) / 60);
+    const displayHours = hours + Math.floor(roundedMins / 60);
+    const displayMins = roundedMins % 60;
+    return displayMins > 0 ? `${displayHours}h ${displayMins}m` : `${displayHours}h`;
   }
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
   return seconds > 0 ? `${minutes}m ${seconds}s` : `${minutes}m`;
 }
 
