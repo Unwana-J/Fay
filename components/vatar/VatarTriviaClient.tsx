@@ -4,24 +4,19 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import Script from "next/script";
 import {
   Trophy,
-  Zap,
   Clock,
-  Sparkles,
   HelpCircle,
   ShoppingBag,
   Flame,
   CheckCircle2,
   XCircle,
   Play,
-  ArrowRight,
-  ShieldAlert,
-  ShieldCheck,
   ChevronRight,
   Volume2,
   VolumeX,
+  Sparkles,
 } from "lucide-react";
 import type {
-  VatarSDK,
   VatarPlayer,
   VatarPurchaseResult,
   VatarLeaderboardEntry,
@@ -121,7 +116,7 @@ export default function VatarTriviaClient() {
         if (data.productId === "hints_10") setHints((h) => h + 10);
         else if (data.productId === "scholar_seal") setSeals((s) => s + 1);
         else if (data.productId === "marathon") setOwnsMarathon(true);
-        setPurchaseNotice("Purchase delivered! ✨");
+        setPurchaseNotice("Acquisition delivered! ✨");
         setTimeout(() => setPurchaseNotice(null), 4000);
       }
     } catch (err) {
@@ -164,7 +159,6 @@ export default function VatarTriviaClient() {
         setPlayer(initPlayer);
         loadProfile(initPlayer);
 
-        // Check for any undelivered purchases interrupted by reload
         vatar.purchases().then((list) => {
           list.forEach((p) => claimPurchase(p));
         });
@@ -177,17 +171,9 @@ export default function VatarTriviaClient() {
         }
       });
 
-    // Listen for purchases made outside the game loop
     vatar.onPurchase((p) => claimPurchase(p));
-
-    // Handle backgrounding / incoming phone calls / pay sheets
-    vatar.onPause(() => {
-      setIsPaused(true);
-    });
-
-    vatar.onResume(() => {
-      setIsPaused(false);
-    });
+    vatar.onPause(() => setIsPaused(true));
+    vatar.onResume(() => setIsPaused(false));
   };
 
   // ─── Fetch Vatar Leaderboard ───────────────────────────────────────────────
@@ -217,7 +203,7 @@ export default function VatarTriviaClient() {
     } catch (err: unknown) {
       const code = (err as { code?: string })?.code;
       if (code !== "cancelled") {
-        setPurchaseNotice(`Purchase not completed (${code || "error"})`);
+        setPurchaseNotice(`Acquisition cancelled (${code || "declined"})`);
         setTimeout(() => setPurchaseNotice(null), 3000);
       }
     } finally {
@@ -280,7 +266,7 @@ export default function VatarTriviaClient() {
     return () => clearInterval(timer);
   }, [screen, isPaused, playSound]);
 
-  // ─── Answer selection (Suspense mode: client captures answer index) ────────
+  // ─── Answer selection (Suspense mode: captures answer) ─────────────────────
   const handleSelectOption = (optionIndex: number) => {
     hasInteractedRef.current = true;
     const currentQ = questions[currentIndex];
@@ -307,13 +293,12 @@ export default function VatarTriviaClient() {
     playSound("click");
     setHints((h) => Math.max(0, h - 1));
 
-    // Eliminate 2 random incorrect options (we can randomly eliminate any 2 of the 4)
     const indices = [0, 1, 2, 3];
     const shuffled = indices.sort(() => Math.random() - 0.5).slice(0, 2);
     setEliminatedOptions((prev) => ({ ...prev, [currentQ.id]: shuffled }));
   };
 
-  // ─── Finish round & compute server-authoritative score ─────────────────────
+  // ─── Finish round & compute score ──────────────────────────────────────────
   const finishRound = async () => {
     if (!player || !roundToken) return;
     playSound("complete");
@@ -338,7 +323,6 @@ export default function VatarTriviaClient() {
       setScholarPoints(data.totalScholarPoints);
       setScreen("results");
 
-      // Submit new cumulative points to Vatar Leaderboard
       if (window.Vatar && data.totalScholarPoints > 0) {
         window.Vatar.submitScore(data.totalScholarPoints).catch(() => {});
       }
@@ -353,19 +337,19 @@ export default function VatarTriviaClient() {
   // ─── Fallback screen if opened outside Lagos Life frame ────────────────────
   if (notFramed) {
     return (
-      <div className="min-h-dvh flex flex-col items-center justify-center p-6 text-center bg-[#13110C] text-[#F5F2EB]">
-        <div className="size-16 rounded-full bg-[#E9C9FF]/20 flex items-center justify-center mb-4 text-3xl">
+      <div className="min-h-dvh flex flex-col items-center justify-center p-6 text-center bg-[#F4EFE6] text-[#1E2211]">
+        <div className="size-16 rounded-full bg-[#7A1C2E]/10 border border-[#7A1C2E]/30 flex items-center justify-center mb-4 text-3xl">
           🏛️
         </div>
-        <h1 className="text-2xl font-bold font-serif mb-2">Fey Trivia on Lagos Life</h1>
-        <p className="text-sm text-[#A8A49C] max-w-xs mb-6">
-          This game is made to run inside the Lagos Life phone. Open Lagos Life and launch Fey Trivia from your Games app!
+        <h1 className="text-2xl font-bold font-serif text-[#1E2211] mb-2">Fey Trivia</h1>
+        <p className="text-sm text-[#525645] max-w-xs mb-6 leading-relaxed">
+          This scholarly parlor is crafted exclusively for the Lagos Life world. Open Lagos Life and launch Fey Trivia from your Games app!
         </p>
         <a
           href="https://lagoslife.app"
-          className="inline-flex h-12 items-center justify-center rounded-full bg-[#E9C9FF] px-8 text-sm font-bold text-black"
+          className="inline-flex h-12 items-center justify-center rounded-full bg-[#7A1C2E] px-8 text-sm font-bold text-white shadow-md active:scale-95 transition-all"
         >
-          Open Lagos Life →
+          Enter Lagos Life →
         </a>
       </div>
     );
@@ -386,30 +370,33 @@ export default function VatarTriviaClient() {
         onLoad={handleScriptLoad}
       />
 
-      <main className="min-h-dvh w-full max-w-md mx-auto flex flex-col bg-[#11110E] text-[#F3EFE6] select-none touch-manipulation font-sans">
-        {/* Top Header Bar */}
-        <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-white/10 bg-[#161512]">
+      <main className="min-h-dvh w-full max-w-md mx-auto flex flex-col bg-[#F4EFE6] text-[#1E2211] select-none touch-manipulation font-sans">
+        {/* Top Header Bar — Bookish Editorial */}
+        <header className="h-14 shrink-0 flex items-center justify-between px-4 border-b border-[#444E2C]/15 bg-[#EBE5DA]/80 backdrop-blur-md">
           <div className="flex items-center gap-2">
-            <span className="text-lg">🏛️</span>
-            <span className="font-serif font-bold text-base tracking-wide text-[#E9C9FF]">Fey Trivia</span>
+            <span className="text-base">🏛️</span>
+            <span className="font-serif font-bold text-base tracking-wide text-[#333C1A]">Fey Trivia</span>
+            <span className="text-[10px] uppercase font-bold tracking-widest text-[#7A1C2E] px-1.5 py-0.5 rounded bg-[#7A1C2E]/10 border border-[#7A1C2E]/20">
+              Parlor
+            </span>
           </div>
 
           <div className="flex items-center gap-3">
             {purchaseNotice && (
-              <span className="text-xs font-semibold text-[#86EFAC] animate-pulse">{purchaseNotice}</span>
+              <span className="text-xs font-semibold text-[#444E2C] animate-pulse">{purchaseNotice}</span>
             )}
             <button
               onClick={() => {
                 hasInteractedRef.current = true;
                 setSoundEnabled(!soundEnabled);
               }}
-              className="p-2 text-[#A8A49C] hover:text-white"
+              className="p-1.5 text-[#525645] hover:text-[#1E2211] transition-colors"
               aria-label="Toggle sound"
             >
-              {soundEnabled ? <Volume2 size={18} /> : <VolumeX size={18} />}
+              {soundEnabled ? <Volume2 size={17} /> : <VolumeX size={17} />}
             </button>
-            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-xs font-semibold">
-              <Trophy size={13} className="text-[#FACC15]" />
+            <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#FDFCFA] border border-[#444E2C]/20 shadow-xs text-xs font-semibold text-[#444E2C]">
+              <Trophy size={13} className="text-[#A67C1E]" />
               <span>{scholarPoints.toLocaleString()}</span>
             </div>
           </div>
@@ -417,8 +404,8 @@ export default function VatarTriviaClient() {
 
         {/* Paused State Banner */}
         {isPaused && (
-          <div className="bg-[#EAB308]/20 border-b border-[#EAB308]/40 px-4 py-2 text-center text-xs font-semibold text-[#FACC15]">
-            Game paused while away · Resuming on return
+          <div className="bg-[#A67C1E]/15 border-b border-[#A67C1E]/30 px-4 py-2 text-center text-xs font-semibold text-[#7A5408]">
+            Sprint paused · Resumes when you return to the parlor
           </div>
         )}
 
@@ -426,30 +413,32 @@ export default function VatarTriviaClient() {
         {screen === "home" && (
           <div className="flex-1 flex flex-col justify-between p-5">
             <div>
-              {/* Player Welcome Card */}
-              <div className="flex items-center justify-between p-4 rounded-2xl bg-white/[0.04] border border-white/10 mb-6">
+              {/* Player Scholar Card */}
+              <div className="flex items-center justify-between p-4 rounded-2xl bg-[#FDFCFA] border border-[#444E2C]/15 shadow-xs mb-5">
                 <div className="flex items-center gap-3">
                   {player?.avatar ? (
-                    <img src={player.avatar} alt="Avatar" className="size-11 rounded-full object-cover border border-white/20" />
+                    <img src={player.avatar} alt="Avatar" className="size-11 rounded-full object-cover border border-[#444E2C]/20" />
                   ) : (
-                    <div className="size-11 rounded-full bg-[#E9C9FF]/20 flex items-center justify-center font-bold text-[#E9C9FF]">
+                    <div className="size-11 rounded-full bg-[#7A1C2E]/10 border border-[#7A1C2E]/20 flex items-center justify-center font-serif font-bold text-[#7A1C2E]">
                       {player?.name?.[0]?.toUpperCase() || "S"}
                     </div>
                   )}
                   <div>
-                    <h2 className="text-base font-bold leading-tight">{player?.name || "Scholar"}</h2>
-                    <p className="text-xs text-[#A8A49C]">Level {Math.floor(scholarPoints / 500) + 1} Scholar</p>
+                    <h2 className="text-base font-serif font-bold leading-tight text-[#1E2211]">{player?.name || "Scholar"}</h2>
+                    <p className="text-xs text-[#525645]">Fellow · Level {Math.floor(scholarPoints / 500) + 1}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-1 text-xs font-bold text-[#FB923C]">
-                  <Flame size={15} />
+                <div className="flex items-center gap-1 text-xs font-bold text-[#A67C1E] bg-[#A67C1E]/10 px-2 py-1 rounded-full border border-[#A67C1E]/20">
+                  <Flame size={14} className="text-[#A67C1E]" />
                   <span>{streak}d</span>
                 </div>
               </div>
 
               {/* Match Difficulty Picker */}
               <div className="mb-5">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#A8A49C] block mb-2">Difficulty</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#525645] block mb-2 font-serif">
+                  Discipline Rigor
+                </label>
                 <div className="grid grid-cols-4 gap-2">
                   {(["random", "easy", "medium", "hard"] as const).map((d) => (
                     <button
@@ -461,8 +450,8 @@ export default function VatarTriviaClient() {
                       }}
                       className={`h-11 rounded-xl text-xs font-bold capitalize transition-all border ${
                         difficulty === d
-                          ? "bg-[#E9C9FF] text-black border-[#E9C9FF]"
-                          : "bg-white/[0.03] text-[#A8A49C] border-white/10 hover:border-white/20"
+                          ? "bg-[#7A1C2E] text-white border-[#7A1C2E] shadow-sm"
+                          : "bg-[#FDFCFA] text-[#525645] border-[#444E2C]/15 hover:border-[#444E2C]/30"
                       }`}
                     >
                       {d}
@@ -473,7 +462,9 @@ export default function VatarTriviaClient() {
 
               {/* Duration Options */}
               <div className="mb-6">
-                <label className="text-xs font-bold uppercase tracking-wider text-[#A8A49C] block mb-2">Duration</label>
+                <label className="text-[11px] font-bold uppercase tracking-wider text-[#525645] block mb-2 font-serif">
+                  Pacing
+                </label>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { m: 5, label: "5m · 10 Qs", locked: false },
@@ -490,14 +481,14 @@ export default function VatarTriviaClient() {
                       }}
                       className={`h-12 rounded-xl px-2 text-xs font-bold transition-all border flex flex-col items-center justify-center ${
                         durationMinutes === dur.m
-                          ? "bg-[#E9C9FF] text-black border-[#E9C9FF]"
+                          ? "bg-[#444E2C] text-white border-[#444E2C] shadow-sm"
                           : dur.locked
-                          ? "bg-white/[0.01] text-white/30 border-white/5"
-                          : "bg-white/[0.03] text-[#A8A49C] border-white/10"
+                          ? "bg-[#DCD5C9]/40 text-[#828574] border-transparent"
+                          : "bg-[#FDFCFA] text-[#525645] border-[#444E2C]/15"
                       }`}
                     >
                       <span>{dur.label}</span>
-                      {dur.locked && <span className="text-[10px] text-[#E9C9FF]">Unlock ₦10k</span>}
+                      {dur.locked && <span className="text-[10px] text-[#7A1C2E] font-medium">Unlock ₦10k</span>}
                     </button>
                   ))}
                 </div>
@@ -509,10 +500,10 @@ export default function VatarTriviaClient() {
               <button
                 disabled={loadingRound || !sdkReady}
                 onClick={startRound}
-                className="w-full h-14 rounded-full bg-[#E9C9FF] text-black font-bold text-base flex items-center justify-center gap-2 shadow-lg shadow-[#E9C9FF]/20 active:scale-[0.98] transition-all disabled:opacity-50"
+                className="w-full h-14 rounded-full bg-[#7A1C2E] text-white font-bold text-base flex items-center justify-center gap-2 shadow-md shadow-[#7A1C2E]/25 active:scale-[0.98] transition-all disabled:opacity-50"
               >
                 <Play size={18} fill="currentColor" />
-                <span>{loadingRound ? "Loading Deck…" : "Start Sprint"}</span>
+                <span>{loadingRound ? "Assembling Deck…" : "Begin Inquiry"}</span>
               </button>
 
               <div className="grid grid-cols-2 gap-2">
@@ -523,10 +514,10 @@ export default function VatarTriviaClient() {
                     fetchLeaderboard();
                     setScreen("leaderboard");
                   }}
-                  className="h-12 rounded-xl bg-white/[0.04] border border-white/10 font-bold text-xs flex items-center justify-center gap-2 hover:bg-white/[0.08]"
+                  className="h-12 rounded-xl bg-[#FDFCFA] border border-[#444E2C]/15 font-bold text-xs text-[#333C1A] flex items-center justify-center gap-2 hover:bg-[#EBE5DA] transition-colors"
                 >
-                  <Trophy size={14} className="text-[#FACC15]" />
-                  <span>Leaderboard</span>
+                  <Trophy size={14} className="text-[#A67C1E]" />
+                  <span>Scholars Board</span>
                 </button>
                 <button
                   onClick={() => {
@@ -534,10 +525,10 @@ export default function VatarTriviaClient() {
                     playSound("click");
                     setScreen("shop");
                   }}
-                  className="h-12 rounded-xl bg-white/[0.04] border border-white/10 font-bold text-xs flex items-center justify-center gap-2 hover:bg-white/[0.08]"
+                  className="h-12 rounded-xl bg-[#FDFCFA] border border-[#444E2C]/15 font-bold text-xs text-[#333C1A] flex items-center justify-center gap-2 hover:bg-[#EBE5DA] transition-colors"
                 >
-                  <ShoppingBag size={14} className="text-[#E9C9FF]" />
-                  <span>Shop ({hints} Hints)</span>
+                  <ShoppingBag size={14} className="text-[#7A1C2E]" />
+                  <span>Emporium ({hints})</span>
                 </button>
               </div>
             </div>
@@ -549,11 +540,11 @@ export default function VatarTriviaClient() {
           <div className="flex-1 flex flex-col justify-between p-5">
             <div>
               {/* Progress & Time */}
-              <div className="flex items-center justify-between text-xs font-bold text-[#A8A49C] mb-4">
-                <span>
+              <div className="flex items-center justify-between text-xs font-bold text-[#525645] mb-4">
+                <span className="font-serif">
                   Question {currentIndex + 1} of {questions.length}
                 </span>
-                <span className="flex items-center gap-1 text-[#FACC15]">
+                <span className="flex items-center gap-1 font-mono text-[#7A1C2E] font-bold">
                   <Clock size={13} />
                   {formatTime(timeLeft)}
                 </span>
@@ -561,13 +552,13 @@ export default function VatarTriviaClient() {
 
               {/* Category Pill & Hint Button */}
               <div className="flex items-center justify-between mb-4">
-                <span className="px-2.5 py-1 rounded-full bg-white/5 border border-white/10 text-[11px] font-semibold text-[#A8A49C]">
+                <span className="px-2.5 py-1 rounded-full bg-[#EBE5DA] border border-[#444E2C]/15 text-[11px] font-semibold text-[#444E2C] font-serif">
                   {currentQ.category}
                 </span>
                 <button
                   onClick={useHint}
                   disabled={Boolean(eliminatedOptions[currentQ.id])}
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#E9C9FF]/10 text-[#E9C9FF] border border-[#E9C9FF]/30 text-xs font-bold disabled:opacity-40"
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#A67C1E]/10 text-[#7A5408] border border-[#A67C1E]/30 text-xs font-bold disabled:opacity-40"
                 >
                   <HelpCircle size={13} />
                   <span>50/50 ({hints})</span>
@@ -575,7 +566,7 @@ export default function VatarTriviaClient() {
               </div>
 
               {/* Question Text */}
-              <h3 className="font-serif text-lg font-bold leading-snug mb-6 text-[#F5F2EB]">
+              <h3 className="font-serif text-lg font-bold leading-snug mb-6 text-[#1E2211]">
                 {currentQ.question}
               </h3>
 
@@ -592,14 +583,14 @@ export default function VatarTriviaClient() {
                       onClick={() => handleSelectOption(idx)}
                       className={`min-h-[52px] w-full p-3.5 rounded-xl text-left text-sm font-medium transition-all border flex items-center justify-between ${
                         isEliminated
-                          ? "opacity-20 line-through border-transparent"
+                          ? "opacity-25 line-through border-transparent bg-transparent"
                           : isSelected
-                          ? "bg-[#E9C9FF] text-black border-[#E9C9FF] font-semibold"
-                          : "bg-white/[0.04] text-[#F3EFE6] border-white/10 hover:border-white/20 active:bg-white/[0.08]"
+                          ? "bg-[#444E2C] text-white border-[#444E2C] font-semibold shadow-xs"
+                          : "bg-[#FDFCFA] text-[#1E2211] border-[#444E2C]/15 hover:border-[#444E2C]/30 active:bg-[#EBE5DA]"
                       }`}
                     >
                       <span>{opt}</span>
-                      {isSelected && <CheckCircle2 size={16} />}
+                      {isSelected && <CheckCircle2 size={16} className="text-white shrink-0" />}
                     </button>
                   );
                 })}
@@ -607,7 +598,7 @@ export default function VatarTriviaClient() {
             </div>
 
             {/* Footer Navigation */}
-            <div className="pt-4 flex items-center justify-between border-t border-white/10">
+            <div className="pt-4 flex items-center justify-between border-t border-[#444E2C]/15">
               <button
                 disabled={currentIndex === 0}
                 onClick={() => {
@@ -615,7 +606,7 @@ export default function VatarTriviaClient() {
                   playSound("click");
                   setCurrentIndex((i) => Math.max(0, i - 1));
                 }}
-                className="text-xs font-bold text-[#A8A49C] disabled:opacity-30"
+                className="text-xs font-bold text-[#525645] disabled:opacity-30"
               >
                 ← Previous
               </button>
@@ -627,7 +618,7 @@ export default function VatarTriviaClient() {
                     playSound("click");
                     setCurrentIndex((i) => Math.min(questions.length - 1, i + 1));
                   }}
-                  className="inline-flex items-center gap-1 text-xs font-bold text-[#E9C9FF]"
+                  className="inline-flex items-center gap-1 text-xs font-bold text-[#7A1C2E]"
                 >
                   <span>Next</span>
                   <ChevronRight size={14} />
@@ -636,9 +627,9 @@ export default function VatarTriviaClient() {
                 <button
                   disabled={loadingRound}
                   onClick={finishRound}
-                  className="h-10 px-5 rounded-full bg-[#E9C9FF] text-black font-bold text-xs"
+                  className="h-10 px-5 rounded-full bg-[#7A1C2E] text-white font-bold text-xs shadow-xs"
                 >
-                  {loadingRound ? "Scoring…" : "Submit Round"}
+                  {loadingRound ? "Evaluating…" : "Submit Sprint"}
                 </button>
               )}
             </div>
@@ -650,62 +641,64 @@ export default function VatarTriviaClient() {
           <div className="flex-1 flex flex-col justify-between p-5 overflow-y-auto">
             <div>
               <div className="text-center py-4">
-                <span className="text-4xl">🎓</span>
-                <h2 className="text-xl font-bold font-serif mt-2 mb-1">
-                  {roundResult.remark?.title || "Round Complete"}
+                <span className="text-4xl">📜</span>
+                <h2 className="text-xl font-bold font-serif text-[#1E2211] mt-2 mb-1">
+                  {roundResult.remark?.title || "Sprint Concluded"}
                 </h2>
-                <p className="text-xs text-[#A8A49C] max-w-xs mx-auto mb-4">
-                  {roundResult.remark?.subtitle || "Great articulation of your knowledge."}
+                <p className="text-xs text-[#525645] max-w-xs mx-auto mb-4 leading-relaxed">
+                  {roundResult.remark?.subtitle || "A formidable demonstration of synthesis and recall."}
                 </p>
 
                 {/* Score Stats Grid */}
-                <div className="grid grid-cols-3 gap-2 p-3.5 rounded-2xl bg-white/[0.04] border border-white/10 mb-6">
+                <div className="grid grid-cols-3 gap-2 p-3.5 rounded-2xl bg-[#FDFCFA] border border-[#444E2C]/15 shadow-xs mb-6">
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-[#A8A49C] block">Accuracy</span>
-                    <span className="text-lg font-extrabold text-[#FACC15]">{roundResult.pct}%</span>
+                    <span className="text-[10px] uppercase font-bold text-[#525645] block font-serif">Precision</span>
+                    <span className="text-lg font-extrabold text-[#7A1C2E]">{roundResult.pct}%</span>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-[#A8A49C] block">Correct</span>
-                    <span className="text-lg font-extrabold">
+                    <span className="text-[10px] uppercase font-bold text-[#525645] block font-serif">Mastered</span>
+                    <span className="text-lg font-extrabold text-[#1E2211]">
                       {roundResult.correct}/{roundResult.total}
                     </span>
                   </div>
                   <div>
-                    <span className="text-[10px] uppercase font-bold text-[#A8A49C] block">Scholar Pts</span>
-                    <span className="text-lg font-extrabold text-[#86EFAC]">+{roundResult.pointsAwarded}</span>
+                    <span className="text-[10px] uppercase font-bold text-[#525645] block font-serif">Scholar Pts</span>
+                    <span className="text-lg font-extrabold text-[#444E2C]">+{roundResult.pointsAwarded}</span>
                   </div>
                 </div>
               </div>
 
               {/* Explanations list */}
-              <h4 className="text-xs font-bold uppercase tracking-wider text-[#A8A49C] mb-3">Round Review</h4>
+              <h4 className="text-[11px] font-bold uppercase tracking-wider text-[#525645] mb-3 font-serif">
+                Scholarly Retrospective
+              </h4>
               <div className="space-y-3 mb-6">
                 {questions.map((q, idx) => {
                   const expl = roundResult.explanations[q.id];
                   const chosenIdx = answers[q.id];
 
                   return (
-                    <div key={q.id} className="p-3 rounded-xl bg-white/[0.02] border border-white/5 text-xs">
+                    <div key={q.id} className="p-3.5 rounded-xl bg-[#FDFCFA] border border-[#444E2C]/15 text-xs shadow-2xs">
                       <div className="flex items-start gap-2 mb-1.5">
                         {expl?.correct ? (
-                          <CheckCircle2 size={15} className="text-[#86EFAC] shrink-0 mt-0.5" />
+                          <CheckCircle2 size={15} className="text-[#444E2C] shrink-0 mt-0.5" />
                         ) : (
-                          <XCircle size={15} className="text-[#F87171] shrink-0 mt-0.5" />
+                          <XCircle size={15} className="text-[#B53A3A] shrink-0 mt-0.5" />
                         )}
-                        <span className="font-semibold text-white/90">
+                        <span className="font-semibold text-[#1E2211]">
                           {idx + 1}. {q.question}
                         </span>
                       </div>
-                      <div className="pl-6 text-[#A8A49C] space-y-0.5">
+                      <div className="pl-6 text-[#525645] space-y-0.5">
                         <p>
-                          Your answer: <span className="font-semibold text-white">{q.options[chosenIdx] ?? "None"}</span>
+                          Your answer: <span className="font-semibold text-[#1E2211]">{q.options[chosenIdx] ?? "Unanswered"}</span>
                         </p>
                         {!expl?.correct && (
-                          <p className="text-[#86EFAC]">
+                          <p className="text-[#444E2C]">
                             Correct: <span className="font-semibold">{q.options[expl?.answer ?? 0]}</span>
                           </p>
                         )}
-                        {expl?.explanation && <p className="pt-1 text-[11px] text-[#D4D0C5] italic">{expl.explanation}</p>}
+                        {expl?.explanation && <p className="pt-1 text-[11px] text-[#525645] italic font-serif leading-relaxed">{expl.explanation}</p>}
                       </div>
                     </div>
                   );
@@ -719,9 +712,9 @@ export default function VatarTriviaClient() {
                 playSound("click");
                 setScreen("home");
               }}
-              className="w-full h-13 rounded-full bg-[#E9C9FF] text-black font-bold text-sm"
+              className="w-full h-13 rounded-full bg-[#7A1C2E] text-white font-bold text-sm shadow-md"
             >
-              Back to Campus
+              Return to Parlor
             </button>
           </div>
         )}
@@ -731,49 +724,49 @@ export default function VatarTriviaClient() {
           <div className="flex-1 flex flex-col justify-between p-5">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-bold font-serif">Scholar Leaderboard</h2>
+                <h2 className="text-base font-bold font-serif text-[#1E2211]">Scholar Leaderboard</h2>
                 <button
                   onClick={() => {
                     hasInteractedRef.current = true;
                     playSound("click");
                     setScreen("home");
                   }}
-                  className="text-xs font-bold text-[#A8A49C]"
+                  className="text-xs font-bold text-[#525645]"
                 >
                   Done
                 </button>
               </div>
 
               {leaderboardMe && (
-                <div className="p-3 rounded-xl bg-[#E9C9FF]/10 border border-[#E9C9FF]/30 mb-4 flex items-center justify-between">
+                <div className="p-3.5 rounded-xl bg-[#FDFCFA] border border-[#A67C1E]/30 mb-4 flex items-center justify-between shadow-xs">
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-bold text-[#E9C9FF]">{leaderboardMe.label}</span>
-                    <span className="text-xs font-semibold">Your Rank</span>
+                    <span className="text-sm font-bold text-[#A67C1E] font-serif">{leaderboardMe.label}</span>
+                    <span className="text-xs font-semibold text-[#525645]">Your Standing</span>
                   </div>
-                  <span className="text-sm font-extrabold text-[#E9C9FF]">
+                  <span className="text-sm font-extrabold text-[#444E2C]">
                     {leaderboardMe.score.toLocaleString()} pts
                   </span>
                 </div>
               )}
 
               {loadingLeaderboard ? (
-                <div className="text-center py-12 text-xs text-[#A8A49C]">Loading Vatar Leaderboard…</div>
+                <div className="text-center py-12 text-xs text-[#525645]">Consulting Vatar Ledger…</div>
               ) : leaderboardTop.length === 0 ? (
-                <div className="text-center py-12 text-xs text-[#A8A49C]">
-                  No scores recorded yet. Play a round to claim the #1 spot!
+                <div className="text-center py-12 text-xs text-[#525645]">
+                  No scholars on the ledger yet. Claim the inaugurating #1 spot!
                 </div>
               ) : (
                 <div className="space-y-1.5 max-h-[420px] overflow-y-auto">
                   {leaderboardTop.map((entry) => (
                     <div
                       key={entry.rank}
-                      className="flex items-center justify-between p-3 rounded-xl bg-white/[0.03] border border-white/5 text-xs"
+                      className="flex items-center justify-between p-3 rounded-xl bg-[#FDFCFA] border border-[#444E2C]/10 text-xs shadow-2xs"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-bold w-6 text-white/50">#{entry.rank}</span>
-                        <span className="font-semibold text-white/90">{entry.name}</span>
+                        <span className="font-bold w-6 text-[#525645] font-serif">#{entry.rank}</span>
+                        <span className="font-semibold text-[#1E2211]">{entry.name}</span>
                       </div>
-                      <span className="font-extrabold text-[#FACC15]">{entry.score.toLocaleString()}</span>
+                      <span className="font-extrabold text-[#A67C1E]">{entry.score.toLocaleString()}</span>
                     </div>
                   ))}
                 </div>
@@ -786,7 +779,7 @@ export default function VatarTriviaClient() {
                 playSound("click");
                 setScreen("home");
               }}
-              className="w-full h-12 rounded-full bg-white/[0.08] text-white font-bold text-xs"
+              className="w-full h-12 rounded-full bg-[#EBE5DA] text-[#1E2211] font-bold text-xs border border-[#444E2C]/15"
             >
               Close
             </button>
@@ -798,14 +791,14 @@ export default function VatarTriviaClient() {
           <div className="flex-1 flex flex-col justify-between p-5">
             <div>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-base font-bold font-serif">Scholar Emporium</h2>
+                <h2 className="text-base font-bold font-serif text-[#1E2211]">Scholar Emporium</h2>
                 <button
                   onClick={() => {
                     hasInteractedRef.current = true;
                     playSound("click");
                     setScreen("home");
                   }}
-                  className="text-xs font-bold text-[#A8A49C]"
+                  className="text-xs font-bold text-[#525645]"
                 >
                   Done
                 </button>
@@ -813,50 +806,50 @@ export default function VatarTriviaClient() {
 
               <div className="space-y-3">
                 {/* 1. Hints Pack */}
-                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-[#FDFCFA] border border-[#444E2C]/15 shadow-xs flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-bold">10× 50/50 Hints</h4>
-                    <p className="text-xs text-[#A8A49C]">Eliminates two incorrect choices</p>
-                    <span className="text-xs font-semibold text-[#86EFAC] mt-1 block">Owned: {hints}</span>
+                    <h4 className="text-sm font-bold font-serif text-[#1E2211]">10× 50/50 Hints</h4>
+                    <p className="text-xs text-[#525645]">Eliminates two incorrect options</p>
+                    <span className="text-xs font-semibold text-[#444E2C] mt-1 block">In satchel: {hints}</span>
                   </div>
                   <button
                     disabled={purchasingProduct === "hints_10"}
                     onClick={() => handleBuy("hints_10")}
-                    className="h-10 px-4 rounded-full bg-[#E9C9FF] text-black text-xs font-bold disabled:opacity-50"
+                    className="h-10 px-4 rounded-full bg-[#7A1C2E] text-white text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-50"
                   >
                     {purchasingProduct === "hints_10" ? "…" : "₦1,000"}
                   </button>
                 </div>
 
                 {/* 2. Scholar's Seal */}
-                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-[#FDFCFA] border border-[#444E2C]/15 shadow-xs flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-bold">Scholar&apos;s Seal</h4>
-                    <p className="text-xs text-[#A8A49C]">Protects streak if you miss a day</p>
-                    <span className="text-xs font-semibold text-[#86EFAC] mt-1 block">Owned: {seals}</span>
+                    <h4 className="text-sm font-bold font-serif text-[#1E2211]">Scholar&apos;s Seal</h4>
+                    <p className="text-xs text-[#525645]">Protects streak against a missed day</p>
+                    <span className="text-xs font-semibold text-[#444E2C] mt-1 block">In satchel: {seals}</span>
                   </div>
                   <button
                     disabled={purchasingProduct === "scholar_seal"}
                     onClick={() => handleBuy("scholar_seal")}
-                    className="h-10 px-4 rounded-full bg-[#E9C9FF] text-black text-xs font-bold disabled:opacity-50"
+                    className="h-10 px-4 rounded-full bg-[#7A1C2E] text-white text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-50"
                   >
                     {purchasingProduct === "scholar_seal" ? "…" : "₦2,500"}
                   </button>
                 </div>
 
                 {/* 3. Marathon Mode */}
-                <div className="p-4 rounded-2xl bg-white/[0.04] border border-white/10 flex items-center justify-between">
+                <div className="p-4 rounded-2xl bg-[#FDFCFA] border border-[#444E2C]/15 shadow-xs flex items-center justify-between">
                   <div>
-                    <h4 className="text-sm font-bold">Marathon Sprint</h4>
-                    <p className="text-xs text-[#A8A49C]">Unlock 15-minute 30-question sprints</p>
-                    <span className="text-xs font-semibold text-[#86EFAC] mt-1 block">
+                    <h4 className="text-sm font-bold font-serif text-[#1E2211]">Marathon Sprint</h4>
+                    <p className="text-xs text-[#525645]">Permanent 15-minute 30-question sprint</p>
+                    <span className="text-xs font-semibold text-[#444E2C] mt-1 block">
                       {ownsMarathon ? "Unlocked ✓" : "Locked"}
                     </span>
                   </div>
                   <button
                     disabled={ownsMarathon || purchasingProduct === "marathon"}
                     onClick={() => handleBuy("marathon")}
-                    className="h-10 px-4 rounded-full bg-[#E9C9FF] text-black text-xs font-bold disabled:opacity-40"
+                    className="h-10 px-4 rounded-full bg-[#7A1C2E] text-white text-xs font-bold shadow-xs active:scale-95 transition-all disabled:opacity-40"
                   >
                     {ownsMarathon ? "Owned" : purchasingProduct === "marathon" ? "…" : "₦10,000"}
                   </button>
@@ -870,7 +863,7 @@ export default function VatarTriviaClient() {
                 playSound("click");
                 setScreen("home");
               }}
-              className="w-full h-12 rounded-full bg-white/[0.08] text-white font-bold text-xs"
+              className="w-full h-12 rounded-full bg-[#EBE5DA] text-[#1E2211] font-bold text-xs border border-[#444E2C]/15"
             >
               Close
             </button>
