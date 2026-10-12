@@ -87,10 +87,15 @@ export default function LeagueArenaClient({
         if (localScores.length > 0) {
           const scoreMap = new Map<string, LeagueDailyScore>();
           for (const s of initialScores) {
-            scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+            const playerKey = (s.username || s.userId || "").trim().toLowerCase();
+            scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
           }
           for (const s of localScores) {
-            scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+            const playerKey = (s.username || s.userId || "").trim().toLowerCase();
+            const existing = scoreMap.get(`${playerKey}_${s.dayNumber}`);
+            if (!existing || s.points >= existing.points) {
+              scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
+            }
           }
           const merged = Array.from(scoreMap.values());
           setScores(merged);
@@ -126,11 +131,12 @@ export default function LeagueArenaClient({
   const currentDay = status.dayNumber;
 
   // Check if current user has already completed today's drop
-  const myIdentifier = profile.id || profile.username.toLowerCase();
+  const myUsername = (profile.username || "Scholar").trim().toLowerCase();
+  const myIdentifier = profile.id || myUsername;
   const myTodayScore = scores.find(
     (s) =>
-      (s.userId === myIdentifier || s.username.toLowerCase() === profile.username.toLowerCase()) &&
-      s.dayNumber === currentDay
+      s.dayNumber === currentDay &&
+      ((s.username || "").trim().toLowerCase() === myUsername || (profile.id && s.userId === profile.id))
   );
   const hasCompletedToday = Boolean(myTodayScore);
 
@@ -284,8 +290,14 @@ export default function LeagueArenaClient({
 
     // Update local state immediately so user NEVER loses their score
     setScores((prevScores) => {
+      const myNameLower = (profile.username || "Scholar").trim().toLowerCase();
       const filtered = prevScores.filter(
-        (s) => !(s.dayNumber === currentDay && (s.userId === myIdentifier || s.username.toLowerCase() === (profile.username || "").toLowerCase()))
+        (s) =>
+          !(
+            s.dayNumber === currentDay &&
+            ((s.username || "").trim().toLowerCase() === myNameLower ||
+              (profile.id && s.userId === profile.id))
+          )
       );
       const updated = [...filtered, myScoreEntry];
       if (typeof window !== "undefined") {
@@ -348,10 +360,15 @@ export default function LeagueArenaClient({
           setScores((prevScores) => {
             const scoreMap = new Map<string, LeagueDailyScore>();
             for (const s of prevScores) {
-              scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+              const playerKey = (s.username || s.userId || "").trim().toLowerCase();
+              scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
             }
             for (const s of data.scores) {
-              scoreMap.set(`${s.userId || s.username}_${s.dayNumber}`, s);
+              const playerKey = (s.username || s.userId || "").trim().toLowerCase();
+              const existing = scoreMap.get(`${playerKey}_${s.dayNumber}`);
+              if (!existing || s.points >= existing.points) {
+                scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
+              }
             }
             const merged = Array.from(scoreMap.values());
             if (typeof window !== "undefined") {
@@ -600,12 +617,12 @@ export default function LeagueArenaClient({
                 <div className="space-y-2">
                   {leaderboard.map((entry) => {
                     const isMe =
-                      entry.userId === myIdentifier ||
-                      entry.username.toLowerCase() === profile.username.toLowerCase();
+                      (entry.username || "").trim().toLowerCase() === myUsername ||
+                      (profile.id && entry.userId === profile.id);
 
                     return (
                       <div
-                        key={entry.userId}
+                        key={entry.username || entry.userId}
                         className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
                           isMe
                             ? "border-[var(--olive)] bg-[var(--olive)]/8 shadow-xs"

@@ -85,17 +85,21 @@ export async function POST(req: NextRequest) {
         dayNumber = status.dayNumber || 1;
       }
 
-      // 2. Check if user has already submitted today's attempt
+      // 2. Check if user has already submitted today's attempt (by user_id or username)
       const playerIdentifier = userId || cleanUsername.toLowerCase();
-      const { data: existingAttempt } = await supabase
+      const { data: existingAttempts } = await supabase
         .from("league_scores")
-        .select("id")
+        .select("id, user_id, username")
         .eq("league_code", cleanLeagueCode)
-        .eq("user_id", playerIdentifier)
-        .eq("day_number", dayNumber)
-        .maybeSingle();
+        .eq("day_number", dayNumber);
 
-      if (existingAttempt) {
+      const alreadyAttempted = (existingAttempts || []).some(
+        (row) =>
+          row.user_id === playerIdentifier ||
+          (row.username && row.username.trim().toLowerCase() === cleanUsername.toLowerCase())
+      );
+
+      if (alreadyAttempted) {
         return NextResponse.json({
           error: "You have already completed your attempt for today's drop.",
           alreadyAttempted: true,

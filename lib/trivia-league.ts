@@ -45,7 +45,7 @@ export interface LeagueLeaderboardEntry {
   todayScore?: number;
   todayPoints?: number;
   rank: number;
-  dailyBreakdown: Record<number, { score: number; points: number; date: string }>;
+  dailyBreakdown: Record<number, { score: number; points: number; totalQuestions?: number; date: string }>;
 }
 
 /**
@@ -182,6 +182,8 @@ export function calculateLeaguePoints(
 
 /**
  * Aggregate individual score rows into a ranked leaderboard.
+ * Deduplicates multiple scores by scholar username and ensures each tournament day
+ * is only counted once per scholar (taking their best attempt if duplicates exist).
  */
 export function aggregateLeagueLeaderboard(
   scores: LeagueDailyScore[],
@@ -190,12 +192,15 @@ export function aggregateLeagueLeaderboard(
   const playerMap = new Map<string, LeagueLeaderboardEntry>();
 
   for (const s of scores) {
-    const key = s.userId || s.username.toLowerCase();
+    const rawName = (s.username || "").trim();
+    // Normalize scholar key by username first, falling back to userId
+    const key = rawName ? rawName.toLowerCase() : (s.userId || "scholar").trim().toLowerCase();
+
     let entry = playerMap.get(key);
     if (!entry) {
       entry = {
-        userId: s.userId || s.username,
-        username: s.username,
+        userId: s.userId || key,
+        username: rawName || s.userId || "Scholar",
         avatar: s.avatar || "/avatars/avatar-scholar.svg",
         totalPoints: 0,
         totalCorrect: 0,
@@ -206,22 +211,50 @@ export function aggregateLeagueLeaderboard(
         dailyBreakdown: {},
       };
       playerMap.set(key, entry);
+    } else {
+      // Retain preferred avatar if available
+      if ((!entry.avatar || entry.avatar === "/avatars/avatar-scholar.svg") && s.avatar && s.avatar !== "/avatars/avatar-scholar.svg") {
+        entry.avatar = s.avatar;
+      }
+      if (s.userId && (!entry.userId || s.userId.length > entry.userId.length)) {
+        entry.userId = s.userId;
+      }
     }
 
-    entry.totalPoints += s.points;
-    entry.totalCorrect += s.score;
-    entry.totalQuestions += s.totalQuestions;
-    entry.daysCompleted += 1;
-    entry.dailyBreakdown[s.dayNumber] = {
-      score: s.score,
-      points: s.points,
-      date: s.date,
-    };
+    // Deduplicate by dayNumber - retain the best attempt for each day
+    const existingDay = entry.dailyBreakdown[s.dayNumber];
+    if (!existingDay) {
+      entry.dailyBreakdown[s.dayNumber] = {
+        score: s.score,
+        points: s.points,
+        totalQuestions: s.totalQuestions || 5,
+        date: s.date,
+      };
+    } else if (s.points > existingDay.points || (s.points === existingDay.points && s.score > existingDay.score)) {
+      entry.dailyBreakdown[s.dayNumber] = {
+        score: s.score,
+        points: s.points,
+        totalQuestions: s.totalQuestions || existingDay.totalQuestions,
+        date: s.date,
+      };
+    }
+  }
 
-    if (s.dayNumber === currentDayNumber) {
+  // Calculate cumulative stats strictly from distinct daily entries
+  for (const entry of playerMap.values()) {
+    const dailyEntries = Object.entries(entry.dailyBreakdown);
+    entry.daysCompleted = dailyEntries.length;
+    entry.totalPoints = dailyEntries.reduce((sum, [, d]) => sum + d.points, 0);
+    entry.totalCorrect = dailyEntries.reduce((sum, [, d]) => sum + d.score, 0);
+    entry.totalQuestions = dailyEntries.reduce((sum, [, d]) => sum + (d.totalQuestions || 0), 0);
+
+    const todayRecord = entry.dailyBreakdown[currentDayNumber];
+    if (todayRecord) {
       entry.completedToday = true;
-      entry.todayScore = s.score;
-      entry.todayPoints = s.points;
+      entry.todayScore = todayRecord.score;
+      entry.todayPoints = todayRecord.points;
+    } else {
+      entry.completedToday = false;
     }
   }
 
@@ -356,12 +389,13 @@ export function computeUserLeagueSummary(
   const scores = scoresOverride ?? getLocalLeagueScores(league.code);
   const leaderboard = aggregateLeagueLeaderboard(scores, status.dayNumber);
 
+  const cleanName = (username || "").trim().toLowerCase();
   const keyMatch = (s: LeagueDailyScore) =>
-    (s.userId && s.userId === userId) ||
-    (s.username && s.username.toLowerCase() === username.toLowerCase());
+    (cleanName && (s.username || "").trim().toLowerCase() === cleanName) ||
+    (userId && s.userId === userId);
 
   const userLeaderboardEntry = leaderboard.find(
-    (e) => (userId && e.userId === userId) || (username && e.username.toLowerCase() === username.toLowerCase())
+    (e) => (cleanName && (e.username || "").trim().toLowerCase() === cleanName) || (userId && e.userId === userId)
   );
 
   const todayScoreRow = scores.find((s) => s.dayNumber === status.dayNumber && keyMatch(s));
