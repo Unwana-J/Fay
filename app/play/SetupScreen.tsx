@@ -8,7 +8,7 @@ import { useFeatureStore } from "@/store/useFeatureStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
 import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Pause, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2, Volume2, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-import { BuzzerSoundType, BUZZER_OPTIONS } from "@/lib/articulate-room";
+import { BuzzerSoundType, BUZZER_OPTIONS, calculateMatchPlayTime } from "@/lib/articulate-room";
 import { playBuzzerSound } from "@/lib/sound";
 import BoardMap from "./BoardMap";
 import ArticulateGuideModal from "@/components/games/ArticulateGuideModal";
@@ -66,6 +66,15 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   const [showAdvancedNaming, setShowAdvancedNaming] = useState(false);
   const [selectedCompletedMatch, setSelectedCompletedMatch] = useState<ArticulateHistoryItem | null>(null);
   const [isLoadingMatchDetails, setIsLoadingMatchDetails] = useState(false);
+
+  const getPlausibleDuration = (durationSeconds?: number, match?: Partial<ArticulateHistoryItem>): number => {
+    if (durationSeconds && durationSeconds > 0 && durationSeconds <= 7200) {
+      return durationSeconds;
+    }
+    const totalScore = (match?.scoreA || 0) + (match?.scoreB || 0) + (match?.scoreC || 0) + (match?.scoreD || 0);
+    const rounds = match?.roundNumber || Math.max(1, Math.ceil(totalScore / 3.5));
+    return Math.max(45, rounds * 70);
+  };
 
   const formatMatchDuration = (seconds?: number): string => {
     if (!seconds || seconds <= 0) return "15 mins";
@@ -127,22 +136,8 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
             };
           });
 
-          let realDuration = match.durationSeconds || 0;
-          if (roomData.created_at && roomData.updated_at) {
-            const start = new Date(roomData.created_at).getTime();
-            const end = new Date(roomData.updated_at).getTime();
-            const diff = Math.round((end - start) / 1000);
-            if (diff > 20) {
-              realDuration = diff;
-            }
-          }
-
-          if (!realDuration || realDuration <= 0) {
-            const totalScore = (match.scoreA || 0) + (match.scoreB || 0) + (match.scoreC || 0) + (match.scoreD || 0);
-            const rounds = roomData.current_turn?.roundNumber || Math.max(1, Math.ceil(totalScore / 3.5));
-            const timer = roomData.settings?.timerSeconds || 45;
-            realDuration = rounds * timer + Math.round(rounds * 20);
-          }
+          const playTime = calculateMatchPlayTime(roomData);
+          const realDuration = playTime.seconds;
 
           const enriched: ArticulateHistoryItem = {
             ...match,
@@ -193,7 +188,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   // Auto-enrich any legacy completed match missing participant lists or duration on mount
   useEffect(() => {
     const legacyRooms = (articulateHistory || []).filter(
-      (r) => r.status === "game_over" && (!r.participants || r.participants.length === 0 || !r.durationSeconds)
+      (r) => r.status === "game_over" && (!r.participants || r.participants.length === 0 || !r.durationSeconds || r.durationSeconds > 7200)
     );
     legacyRooms.forEach((r) => {
       enrichMatchDetails(r);
@@ -1053,7 +1048,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                           </span>
                           <span className="inline-flex items-center gap-1 text-[11px] font-space font-medium text-[var(--text-dim)] bg-[var(--bg-card)] px-2 py-0.5 rounded-md border border-[var(--border-dim)]">
                             <Clock className="w-3 h-3 text-[var(--gold)]" />
-                            {formatMatchDuration(room.durationSeconds)}
+                            {formatMatchDuration(getPlausibleDuration(room.durationSeconds, room))}
                           </span>
                         </div>
                       </div>
@@ -1978,7 +1973,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     {isLoadingMatchDetails ? (
                       <Loader2 className="w-4 h-4 animate-spin text-[var(--gold)]" />
                     ) : (
-                      formatMatchDuration(selectedCompletedMatch.durationSeconds)
+                      formatMatchDuration(getPlausibleDuration(selectedCompletedMatch.durationSeconds, selectedCompletedMatch))
                     )}
                   </div>
                 </div>

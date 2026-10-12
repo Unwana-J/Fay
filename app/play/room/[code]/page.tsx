@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, use } from "react";
 import { useAppStore } from "@/store/useAppStore";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { ArticulateRoom, RoomPlayer, BuzzerSoundType, isRoomSnapshotFresh } from "@/lib/articulate-room";
+import { ArticulateRoom, RoomPlayer, BuzzerSoundType, isRoomSnapshotFresh, calculateMatchPlayTime } from "@/lib/articulate-room";
 import { playBuzzerSound, warmUpAudio } from "@/lib/sound";
 import RoomLobby from "./components/RoomLobby";
 import SpectatorLounge from "./components/SpectatorLounge";
@@ -582,11 +582,8 @@ export default function ArticulateRoomPage({
       };
     });
 
-    const matchStartTime = room.created_at ? new Date(room.created_at).getTime() : Date.now();
-    const durationSeconds = Math.max(
-      (room.current_turn?.roundNumber || 1) * (room.settings?.timerSeconds || 45),
-      Math.floor((Date.now() - matchStartTime) / 1000)
-    );
+    const playTime = calculateMatchPlayTime(room);
+    const durationSeconds = playTime.seconds;
 
     saveArticulateRoom({
       id: room.room_code,

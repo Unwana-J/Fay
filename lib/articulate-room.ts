@@ -103,44 +103,71 @@ export interface ArticulateRoom {
   last_speaker_indices?: { teamA?: number; teamB?: number; teamC?: number; teamD?: number }; // Track strict round-robin index per team
   last_speaker_ids?: { teamA?: string; teamB?: string; teamC?: string; teamD?: string }; // Track strict last speaker ID per team
   match_started_at?: string; // ISO timestamp when first round started
-  match_ended_at?: string; // ISO timestamp when match concluded
+  match_ended_at?: string; // ISO timestamp when match concluded / winner declared
+  goal_reached_at?: string; // ISO timestamp when victory scoreGoal was achieved
+  active_play_seconds?: number; // Accumulated active play time, paused when inactive > 10m
+  last_activity_at?: string; // ISO timestamp of most recent player action
   version?: number; // Monotonic revision counter, bumped on every persisted write (stale-snapshot rejection)
   created_at?: string;
   updated_at?: string;
 }
 
 /**
- * Calculates total match play time in seconds and human-formatted string (e.g. "18m 42s").
+ * Calculates total active match play time in seconds and human-formatted string (e.g. "18m 42s" or "1h 15m").
+ * - Starts timeline strictly when the first round begins (match_started_at), ignoring lobby setup time.
+ * - Concludes timeline strictly when a winner is declared or victory score goal achieved (match_ended_at / goal_reached_at).
+ * - Pauses accumulation if there is no game activity for > 10 minutes (600s).
  */
-export function calculateMatchPlayTime(room: ArticulateRoom): { seconds: number; formatted: string } {
-  // 1. Explicit match timestamps
+export function calculateMatchPlayTime(room: ArticulateRoom | Partial<ArticulateRoom>): { seconds: number; formatted: string } {
+  const totalScore =
+    (room.teams?.teamA?.score ?? 0) +
+    (room.teams?.teamB?.score ?? 0) +
+    (room.teams?.teamC?.score ?? 0) +
+    (room.teams?.teamD?.score ?? 0);
+  const timerSeconds = room.settings?.timerSeconds || 45;
+  const recordedRounds = room.current_turn?.roundNumber || 0;
+  const estimatedRounds = Math.max(1, Math.ceil(totalScore / 3.5));
+  const rounds = Math.max(recordedRounds, estimatedRounds);
+
+  // 1. Explicit active_play_seconds recorded by action tracker
+  if (typeof room.active_play_seconds === "number" && room.active_play_seconds > 0) {
+    const sec = Math.round(room.active_play_seconds);
+    return { seconds: sec, formatted: formatMatchDuration(sec) };
+  }
+
+  // 2. Explicit match start timestamp
   if (room.match_started_at) {
     const startMs = new Date(room.match_started_at).getTime();
-    const endMs = room.match_ended_at
-      ? new Date(room.match_ended_at).getTime()
-      : room.updated_at
-      ? new Date(room.updated_at).getTime()
-      : Date.now();
-    const diffSec = Math.max(1, Math.round((endMs - startMs) / 1000));
-    return { seconds: diffSec, formatted: formatMatchDuration(diffSec) };
-  }
+    const endIso =
+      room.match_ended_at ||
+      room.goal_reached_at ||
+      (room.status === "game_over" ? (room.last_activity_at || room.updated_at) : undefined);
 
-  // 2. Room created_at and updated_at fallback (e.g. existing completed rooms)
-  if (room.created_at && room.updated_at) {
-    const startMs = new Date(room.created_at).getTime();
-    const endMs = new Date(room.updated_at).getTime();
-    const diffSec = Math.round((endMs - startMs) / 1000);
-
-    // If within realistic play window (10s to 6 hours)
-    if (diffSec > 10 && diffSec < 6 * 3600) {
-      return { seconds: diffSec, formatted: formatMatchDuration(diffSec) };
+    let endMs: number;
+    if (endIso) {
+      endMs = new Date(endIso).getTime();
+    } else {
+      // In-progress room: if inactive for > 10 minutes, pause after 10m
+      const lastActiveMs = room.last_activity_at ? new Date(room.last_activity_at).getTime() : startMs;
+      const idleMs = Date.now() - lastActiveMs;
+      endMs = idleMs > 10 * 60 * 1000 ? lastActiveMs + 10 * 60 * 1000 : Date.now();
     }
+
+    const rawDiffSec = Math.max(1, Math.round((endMs - startMs) / 1000));
+
+    // Cap timeline if excessive idle gaps (> 10m per round) occurred between rounds
+    const maxPlausibleSec = rounds * (timerSeconds + 600); // 10 minutes max pause per round
+    if (rawDiffSec <= maxPlausibleSec) {
+      return { seconds: rawDiffSec, formatted: formatMatchDuration(rawDiffSec) };
+    }
+
+    // Normalized active duration with 10m pause applied
+    const normalizedSec = Math.max(timerSeconds, Math.round(rounds * (timerSeconds + 25)));
+    return { seconds: normalizedSec, formatted: formatMatchDuration(normalizedSec) };
   }
 
-  // 3. Fallback based on rounds played
-  const rounds = room.current_turn?.roundNumber || 1;
-  const turnSeconds = room.settings?.timerSeconds || 45;
-  const estimatedSeconds = Math.max(rounds * (turnSeconds + 15), turnSeconds);
+  // 3. Fallback for legacy rooms: calculate active play duration based on rounds and active speech
+  const estimatedSeconds = Math.max(rounds * (timerSeconds + 25), timerSeconds);
   return { seconds: estimatedSeconds, formatted: formatMatchDuration(estimatedSeconds) };
 }
 

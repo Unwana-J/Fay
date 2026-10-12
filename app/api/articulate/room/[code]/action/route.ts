@@ -28,6 +28,9 @@ async function persistRoom(room: ArticulateRoom) {
         host_name: room.host_name,
         match_started_at: room.match_started_at,
         match_ended_at: room.match_ended_at,
+        goal_reached_at: room.goal_reached_at,
+        active_play_seconds: room.active_play_seconds,
+        last_activity_at: room.last_activity_at,
         teamA: room.teams.teamA,
         teamB: room.teams.teamB,
         ...(room.teams.teamC ? { teamC: room.teams.teamC } : {}),
@@ -170,6 +173,9 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           last_speaker_ids: rawTeams.last_speaker_ids || {},
           match_started_at: rawTeams.match_started_at || undefined,
           match_ended_at: rawTeams.match_ended_at || undefined,
+          goal_reached_at: rawTeams.goal_reached_at || undefined,
+          active_play_seconds: typeof rawTeams.active_play_seconds === "number" ? rawTeams.active_play_seconds : undefined,
+          last_activity_at: rawTeams.last_activity_at || undefined,
           version: typeof rawTeams._version === "number" ? rawTeams._version : 0,
           created_at: data.created_at,
           updated_at: data.updated_at,
@@ -264,9 +270,76 @@ export async function POST(
   return actionResponse({ error: "Room is busy, please retry" }, { status: 503 });
 }
 
+const TEN_MINUTES_SEC = 600;
+const ACTIVE_GAMEPLAY_ACTIONS = new Set([
+  "start_round",
+  "score_word",
+  "pass_word",
+  "end_round",
+  "dispute_word",
+  "resolve_dispute",
+  "claim_passed_word",
+  "resolve_passed_claim",
+  "finish_game",
+  "declare_winner",
+]);
+
+function recordRoomActivity(room: ArticulateRoom, action: string) {
+  if (!ACTIVE_GAMEPLAY_ACTIONS.has(action)) return;
+
+  const now = Date.now();
+  const nowIso = new Date(now).toISOString();
+
+  // If match has not started yet, it starts strictly on first start_round
+  if (!room.match_started_at) {
+    if (action === "start_round") {
+      room.match_started_at = nowIso;
+      room.active_play_seconds = 0;
+      room.last_activity_at = nowIso;
+    }
+    return;
+  }
+
+  // Accumulate active play seconds if match is active (not already game_over)
+  if (room.status !== "game_over") {
+    if (room.last_activity_at) {
+      const lastMs = new Date(room.last_activity_at).getTime();
+      const elapsedSec = Math.max(0, Math.round((now - lastMs) / 1000));
+      // Pause timeline if inactive for > 10 minutes (credit at most 10 minutes from this gap)
+      const creditSec = Math.min(elapsedSec, TEN_MINUTES_SEC);
+      room.active_play_seconds = (room.active_play_seconds || 0) + creditSec;
+    } else {
+      const startMs = new Date(room.match_started_at).getTime();
+      const elapsedSec = Math.max(0, Math.round((now - startMs) / 1000));
+      room.active_play_seconds = Math.min(elapsedSec, TEN_MINUTES_SEC);
+    }
+  }
+
+  room.last_activity_at = nowIso;
+
+  // Track if any team has reached the victory scoreGoal
+  const scoreGoal = room.settings?.scoreGoal || 20;
+  const isGoalReached =
+    (room.teams.teamA.score >= scoreGoal) ||
+    (room.teams.teamB.score >= scoreGoal) ||
+    (room.teams.teamC ? room.teams.teamC.score >= scoreGoal : false) ||
+    (room.teams.teamD ? room.teams.teamD.score >= scoreGoal : false);
+
+  if (isGoalReached && !room.goal_reached_at) {
+    room.goal_reached_at = nowIso;
+  }
+
+  if (action === "finish_game" || action === "declare_winner") {
+    if (!room.match_ended_at) {
+      room.match_ended_at = nowIso;
+    }
+  }
+}
+
 async function handleAction(room: ArticulateRoom, body: any): Promise<NextResponse> {
   {
     const { action, playerId, playerName, preferredTeam, targetTeam, settings, hostId, previousPlayerId } = body;
+    recordRoomActivity(room, action);
 
     // ---------------------------------------------------------------
     // TURN GUARDS: reject delayed packets that belong to a previous turn
@@ -1024,6 +1097,9 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         room.locked = false;
         room.match_started_at = undefined;
         room.match_ended_at = undefined;
+        room.goal_reached_at = undefined;
+        room.active_play_seconds = undefined;
+        room.last_activity_at = undefined;
         room.teams.teamA.score = 0;
         room.teams.teamB.score = 0;
         if (room.teams.teamC) room.teams.teamC.score = 0;
