@@ -26,6 +26,15 @@ export const metadata: Metadata = {
   description:
     "A premium learning platform that challenges you to research, synthesize, and explain ideas in your own words. Build genuine understanding through active learning.",
   keywords: ["learning", "critical thinking", "public speaking", "knowledge", "education"],
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/icons/fey-icon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/icons/fey-icon-512.png", sizes: "180x180", type: "image/png" },
+    ],
+  },
 };
 
 import AppLayout from "@/components/ui/AppLayout";
