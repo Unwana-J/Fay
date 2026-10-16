@@ -14,6 +14,9 @@ import {
   ExternalLink,
   X,
   ArrowLeft,
+  ArrowUp,
+  ArrowDown,
+  LayoutTemplate,
   Pencil,
   Plus,
   Trash2,
@@ -24,6 +27,7 @@ import {
 import Link from "next/link";
 import { usePodiumStore } from "@/store/usePodiumStore";
 import { useAppStore } from "@/store/useAppStore";
+import { type SlideLayout } from "@/lib/podium-types";
 import { encodePodiumDeck } from "@/lib/podium-share";
 import { PODIUM_THEMES } from "@/lib/podium-themes";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -120,6 +124,11 @@ function PodiumPageInner() {
     updateSlide,
     applyThemeToDeck,
     applyThemeToSlide,
+    createManualDeck,
+    addSlide,
+    deleteSlide,
+    moveSlide,
+    changeSlideLayout,
     reset,
   } = usePodiumStore();
 
@@ -132,6 +141,7 @@ function PodiumPageInner() {
   const [timeLeft, setTimeLeft] = useState(notesTimeLimit);
   const [timerRunning, setTimerRunning] = useState(false);
   const [editingSlideIndex, setEditingSlideIndex] = useState<number | null>(null);
+  const [isSpinningTopic, setIsSpinningTopic] = useState(false);
 
   // Featured slide & quote for sharing / preview card
   const [featuredSlideIndex, setFeaturedSlideIndex] = useState<number>(0);
@@ -231,6 +241,8 @@ function PodiumPageInner() {
     reset();
     spinLocalTopic();
     setPhase("topic");
+    setIsSpinningTopic(true);
+    setTimeout(() => setIsSpinningTopic(false), 850);
   };
 
   const handleAcceptTopic = () => {
@@ -240,7 +252,9 @@ function PodiumPageInner() {
   };
 
   const handleRespin = () => {
+    setIsSpinningTopic(true);
     spinLocalTopic();
+    setTimeout(() => setIsSpinningTopic(false), 850);
   };
 
   const handleConfirmCustom = () => {
@@ -248,6 +262,10 @@ function PodiumPageInner() {
     confirmCustomTopic();
     setShowCustomForm(false);
     setPhase("notes");
+  };
+
+  const handleDesignYourself = () => {
+    createManualDeck(profile.username || "Scholar");
   };
 
   const handleGenerateSlides = async () => {
@@ -275,8 +293,7 @@ function PodiumPageInner() {
       setCurrentSlide(0);
       setPhase("preview");
     } catch (err: any) {
-      setGenerationError(err.message || "Something went wrong");
-      setPhase("notes");
+      setGenerationError(err.message || "Something went wrong while contacting AI");
     } finally {
       setIsGenerating(false);
     }
@@ -337,12 +354,13 @@ function PodiumPageInner() {
               >
                 <ArrowLeft size={13} /> Games
               </Link>
-              <div className="flex items-center gap-3 mb-4">
+              <div className="flex items-center gap-3.5 mb-4">
                 <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center text-3xl shadow-sm border"
+                  className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm border relative group"
                   style={{ background: "rgba(166,124,30,0.12)", borderColor: "rgba(166,124,30,0.25)" }}
                 >
-                  🎤
+                  <FeyLogo size={36} />
+                  <span className="absolute -bottom-1 -right-1 text-sm drop-shadow-sm">🎤</span>
                 </div>
                 <div>
                   <h1
@@ -352,7 +370,7 @@ function PodiumPageInner() {
                     The Podium
                   </h1>
                   <p className="text-sm" style={{ color: "var(--text-dim)" }}>
-                    Spin a topic · Jot your hot takes · Let AI build your slides
+                    Spin a topic · Jot your hot takes · Design slides with or without AI
                   </p>
                 </div>
               </div>
@@ -414,14 +432,31 @@ function PodiumPageInner() {
               </div>
             </div>
 
-            {/* CTA */}
-            <button
-              onClick={handleStartNew}
-              className="w-full py-4 rounded-2xl font-space font-extrabold text-lg tracking-tight flex items-center justify-center gap-2 cursor-pointer transition-opacity hover:opacity-90"
-              style={{ background: "var(--terra)", color: "#fff" }}
-            >
-              <Mic size={20} /> Spin a Topic &amp; Start
-            </button>
+            {/* CTA Buttons */}
+            <div className="space-y-3">
+              <button
+                onClick={handleStartNew}
+                className="w-full py-4 rounded-2xl font-space font-extrabold text-lg tracking-tight flex items-center justify-center gap-2 cursor-pointer transition-opacity hover:opacity-90"
+                style={{ background: "var(--terra)", color: "#fff" }}
+              >
+                <Shuffle size={20} /> Spin a Hot-Take Topic
+              </button>
+
+              <button
+                onClick={() => {
+                  reset();
+                  setShowCustomForm(true);
+                }}
+                className="w-full py-3.5 rounded-2xl font-space font-bold text-sm tracking-tight flex items-center justify-center gap-2 cursor-pointer border hover:opacity-90 transition-opacity"
+                style={{
+                  background: "var(--bg-card)",
+                  borderColor: "var(--border-dim)",
+                  color: "var(--text)",
+                }}
+              >
+                <PenLine size={15} style={{ color: "var(--gold)" }} /> Or Write Your Own Topic
+              </button>
+            </div>
 
             {/* Saved decks */}
             {savedDecks.length > 0 && (
@@ -484,15 +519,28 @@ function PodiumPageInner() {
             initial={{ opacity: 0, scale: 0.95 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.95 }}
-            className="min-h-screen flex flex-col items-center justify-center px-4 py-12"
+            className="min-h-screen flex flex-col items-center justify-center px-4 py-12 relative"
           >
-            <TopicSpinner topic={currentTopic} />
+            {/* Top Back Navigation */}
+            <div className="absolute top-6 left-4 sm:left-8">
+              <button
+                type="button"
+                onClick={() => setPhase("lobby")}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-75 transition-opacity cursor-pointer"
+                style={{ color: "var(--text-dim)" }}
+              >
+                <ArrowLeft size={13} /> Back to Lobby
+              </button>
+            </div>
+
+            <TopicSpinner topic={currentTopic} isSpinning={isSpinningTopic} />
 
             <div className="w-full max-w-lg mt-10 space-y-3">
               {/* Accept */}
               <button
                 onClick={handleAcceptTopic}
-                className="w-full py-4 rounded-2xl font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer transition-opacity hover:opacity-90"
+                disabled={isSpinningTopic}
+                className="w-full py-4 rounded-2xl font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer transition-opacity hover:opacity-90 disabled:opacity-50"
                 style={{ background: "var(--terra)", color: "#fff" }}
               >
                 <ChevronRight size={18} /> Accept This Topic
@@ -502,7 +550,8 @@ function PodiumPageInner() {
               <div className="flex gap-3">
                 <button
                   onClick={handleRespin}
-                  className="flex-1 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                  disabled={isSpinningTopic}
+                  className="flex-1 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50"
                   style={{
                     borderColor: "var(--border-dim)",
                     color: "var(--text-dim)",
@@ -513,7 +562,8 @@ function PodiumPageInner() {
                 </button>
                 <button
                   onClick={() => setShowCustomForm(true)}
-                  className="flex-1 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 cursor-pointer hover:opacity-80 transition-opacity"
+                  disabled={isSpinningTopic}
+                  className="flex-1 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 cursor-pointer hover:opacity-80 transition-opacity disabled:opacity-50"
                   style={{
                     borderColor: "var(--border-dim)",
                     color: "var(--text-dim)",
@@ -533,59 +583,6 @@ function PodiumPageInner() {
                 ← Back to lobby
               </button>
             </div>
-
-            {/* Custom topic modal */}
-            <AnimatePresence>
-              {showCustomForm && (
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50"
-                  onClick={() => setShowCustomForm(false)}
-                >
-                  <motion.div
-                    initial={{ scale: 0.95, y: 20 }}
-                    animate={{ scale: 1, y: 0 }}
-                    exit={{ scale: 0.95, y: 20 }}
-                    className="w-full max-w-md rounded-3xl p-6 border"
-                    style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
-                    onClick={(e) => e.stopPropagation()}
-                  >
-                    <h3
-                      className="font-space font-bold text-lg mb-4"
-                      style={{ color: "var(--text)" }}
-                    >
-                      Custom Topic
-                    </h3>
-                    <div className="space-y-3 mb-4">
-                      <input
-                        className="w-full px-4 py-3 rounded-xl border bg-transparent text-sm focus:outline-none"
-                        style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
-                        placeholder="Your bold topic title..."
-                        value={customInput}
-                        onChange={(e) => setCustomInput(e.target.value)}
-                      />
-                      <input
-                        className="w-full px-4 py-3 rounded-xl border bg-transparent text-sm focus:outline-none"
-                        style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
-                        placeholder="Subtitle (optional — e.g. 'A Sociological Study')"
-                        value={customSubInput}
-                        onChange={(e) => setCustomSubInput(e.target.value)}
-                      />
-                    </div>
-                    <button
-                      onClick={handleConfirmCustom}
-                      disabled={!customInput.trim()}
-                      className="w-full py-3 rounded-xl font-bold text-sm cursor-pointer disabled:opacity-40 transition-opacity"
-                      style={{ background: "var(--terra)", color: "#fff" }}
-                    >
-                      Use This Topic
-                    </button>
-                  </motion.div>
-                </motion.div>
-              )}
-            </AnimatePresence>
           </motion.div>
         )}
 
@@ -600,6 +597,30 @@ function PodiumPageInner() {
             exit={{ opacity: 0, y: -20 }}
             className="max-w-2xl mx-auto px-4 sm:px-8 py-8"
           >
+            {/* Top Back Navigation Breadcrumbs */}
+            <div className="flex items-center gap-2 mb-4">
+              <button
+                type="button"
+                onClick={() => setPhase("topic")}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-75 transition-opacity cursor-pointer"
+                style={{ color: "var(--text-dim)" }}
+              >
+                <ArrowLeft size={13} /> Back to Topic
+              </button>
+              <span className="text-xs" style={{ color: "var(--border-dim)" }}>·</span>
+              <button
+                type="button"
+                onClick={() => {
+                  reset();
+                  setPhase("lobby");
+                }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-75 transition-opacity cursor-pointer"
+                style={{ color: "var(--text-mute)" }}
+              >
+                Exit to Lobby
+              </button>
+            </div>
+
             {/* Topic header + timer */}
             <div className="flex items-start justify-between mb-6 gap-4">
               <div>
@@ -691,26 +712,85 @@ function PodiumPageInner() {
               onChange={(e) => setNotes(e.target.value)}
             />
 
-            {/* Action buttons */}
-            <div className="flex gap-3 mt-4">
-              <button
-                onClick={() => setPhase("topic")}
-                className="flex-1 py-3 rounded-2xl border font-bold text-sm cursor-pointer hover:opacity-80 transition-opacity"
-                style={{
-                  borderColor: "var(--border-dim)",
-                  color: "var(--text-dim)",
-                  background: "var(--bg-card)",
-                }}
-              >
-                ← Change Topic
-              </button>
-              <button
-                onClick={handleGenerateSlides}
-                className="flex-[2] py-3 rounded-2xl font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer hover:opacity-90 transition-opacity"
-                style={{ background: "var(--terra)", color: "#fff" }}
-              >
-                <Sparkles size={16} /> Build My Slides
-              </button>
+            {/* Slide Creation Modes */}
+            <div className="mt-6 space-y-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* 1. Design Slides Yourself (Instant & Zero Dependency) */}
+                <button
+                  type="button"
+                  onClick={handleDesignYourself}
+                  className="p-4 rounded-2xl border text-left cursor-pointer transition-all hover:scale-[1.01] hover:border-[var(--gold)] group flex flex-col justify-between"
+                  style={{
+                    background: "var(--bg-card)",
+                    borderColor: "var(--border-dim)",
+                  }}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">✍️</span>
+                      <span
+                        className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full font-bold"
+                        style={{ background: "rgba(166,124,30,0.15)", color: "var(--gold)" }}
+                      >
+                        Instant · 0ms
+                      </span>
+                    </div>
+                    <div className="font-space font-extrabold text-base mb-1 text-[var(--text)] group-hover:text-[var(--gold)] transition-colors">
+                      Design Slides Yourself
+                    </div>
+                    <div className="text-xs text-[var(--text-dim)] leading-relaxed">
+                      Convert your topic &amp; notes directly into editable slides. No AI latency, full creative control.
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-1 text-xs font-bold" style={{ color: "var(--gold)" }}>
+                    Open Slide Studio <ChevronRight size={13} />
+                  </div>
+                </button>
+
+                {/* 2. Generate with AI (Gemini speechwriter) */}
+                <button
+                  type="button"
+                  onClick={handleGenerateSlides}
+                  className="p-4 rounded-2xl border text-left cursor-pointer transition-all hover:scale-[1.01] hover:border-[var(--terra)] group flex flex-col justify-between"
+                  style={{
+                    background: "color-mix(in srgb, var(--terra) 8%, var(--bg-card))",
+                    borderColor: "rgba(140, 45, 25, 0.4)",
+                  }}
+                >
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-2xl">✨</span>
+                      <span
+                        className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full font-bold"
+                        style={{ background: "var(--terra)", color: "#fff" }}
+                      >
+                        AI Speechwriter
+                      </span>
+                    </div>
+                    <div className="font-space font-extrabold text-base mb-1 text-[var(--text)] group-hover:text-[var(--terra)] transition-colors">
+                      Generate with AI
+                    </div>
+                    <div className="text-xs text-[var(--text-dim)] leading-relaxed">
+                      Let Fay-re brainstorm bold punchlines, structure arguments, and polish your notes into 5 punchy slides.
+                    </div>
+                  </div>
+                  <div className="mt-4 flex items-center gap-1 text-xs font-bold" style={{ color: "var(--terra)" }}>
+                    Build with AI <Sparkles size={13} />
+                  </div>
+                </button>
+              </div>
+
+              {/* Back button */}
+              <div className="text-center pt-2">
+                <button
+                  type="button"
+                  onClick={() => setPhase("topic")}
+                  className="text-xs font-semibold cursor-pointer hover:opacity-75 transition-opacity"
+                  style={{ color: "var(--text-mute)" }}
+                >
+                  ← Pick or spin a different topic
+                </button>
+              </div>
             </div>
           </motion.div>
         )}
@@ -749,15 +829,27 @@ function PodiumPageInner() {
             <p className="text-sm" style={{ color: "var(--text-dim)" }}>
               Fay-re is crafting your masterpiece.
             </p>
+
             {generationError && (
-              <div className="mt-6 p-4 rounded-xl border border-red-500/30 bg-red-500/10 text-sm text-red-400 max-w-sm">
-                {generationError}
-                <button
-                  onClick={() => setPhase("notes")}
-                  className="block mt-2 underline text-xs cursor-pointer"
-                >
-                  ← Go back
-                </button>
+              <div className="mt-6 p-5 rounded-2xl border border-red-500/30 bg-red-500/10 text-sm max-w-md mx-auto space-y-3">
+                <p className="font-bold text-red-400">AI Slide Generation Notice</p>
+                <p className="text-xs text-red-300/90 leading-relaxed">{generationError}</p>
+                <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                  <button
+                    onClick={handleDesignYourself}
+                    className="flex-1 py-2.5 px-3 rounded-xl font-bold text-xs cursor-pointer transition-opacity text-white flex items-center justify-center gap-1.5 shadow-sm"
+                    style={{ background: "var(--terra)" }}
+                  >
+                    <PenLine size={13} /> Draft from my notes instead
+                  </button>
+                  <button
+                    onClick={() => setPhase("notes")}
+                    className="py-2.5 px-3 rounded-xl border text-xs font-bold cursor-pointer hover:bg-white/5 transition-colors"
+                    style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
+                  >
+                    ← Back to Notes
+                  </button>
+                </div>
               </div>
             )}
           </motion.div>
@@ -776,6 +868,30 @@ function PodiumPageInner() {
               exit={{ opacity: 0, y: -20 }}
               className="max-w-6xl mx-auto px-4 sm:px-8 py-8"
             >
+              {/* Top Back Navigation Breadcrumbs */}
+              <div className="flex items-center gap-2 mb-4">
+                <button
+                  type="button"
+                  onClick={() => setPhase("notes")}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-75 transition-opacity cursor-pointer"
+                  style={{ color: "var(--text-dim)" }}
+                >
+                  <ArrowLeft size={13} /> Back to Notes
+                </button>
+                <span className="text-xs" style={{ color: "var(--border-dim)" }}>·</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    reset();
+                    setPhase("lobby");
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-75 transition-opacity cursor-pointer"
+                  style={{ color: "var(--text-mute)" }}
+                >
+                  Exit to Lobby
+                </button>
+              </div>
+
               {/* Header */}
               <div className="flex items-center justify-between mb-6">
                 <div>
@@ -878,24 +994,77 @@ function PodiumPageInner() {
 
                       {/* Footer row */}
                       <div
-                        className="px-4 py-2 flex items-center gap-3"
+                        className="px-4 py-2 flex items-center gap-2 sm:gap-3"
                         style={{ background: "var(--bg-card)" }}
                       >
-                        <span className="font-mono text-xs" style={{ color: "var(--text-mute)" }}>
+                        <span className="font-mono text-xs font-semibold shrink-0" style={{ color: "var(--text-mute)" }}>
                           {i + 1}
                         </span>
                         <span className="text-xs font-bold truncate flex-1" style={{ color: "var(--text)" }}>
                           {slide.title}
                         </span>
                         <span
-                          className="text-xs px-2 py-0.5 rounded-full"
+                          className="text-[10px] px-2 py-0.5 rounded-full font-mono uppercase shrink-0"
                           style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}
                         >
                           {slide.layout}
                         </span>
+
+                        {/* Reorder buttons */}
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveSlide(i, i - 1);
+                              if (editingSlideIndex === i) setEditingSlideIndex(i - 1);
+                              else if (editingSlideIndex === i - 1) setEditingSlideIndex(i);
+                            }}
+                            disabled={i === 0}
+                            title="Move slide up"
+                            className="p-1 rounded hover:bg-[var(--bg-input)] cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed transition-opacity"
+                          >
+                            <ArrowUp size={12} style={{ color: "var(--text-dim)" }} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              moveSlide(i, i + 1);
+                              if (editingSlideIndex === i) setEditingSlideIndex(i + 1);
+                              else if (editingSlideIndex === i + 1) setEditingSlideIndex(i);
+                            }}
+                            disabled={i === generatedDeck.slides.length - 1}
+                            title="Move slide down"
+                            className="p-1 rounded hover:bg-[var(--bg-input)] cursor-pointer disabled:opacity-20 disabled:cursor-not-allowed transition-opacity"
+                          >
+                            <ArrowDown size={12} style={{ color: "var(--text-dim)" }} />
+                          </button>
+                        </div>
+
+                        {/* Delete button (if >1 slide) */}
+                        {generatedDeck.slides.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteSlide(i);
+                              if (editingSlideIndex === i) {
+                                setEditingSlideIndex(null);
+                              } else if (editingSlideIndex !== null && editingSlideIndex > i) {
+                                setEditingSlideIndex(editingSlideIndex - 1);
+                              }
+                            }}
+                            title="Delete slide"
+                            className="p-1 rounded hover:bg-red-500/10 cursor-pointer transition-colors shrink-0"
+                          >
+                            <Trash2 size={12} className="text-red-400" />
+                          </button>
+                        )}
+
                         <button
                           onClick={() => setEditingSlideIndex(editingSlideIndex === i ? null : i)}
-                          className="flex items-center gap-1 text-xs px-3 py-1.5 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity"
+                          className="flex items-center gap-1 text-xs px-2.5 py-1.5 rounded-lg border cursor-pointer hover:opacity-80 transition-opacity shrink-0"
                           style={{
                             borderColor: editingSlideIndex === i ? "var(--terra)" : "var(--border-dim)",
                             color: editingSlideIndex === i ? "var(--terra)" : "var(--text-dim)",
@@ -908,6 +1077,43 @@ function PodiumPageInner() {
                       </div>
                     </motion.div>
                   ))}
+
+                  {/* Add Slide Toolbar */}
+                  <div
+                    className="p-3.5 rounded-2xl border flex flex-col sm:flex-row items-center justify-between gap-3"
+                    style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
+                  >
+                    <div className="flex items-center gap-2">
+                      <Plus size={15} style={{ color: "var(--gold)" }} />
+                      <span className="text-xs font-bold" style={{ color: "var(--text)" }}>Add Slide:</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 flex-wrap justify-center">
+                      {([
+                        { layout: "title-body", label: "Body Text" },
+                        { layout: "title-bullets", label: "Bullets" },
+                        { layout: "quote", label: "Quote" },
+                        { layout: "title-only", label: "Cover" },
+                        { layout: "closing", label: "Closing" },
+                      ] as const).map(({ layout, label }) => (
+                        <button
+                          key={layout}
+                          type="button"
+                          onClick={() => {
+                            addSlide(layout);
+                            setEditingSlideIndex(generatedDeck.slides.length);
+                          }}
+                          className="px-2.5 py-1.5 rounded-lg border text-xs font-semibold flex items-center gap-1 hover:border-[var(--terra)] hover:text-[var(--terra)] transition-all cursor-pointer"
+                          style={{
+                            borderColor: "var(--border-dim)",
+                            background: "var(--bg-input)",
+                            color: "var(--text-dim)",
+                          }}
+                        >
+                          <Plus size={11} /> {label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {/* ── Right: edit panel ── */}
@@ -926,21 +1132,97 @@ function PodiumPageInner() {
                       <div className="flex items-center justify-between mb-4">
                         <div>
                           <p className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
-                            Slide {editingSlideIndex + 1}
-                          </p>
-                          <p className="text-xs mt-0.5 font-mono" style={{ color: "var(--text-mute)" }}>
-                            {editSlide.layout}
+                            Slide {editingSlideIndex + 1} of {generatedDeck.slides.length}
                           </p>
                         </div>
-                        <button
-                          onClick={() => setEditingSlideIndex(null)}
-                          className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] cursor-pointer"
-                        >
-                          <X size={14} style={{ color: "var(--text-mute)" }} />
-                        </button>
+                        <div className="flex items-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (editingSlideIndex > 0) {
+                                moveSlide(editingSlideIndex, editingSlideIndex - 1);
+                                setEditingSlideIndex(editingSlideIndex - 1);
+                              }
+                            }}
+                            disabled={editingSlideIndex === 0}
+                            title="Move slide up"
+                            className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] cursor-pointer disabled:opacity-20 transition-opacity"
+                          >
+                            <ArrowUp size={13} style={{ color: "var(--text-dim)" }} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (editingSlideIndex < generatedDeck.slides.length - 1) {
+                                moveSlide(editingSlideIndex, editingSlideIndex + 1);
+                                setEditingSlideIndex(editingSlideIndex + 1);
+                              }
+                            }}
+                            disabled={editingSlideIndex === generatedDeck.slides.length - 1}
+                            title="Move slide down"
+                            className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] cursor-pointer disabled:opacity-20 transition-opacity"
+                          >
+                            <ArrowDown size={13} style={{ color: "var(--text-dim)" }} />
+                          </button>
+                          {generatedDeck.slides.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                deleteSlide(editingSlideIndex);
+                                setEditingSlideIndex(null);
+                              }}
+                              title="Delete slide"
+                              className="p-1.5 rounded-lg hover:bg-red-500/10 cursor-pointer transition-colors"
+                            >
+                              <Trash2 size={13} className="text-red-400" />
+                            </button>
+                          )}
+                          <button
+                            onClick={() => setEditingSlideIndex(null)}
+                            title="Close edit panel"
+                            className="p-1.5 rounded-lg hover:bg-[var(--bg-input)] cursor-pointer"
+                          >
+                            <X size={14} style={{ color: "var(--text-mute)" }} />
+                          </button>
+                        </div>
                       </div>
 
                       <div className="space-y-4">
+
+                        {/* Layout Selector */}
+                        <div>
+                          <label className="block text-xs font-bold mb-1.5" style={{ color: "var(--text-dim)" }}>
+                            Slide Layout
+                          </label>
+                          <div
+                            className="grid grid-cols-3 gap-1 p-1 rounded-xl border text-center"
+                            style={{ background: "var(--bg-base)", borderColor: "var(--border-dim)" }}
+                          >
+                            {([
+                              { id: "title-body", label: "Body" },
+                              { id: "title-bullets", label: "Bullets" },
+                              { id: "quote", label: "Quote" },
+                              { id: "title-only", label: "Cover" },
+                              { id: "closing", label: "Closing" },
+                            ] as const).map(({ id, label }) => {
+                              const isCurrent = editSlide.layout === id;
+                              return (
+                                <button
+                                  key={id}
+                                  type="button"
+                                  onClick={() => changeSlideLayout(editingSlideIndex, id as SlideLayout)}
+                                  className={`py-1.5 px-2 rounded-lg text-[11px] font-semibold transition-all cursor-pointer truncate ${
+                                    isCurrent
+                                      ? "bg-[var(--terra)] text-white shadow-sm"
+                                      : "text-[var(--text-dim)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]"
+                                  }`}
+                                >
+                                  {label}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
 
                         {/* Title — all layouts */}
                         <div>
@@ -1431,8 +1713,31 @@ function PodiumPageInner() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -20 }}
-              className="max-w-xl mx-auto px-4 sm:px-6 py-10 text-center"
+              className="max-w-xl mx-auto px-4 sm:px-6 py-8 text-center"
             >
+              {/* Top Back Navigation */}
+              <div className="flex items-center justify-between mb-6 text-left">
+                <button
+                  type="button"
+                  onClick={() => setPhase("preview")}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-75 transition-opacity cursor-pointer"
+                  style={{ color: "var(--text-dim)" }}
+                >
+                  <ArrowLeft size={13} /> Back to Slide Studio
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    reset();
+                    setPhase("lobby");
+                  }}
+                  className="inline-flex items-center gap-1.5 text-xs font-semibold hover:opacity-75 transition-opacity cursor-pointer"
+                  style={{ color: "var(--text-mute)" }}
+                >
+                  Exit to Lobby
+                </button>
+              </div>
+
               <div className="text-5xl mb-3">🎤</div>
               <h2
                 className="font-space font-extrabold text-2xl mb-1.5"
@@ -1648,6 +1953,79 @@ function PodiumPageInner() {
           );
         })()}
 
+      </AnimatePresence>
+
+      {/* Global Custom Topic Modal */}
+      <AnimatePresence>
+        {showCustomForm && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50"
+            onClick={() => setShowCustomForm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="w-full max-w-md rounded-3xl p-6 border shadow-2xl"
+              style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h3
+                  className="font-space font-bold text-lg"
+                  style={{ color: "var(--text)" }}
+                >
+                  Custom Presentation Topic
+                </h3>
+                <button
+                  onClick={() => setShowCustomForm(false)}
+                  className="p-1 rounded-lg hover:bg-[var(--bg-input)] cursor-pointer"
+                >
+                  <X size={16} style={{ color: "var(--text-mute)" }} />
+                </button>
+              </div>
+
+              <div className="space-y-3 mb-5">
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text-dim)" }}>
+                    Presentation Title / Thesis
+                  </label>
+                  <input
+                    className="w-full px-4 py-3 rounded-xl border bg-transparent text-sm focus:outline-none"
+                    style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                    placeholder="e.g. Remote work proved 50% of meetings are pointless"
+                    value={customInput}
+                    onChange={(e) => setCustomInput(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1" style={{ color: "var(--text-dim)" }}>
+                    Subtitle / Frame (optional)
+                  </label>
+                  <input
+                    className="w-full px-4 py-3 rounded-xl border bg-transparent text-sm focus:outline-none"
+                    style={{ borderColor: "var(--border-dim)", color: "var(--text-dim)" }}
+                    placeholder="e.g. An Unsolicited Exposé · Field Notes"
+                    value={customSubInput}
+                    onChange={(e) => setCustomSubInput(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <button
+                onClick={handleConfirmCustom}
+                disabled={!customInput.trim()}
+                className="w-full py-3.5 rounded-xl font-bold text-sm cursor-pointer disabled:opacity-40 transition-opacity shadow-sm"
+                style={{ background: "var(--terra)", color: "#fff" }}
+              >
+                Continue to Notes &amp; Slides →
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </div>
   );

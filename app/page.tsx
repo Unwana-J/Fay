@@ -522,21 +522,34 @@ export default function Dashboard() {
               })}
             </div>
 
-            {/* The Question in classic editorial typography */}
-            <p
-              className={cn(
-                "font-serif font-bold mb-3 tracking-tight transition-all duration-300",
-                spinning ? "blur-sm scale-[0.99] opacity-50" : ""
-              )}
-              style={{
-                fontSize: "clamp(1.35rem, 2.7vw, 1.85rem)",
-                color: "var(--text)",
-                lineHeight: 1.3,
-                maxWidth: "54ch",
-              }}
-            >
-              {spinning ? "Consulting scholarship..." : suggestedTopic.text}
-            </p>
+            {/* The Question in classic editorial typography with subtle Fey spin state */}
+            {spinning ? (
+              <div className="py-4 my-1 flex items-center gap-3">
+                <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
+                  <FeyLogo size={24} spinning={true} />
+                </div>
+                <div>
+                  <span className="font-mono text-xs uppercase tracking-widest text-[var(--gold)] font-bold animate-pulse block">
+                    Consulting Scholarship...
+                  </span>
+                  <span className="text-xs text-[var(--text-mute)] font-serif italic">
+                    Selecting your daily articulation challenge
+                  </span>
+                </div>
+              </div>
+            ) : (
+              <p
+                className="font-serif font-bold mb-3 tracking-tight transition-all duration-300"
+                style={{
+                  fontSize: "clamp(1.35rem, 2.7vw, 1.85rem)",
+                  color: "var(--text)",
+                  lineHeight: 1.3,
+                  maxWidth: "54ch",
+                }}
+              >
+                {suggestedTopic.text}
+              </p>
+            )}
 
             {/* Feynman challenge prompt */}
             <p

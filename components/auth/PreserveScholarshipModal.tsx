@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { Flame, ShieldCheck, Check, Sparkles, X, ArrowRight, Lock, Eye, EyeOff, Smartphone, Laptop, Loader2, User } from "lucide-react";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 import { useAppStore } from "@/store/useAppStore";
 import { analytics } from "@/lib/analytics";
 import confetti from "canvas-confetti";
@@ -274,20 +275,24 @@ export default function PreserveScholarshipModal() {
               </div>
 
               {/* Mode Toggle Tabs */}
-              <div className="flex items-center gap-2 border-b pb-1" style={{ borderColor: "var(--border-dim)" }}>
+              <div 
+                className="flex p-1.5 rounded-2xl border bg-[var(--bg-input)] shadow-inner gap-1.5"
+                style={{ borderColor: "var(--border-dim)" }}
+              >
                 <button
                   type="button"
                   onClick={() => {
                     setMode("register");
                     setError("");
                   }}
-                  className={`text-xs font-semibold pb-1.5 border-b-2 transition-colors ${
+                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation select-none active:scale-[0.98] ${
                     mode === "register"
-                      ? "border-[var(--terra)] text-[var(--text)]"
-                      : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]"
+                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[var(--border)] ring-1 ring-[var(--terra)]/25"
+                      : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]/40 border border-transparent"
                   }`}
                 >
-                  Create Cloud Account
+                  <Sparkles size={13} className={mode === "register" ? "text-[var(--terra)]" : "opacity-60"} />
+                  <span>Create Cloud Account</span>
                 </button>
                 <button
                   type="button"
@@ -295,13 +300,14 @@ export default function PreserveScholarshipModal() {
                     setMode("login");
                     setError("");
                   }}
-                  className={`text-xs font-semibold pb-1.5 border-b-2 transition-colors ${
+                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation select-none active:scale-[0.98] ${
                     mode === "login"
-                      ? "border-[var(--terra)] text-[var(--text)]"
-                      : "border-transparent text-[var(--text-muted)] hover:text-[var(--text)]"
+                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[var(--border)] ring-1 ring-[var(--olive)]/25"
+                      : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]/40 border border-transparent"
                   }`}
                 >
-                  Existing Account Login
+                  <ShieldCheck size={13} className={mode === "login" ? "text-[var(--olive)]" : "opacity-60"} />
+                  <span>Existing Account Login</span>
                 </button>
               </div>
 
@@ -407,7 +413,7 @@ export default function PreserveScholarshipModal() {
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 size={14} className="animate-spin" /> Saving...
+                        <FeyLogo size={14} spinning={true} /> Saving...
                       </>
                     ) : mode === "register" ? (
                       <>

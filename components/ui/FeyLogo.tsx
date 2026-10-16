@@ -131,3 +131,5 @@ export default function FeyLogo({ className, size = 32, spinning = false, color 
     </svg>
   );
 }
+
+export { FeyLogo };

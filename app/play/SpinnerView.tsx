@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { motion, useAnimation, AnimatePresence } from "framer-motion";
 import { HelpCircle, RefreshCcw } from "lucide-react";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 import { useFeyVoice } from "@/lib/useFeyVoice";
 import { type TeamId } from "@/store/useGameStore";
 
@@ -189,7 +190,7 @@ export default function SpinnerView({ activeTeam, teamColor, onComplete }: Spinn
           className="absolute w-16 h-16 rounded-full bg-[var(--bg-card)] border-4 border-[var(--border-dim)] hover:border-[var(--text-mute)] shadow-lg hover:shadow-xl flex flex-col items-center justify-center cursor-pointer transition-all z-20 active:scale-95 disabled:cursor-not-allowed"
         >
           {isSpinning ? (
-            <RefreshCcw className="w-5 h-5 text-[var(--text-mute)] animate-spin" />
+            <FeyLogo size={24} spinning={true} />
           ) : (
             <span className="text-[10px] font-space font-black text-[var(--text)] leading-none text-center">
               TAP<br/>SPIN

@@ -20,6 +20,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 
@@ -425,7 +426,7 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                   >
                     {isLoading ? (
                       <>
-                        <Loader2 size={13} className="animate-spin" /> Launching...
+                        <FeyLogo size={13} spinning={true} /> Launching...
                       </>
                     ) : (
                       <>

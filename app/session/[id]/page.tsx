@@ -19,6 +19,7 @@ import { useAppStore, type ActiveSession } from "@/store/useAppStore";
 import { CATEGORY_ICONS, CATEGORY_COLORS } from "@/lib/topics";
 import { formatTime, cn } from "@/lib/utils";
 import ShareNoteModal from "@/components/notes/ShareNoteModal";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 import { encodeSharedNote } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -594,7 +595,14 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
             animate={{ opacity: 1, y: 0 }}
             className="flex flex-col items-center gap-6 w-full max-w-md"
           >
-            <div className="text-5xl">🎙️</div>
+            <motion.div
+              initial={{ scale: 0.8 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", damping: 15 }}
+              className="w-16 h-16 rounded-2xl border border-[var(--gold)]/40 bg-[var(--bg-card)] shadow-md flex items-center justify-center relative"
+            >
+              <FeyLogo size={36} />
+            </motion.div>
             <h3 className="font-space text-2xl font-bold" style={{ color: "var(--text)" }}>Great job!</h3>
             <p style={{ color: "var(--text-dim)" }} className="text-sm">You spoke for {actualElapsed} seconds.</p>
 
@@ -1022,9 +1030,12 @@ function StageComplete({
         initial={{ scale: 0 }}
         animate={{ scale: 1 }}
         transition={{ type: "spring", stiffness: 200, delay: 0.2 }}
-        className="text-6xl"
+        className="relative flex items-center justify-center my-2"
       >
-        🏆
+        <div className="w-20 h-20 rounded-3xl border border-[var(--gold)]/50 bg-[var(--bg-card)] shadow-lg flex items-center justify-center relative">
+          <div className="absolute -inset-1.5 rounded-[28px] border border-[var(--gold)]/30 border-dashed animate-[spin_24s_linear_infinite]" />
+          <FeyLogo size={46} />
+        </div>
       </motion.div>
 
       <div>

@@ -16,6 +16,7 @@ import RoundCountdownOverlay from "./components/RoundCountdownOverlay";
 import RoomErrorBoundary from "./components/RoomErrorBoundary";
 import LobbyQueueModal from "./components/LobbyQueueModal";
 import { Loader2, ArrowLeft, AlertCircle, Sparkles, Moon, LogOut, CheckCircle2, Edit2, RotateCw, Users, Crown, X, AlertTriangle } from "lucide-react";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
@@ -1426,7 +1427,10 @@ export default function ArticulateRoomPage({
   if (loading) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center p-6 text-center space-y-4">
-        <Loader2 className="w-8 h-8 text-[var(--olive)] animate-spin" />
+        <div className="relative flex items-center justify-center">
+          <div className="absolute -inset-4 rounded-full border border-[var(--gold)]/30 border-dashed animate-[spin_10s_linear_infinite]" />
+          <FeyLogo size={48} spinning={true} />
+        </div>
         <p className="font-space font-bold text-sm text-[var(--text-dim)]">
           Connecting to Articulate Room {roomCode}...
         </p>
@@ -1877,7 +1881,9 @@ export default function ArticulateRoomPage({
             </motion.div>
           ) : (
             <div className="surface rounded-3xl p-8 border border-[var(--border-dim)] text-center space-y-3 my-auto">
-              <Loader2 className="w-6 h-6 animate-spin text-[var(--olive)] mx-auto" />
+              <div className="flex justify-center">
+                <FeyLogo size={28} spinning={true} />
+              </div>
               <p className="text-sm font-space font-bold text-[var(--text-dim)]">
                 Synchronizing game room...
               </p>
@@ -2055,7 +2061,7 @@ export default function ArticulateRoomPage({
                   >
                     {isLeaving ? (
                       <>
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <FeyLogo size={16} spinning={true} />
                         <span>Transferring Host & Leaving...</span>
                       </>
                     ) : (

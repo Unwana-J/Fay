@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Bot, CheckCircle, XCircle, AlertTriangle, Loader2, Scale, Mic, MicOff, RotateCcw } from "lucide-react";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 import { useAIReferee, type ValidationResult } from "@/lib/useAIReferee";
 import { useSpeechInput } from "@/lib/useSpeechInput";
 
@@ -112,7 +113,7 @@ export default function AIJudgePanel({
               }`}
             >
               {isValidating ? (
-                <Loader2 className="w-6 h-6 animate-spin text-[var(--olive)]" />
+                <FeyLogo size={24} spinning={true} />
               ) : isListening ? (
                 <Mic className="w-6 h-6 text-white" />
               ) : (

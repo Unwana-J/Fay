@@ -14,11 +14,13 @@ import {
   ShieldCheck,
   Smartphone,
   Laptop,
+  User,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { CATEGORIES, CATEGORY_ICONS } from "@/lib/topics";
 import { AVATARS, DEFAULT_AVATAR_PATH, PRESET_MISSIONS } from "@/lib/avatars";
 import UserAvatar from "@/components/ui/UserAvatar";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 
 import { useRouter, usePathname } from "next/navigation";
 
@@ -214,20 +216,24 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
               </div>
 
               {/* Sub-tab selection */}
-              <div className="flex gap-2 p-1 rounded-xl bg-[var(--bg-input)] border" style={{ borderColor: "var(--border-dim)" }}>
+              <div 
+                className="flex p-1.5 rounded-2xl border bg-[var(--bg-input)] shadow-inner gap-1.5" 
+                style={{ borderColor: "var(--border-dim)" }}
+              >
                 <button
                   type="button"
                   onClick={() => {
                     setSignInType("cloud");
                     setError("");
                   }}
-                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation select-none active:scale-[0.98] ${
                     signInType === "cloud"
-                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm"
-                      : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[var(--border)] ring-1 ring-[var(--olive)]/25"
+                      : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]/40 border border-transparent"
                   }`}
                 >
-                  <ShieldCheck size={13} /> Cloud Account (Email)
+                  <ShieldCheck size={13} className={signInType === "cloud" ? "text-[var(--olive)]" : "opacity-60"} /> 
+                  <span>Cloud Account (Email)</span>
                 </button>
                 <button
                   type="button"
@@ -235,13 +241,14 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                     setSignInType("guest");
                     setError("");
                   }}
-                  className={`flex-1 py-1.5 text-xs font-semibold rounded-lg transition-all flex items-center justify-center gap-1.5 ${
+                  className={`flex-1 py-2 px-3 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 cursor-pointer touch-manipulation select-none active:scale-[0.98] ${
                     signInType === "guest"
-                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm"
-                      : "text-[var(--text-muted)] hover:text-[var(--text)]"
+                      ? "bg-[var(--bg-card)] text-[var(--text)] shadow-[0_2px_8px_rgba(0,0,0,0.06)] border border-[var(--border)] ring-1 ring-[var(--gold)]/25"
+                      : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]/40 border border-transparent"
                   }`}
                 >
-                  Quick Guest Name
+                  <User size={13} className={signInType === "guest" ? "text-[var(--gold)]" : "opacity-60"} />
+                  <span>Quick Guest Name</span>
                 </button>
               </div>
 
@@ -315,7 +322,7 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                     >
                       {isLoading ? (
                         <>
-                          <Loader2 size={15} className="animate-spin" /> Logging In...
+                          <FeyLogo size={15} spinning={true} /> Logging In...
                         </>
                       ) : (
                         <>

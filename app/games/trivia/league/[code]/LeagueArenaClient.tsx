@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
+import { FeyLogo } from "@/components/ui/FeyLogo";
 import {
   type FriendshipLeague,
   type LeagueDailyScore,
@@ -1286,7 +1287,7 @@ export default function LeagueArenaClient({
 
             {submittingScore && (
               <div className="flex items-center justify-center gap-2 text-xs text-[var(--text-dim)]">
-                <Loader2 size={14} className="animate-spin" /> Syncing results to league standings...
+                <FeyLogo size={14} spinning={true} /> Syncing results to league standings...
               </div>
             )}
 
