@@ -404,9 +404,8 @@ export default function RoomGameOver({
           <button
             type="button"
             onClick={openClaimAccountPrompt}
-            className="btn-terra px-4 py-2.5 rounded-xl font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 shadow-md self-start sm:self-auto"
+            className="btn-terra px-4 py-2.5 rounded-xl font-space font-bold text-xs cursor-pointer whitespace-nowrap shrink-0 shadow-md self-start sm:self-auto"
           >
-            <Flame className="w-3.5 h-3.5 text-amber-300" />
             <span>Track Streak →</span>
           </button>
         </motion.div>

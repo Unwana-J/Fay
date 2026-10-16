@@ -21,6 +21,10 @@ import {
   HelpCircle,
   ShieldCheck,
   Flame,
+  Dices,
+  Sprout,
+  Scale,
+  Crown,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -56,13 +60,21 @@ import { getTriviaPerformanceRemark, type TriviaRemark } from "@/lib/trivia-rema
 export type ReviewMode = "instant" | "suspense";
 export type GamePhase = "setup" | "playing" | "results";
 export type SetupTab = "solo" | "league" | "challenge" | "leaderboard" | "history";
-export type DurationOption = { label: string; minutes: number; emoji: string };
+export type DurationOption = {
+  label: string;
+  minutes: number;
+  emoji: string;
+  icon: typeof Zap;
+  iconColor: string;
+};
 
 export interface DifficultyOption {
   id: TriviaDifficultyFilter;
   label: string;
   emoji: string;
   desc: string;
+  icon: typeof Dices;
+  iconColor: string;
 }
 
 export interface ChallengerInfo {
@@ -75,16 +87,16 @@ export interface ChallengerInfo {
 }
 
 const DURATION_OPTIONS: DurationOption[] = [
-  { label: "Quick", minutes: 5, emoji: "⚡" },
-  { label: "Standard", minutes: 10, emoji: "🎯" },
-  { label: "Marathon", minutes: 15, emoji: "🏆" },
+  { label: "Quick", minutes: 5, emoji: "⚡", icon: Zap, iconColor: "text-amber-500" },
+  { label: "Standard", minutes: 10, emoji: "🎯", icon: Target, iconColor: "text-[var(--terra)]" },
+  { label: "Marathon", minutes: 15, emoji: "🏆", icon: Trophy, iconColor: "text-[var(--gold)]" },
 ];
 
 export const DIFFICULTY_OPTIONS: DifficultyOption[] = [
-  { id: "random", label: "Random", emoji: "🎲", desc: "Mixed Pool (Default)" },
-  { id: "easy", label: "Easy", emoji: "🌱", desc: "Cultural basics" },
-  { id: "medium", label: "Medium", emoji: "⚖️", desc: "Balanced level" },
-  { id: "hard", label: "Hard", emoji: "🔥", desc: "Scholar lore" },
+  { id: "random", label: "Random", emoji: "🎲", desc: "Mixed Pool (Default)", icon: Dices, iconColor: "text-[var(--olive)]" },
+  { id: "easy", label: "Easy", emoji: "🌱", desc: "Cultural basics", icon: Sprout, iconColor: "text-emerald-500" },
+  { id: "medium", label: "Medium", emoji: "⚖️", desc: "Balanced level", icon: Scale, iconColor: "text-amber-600 dark:text-amber-400" },
+  { id: "hard", label: "Hard", emoji: "🔥", desc: "Scholar lore", icon: Flame, iconColor: "text-[var(--terra)]" },
 ];
 
 const CATEGORY_COLORS: Record<TriviaCategory, string> = {
@@ -179,10 +191,9 @@ function SetupScreen({
             <button
               type="button"
               onClick={openClaimAccountPrompt}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold font-space transition cursor-pointer shadow-xs"
+              className="px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold font-space transition cursor-pointer shadow-xs"
               title="Link a free account to track your daily streak & ranking across devices"
             >
-              <Flame size={13} className="text-amber-500 animate-pulse" />
               <span>Track Streak</span>
             </button>
           )}
@@ -223,13 +234,13 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("solo")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate",
             activeTab === "solo"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>🎮</span>
+          <Sparkles size={13} className="text-[var(--terra)] shrink-0" />
           <span className="hidden sm:inline">Play</span>
         </button>
 
@@ -237,13 +248,13 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("league")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate",
             activeTab === "league"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>🏆</span>
+          <Trophy size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
           <span>Leagues</span>
         </button>
         )}
@@ -252,13 +263,13 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("challenge")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer relative truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative truncate",
             activeTab === "challenge"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>⚔️</span>
+          <Swords size={13} className="text-[var(--olive)] shrink-0" />
           <span>Challenges</span>
           {activeChallenge && (
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--terra)] animate-pulse shrink-0" />
@@ -270,13 +281,13 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("leaderboard")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate",
             activeTab === "leaderboard"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <Trophy size={12} className="text-[var(--gold)] shrink-0" />
+          <Crown size={13} className="text-[var(--gold)] shrink-0" />
           <span className="hidden sm:inline">Ranks</span>
           <span className="sm:hidden">Top</span>
         </button>
@@ -346,8 +357,8 @@ function SetupScreen({
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-[#008751]">
-                      ⚔️ Head-to-Head Challenge
+                    <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-[#008751] inline-flex items-center gap-1">
+                      <Swords size={11} /> Head-to-Head Challenge
                     </span>
                     <span className="text-[10px] font-mono text-[var(--gold)]">
                       {challenger.grade || "Sharp Sharp! 🎯"}
@@ -369,7 +380,7 @@ function SetupScreen({
           <div className="surface rounded-2xl p-4 border mb-6 flex items-center justify-between gap-4">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-[var(--olive)]/10 text-[var(--olive)] flex items-center justify-center font-space font-bold text-sm">
-                🎯
+                <Target size={18} className="text-[var(--olive)]" />
               </div>
               <div>
                 <div className="text-xs font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
@@ -423,7 +434,9 @@ function SetupScreen({
                         : "border-[var(--border-dim)] hover:border-[var(--border)]"
                     )}
                   >
-                    <div className="text-3xl mb-2">{opt.emoji}</div>
+                    <div className="w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center bg-[var(--bg-input)] border border-[var(--border-dim)] shadow-xs">
+                      <opt.icon size={20} className={opt.iconColor} strokeWidth={2.2} />
+                    </div>
                     <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
                       {opt.label}
                     </div>
@@ -464,7 +477,9 @@ function SetupScreen({
                         : "border-[var(--border-dim)] hover:border-[var(--border)]"
                     )}
                   >
-                    <div className="text-2xl mb-1.5">{opt.emoji}</div>
+                    <div className="w-9 h-9 rounded-xl mx-auto mb-1.5 flex items-center justify-center bg-[var(--bg-input)] border border-[var(--border-dim)] shadow-xs">
+                      <opt.icon size={18} className={opt.iconColor} strokeWidth={2.2} />
+                    </div>
                     <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
                       {opt.label}
                     </div>
@@ -482,10 +497,11 @@ function SetupScreen({
             {/* Review Cadence Selector */}
             <div className="surface rounded-2xl p-5 border">
               <p
-                className="text-xs font-bold uppercase tracking-wider mb-3"
+                className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5"
                 style={{ color: "var(--text-mute)" }}
               >
-                <BookOpen size={10} className="inline mr-1.5" /> Review Cadence
+                <BookOpen size={12} className="text-[var(--text-dim)]" />
+                <span>When Answers Are Shown</span>
               </p>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <button
@@ -499,10 +515,11 @@ function SetupScreen({
                   )}
                 >
                   <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
-                    <span>⚡ Instant Feedback</span>
+                    <Zap size={15} className="text-amber-500" />
+                    <span>Instant Feedback</span>
                   </div>
                   <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
-                    Reveal explanation immediately after each question.
+                    See correct answers and explanations after every question.
                   </div>
                 </button>
 
@@ -517,10 +534,11 @@ function SetupScreen({
                   )}
                 >
                   <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
-                    <span>⏳ Suspense Mode</span>
+                    <Clock size={15} className="text-[var(--terra)]" />
+                    <span>Suspense Mode</span>
                   </div>
                   <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
-                    Answer continuously; review full breakdown at the end.
+                    Answer without interruptions; see all answers at the end.
                   </div>
                 </button>
               </div>
@@ -531,7 +549,7 @@ function SetupScreen({
               onClick={() => onStartSolo(duration.minutes, mode, difficulty)}
               className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md hover:opacity-95 transition-opacity"
             >
-              <span>{challenger ? `Accept Challenge · Play Same ${challenger.total || 15} Questions` : "Start Solo Sprint"}</span>
+              <span>{challenger ? `Accept Challenge · Play Same ${challenger.total || 15} Questions` : "Start Solo Quiz"}</span>
               <ChevronRight size={18} />
             </button>
 
@@ -546,7 +564,7 @@ function SetupScreen({
                   Want to challenge your friends?
                 </span>
                 <span className="text-[11px] text-[var(--text-dim)]">
-                  Convene a timed challenge and share the link to see who tops the board.
+                  Create a timed challenge and share the link to see who tops the board.
                 </span>
               </div>
               <button
@@ -1058,9 +1076,8 @@ function ResultsScreen({
           </div>
           <button
             onClick={openClaimAccountPrompt}
-            className="btn-terra px-4 py-2.5 rounded-xl font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0 shadow-md self-start sm:self-auto"
+            className="btn-terra px-4 py-2.5 rounded-xl font-space font-bold text-xs cursor-pointer whitespace-nowrap shrink-0 shadow-md self-start sm:self-auto"
           >
-            <Flame size={14} className="text-amber-300" />
             <span>Track Streak →</span>
           </button>
         </motion.div>

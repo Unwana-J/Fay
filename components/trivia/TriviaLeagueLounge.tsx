@@ -21,6 +21,9 @@ import {
   Crown,
   Trash2,
   ShieldCheck,
+  Timer,
+  RotateCw,
+  ChevronRight,
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import CreateLeagueModal from "@/components/trivia/CreateLeagueModal";
@@ -196,8 +199,9 @@ export default function TriviaLeagueLounge() {
                     <span>•</span>
                     <span className="capitalize">{league.difficulty}</span>
                     <span>•</span>
-                    <span className="text-[var(--terra)] font-bold">
-                      ⚡ 1 attempt locked for today
+                    <span className="text-[var(--terra)] font-bold inline-flex items-center gap-1">
+                      <Zap size={11} className="text-amber-500" />
+                      <span>1 attempt locked for today</span>
                     </span>
                   </p>
                 </div>
@@ -227,8 +231,8 @@ export default function TriviaLeagueLounge() {
       >
         <div className="relative z-10 space-y-3">
           <div className="flex items-center gap-2">
-            <span className="w-8 h-8 rounded-xl bg-[var(--terra)]/15 border border-[var(--terra)]/30 flex items-center justify-center text-base">
-              🏆
+            <span className="w-8 h-8 rounded-xl bg-[var(--terra)]/15 border border-[var(--terra)]/30 flex items-center justify-center text-[var(--terra)]">
+              <Trophy size={16} />
             </span>
             <div className="text-[11px] font-mono uppercase tracking-wider text-[var(--terra)] font-bold">
               Multi-Day Tournaments
@@ -387,12 +391,12 @@ export default function TriviaLeagueLounge() {
                             )}
 
                             {isHost ? (
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30">
-                                👑 Host
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                                <Crown size={11} className="text-amber-600 dark:text-amber-400" /> Host
                               </span>
                             ) : (
-                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                                👥 Team Scholar
+                              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                <Users size={11} /> Team Scholar
                               </span>
                             )}
 
@@ -425,8 +429,18 @@ export default function TriviaLeagueLounge() {
                                   <CheckCircle2 size={13} />
                                   <span>Day {summary.status.dayNumber} Done ({summary.todayPoints} pts)</span>
                                 </div>
-                                <span className="text-[10px] font-mono text-[var(--text-dim)]">
-                                  {league.attemptPolicy === "strict" ? "⏳ Waiting for midnight drop" : "🔁 Re-attempts open"}
+                                <span className="text-[10px] font-mono text-[var(--text-dim)] inline-flex items-center gap-1">
+                                  {league.attemptPolicy === "strict" ? (
+                                    <>
+                                      <Clock size={11} className="text-[var(--text-mute)]" />
+                                      <span>Waiting for midnight drop</span>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <RotateCw size={11} className="text-[var(--olive)]" />
+                                      <span>Re-attempts open</span>
+                                    </>
+                                  )}
                                 </span>
                               </div>
                             ) : (
@@ -440,8 +454,9 @@ export default function TriviaLeagueLounge() {
                           {/* Standings snippet */}
                           <div className="text-xs font-mono text-[var(--text-dim)] flex items-center gap-2">
                             {summary.userDaysCompleted > 0 && (
-                              <span className="font-bold text-[var(--text)]">
-                                Rank #{summary.userRank} · {summary.userTotalPoints} pts
+                              <span className="font-bold text-[var(--text)] inline-flex items-center gap-1">
+                                <Award size={12} className="text-amber-600 dark:text-amber-400" />
+                                <span>Rank #{summary.userRank} · {summary.userTotalPoints} pts</span>
                               </span>
                             )}
                           </div>
@@ -453,18 +468,18 @@ export default function TriviaLeagueLounge() {
                                 e.stopPropagation();
                                 handleCopyShare(league);
                               }}
-                              className="px-2.5 py-1.5 rounded-lg border border-[var(--border-dim)] text-xs font-mono text-[var(--text-dim)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer bg-[var(--bg-input)]"
+                              className="px-3 py-1.5 rounded-xl border border-[var(--border-dim)] text-xs font-mono font-semibold text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--border)] flex items-center gap-1.5 cursor-pointer bg-[var(--bg-input)] transition-all"
                               title="Copy Share Link"
                             >
                               {copiedCode === league.code ? (
                                 <>
-                                  <Check size={12} className="text-emerald-500" />
-                                  <span className="text-[11px] text-emerald-600">Copied</span>
+                                  <Check size={13} className="text-emerald-500" />
+                                  <span className="text-xs text-emerald-600">Copied</span>
                                 </>
                               ) : (
                                 <>
-                                  <Share2 size={12} />
-                                  <span className="text-[11px]">Share</span>
+                                  <Share2 size={13} />
+                                  <span className="text-xs">Share</span>
                                 </>
                               )}
                             </button>
@@ -472,13 +487,14 @@ export default function TriviaLeagueLounge() {
                             <button
                               type="button"
                               onClick={(e) => handleRemove(league.code, e)}
-                              className="p-1.5 rounded-lg border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300 cursor-pointer bg-[var(--bg-input)]"
+                              className="p-2 rounded-xl border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300/60 hover:bg-rose-500/10 cursor-pointer bg-[var(--bg-input)] transition-all"
                               title="Remove League"
+                              aria-label="Remove League"
                             >
-                              <Trash2 size={12} />
+                              <Trash2 size={13} />
                             </button>
 
-                            <div className="btn-terra px-3 py-1.5 rounded-xl font-space font-bold text-xs flex items-center gap-1">
+                            <div className="btn-terra px-3.5 py-1.5 rounded-xl font-space font-bold text-xs flex items-center gap-1.5 shadow-xs">
                               <span>Arena</span>
                               <ChevronRight size={13} />
                             </div>
@@ -548,11 +564,13 @@ export default function TriviaLeagueLounge() {
       {/* Rules Breakdown */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         <div
-          className="p-4 rounded-2xl bg-[var(--bg-input)] border text-left space-y-1"
+          className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border text-left space-y-2 shadow-xs transition-all hover:border-[var(--border)]"
           style={{ borderColor: "var(--border-dim)" }}
         >
-          <div className="text-lg mb-1">⏳</div>
-          <div className="font-space font-bold text-xs text-[var(--text)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--terra)]/10 text-[var(--terra)] border border-[var(--terra)]/20 flex items-center justify-center">
+            <Timer size={18} strokeWidth={2.2} />
+          </div>
+          <div className="font-space font-bold text-xs sm:text-sm text-[var(--text)]">
             1 Attempt Daily
           </div>
           <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
@@ -561,11 +579,13 @@ export default function TriviaLeagueLounge() {
         </div>
 
         <div
-          className="p-4 rounded-2xl bg-[var(--bg-input)] border text-left space-y-1"
+          className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border text-left space-y-2 shadow-xs transition-all hover:border-[var(--border)]"
           style={{ borderColor: "var(--border-dim)" }}
         >
-          <div className="text-lg mb-1">⚡</div>
-          <div className="font-space font-bold text-xs text-[var(--text)]">
+          <div className="w-9 h-9 rounded-xl bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20 flex items-center justify-center">
+            <Zap size={18} strokeWidth={2.2} />
+          </div>
+          <div className="font-space font-bold text-xs sm:text-sm text-[var(--text)]">
             Velocity Scoring
           </div>
           <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
@@ -574,11 +594,13 @@ export default function TriviaLeagueLounge() {
         </div>
 
         <div
-          className="p-4 rounded-2xl bg-[var(--bg-input)] border text-left space-y-1"
+          className="p-4 sm:p-5 rounded-2xl bg-[var(--bg-card)] border text-left space-y-2 shadow-xs transition-all hover:border-[var(--border)]"
           style={{ borderColor: "var(--border-dim)" }}
         >
-          <div className="text-lg mb-1">🥇</div>
-          <div className="font-space font-bold text-xs text-[var(--text)]">
+          <div className="w-9 h-9 rounded-xl bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/25 flex items-center justify-center">
+            <Trophy size={18} strokeWidth={2.2} />
+          </div>
+          <div className="font-space font-bold text-xs sm:text-sm text-[var(--text)]">
             Final Podium
           </div>
           <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
@@ -593,24 +615,5 @@ export default function TriviaLeagueLounge() {
         onClose={() => setShowCreateModal(false)}
       />
     </div>
-  );
-}
-
-function ChevronRight({ size = 14, className = "" }: { size?: number; className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width={size}
-      height={size}
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="m9 18 6-6-6-6" />
-    </svg>
   );
 }

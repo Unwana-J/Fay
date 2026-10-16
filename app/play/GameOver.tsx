@@ -185,9 +185,8 @@ export default function GameOver({
             <button
               type="button"
               onClick={openClaimAccountPrompt}
-              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-space font-extrabold text-xs transition cursor-pointer shrink-0 shadow-sm flex items-center justify-center gap-1.5"
+              className="w-full sm:w-auto px-5 py-2.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-space font-extrabold text-xs transition cursor-pointer shrink-0 shadow-sm"
             >
-              <Flame size={14} className="text-amber-200" />
               <span>Track Streak →</span>
             </button>
           </div>

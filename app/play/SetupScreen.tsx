@@ -510,8 +510,8 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                   <div className="p-3 rounded-2xl bg-[var(--terra)]/10 text-[var(--terra)]">
                     <Globe className="w-6 h-6" />
                   </div>
-                  <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full">
-                    Real-time Rooms
+                  <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-600 bg-emerald-500/10 px-2.5 py-1 rounded-full border border-emerald-500/20">
+                    Online Rooms
                   </span>
                 </div>
 
@@ -520,7 +520,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     Host an Online Match
                   </h2>
                   <p className="text-xs text-[var(--text-dim)] leading-relaxed">
-                    Start a room in 1 second. Share the link to WhatsApp or group chat and friends can tap to join immediately.
+                    Create a room and share the link with friends to play together in real time.
                   </p>
                 </div>
 
@@ -528,25 +528,25 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                 <div className="p-4 sm:p-5 rounded-2xl bg-[var(--bg)] border border-[var(--border-dim)] space-y-4">
                   <div className="flex items-center justify-between">
                     <span className="text-xs font-bold font-space text-[var(--text)] flex items-center gap-1.5">
-                      <Sparkles className="w-3.5 h-3.5 text-[var(--gold)]" />
-                      Host Match Settings
+                      <Settings className="w-3.5 h-3.5 text-[var(--terra)]" />
+                      Match Settings
                     </span>
                     <span className="text-[10px] text-[var(--text-mute)] font-medium">
-                      Host picks rules
+                      Host controls
                     </span>
                   </div>
 
                   {/* Match / Group Title (Optional) */}
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold text-[var(--text-dim)] flex items-center justify-between">
-                      <span>Match / Group Title (Optional)</span>
-                      <span className="text-[10px] text-[var(--text-mute)] font-normal">e.g. Lokin Labs Hangout</span>
+                      <span>Match Title (Optional)</span>
+                      <span className="text-[10px] text-[var(--text-mute)] font-normal">e.g. Friday Hangout</span>
                     </label>
                     <input
                       type="text"
                       value={onlineRoomName}
                       onChange={(e) => setOnlineRoomName(e.target.value)}
-                      placeholder="e.g. Friday Game Night, Designers vs Engineers"
+                      placeholder="e.g. Friday Game Night"
                       maxLength={40}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-xs font-space font-medium text-[var(--text)] focus:border-[var(--terra)] focus:outline-none placeholder:text-[var(--text-mute)]"
                     />
@@ -557,7 +557,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
                         <Users className="w-3 h-3 text-[var(--text-mute)]" />
-                        Number of Competing Teams
+                        Number of Teams
                       </span>
                       <span className="font-mono font-bold text-[var(--terra)]">
                         {onlineTeamCount} Teams
@@ -588,7 +588,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                       onClick={() => setShowAdvancedNaming(!showAdvancedNaming)}
                       className="text-[11px] font-bold text-[var(--terra)] hover:underline flex items-center gap-1 cursor-pointer"
                     >
-                      <span>{showAdvancedNaming ? "▲ Hide Custom Team Names" : "▼ Customize Team Names"}</span>
+                      <span>{showAdvancedNaming ? "Hide Custom Team Names" : "Customize Team Names"}</span>
                     </button>
                     {showAdvancedNaming && (
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -652,12 +652,12 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     )}
                   </div>
 
-                  {/* Sprint Duration Selector: 30s vs 45s vs 60s */}
+                  {/* Speaking Duration Selector: 30s vs 45s vs 60s */}
                   <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
                         <Clock className="w-3 h-3 text-[var(--text-mute)]" />
-                        Speaking Sprint Duration
+                        Speaking Time
                       </span>
                       <span className="font-mono font-bold text-[var(--terra)]">
                         {onlineTimerSeconds}s
@@ -673,7 +673,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
                         }`}
                       >
-                        ⚡ 30s
+                        30s
                       </button>
                       <button
                         type="button"
@@ -684,7 +684,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
                         }`}
                       >
-                        🎯 45s
+                        45s
                       </button>
                       <button
                         type="button"
@@ -695,7 +695,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text)] hover:border-[var(--text-dim)]"
                         }`}
                       >
-                        ⏱️ 60s
+                        60s
                       </button>
                     </div>
                   </div>
@@ -705,7 +705,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
                         <Target className="w-3 h-3 text-[var(--text-mute)]" />
-                        Winning Target Score
+                        Score to Win
                       </span>
                       <span className="font-mono font-bold text-[var(--olive)]">
                         First to {onlineScoreGoal} pts
@@ -734,10 +734,10 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     <div className="flex items-center justify-between text-[11px]">
                       <span className="font-semibold text-[var(--text-dim)] flex items-center gap-1">
                         <Volume2 className="w-3 h-3 text-[var(--text-mute)]" />
-                        Round-Over Buzzer Sound
+                        Buzzer Sound
                       </span>
                       <span className="text-[10px] text-[var(--text-mute)] font-normal">
-                        Tap sound to test
+                        Tap to preview
                       </span>
                     </div>
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -760,9 +760,11 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             <div className="flex items-center justify-between w-full mb-1">
                               <span className="text-base">{opt.icon}</span>
                               {isSelected ? (
-                                <span className="w-2 h-2 rounded-full bg-[var(--terra)]" />
+                                <Volume2 size={12} className="text-[var(--terra)]" />
                               ) : (
-                                <span className="text-[9px] text-[var(--text-mute)] opacity-60">▶ Test</span>
+                                <span className="text-[9px] text-[var(--text-mute)] opacity-60 inline-flex items-center gap-0.5">
+                                  <Volume2 size={9} /> Test
+                                </span>
                               )}
                             </div>
                             <div>
@@ -781,7 +783,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
                   <div className="pt-2 border-t border-[var(--border-dim)]/60 text-[10px] text-[var(--text-mute)] flex items-center gap-1.5">
                     <Lock className="w-3 h-3 shrink-0" />
-                    <span>Round locks when active; late joiners enter in next round.</span>
+                    <span>Late joiners can spectate and join in the next round.</span>
                   </div>
                 </div>
 
@@ -793,22 +795,19 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
               </div>
 
               <motion.button
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.98 }}
+                whileHover={{ scale: 1.01 }}
+                whileTap={{ scale: 0.99 }}
                 onClick={handleCreateOnlineRoom}
                 disabled={isCreatingOnline}
-                className="w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
+                className="w-full bg-[var(--terra)] text-white py-3.5 rounded-2xl font-space font-bold text-sm shadow-md hover:opacity-95 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
               >
                 {isCreatingOnline ? (
                   <>
-                    <Loader2 className="w-5 h-5 animate-spin" />
-                    Generating Room...
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Creating Room...
                   </>
                 ) : (
-                  <>
-                    Create Room & Invite Friends
-                    <ArrowRight className="w-5 h-5" />
-                  </>
+                  <span>Create Room &amp; Invite Friends</span>
                 )}
               </motion.button>
             </div>
@@ -822,10 +821,10 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
                 <div className="space-y-1.5">
                   <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">
-                    Join Friend&apos;s Match
+                    Join a Match
                   </h2>
                   <p className="text-xs text-[var(--text-dim)] leading-relaxed">
-                    Have a 4-letter room code from your host? Enter it below to jump directly into the team lobby.
+                    Enter the room code from your host to jump into the lobby.
                   </p>
                 </div>
 
@@ -849,13 +848,13 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     disabled={!onlineJoinCode.trim()}
                     className="w-full bg-[var(--olive)] text-white py-3.5 rounded-xl font-space font-bold text-sm shadow-sm hover:opacity-90 flex items-center justify-center gap-2 cursor-pointer transition disabled:opacity-50"
                   >
-                    Enter Room <ArrowRight className="w-4 h-4" />
+                    <span>Join Room</span>
                   </button>
                 </form>
               </div>
 
               <div className="p-3 rounded-xl bg-[var(--bg)] border border-[var(--border-dim)] text-[11px] text-[var(--text-dim)] text-center">
-                💡 Or simply tap the invite link sent to you on WhatsApp or iMessage.
+                Tip: You can also tap the invite link shared by your host to join directly.
               </div>
             </div>
           </div>

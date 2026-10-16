@@ -582,10 +582,9 @@ export default function LeagueArenaClient({
           {!profile?.hasClaimedAccount && (
             <button
               onClick={openClaimAccountPrompt}
-              className="text-[11px] font-space font-bold px-3 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition-colors cursor-pointer flex items-center gap-1.5 shadow-xs"
+              className="text-[11px] font-space font-bold px-3 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition-colors cursor-pointer shadow-xs"
               title="Link free account to track your daily streak & protect tournament scores"
             >
-              <Flame size={12} className="text-amber-500 animate-pulse" />
               <span>Track Streak</span>
             </button>
           )}
@@ -626,9 +625,8 @@ export default function LeagueArenaClient({
                 </div>
                 <button
                   onClick={openClaimAccountPrompt}
-                  className="btn-terra px-3 py-1.5 rounded-xl text-xs font-space font-bold whitespace-nowrap self-start sm:self-auto cursor-pointer shadow-xs shrink-0 flex items-center gap-1"
+                  className="btn-terra px-3.5 py-1.5 rounded-xl text-xs font-space font-bold whitespace-nowrap self-start sm:self-auto cursor-pointer shadow-xs shrink-0"
                 >
-                  <Flame size={12} className="text-amber-300" />
                   <span>Track Streak →</span>
                 </button>
               </div>
@@ -743,9 +741,9 @@ export default function LeagueArenaClient({
                   <button
                     type="button"
                     onClick={() => startDailyRound(nextUncompletedDay)}
-                    className="btn-terra px-6 py-3 rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    className="btn-terra px-6 py-3 rounded-2xl text-xs font-bold shadow-md shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
-                    <Sparkles size={14} /> Start Drop {nextUncompletedDay} <ArrowRight size={14} />
+                    <span>Start Drop {nextUncompletedDay}</span>
                   </button>
                 )}
               </div>
@@ -765,7 +763,8 @@ export default function LeagueArenaClient({
                     <div className="space-y-1">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5 text-xs font-space font-bold text-[var(--text)]">
-                          <span>⏳ Wait for Scheduled Drop</span>
+                          <Clock size={13} className="text-[var(--terra)]" />
+                          <span>Wait for Scheduled Drop</span>
                         </div>
                         {hasCompletedToday ? (
                           <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
@@ -822,11 +821,9 @@ export default function LeagueArenaClient({
                         <button
                           type="button"
                           onClick={() => startDailyRound(nextUncompletedDay)}
-                          className="btn-terra px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
+                          className="btn-terra px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
                         >
-                          <Sparkles size={12} />
-                          <span>Attempt Drop {nextUncompletedDay} Now</span>
-                          <ArrowRight size={12} />
+                          <span>Play Drop {nextUncompletedDay}</span>
                         </button>
                       ) : (
                         <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300">
@@ -863,22 +860,22 @@ export default function LeagueArenaClient({
 
               {/* Host Controls: Add Extra Drops or Toggle Unlimited Drops */}
               {isCreator && (
-                <div className="p-3.5 rounded-2xl border border-[var(--olive)]/30 bg-[var(--olive)]/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="p-3.5 rounded-2xl border border-[var(--olive)]/30 bg-[var(--olive)]/10 flex flex-col md:flex-row md:items-center justify-between gap-3">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-xl bg-[var(--olive)]/20 flex items-center justify-center shrink-0 text-[var(--olive)]">
-                      <Crown size={16} />
+                      <Crown size={15} />
                     </div>
                     <div>
                       <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1.5">
-                        <span>Tournament Host Controls</span>
+                        <span>Host Controls</span>
                         <span className="text-[9px] uppercase font-mono px-1.5 py-0.2 rounded bg-[var(--olive)]/20 text-[var(--olive)] font-bold">
                           Creator
                         </span>
                       </div>
                       <p className="text-[11px] text-[var(--text-dim)]">
                         {league.attemptPolicy === "unlimited"
-                          ? "Unlimited drops active. New drops unlock automatically as scholars finish each drop."
-                          : "Extend this tournament by adding extra drops or enabling unlimited drops."}
+                          ? "Unlimited mode active. New drops unlock automatically as you finish each one."
+                          : "Extend this tournament by adding extra drops or enabling unlimited play."}
                       </p>
                     </div>
                   </div>
@@ -888,22 +885,20 @@ export default function LeagueArenaClient({
                       type="button"
                       onClick={() => handleAddExtraDrops(1)}
                       disabled={isUpdatingLeague}
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-dim)] hover:border-[var(--olive)] text-[var(--text)] hover:text-[var(--olive)] flex items-center gap-1 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-dim)] hover:border-[var(--olive)] text-[var(--text)] hover:text-[var(--olive)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
                       title="Add 1 more drop to tournament"
                     >
-                      <Plus size={12} />
-                      <span>+1 Drop</span>
+                      +1 Drop
                     </button>
 
                     <button
                       type="button"
                       onClick={() => handleAddExtraDrops(3)}
                       disabled={isUpdatingLeague}
-                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-dim)] hover:border-[var(--olive)] text-[var(--text)] hover:text-[var(--olive)] flex items-center gap-1 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--bg-card)] border border-[var(--border-dim)] hover:border-[var(--olive)] text-[var(--text)] hover:text-[var(--olive)] transition-all cursor-pointer shadow-xs disabled:opacity-50"
                       title="Add 3 more drops to tournament"
                     >
-                      <Plus size={12} />
-                      <span>+3 Drops</span>
+                      +3 Drops
                     </button>
 
                     {league.attemptPolicy !== "unlimited" && (
@@ -911,10 +906,9 @@ export default function LeagueArenaClient({
                         type="button"
                         onClick={handleToggleUnlimitedDrops}
                         disabled={isUpdatingLeague}
-                        className="btn-terra px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer shadow-xs disabled:opacity-50"
+                        className="btn-terra px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer shadow-xs disabled:opacity-50"
                       >
-                        <Infinity size={13} />
-                        <span>Allow Unlimited Drops</span>
+                        Enable Unlimited Drops
                       </button>
                     )}
                   </div>
@@ -932,12 +926,12 @@ export default function LeagueArenaClient({
                     <div
                       key={dayNum}
                       className={cn(
-                        "p-4 rounded-2xl border transition-all flex flex-col justify-between gap-3",
+                        "p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[145px]",
                         isDone
-                          ? "border-[var(--olive)]/40 bg-[var(--olive)]/5"
+                          ? "border-[var(--olive)]/35 bg-[var(--olive)]/5"
                           : isNext
-                          ? "border-[var(--terra)]/60 bg-[var(--terra)]/5 shadow-xs"
-                          : "border-[var(--border-dim)] bg-[var(--bg-card)]/50 opacity-70"
+                          ? "border-[var(--terra)]/60 bg-[var(--terra)]/5 shadow-xs ring-1 ring-[var(--terra)]/20"
+                          : "border-[var(--border-dim)] bg-[var(--bg-card)]/40 opacity-60"
                       )}
                     >
                       <div className="space-y-1.5">
@@ -946,51 +940,48 @@ export default function LeagueArenaClient({
                             Drop {dayNum}
                           </span>
                           {isDone ? (
-                            <span className="flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
-                              <CheckCircle2 size={11} /> Score Locked
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                              <CheckCircle2 size={11} /> Completed
                             </span>
                           ) : isNext ? (
                             <span className="text-[10px] font-mono font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2 py-0.5 rounded-full border border-[var(--terra)]/30">
-                              {dayNum === 1 ? "Drop 1 · Ready" : "Unlocked · Next Up"}
+                              Ready to Play
                             </span>
                           ) : (
-                            <span className="flex items-center gap-1 text-[10px] font-mono text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)]">
-                              <Lock size={10} /> Locked · Complete Drop {dayNum - 1} first
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)]">
+                              <Lock size={10} /> Locked
                             </span>
                           )}
                         </div>
 
-                        <div className="text-[11px] text-[var(--text-dim)] flex items-center gap-2">
+                        <div className="text-[11px] text-[var(--text-dim)] flex items-center gap-1.5">
                           <span>{league.questionsPerDay} Questions</span>
                           <span>•</span>
                           <span>{league.category === "all" ? "All Topics" : league.category}</span>
                         </div>
-
-                        {isDone && (
-                          <div className="text-xs font-mono font-bold text-[var(--olive-text)] bg-[var(--bg-input)]/80 p-2 rounded-xl border border-[var(--border-dim)]">
-                            Score: {score.score}/{league.questionsPerDay} ({score.points} pts)
-                          </div>
-                        )}
                       </div>
 
-                      <div className="pt-2 border-t border-[var(--border-dim)]/50 flex items-center justify-end">
+                      <div className="pt-3">
                         {isDone ? (
-                          <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
-                            ✓ Score Locked
-                          </span>
+                          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-xs font-mono">
+                            <span className="text-[var(--text-dim)]">
+                              Score: <strong className="text-[var(--text)]">{score.score}/{league.questionsPerDay}</strong>
+                            </span>
+                            <span className="font-bold text-[var(--olive)]">
+                              +{score.points} pts
+                            </span>
+                          </div>
                         ) : isNext ? (
                           <button
                             type="button"
                             onClick={() => startDailyRound(dayNum)}
-                            className="btn-terra px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
+                            className="w-full btn-terra py-2.5 rounded-xl text-xs font-bold cursor-pointer hover:opacity-95 active:scale-[0.99] transition-all shadow-xs text-center"
                           >
-                            <span>Attempt Drop {dayNum} Now</span>
-                            <ArrowRight size={12} />
+                            Play Drop {dayNum}
                           </button>
                         ) : (
-                          <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
-                            <Lock size={12} className="opacity-60" />
-                            <span>Complete Drop {dayNum - 1} to unlock</span>
+                          <div className="text-[11px] text-[var(--text-mute)] font-mono py-1">
+                            Unlocks after Drop {dayNum - 1}
                           </div>
                         )}
                       </div>

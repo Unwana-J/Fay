@@ -278,9 +278,9 @@ export default function PlayerIdentityModal({
                   <button
                     type="button"
                     onClick={() => openClaimAccountPrompt()}
-                    className="font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer inline-flex items-center gap-1"
+                    className="font-bold text-amber-600 dark:text-amber-400 hover:underline cursor-pointer"
                   >
-                    <Flame className="w-3 h-3 text-amber-500 animate-pulse" /> Track Streak
+                    Track Streak
                   </button>
                   <span>•</span>
                   <button

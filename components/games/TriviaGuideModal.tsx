@@ -30,14 +30,14 @@ const STEPS = [
     id: "questions",
     title: "1,000+ Curated Questions",
     shortTitle: "Categories",
-    badge: "INTELLECTUAL PILLARS",
+    badge: "TOPIC CATEGORIES",
     icon: BookOpen,
     color: "var(--olive)",
   },
   {
     id: "sprints",
-    title: "Sprint Modes & Review Cadence",
-    shortTitle: "Pace & Modes",
+    title: "Game Length & Feedback",
+    shortTitle: "Pace & Feedback",
     badge: "CHOOSE YOUR FORMAT",
     icon: Clock,
     color: "var(--terra)",
@@ -46,7 +46,7 @@ const STEPS = [
     id: "challenges",
     title: "Squad Challenges & Leaderboards",
     shortTitle: "Challenges & Ranks",
-    badge: "BRAGGING RIGHTS",
+    badge: "CHALLENGE & COMPETE",
     icon: Swords,
     color: "var(--gold)",
   },
@@ -252,7 +252,7 @@ export default function TriviaGuideModal({
               {currentStep === 0 && (
                 <div className="space-y-3.5">
                   <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>
-                    Naija Trivia is an intellectual arcade designed to challenge your cultural depth across 3 core pillars of Nigerian knowledge:
+                    Naija Trivia tests your cultural depth across 3 core Nigerian categories:
                   </p>
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
@@ -272,7 +272,7 @@ export default function TriviaGuideModal({
                         <span>Pop Culture</span>
                       </div>
                       <p className="text-[11px] text-[var(--text-dim)] leading-normal">
-                        Afrobeats legends, Nollywood cinema classics, sports heroes, and viral cultural phenomenons.
+                        Afrobeats legends, Nollywood cinema classics, sports heroes, and viral cultural moments.
                       </p>
                     </div>
 
@@ -296,15 +296,15 @@ export default function TriviaGuideModal({
                         4 Tailored Difficulty Levels
                       </span>
                       <span className="text-[11px] text-[var(--text-dim)]">
-                        Choose between <strong>Random (Mixed)</strong>, <strong>Easy (Cultural Basics)</strong>, <strong>Medium</strong>, or <strong>Hard (Scholar Lore)</strong>.
+                        Choose between <strong>Mixed</strong>, <strong>Easy</strong>, <strong>Medium</strong>, or <strong>Hard</strong> questions.
                       </span>
                     </div>
-                    <span className="text-2xl shrink-0">🎯</span>
+                    <Target size={22} className="text-[var(--olive)] shrink-0" />
                   </div>
                 </div>
               )}
 
-              {/* STEP 2: SPRINTS & REVIEW CADENCE */}
+              {/* STEP 2: SPRINTS & FEEDBACK */}
               {currentStep === 1 && (
                 <div className="space-y-3.5">
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
@@ -313,18 +313,18 @@ export default function TriviaGuideModal({
                       style={{ borderColor: "var(--border-dim)" }}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="p-2 rounded-xl bg-[var(--terra-bg)] text-[var(--terra)] font-bold text-xs">
-                          ⚡
+                        <span className="p-2 rounded-xl bg-[var(--terra-bg)] text-[var(--terra)] flex items-center justify-center">
+                          <Zap size={14} />
                         </span>
                         <div>
-                          <h4 className="font-space font-bold text-sm text-[var(--text)]">Sprint Durations</h4>
-                          <span className="text-[10px] text-[var(--text-mute)]">Pick your pace</span>
+                          <h4 className="font-space font-bold text-sm text-[var(--text)]">Quiz Lengths</h4>
+                          <span className="text-[10px] text-[var(--text-mute)]">Pick your time</span>
                         </div>
                       </div>
                       <ul className="text-xs text-[var(--text-dim)] space-y-1.5 pt-1">
-                        <li>• <strong>Quick Sprint (5 min):</strong> 10 questions for a brisk break.</li>
-                        <li>• <strong>Standard (10 min):</strong> 15 questions for a balanced run.</li>
-                        <li>• <strong>Marathon (15 min):</strong> 25 questions for serious loremasters.</li>
+                        <li>• <strong>Quick (5 min):</strong> 10 questions for a quick round.</li>
+                        <li>• <strong>Standard (10 min):</strong> 15 questions for a balanced game.</li>
+                        <li>• <strong>Marathon (15 min):</strong> 25 questions for serious trivia buffs.</li>
                       </ul>
                     </div>
 
@@ -333,17 +333,17 @@ export default function TriviaGuideModal({
                       style={{ borderColor: "var(--border-dim)" }}
                     >
                       <div className="flex items-center gap-2">
-                        <span className="p-2 rounded-xl bg-[var(--olive-dim)] text-[var(--olive)] font-bold text-xs">
-                          📖
+                        <span className="p-2 rounded-xl bg-[var(--olive-dim)] text-[var(--olive)] flex items-center justify-center">
+                          <BookOpen size={14} />
                         </span>
                         <div>
-                          <h4 className="font-space font-bold text-sm text-[var(--text)]">Review Cadence</h4>
-                          <span className="text-[10px] text-[var(--text-mute)]">Learn vs. Test</span>
+                          <h4 className="font-space font-bold text-sm text-[var(--text)]">When Answers Are Shown</h4>
+                          <span className="text-[10px] text-[var(--text-mute)]">Learn as you go or test yourself</span>
                         </div>
                       </div>
                       <ul className="text-xs text-[var(--text-dim)] space-y-1.5 pt-1">
-                        <li>• <strong>Instant Feedback:</strong> Unveils detailed historical explanation immediately after each pick.</li>
-                        <li>• <strong>Suspense Mode:</strong> Rapid non-stop answering; review full breakdown on the scorecard.</li>
+                        <li>• <strong>Instant Feedback:</strong> Shows the correct answer and explanation right after each question.</li>
+                        <li>• <strong>Suspense Mode:</strong> Rapid non-stop answering; review all answers at the end.</li>
                       </ul>
                     </div>
                   </div>
@@ -352,9 +352,9 @@ export default function TriviaGuideModal({
                     className="p-3 rounded-xl border surface flex items-center gap-3 text-xs"
                     style={{ borderColor: "var(--border-dim)" }}
                   >
-                    <span className="text-xl">⏱️</span>
+                    <Clock size={18} className="text-[var(--terra)] shrink-0" />
                     <p style={{ color: "var(--text-dim)" }}>
-                      <strong>Beat The Clock:</strong> Each question is timed. Fast, accurate streaks award bonus XP to boost your scholar standing!
+                      <strong>Beat The Clock:</strong> Each question is timed. Fast, accurate answers award bonus XP to boost your scholar standing!
                     </p>
                   </div>
                 </div>
@@ -370,17 +370,17 @@ export default function TriviaGuideModal({
                         <span>Squad Challenges</span>
                       </div>
                       <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
-                        Convene a custom challenge or share your completed round link on WhatsApp. Friends answer the exact same deck to see who tops your board.
+                        Create a challenge or share your completed game link. Friends answer the exact same questions to see who gets the highest score.
                       </p>
                     </div>
 
                     <div className="surface rounded-2xl p-3.5 border space-y-1.5" style={{ borderColor: "var(--border-dim)" }}>
                       <div className="flex items-center gap-2 text-xs font-space font-bold text-[var(--gold)]">
                         <Trophy size={14} />
-                        <span>Broadside Proof Cards</span>
+                        <span>Shareable Score Cards</span>
                       </div>
                       <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
-                        Export aesthetic 1200x630 proof cards with 1-click clipboard copy to share on Twitter/X, Instagram Stories, and group chats.
+                        Copy a clean score card image to your clipboard in 1 click to share on WhatsApp, Twitter/X, or Instagram.
                       </p>
                     </div>
                   </div>

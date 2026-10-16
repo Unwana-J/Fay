@@ -6,9 +6,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { motion, AnimatePresence, useMotionValue, useSpring, useTransform } from "framer-motion";
 import {
-  BookOpen, Compass, Network,
-  Activity, User, Zap, X, Calendar, ChevronRight, Users, Library, Gamepad2,
-  ShieldAlert, Sparkles
+  LayoutDashboard, Compass, Orbit,
+  Activity, User, Zap, X, Calendar, ChevronRight, Users, BookOpen, Dices,
+  ShieldAlert, Sparkles, ShieldCheck, Flame
 } from "lucide-react";
 import { useAppStore, type CompletedSession } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress } from "@/lib/achievements";
@@ -17,12 +17,12 @@ import FeyLogo from "@/components/ui/FeyLogo";
 import UserAvatar from "@/components/ui/UserAvatar";
 
 const NAV_ITEMS = [
-  { href: "/",              label: "Dashboard",     icon: BookOpen },
+  { href: "/",              label: "Dashboard",     icon: LayoutDashboard },
   { href: "/discover",      label: "Discover",      icon: Compass },
-  { href: "/games",         label: "Games",         icon: Gamepad2 },
+  { href: "/games",         label: "Games",         icon: Dices },
   { href: "/community",     label: "Community",     icon: Users },
-  { href: "/library",       label: "Library",       icon: Library },
-  { href: "/constellation", label: "Constellation", icon: Network },
+  { href: "/library",       label: "Library",       icon: BookOpen },
+  { href: "/constellation", label: "Constellation", icon: Orbit },
   { href: "/analytics",     label: "Analytics",     icon: Activity },
   { href: "/profile",       label: "Profile",       icon: User },
 ];
@@ -234,7 +234,9 @@ function StreakCalendarModal({
           style={{ background: "var(--bg-input)/30", borderColor: "var(--border-dim)" }}
         >
           <div className="flex items-start sm:items-center gap-3">
-            <span className="text-2xl select-none shrink-0">🛡️</span>
+            <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/25 flex items-center justify-center shrink-0 text-amber-600 dark:text-amber-400">
+              <ShieldCheck size={20} />
+            </div>
             <div>
               <div className="text-xs font-bold font-serif" style={{ color: "var(--text)" }}>
                 Scholar&apos;s Seal of Protection
@@ -427,7 +429,11 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             }}
           >
             <div className="flex items-center gap-1.5">
-              <span className={streak.current > 0 ? "flame-pulse text-base" : "opacity-45 text-sm"}>🔥</span>
+              {streak.current > 0 ? (
+                <Flame size={15} className="text-amber-500 fill-amber-500/80 animate-pulse shrink-0" />
+              ) : (
+                <Flame size={15} className="text-[var(--text-mute)] opacity-50 shrink-0" />
+              )}
               <span
                 className="font-medium font-mono text-[11px]"
                 style={{ color: streak.current > 0 ? "var(--terra)" : "var(--text)" }}
@@ -435,9 +441,14 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
                 {streak.current} {streak.current === 1 ? "day streak" : "days streak"}
               </span>
             </div>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1.5">
               {(streak.shields ?? 0) > 0 && (
-                <span className="text-[10px] select-none" title={`${streak.shields} streak shield active`}>🛡️</span>
+                <span
+                  className="inline-flex items-center text-amber-600 dark:text-amber-400"
+                  title={`${streak.shields} streak shield active`}
+                >
+                  <ShieldCheck size={13} />
+                </span>
               )}
               <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>
                 History →

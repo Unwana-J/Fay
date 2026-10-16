@@ -2,7 +2,22 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowLeft, ChevronDown, ChevronUp, User, ShieldCheck, Sparkles, Flame, Trophy } from "lucide-react";
+import {
+  ChevronRight,
+  ArrowLeft,
+  ChevronDown,
+  ChevronUp,
+  User,
+  ShieldCheck,
+  Sparkles,
+  Flame,
+  Trophy,
+  Crown,
+  Swords,
+  Zap,
+  Award,
+  Users,
+} from "lucide-react";
 import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
 import { getTriviaLeaderboard, type CloudTriviaScore } from "@/lib/trivia-leaderboard";
@@ -20,6 +35,47 @@ import {
 } from "@/lib/trivia-league";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/utils";
+
+function RankTrophyBadge({ rank }: { rank?: number }) {
+  if (!rank) {
+    return <span className="font-space font-bold text-xs text-[var(--text-mute)]">—</span>;
+  }
+  if (rank === 1) {
+    return (
+      <div
+        className="w-7 h-7 mx-auto rounded-full bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 font-space font-extrabold text-xs shadow-xs"
+        title="1st Place · Gold"
+      >
+        1
+      </div>
+    );
+  }
+  if (rank === 2) {
+    return (
+      <div
+        className="w-7 h-7 mx-auto rounded-full bg-slate-400/15 border border-slate-400/30 flex items-center justify-center text-slate-600 dark:text-slate-300 font-space font-extrabold text-xs shadow-xs"
+        title="2nd Place · Silver"
+      >
+        2
+      </div>
+    );
+  }
+  if (rank === 3) {
+    return (
+      <div
+        className="w-7 h-7 mx-auto rounded-full bg-amber-700/15 border border-amber-700/30 flex items-center justify-center text-amber-800 dark:text-amber-500 font-space font-extrabold text-xs shadow-xs"
+        title="3rd Place · Bronze"
+      >
+        3
+      </div>
+    );
+  }
+  return (
+    <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+      #{rank}
+    </span>
+  );
+}
 
 interface TriviaLeaderboardViewProps {
   onPlay: () => void;
@@ -196,8 +252,9 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)] block">
                 Trivia XP
               </span>
-              <span className="font-space font-extrabold text-lg text-[#008751] flex items-center gap-0.5">
-                ⚡ {userEntry.triviaXP}
+              <span className="font-space font-extrabold text-lg text-[#008751] flex items-center gap-1">
+                <Zap size={14} className="text-emerald-600 dark:text-emerald-400" />
+                <span>{userEntry.triviaXP}</span>
               </span>
             </div>
             <div>
@@ -213,8 +270,9 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                 <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)] block">
                   League Drops
                 </span>
-                <span className="font-space font-extrabold text-lg text-[var(--terra)] flex items-center gap-0.5">
-                  🏆 {userEntry.leagueDrops}
+                <span className="font-space font-extrabold text-lg text-[var(--terra)] flex items-center gap-1">
+                  <Trophy size={14} />
+                  <span>{userEntry.leagueDrops}</span>
                 </span>
               </div>
             ) : null}
@@ -279,7 +337,8 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
           disabled={isLoading}
           className="text-[11px] text-[var(--text-mute)] hover:text-[var(--text)] flex items-center gap-1 cursor-pointer transition-colors"
         >
-          <span>🔄 Refresh</span>
+          <ChevronDown size={12} className={isLoading ? "animate-spin" : ""} />
+          <span>Refresh</span>
         </button>
       </div>
 
@@ -297,7 +356,8 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>👑</span> Global Scholars
+          <Crown size={13} className="text-amber-500" />
+          <span>Global Scholars</span>
         </button>
         <button
           onClick={() => setTab("challenges")}
@@ -308,7 +368,8 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>⚔️</span> Group Challenges ({challenges.length})
+          <Swords size={13} className="text-[var(--terra)]" />
+          <span>Group Challenges ({challenges.length})</span>
         </button>
         <button
           onClick={() => {
@@ -322,7 +383,8 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>🏆</span> Friendship Leagues ({leagues.length})
+          <Trophy size={13} className="text-amber-600 dark:text-amber-400" />
+          <span>Friendship Leagues ({leagues.length})</span>
         </button>
         <button
           onClick={() => {
@@ -336,14 +398,15 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
-          <span>❇️</span> My Personal Bests
+          <Sparkles size={13} className="text-[var(--olive)]" />
+          <span>My Personal Bests</span>
         </button>
       </div>
 
       {/* Ranking rule banner */}
       {tab === "global" && (
         <div className="p-3 rounded-xl bg-[var(--olive)]/10 border border-[var(--olive)]/20 text-xs flex items-center gap-2 text-[var(--text-dim)]">
-          <span className="text-base">🏆</span>
+          <Trophy size={16} className="text-[var(--olive)] shrink-0" />
           <span>
             <strong>Global Standing:</strong> Ranked primarily by <strong>Total Trivia XP</strong> accumulated across solo games, friendship league drops, and unique rounds completed. Single-trial group challenges award <strong>2.5x XP multipliers</strong>!
           </span>
@@ -422,17 +485,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                   {/* Left: Rank & Avatar & Identity */}
                   <div className="flex items-center gap-3 min-w-0">
                     <div className="w-8 text-center shrink-0">
-                      {entry.rank === 1 ? (
-                        <span className="text-xl">🥇</span>
-                      ) : entry.rank === 2 ? (
-                        <span className="text-xl">🥈</span>
-                      ) : entry.rank === 3 ? (
-                        <span className="text-xl">🥉</span>
-                      ) : (
-                        <span className="font-space font-bold text-xs text-[var(--text-mute)]">
-                          #{entry.rank}
-                        </span>
-                      )}
+                      <RankTrophyBadge rank={entry.rank} />
                     </div>
 
                     <UserAvatar avatar={entry.avatar} size="md" />
@@ -454,10 +507,10 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                         </span>
                         {entry.leagueDrops && entry.leagueDrops > 0 ? (
                           <span
-                            className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30 shrink-0"
+                            className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30 shrink-0"
                             title={`${entry.leagueDrops} tournament drop${entry.leagueDrops === 1 ? "" : "s"} completed`}
                           >
-                            🏆 {entry.leagueDrops} {entry.leagueDrops === 1 ? "drop" : "drops"}
+                            <Trophy size={10} /> {entry.leagueDrops} {entry.leagueDrops === 1 ? "drop" : "drops"}
                           </span>
                         ) : null}
                       </div>
@@ -467,8 +520,9 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                   {/* Right: Scores (XP First, Accuracy Second) */}
                   <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
                     <div className="w-20">
-                      <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-0.5">
-                        ⚡ {entry.triviaXP}
+                      <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-1">
+                        <Zap size={13} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>{entry.triviaXP}</span>
                       </div>
                       <div className="text-[10px] font-semibold text-[var(--text-mute)]">
                         {entry.gamesPlayed} {entry.gamesPlayed === 1 ? "game" : "games"}
@@ -532,10 +586,10 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                         </span>
                         {userEntry.leagueDrops && userEntry.leagueDrops > 0 ? (
                           <span
-                            className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30 shrink-0"
+                            className="inline-flex items-center gap-1 text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30 shrink-0"
                             title={`${userEntry.leagueDrops} tournament drop${userEntry.leagueDrops === 1 ? "" : "s"} completed`}
                           >
-                            🏆 {userEntry.leagueDrops} {userEntry.leagueDrops === 1 ? "drop" : "drops"}
+                            <Trophy size={10} /> {userEntry.leagueDrops} {userEntry.leagueDrops === 1 ? "drop" : "drops"}
                           </span>
                         ) : null}
                       </div>
@@ -544,8 +598,9 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
 
                   <div className="flex items-center gap-4 sm:gap-6 text-right shrink-0">
                     <div className="w-20">
-                      <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-0.5">
-                        ⚡ {userEntry.triviaXP}
+                      <div className="font-mono text-sm sm:text-base font-extrabold text-[#008751] flex items-center justify-end gap-1">
+                        <Zap size={13} className="text-emerald-600 dark:text-emerald-400" />
+                        <span>{userEntry.triviaXP}</span>
                       </div>
                       <div className="text-[10px] font-semibold text-[var(--text-mute)]">
                         {userEntry.gamesPlayed} {userEntry.gamesPlayed === 1 ? "game" : "games"}
@@ -714,17 +769,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                         >
                           <div className="flex items-center gap-3 min-w-0">
                             <div className="w-8 text-center shrink-0">
-                              {idx === 0 ? (
-                                <span className="text-xl">🥇</span>
-                              ) : idx === 1 ? (
-                                <span className="text-xl">🥈</span>
-                              ) : idx === 2 ? (
-                                <span className="text-xl">🥉</span>
-                              ) : (
-                                <span className="font-space font-bold text-xs text-[var(--text-mute)]">
-                                  #{idx + 1}
-                                </span>
-                              )}
+                              <RankTrophyBadge rank={idx + 1} />
                             </div>
 
                             <UserAvatar avatar={s.avatar} size="md" />
@@ -907,7 +952,9 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
         <div className="space-y-3">
           {leagues.length === 0 ? (
             <div className="surface rounded-2xl p-8 border text-center space-y-3" style={{ borderColor: "var(--border-dim)" }}>
-              <div className="text-3xl">🏆</div>
+              <div className="w-12 h-12 rounded-2xl mx-auto bg-amber-500/10 border border-amber-500/25 flex items-center justify-center text-amber-600 dark:text-amber-400">
+                <Trophy size={24} />
+              </div>
               <h4 className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
                 No Active Friendship Leagues Found
               </h4>
@@ -944,12 +991,12 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                         {status.isCompleted ? "Completed" : `Day ${status.dayNumber} / ${l.durationDays}`}
                       </span>
                       {isCreator ? (
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                          👑 Host
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                          <Crown size={10} className="text-amber-600 dark:text-amber-400" /> Host
                         </span>
                       ) : (
-                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/15 text-[var(--olive)] border border-[var(--olive)]/30">
-                          👥 Team Scholar
+                        <span className="inline-flex items-center gap-1 text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/15 text-[var(--olive)] border border-[var(--olive)]/30">
+                          <Users size={10} /> Team Scholar
                         </span>
                       )}
                     </div>

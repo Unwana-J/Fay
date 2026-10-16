@@ -279,7 +279,7 @@ export async function GET(req: NextRequest) {
                   fontFamily: "Georgia, serif",
                 }}
               >
-                {challengeTitle ? `Invitational Gauntlet · Hosted by Scholar ${by} 🇳🇬` : "Can you beat this? 🇳🇬"}
+                {challengeTitle ? `Challenge by ${by} · Can you beat this score? 🇳🇬` : "Can you beat this? 🇳🇬"}
               </p>
 
               <p
@@ -291,7 +291,7 @@ export async function GET(req: NextRequest) {
                 }}
               >
                 {challengeTitle
-                  ? `Enter this custom gauntlet of ${total} curated questions. Compete against ${by} and claim the top ranking!`
+                  ? `Play this challenge of ${total} curated questions. Compete against ${by} and claim the top ranking!`
                   : `Answer the exact same ${total} questions and see if you can top their score on Fey!`}
               </p>
             </div>
@@ -321,7 +321,7 @@ export async function GET(req: NextRequest) {
                   marginBottom: "8px",
                 }}
               >
-                {challengeTitle ? "★ Gauntlet Deck ★" : "★ Official Score ★"}
+                {challengeTitle ? "★ Challenge Deck ★" : "★ Official Score ★"}
               </span>
 
               <div

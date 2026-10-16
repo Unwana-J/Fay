@@ -14,6 +14,10 @@ import {
   Share2,
   Users,
   Loader2,
+  Zap,
+  Clock,
+  Infinity,
+  ShieldCheck,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { useRouter } from "next/navigation";
@@ -321,10 +325,10 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                   </select>
                 </div>
 
-                {/* Tournament Pacing Mode */}
+                {/* Quiz Schedule Mode */}
                 <div>
                   <label className="text-xs font-semibold block mb-1.5" style={{ color: "var(--text)" }}>
-                    Tournament Pacing & Drops Mode
+                    Quiz Schedule
                   </label>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
@@ -336,11 +340,12 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                           : "border-[var(--border-dim)] bg-[var(--bg-input)] hover:border-[var(--border)]"
                       }`}
                     >
-                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1">
-                        <span>⚡ Sequential</span>
+                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1.5">
+                        <Zap size={13} className="text-amber-500" />
+                        <span>Self-Paced</span>
                       </div>
                       <p className="text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">
-                        Drop 2 unlocks right after Drop 1 without 24h wait.
+                        Next quiz unlocks right after finishing each one.
                       </p>
                     </button>
 
@@ -353,11 +358,12 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                           : "border-[var(--border-dim)] bg-[var(--bg-input)] hover:border-[var(--border)]"
                       }`}
                     >
-                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1">
-                        <span>⏳ Daily 24h</span>
+                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1.5">
+                        <Clock size={13} className="text-[var(--terra)]" />
+                        <span>Daily (24h)</span>
                       </div>
                       <p className="text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">
-                        Paced cohort: 1 drop unlocks strictly every 24h at midnight.
+                        1 new quiz unlocks every day at midnight.
                       </p>
                     </button>
 
@@ -373,11 +379,12 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                           : "border-[var(--border-dim)] bg-[var(--bg-input)] hover:border-[var(--border)]"
                       }`}
                     >
-                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1">
-                        <span>♾️ Unlimited</span>
+                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1.5">
+                        <Infinity size={13} className="text-[var(--olive)]" />
+                        <span>Continuous</span>
                       </div>
                       <p className="text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">
-                        Continuous marathon with endless sequential drops.
+                        Play back-to-back quizzes with no wait time.
                       </p>
                     </button>
                   </div>
@@ -391,13 +398,14 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                         onChange={(e) => setAllowExtraDrops(e.target.checked)}
                         className="rounded border-[var(--border)] text-[var(--terra)] focus:ring-[var(--terra)]"
                       />
-                      <span>Allow Host to Add Extra / Unlimited Drops</span>
+                      <span>Allow Host to Add Extra Quizzes</span>
                     </label>
                     <span className="text-[10px] text-[var(--olive)] font-mono font-bold">Host Power</span>
                   </div>
 
                   <p className="text-[10px] text-[var(--text-mute)] mt-1.5 flex items-center gap-1 font-mono">
-                    <span>🛡️</span> Drops unlock one after another (Drop 2 requires Drop 1). Strictly 1-attempt per drop.
+                    <ShieldCheck size={12} className="text-amber-500 inline shrink-0" />
+                    <span>Quizzes unlock sequentially. Exactly 1 official attempt per quiz.</span>
                   </p>
                 </div>
 

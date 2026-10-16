@@ -293,10 +293,9 @@ export default function RoomLobby({
               <button
                 type="button"
                 onClick={openClaimAccountPrompt}
-                className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition cursor-pointer shadow-2xs"
+                className="px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition cursor-pointer shadow-2xs"
                 title="Link free account to track your daily streak & articulate rank"
               >
-                <Flame className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
                 <span>Track Streak</span>
               </button>
             )}
@@ -452,7 +451,7 @@ export default function RoomLobby({
               >
                 <span>{BUZZER_OPTIONS.find((b) => b.id === (room.settings.buzzerSound || "classic"))?.icon || "🚨"}</span>
                 <span>{BUZZER_OPTIONS.find((b) => b.id === (room.settings.buzzerSound || "classic"))?.label || "Classic Buzzer"}</span>
-                <span className="text-[9px] opacity-70">🔊</span>
+                <Volume2 size={11} className="opacity-70 ml-0.5" />
               </button>
             )}
           </div>
@@ -520,9 +519,8 @@ export default function RoomLobby({
           <button
             type="button"
             onClick={openClaimAccountPrompt}
-            className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-space font-bold text-xs transition cursor-pointer shrink-0 self-start sm:self-auto shadow-xs flex items-center gap-1"
+            className="px-3.5 py-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-space font-bold text-xs transition cursor-pointer shrink-0 self-start sm:self-auto shadow-xs"
           >
-            <Flame size={13} className="text-amber-200" />
             <span>Track Streak →</span>
           </button>
         </div>

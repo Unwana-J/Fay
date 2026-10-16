@@ -111,7 +111,7 @@ export function VisibleCountdownTimer({
             <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500" />
           </span>
           <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-400">
-            Gauntlet Closes In
+            Challenge Ends In
           </span>
         </div>
         <span className="text-[10px] font-mono text-[var(--text-mute)] font-medium">
@@ -185,8 +185,8 @@ export function VisibleCountdownTimer({
           />
         </div>
         <div className="flex items-center justify-between text-[9px] font-mono text-[var(--text-dim)] px-0.5">
-          <span>{Math.round(countdown.percentRemaining)}% window remaining</span>
-          <span>{challenge.durationHours > 0 ? `${challenge.durationHours}h gauntlet` : "Permanent"}</span>
+          <span>{Math.round(countdown.percentRemaining)}% time remaining</span>
+          <span>{challenge.durationHours > 0 ? `${challenge.durationHours}h challenge` : "No time limit"}</span>
         </div>
       </div>
     </div>
@@ -394,7 +394,7 @@ export default function TriviaChallengeLounge({
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full bg-[var(--terra)]" />
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--olive)]">
-                Head-to-Head Gauntlets
+                1v1 &amp; Group Challenges
               </span>
             </div>
             <h2
@@ -404,7 +404,7 @@ export default function TriviaChallengeLounge({
               Trivia Challenges &amp; Arena
             </h2>
             <p className="text-xs sm:text-sm text-[var(--text-dim)] mt-0.5">
-              Play identical decks, invite friends to 1v1 duels, or compete in public community clashes.
+              Play identical decks, invite friends to 1v1 duels, or compete in community challenges.
             </p>
           </div>
 
@@ -545,7 +545,7 @@ export default function TriviaChallengeLounge({
                           className="px-4 py-2.5 rounded-xl btn-terra font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all text-center whitespace-nowrap"
                         >
                           <Zap size={13} />
-                          <span>Play Gauntlet</span>
+                          <span>Accept Challenge</span>
                           <ArrowRight size={13} />
                         </button>
                       </div>
@@ -566,7 +566,7 @@ export default function TriviaChallengeLounge({
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-space font-bold uppercase tracking-wider text-[var(--olive)] flex items-center gap-2">
                     <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Live Gauntlets ({activeMyList.length})</span>
+                    <span>Active Challenges ({activeMyList.length})</span>
                   </span>
                 </div>
 
@@ -696,16 +696,16 @@ export default function TriviaChallengeLounge({
                   <Swords size={20} />
                 </div>
                 <h3 className="font-space font-extrabold text-base text-[var(--text)]">
-                  No Custom Gauntlets Created Yet
+                  No Custom Challenges Yet
                 </h3>
                 <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
-                  Convene an invitational gauntlet, pick a duration, and drop the link in your group chats.
+                  Create a challenge, pick how many days it stays open, and share the link with friends to see who gets the highest score.
                 </p>
                 <button
                   onClick={() => setView("create")}
                   className="px-4 py-2.5 rounded-xl btn-terra font-space font-bold text-xs cursor-pointer inline-flex items-center gap-1.5 shadow-sm"
                 >
-                  <span>Convene Your First Challenge</span>
+                  <span>Create Your First Challenge</span>
                   <ArrowRight size={13} />
                 </button>
               </div>
@@ -770,7 +770,7 @@ export default function TriviaChallengeLounge({
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--terra)]">
-                  Group Gauntlet
+                  Group Challenge
                 </span>
                 {currentChallenge.isPublic && (
                   <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/30">
@@ -809,7 +809,7 @@ export default function TriviaChallengeLounge({
 
           {scores.length === 0 ? (
             <div className="py-12 text-center text-xs text-[var(--text-dim)] border border-dashed rounded-2xl" style={{ borderColor: "var(--border-dim)" }}>
-              No contenders have completed this gauntlet yet. Be the first to play!
+              No players have completed this challenge yet. Be the first to play!
             </div>
           ) : (
             <div className="rounded-2xl border overflow-hidden surface divide-y divide-[var(--border-dim)]" style={{ borderColor: "var(--border-dim)" }}>
@@ -889,14 +889,14 @@ export default function TriviaChallengeLounge({
             <Swords size={16} />
           </span>
           <span className="text-xs font-mono font-bold uppercase tracking-wider text-[var(--olive)]">
-            Gauntlet Creator
+            Challenge Creator
           </span>
         </div>
         <h2 className="font-space font-extrabold text-2xl sm:text-3xl tracking-tight" style={{ color: "var(--text)" }}>
-          Convene a Trivia Gauntlet
+          Create a Trivia Challenge
         </h2>
         <p className="text-sm mt-1" style={{ color: "var(--text-dim)" }}>
-          Set your duration window, question pool, and invite friends to compete on an identical challenge deck.
+          Pick the questions and how long the challenge stays open. Friends will answer the exact same quiz to compete on your leaderboard.
         </p>
       </div>
 
@@ -909,7 +909,7 @@ export default function TriviaChallengeLounge({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={`e.g. ${profile?.username || "Scholar"}'s Naija History Gauntlet`}
+          placeholder={`e.g. ${profile?.username || "Scholar"}'s Naija History Challenge`}
           className="w-full px-4 py-3.5 rounded-2xl border text-sm bg-[var(--bg-base)] focus:outline-none focus:border-[var(--olive)] transition-colors shadow-xs"
           style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
         />
@@ -932,7 +932,7 @@ export default function TriviaChallengeLounge({
           />
         </div>
         <p className="text-[11px] text-[var(--text-dim)]">
-          When checked, any scholar browsing the Fey Community Arena can discover and accept your gauntlet.
+          When checked, anyone browsing the Community Arena can find and play your challenge.
         </p>
       </div>
 
@@ -1047,7 +1047,7 @@ export default function TriviaChallengeLounge({
           type="submit"
           className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-lg hover:scale-[1.01] active:scale-[0.99] transition-all"
         >
-          <span>Create &amp; Launch Gauntlet</span>
+          <span>Create &amp; Launch Challenge</span>
           <ArrowRight size={16} />
         </button>
       </div>
