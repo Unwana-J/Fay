@@ -29,6 +29,8 @@ import {
   getAllLocalLeagues,
   computeUserLeagueSummary,
   removeLocalLeague,
+  saveLocalLeague,
+  getLeagueShareUrl,
   type FriendshipLeague,
 } from "@/lib/trivia-league";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -52,7 +54,24 @@ export default function TriviaLeagueLounge() {
 
   useEffect(() => {
     refreshLeagues();
-  }, [showCreateModal]);
+
+    // Fetch user's leagues from cloud so team members see the arena too
+    if (profile.id || profile.username) {
+      const q = new URLSearchParams();
+      if (profile.id) q.set("userId", profile.id);
+      if (profile.username) q.set("username", profile.username);
+
+      fetch(`/api/trivia/league?${q.toString()}`)
+        .then((res) => (res.ok ? res.json() : null))
+        .then((data) => {
+          if (data?.leagues && Array.isArray(data.leagues)) {
+            data.leagues.forEach((l: FriendshipLeague) => saveLocalLeague(l));
+            refreshLeagues();
+          }
+        })
+        .catch(() => {});
+    }
+  }, [showCreateModal, profile.id, profile.username]);
 
   const leagueSummaries = useMemo(() => {
     return leagues.map((league) => {
@@ -82,7 +101,7 @@ export default function TriviaLeagueLounge() {
     );
   }, [activeLeagues]);
 
-  function handleJoinLeague(e: React.FormEvent) {
+  async function handleJoinLeague(e: React.FormEvent) {
     e.preventDefault();
     const clean = inputCode.trim().toUpperCase();
     if (!clean || clean.length < 4) {
@@ -90,15 +109,21 @@ export default function TriviaLeagueLounge() {
       return;
     }
     setJoinError("");
+    try {
+      const res = await fetch(`/api/trivia/league?code=${clean}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.league) {
+          saveLocalLeague(data.league);
+          refreshLeagues();
+        }
+      }
+    } catch {}
     router.push(`/games/trivia/league/${clean}`);
   }
 
   async function handleCopyShare(league: FriendshipLeague) {
-    const origin =
-      typeof window !== "undefined"
-        ? window.location.origin
-        : "https://fey.lokinlabs.com.ng";
-    const shareUrl = `${origin}/games/trivia/league/${league.code}`;
+    const shareUrl = getLeagueShareUrl(league);
     const ok = await copyTextToClipboard(shareUrl);
     if (ok) {
       setCopiedCode(league.code);
@@ -328,6 +353,12 @@ export default function TriviaLeagueLounge() {
               <div className="grid grid-cols-1 gap-3.5">
                 {activeLeagues.map(({ league, summary }) => {
                   const isReady = summary.status.isActive && !summary.hasCompletedToday;
+                  const isHost =
+                    (league.creatorId && league.creatorId === profile.id) ||
+                    (league.creatorName &&
+                      (league.creatorName || "").trim().toLowerCase() ===
+                        (profile.username || "").trim().toLowerCase());
+
                   return (
                     <div
                       key={league.code}
@@ -355,6 +386,16 @@ export default function TriviaLeagueLounge() {
                               </span>
                             )}
 
+                            {isHost ? (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30">
+                                👑 Host
+                              </span>
+                            ) : (
+                              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                                👥 Team Scholar
+                              </span>
+                            )}
+
                             <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-lg bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-dim)]">
                               Code: {league.code}
                             </span>
@@ -379,9 +420,14 @@ export default function TriviaLeagueLounge() {
                         <div className="flex flex-wrap sm:flex-col items-start sm:items-end justify-between gap-2.5 shrink-0 border-t sm:border-t-0 pt-3 sm:pt-0 border-[var(--border-dim)]">
                           {summary.status.isActive && (
                             summary.hasCompletedToday ? (
-                              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-mono font-bold">
-                                <CheckCircle2 size={13} />
-                                <span>Day {summary.status.dayNumber} Done ({summary.todayPoints} pts)</span>
+                              <div className="flex flex-col items-start sm:items-end gap-1">
+                                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-emerald-500/10 border border-emerald-500/25 text-emerald-800 dark:text-emerald-300 text-xs font-mono font-bold">
+                                  <CheckCircle2 size={13} />
+                                  <span>Day {summary.status.dayNumber} Done ({summary.todayPoints} pts)</span>
+                                </div>
+                                <span className="text-[10px] font-mono text-[var(--text-dim)]">
+                                  {league.attemptPolicy === "strict" ? "⏳ Waiting for midnight drop" : "🔁 Re-attempts open"}
+                                </span>
                               </div>
                             ) : (
                               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-xl bg-[var(--terra)]/15 border border-[var(--terra)]/35 text-[var(--terra)] text-xs font-mono font-bold animate-pulse">

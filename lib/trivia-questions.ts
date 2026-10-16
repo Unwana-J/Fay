@@ -1,4 +1,4 @@
-export type TriviaCategory = "History" | "Pop Culture" | "General Knowledge";
+export type TriviaCategory = "History" | "Pop Culture" | "General Knowledge" | "Sports";
 export type TriviaDifficulty = "easy" | "medium" | "hard";
 export type TriviaDifficultyFilter = "random" | "easy" | "medium" | "hard";
 
@@ -6017,6 +6017,337 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
     options: ["Green represents Nigeria's rich natural wealth and fertile agricultural land; White represents peace and unity", "Green represents forests; White represents cotton", "Green represents military power; White represents religion", "Green represents Islam; White represents Christianity"],
     answer: 0, category: "General Knowledge", difficulty: "easy",
     explanation: "Designed in 1959 by Michael Taiwo Akinkunmi, the green vertical bands represent agricultural wealth, flanking the white band signifying peace."
+  },
+  {
+    id: "g331", question: "Which police tactical unit triggered nationwide youth protests in October 2020 after widespread allegations of profiling, extortion, and brutality?",
+    options: ["Mobile Police (MOPOL)", "Special Anti-Robbery Squad (SARS)", "Federal Highway Patrol", "Special Protection Unit (SPU)"],
+    answer: 1, category: "General Knowledge", difficulty: "easy",
+    explanation: "The Special Anti-Robbery Squad (SARS) became notorious for unlawful profiling of young Nigerians, extortion, and human rights violations, sparking the global #EndSARS movement in October 2020."
+  },
+  {
+    id: "g332", question: "During the October 2020 #EndSARS demonstrations, peaceful protesters organized their core governance and justice reforms into what famous charter?",
+    options: ["5-for-5 Demands", "Ten Commandments of Youth", "People's Charter of 2020", "October Declaration"],
+    answer: 0, category: "General Knowledge", difficulty: "easy",
+    explanation: "The '5-for-5 Demands' called for immediate release of arrested protesters, justice and compensation for victims, an independent panel of inquiry, psychological re-evaluation of officers, and police salary increases."
+  },
+  {
+    id: "g333", question: "Which prominent civic organization formed by young Nigerian women played a vital role during #EndSARS by crowdfunding via Bitcoin, organizing medical aid, and providing legal bail?",
+    options: ["Market Women Association", "Stand to End Rape (STER)", "The Feminist Coalition (FemCo)", "Women in Management, Business and Public Service (WIMBIZ)"],
+    answer: 2, category: "General Knowledge", difficulty: "medium",
+    explanation: "The Feminist Coalition (FemCo), co-founded by Feyikemi Abudu and Damilola Odufuwa, raised over ₦147 million (including Bitcoin when local bank accounts were restricted) to fund ambulances, emergency helplines, and legal defense."
+  },
+  {
+    id: "g334", question: "Which landmark infrastructure in Lagos served as the primary gathering epicentre of peaceful #EndSARS demonstrators before the tragic events of October 20, 2020?",
+    options: ["Lekki Toll Gate", "Third Mainland Bridge", "Tafawa Balewa Square (TBS)", "Maryland Independence Tunnel"],
+    answer: 0, category: "General Knowledge", difficulty: "easy",
+    explanation: "The Lekki Toll Gate on the Victoria Island–Epe Expressway was occupied day and night by thousands of peaceful protesters waving Nigerian flags and singing the national anthem."
+  },
+  {
+    id: "g335", question: "Following the October 2020 #EndSARS protests, what investigative bodies were established across 28 Nigerian states to receive petitions, investigate police brutality, and award compensation to victims?",
+    options: ["Police Service Investigative Council", "National Human Rights Tribunal", "Truth and Reconciliation Commission", "Judicial Panels of Inquiry"],
+    answer: 3, category: "General Knowledge", difficulty: "medium",
+    explanation: "States across Nigeria instituted Judicial Panels of Inquiry chaired by retired judges to hear testimonies from victims of police torture and extrajudicial killings, recommending indictments and paying compensations."
+  },
+  // ─── NIGERIAN SPORTS & ATHLETICS ───────────────────────────────────────────
+  {
+    id: "s001", question: "In what year did Nigeria's 'Dream Team' defeat Argentina 3-2 to win Africa's first Olympic Men's Football Gold medal in Atlanta?",
+    options: ["1992", "1996", "2000", "2004"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Nigeria's U-23 Dream Team made global history at the 1996 Atlanta Summer Olympics, beating Brazil 4-3 in the semi-final and Argentina 3-2 in the final."
+  },
+  {
+    id: "s002", question: "Who scored Nigeria's historic first-ever FIFA World Cup goal against Bulgaria at USA '94 and celebrated by gripping the net in tears?",
+    options: ["Daniel Amokachi", "Emmanuel Amunike", "Rashidi Yekini", "Samson Siasia"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Rashidi Yekini scored in the 21st minute against Bulgaria on June 21, 1994, at the Cotton Bowl in Dallas, delivering one of World Cup history's most iconic celebrations."
+  },
+  {
+    id: "s003", question: "Which Nigerian athlete made history as Nigeria's first individual Olympic gold medalist by leaping 7.12m in the women's long jump in Atlanta 1996?",
+    options: ["Falilat Ogunkoya", "Mary Onyali", "Chioma Ajunwa", "Blessing Okagbare"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Chioma Ajunwa, who was also an officer in the Nigerian Police Force and a former footballer for the Super Falcons, won long jump Gold on August 2, 1996."
+  },
+  {
+    id: "s004", question: "Who shattered the world record in the women's 100m hurdles with a blistering time of 12.12 seconds at the 2022 World Athletics Championships?",
+    options: ["Tobi Amusan", "Ese Brume", "Blessing Okagbare", "Gloria Alozie"],
+    answer: 0, category: "Sports", difficulty: "easy",
+    explanation: "Oluwatobiloba 'Tobi' Amusan broke Kendra Harrison's world record in Eugene, Oregon in July 2022, becoming Nigeria's first-ever World Athletics champion and world record holder."
+  },
+  {
+    id: "s005", question: "Which legendary Nigerian playmaker was famously praised with the chant 'so good they named him twice' for his mesmerizing dribbling?",
+    options: ["Nwankwo Kanu", "Finidi George", "Austin 'Jay-Jay' Okocha", "Sunday Oliseh"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Austin Jay-Jay Okocha dazzled at Eintracht Frankfurt, Fenerbahçe, PSG, and Bolton Wanderers, and captained Nigeria to the 2004 AFCON where he was named Best Player."
+  },
+  {
+    id: "s006", question: "Who earned the nickname 'The Big Boss' after captaining Nigeria to win the 1994 AFCON and later coaching them to victory in 2013?",
+    options: ["Christian Chukwu", "Stephen Keshi", "Shuaibu Amodu", "Sunday Oliseh"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Stephen Keshi joined Egypt's Mahmoud El-Gohary as the only men in African football history to win the Africa Cup of Nations as both player (1994) and manager (2013)."
+  },
+  {
+    id: "s007", question: "Who won the CAF African Women's Footballer of the Year award a record 6 times between 2014 and 2023?",
+    options: ["Perpetua Nkwocha", "Asisat Oshoala", "Francisca Ordega", "Chiamaka Nnadozie"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Asisat 'Agba Baller' Oshoala surpassed Perpetua Nkwocha's record of 4 awards by claiming her 6th CAF Women's Player of the Year in December 2023."
+  },
+  {
+    id: "s008", question: "Which Nigerian football club became the first to lift the CAF Champions League, defending the title back-to-back in 2003 and 2004?",
+    options: ["Shooting Stars (3SC)", "Rangers International", "Enyimba International F.C.", "Kano Pillars"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Aba-based Enyimba, known as 'The People's Elephant', broke Nigeria's 38-year continental jinx by defeating Ismaily in 2003 and Étoile du Sahel in 2004 under coach Kadiri Ikhana."
+  },
+  {
+    id: "s009", question: "Who became Nigeria's very first world boxing champion when he claimed the World Featherweight title in Paris in 1957?",
+    options: ["Dick Tiger", "Hogan 'Kid' Bassey", "Bash Ali", "Samuel Peter"],
+    answer: 1, category: "Sports", difficulty: "medium",
+    explanation: "Okon Bassey Asuquo, known as Hogan 'Kid' Bassey, defeated French Algerian Cherif Hamia at the Palais des Sports in Paris on June 24, 1957."
+  },
+  {
+    id: "s010", question: "In the 1998 FIFA World Cup in Nantes, whose sensational 25-yard thunderbolt sealed Nigeria's thrilling 3-2 comeback against Spain?",
+    options: ["Mutiu Adepoju", "Garba Lawal", "Sunday Oliseh", "Finidi George"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Sunday Oliseh unleashed a 116 km/h rocket into Andoni Zubizarreta's net in the 78th minute on June 13, 1998, causing nationwide celebrations."
+  },
+  {
+    id: "s011", question: "Who scored the dramatic golden goal in the 94th minute of the Atlanta 1996 Olympic semi-final to cap Nigeria's 4-3 comeback win over Brazil?",
+    options: ["Daniel Amokachi", "Nwankwo Kanu", "Victor Ikpeba", "Celestine Babayaro"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Trailing Bebeto and Ronaldo's Brazil 1-3 with 12 minutes left, Kanu equalised in the 90th minute and scored the historic sudden-death golden goal in extra time."
+  },
+  {
+    id: "s012", question: "Which Nigerian striker scored 26 Serie A goals in 2022/23 to lead S.S.C. Napoli to their first Italian league title in 33 years?",
+    options: ["Ademola Lookman", "Victor Osimhen", "Taiwo Awoniyi", "Terem Moffi"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Victor Osimhen became the first African player to win the Serie A Capocannoniere (top scorer) and was crowned 2023 CAF African Men's Footballer of the Year."
+  },
+  {
+    id: "s013", question: "How many Women's Africa Cup of Nations (WAFCON) trophies has Nigeria's Super Falcons won as the most dominant side in African history?",
+    options: ["5", "7", "9", "11"],
+    answer: 2, category: "Sports", difficulty: "medium",
+    explanation: "The Super Falcons have won 9 of the first 12 WAFCON tournaments (1998, 2000, 2002, 2004, 2006, 2010, 2014, 2016, 2018)."
+  },
+  {
+    id: "s014", question: "Who was the Dutch tactician who managed Nigeria from 1989 to 1994, leading the Super Eagles to 5th in the FIFA World Rankings?",
+    options: ["Johannes Bonfrere", "Clemens Westerhof", "Thijs Libregts", "Guus Hiddink"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Clemens Westerhof transformed Nigerian football into a global powerhouse, qualifying Nigeria for their maiden World Cup and winning AFCON 1994."
+  },
+  {
+    id: "s015", question: "Which Nigerian table tennis maestro was ranked world No. 10 and became the first African in the Olympic singles quarter-finals at Rio 2016?",
+    options: ["Segun Toriola", "Quadri Aruna", "Bose Kaffo", "Olajide Omotayo"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Quadri Aruna defeated top seeds like Timo Boll and Chuang Chih-yuan in Rio, putting African table tennis on the global premier stage."
+  },
+  {
+    id: "s016", question: "In July 2021, which Nigerian national team shocked the sports world by defeating USA's team of NBA superstars 90-87 in an exhibition in Las Vegas?",
+    options: ["D'Tigers (Men's Basketball)", "D'Tigress (Women's Basketball)", "Super Eagles", "Nigeria Golden Eaglets"],
+    answer: 0, category: "Sports", difficulty: "easy",
+    explanation: "Led by coach Mike Brown and players like Gabe Vincent and Precious Achiuwa, Nigeria became the first African nation ever to beat USA Men's Basketball."
+  },
+  {
+    id: "s017", question: "Who claimed a historic Olympic Silver medal in women's freestyle 68kg wrestling at the Tokyo 2020 Games, Nigeria's first-ever Olympic wrestling medal?",
+    options: ["Odunayo Adekuoroye", "Blessing Oborududu", "Aminat Adeniyi", "Mercy Genesis"],
+    answer: 1, category: "Sports", difficulty: "medium",
+    explanation: "Ten-time African champion Blessing Oborududu won silver in Tokyo on August 3, 2021, falling only to world champion Tamyra Mensah-Stock."
+  },
+  {
+    id: "s018", question: "Which Nigerian football star scored an astonishing 15-minute hat-trick for Arsenal against Chelsea in October 1999 to turn a 0-2 deficit into a 3-2 victory?",
+    options: ["Emmanuel Adebayor", "Nwankwo Kanu", "Alex Iwobi", "John Utaka"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Nwankwo Kanu's hat-trick concluded with an unbelievable curling strike from near the corner flag past Chelsea goalkeeper Ed de Goey, prompting Martin Tyler's iconic 'Kanu, believe it?!'"
+  },
+  {
+    id: "s019", question: "Nigeria's men's 4x400m relay squad was retroactively awarded the Sydney 2000 Olympic Gold medal in 2012 due to which event?",
+    options: ["Lane infringement by Great Britain", "Doping disqualification of USA athlete Antonio Pettigrew", "Baton drop appeal", "False start review"],
+    answer: 1, category: "Sports", difficulty: "hard",
+    explanation: "The Nigerian quartet of Clement Chukwu, Jude Monye, Sunday Bada, and Enefiok Udo-Obong was awarded the Gold medal after Pettigrew admitted to performance-enhancing drugs."
+  },
+  {
+    id: "s020", question: "Which Nigerian goalkeeper made world headlines at the 2010 World Cup in South Africa by producing multiple world-class saves to frustrate Lionel Messi?",
+    options: ["Peter Rufai", "Ike Shorunmu", "Vincent Enyeama", "Carl Ikeme"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Vincent Enyeama was awarded Man of the Match despite Nigeria's 0-1 defeat to Argentina after stopping 6 on-target shots from Lionel Messi."
+  },
+  {
+    id: "s021", question: "Which Nigerian heavyweight boxer, nicknamed 'The Nigerian Nightmare', captured the WBC World Heavyweight title in 2008 by knocking out Oleg Maskaev?",
+    options: ["Henry Akinwande", "Herbie Hide", "Samuel Peter", "Efe Ajagba"],
+    answer: 2, category: "Sports", difficulty: "medium",
+    explanation: "Akwa Ibom-born Samuel Peter claimed the WBC World Heavyweight crown in Cancun, Mexico on March 8, 2008 with a sixth-round technical knockout."
+  },
+  {
+    id: "s022", question: "Which colourful Nigerian defender was famous across Europe for his bright green braided hair and tough tackling for Auxerre, Inter, and AC Milan?",
+    options: ["Uche Okechukwu", "Taribo West", "Celestine Babayaro", "Joseph Yobo"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Pastor Taribo West was an essential component of Nigeria's 1996 Olympic Gold and 1998 World Cup squads, and won the UEFA Cup with Inter Milan in 1998."
+  },
+  {
+    id: "s023", question: "Who was the Dutch-based winger who scored on his international debut and provided the pinpoint cross for Rashidi Yekini's opening 1994 World Cup goal?",
+    options: ["Finidi George", "Emmanuel Amunike", "Tijani Babangida", "Victor Ikpeba"],
+    answer: 0, category: "Sports", difficulty: "medium",
+    explanation: "Finidi George, a key member of Louis van Gaal's Champions League-winning Ajax side, was widely regarded as one of the world's best right-wingers in the 1990s."
+  },
+  {
+    id: "s024", question: "Which Nigerian sprinter won individual Olympic bronze in the 200m at Barcelona 1992 and bronze in the 4x100m relay at Atlanta 1996?",
+    options: ["Mary Onyali-Omagbemi", "Falilat Ogunkoya", "Beatrice Utondu", "Christy Opara-Thompson"],
+    answer: 0, category: "Sports", difficulty: "medium",
+    explanation: "Mary Onyali represented Nigeria at five consecutive Olympic Games (1988–2004) and won numerous African championship sprint titles."
+  },
+  {
+    id: "s025", question: "Who scored the sole winning goal with an exquisite flick and volley in the 2013 AFCON Final against Burkina Faso in Johannesburg?",
+    options: ["Victor Moses", "Emmanuel Emenike", "Sunday Mba", "Ahmed Musa"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Enugu Rangers midfielder Sunday Mba scored in the 40th minute, etching his name into Nigerian folklore as a home-based hero winning the continental title."
+  },
+  {
+    id: "s026", question: "Who coached D'Tigress to make Olympic basketball history at Paris 2024 by becoming the first African team ever to reach the quarterfinals?",
+    options: ["Sam Vincent", "Hughley Otis", "Rena Wakama", "Mfon Udoka"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Coach Rena Wakama led D'Tigress to historic group-stage wins over world No. 3 Australia and Canada, and was named Best Coach of the Olympic tournament."
+  },
+  {
+    id: "s027", question: "What was the official name of the Nigerian senior men's national football team before it was renamed the 'Super Eagles' in 1988?",
+    options: ["Red Devils", "Green Eagles", "Nigerian Tigers", "Lagos Lions"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Originally known as the UK Tourists (1949) then the Red Devils, the team was called the Green Eagles from 1960 until after the 1988 Maroc AFCON."
+  },
+  {
+    id: "s028", question: "In what year did Nigeria win their very first Africa Cup of Nations (AFCON) title, beating Algeria 3-0 in the final in Surulere, Lagos?",
+    options: ["1976", "1980", "1984", "1988"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "On March 22, 1980, the Green Eagles lifted the trophy in front of 85,000 roaring fans at the National Stadium in Lagos, with Segun Odegbami scoring twice."
+  },
+  {
+    id: "s029", question: "Who was nicknamed 'Mathematical' for his precision on the right wing and was joint top-scorer in Nigeria's 1980 AFCON triumph?",
+    options: ["Adokiye Amiesimaka", "Segun Odegbami", "Aloysius Atuegbu", "Felix Owolabi"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Chief Segun Odegbami earned the moniker 'Mathematical' while studying engineering at The Polytechnic, Ibadan and playing for Shooting Stars (3SC)."
+  },
+  {
+    id: "s030", question: "Who captained Nigeria to their first AFCON title in 1980 and was famously nicknamed 'Chairman' for his commanding central defensive presence?",
+    options: ["Christian Chukwu", "Stephen Keshi", "Muda Lawal", "Godwin Odiye"],
+    answer: 0, category: "Sports", difficulty: "easy",
+    explanation: "Christian Chukwu of Enugu Rangers was the revered captain and cornerstone of Nigeria's 1980 championship team, later coaching the national team."
+  },
+  {
+    id: "s031", question: "Which Nigerian forward famously performed six consecutive somersaults and backflips after scoring against Sweden at the 2002 World Cup in Kobe?",
+    options: ["Bartholomew Ogbeche", "Julius Aghahowa", "Femi Opabunmi", "Benedict Akwuegbu"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Julius Aghahowa scored a diving header in the 27th minute and executed his trademark world-class tumbling routine across the pitch."
+  },
+  {
+    id: "s032", question: "Who remains Nigeria's all-time highest goalscorer for the Super Eagles with an astonishing 37 international goals?",
+    options: ["Nwankwo Kanu", "Yakubu Aiyegbeni", "Rashidi Yekini", "Victor Osimhen"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Rashidi Yekini's record of 37 goals in 62 caps has stood unbroken since his final appearance in 1998."
+  },
+  {
+    id: "s033", question: "Which Nigerian long jumper won bronze at the Tokyo 2020 Olympics and Silver at the 2022 World Athletics Championships with a leap of 7.02m?",
+    options: ["Blessing Okagbare", "Ese Brume", "Ruth Usoro", "Chioma Ajunwa"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Delta State-born Ese Brume has been one of world athletics' most consistent long jumpers, winning medals across Olympic, World, and Commonwealth Games."
+  },
+  {
+    id: "s034", question: "How many FIFA U-17 World Cup titles has Nigeria's 'Golden Eaglets' won, holding the all-time world record?",
+    options: ["3", "4", "5", "6"],
+    answer: 2, category: "Sports", difficulty: "medium",
+    explanation: "Nigeria won the tournament in 1985 (China), 1993 (Japan), 2007 (South Korea), 2013 (UAE), and 2015 (Chile), more than any other country in history."
+  },
+  {
+    id: "s035", question: "Who was the star playmaker awarded the Golden Ball as best player at the 2013 FIFA U-17 World Cup after tallying 6 goals and 7 assists?",
+    options: ["Isaac Success", "Kelechi Iheanacho", "Taiwo Awoniyi", "Chidiebere Nwakali"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Kelechi 'Senior Man' Iheanacho led Nigeria to the 2013 title in the UAE and earned a move to Manchester City, where he later won the Premier League."
+  },
+  {
+    id: "s036", question: "Which Nigerian table tennis legend achieved the extraordinary feat of competing in seven consecutive Olympic Games from Barcelona 1992 to Rio 2016?",
+    options: ["Atanda Musa", "Segun Toriola", "Bose Kaffo", "Monday Merotohun"],
+    answer: 1, category: "Sports", difficulty: "medium",
+    explanation: "Segun Toriola is an ITTF Hall of Fame member and joined an elite club of global Olympians with seven Summer Olympic appearances."
+  },
+  {
+    id: "s037", question: "Which Nigerian Paralympic powerlifter won five Paralympic medals, including Gold in 2000, 2004, and 2016 while repeatedly breaking world records?",
+    options: ["Lucy Ejike", "Folashade Oluwafemiayo", "Grace Anozie", "Ndidi Nwosu"],
+    answer: 0, category: "Sports", difficulty: "medium",
+    explanation: "Lucy Ejike has dominated international para powerlifting for over two decades, carrying Nigeria's flag at multiple Paralympic Games."
+  },
+  {
+    id: "s038", question: "Which Super Eagles attacker scored both goals in Nigeria's 2-0 group stage win over Iceland at the 2018 World Cup in Volgograd?",
+    options: ["Alex Iwobi", "Odion Ighalo", "Ahmed Musa", "Victor Moses"],
+    answer: 2, category: "Sports", difficulty: "easy",
+    explanation: "Ahmed Musa became Nigeria's top scorer in World Cup history with 4 total goals, following his earlier double against Argentina in 2014."
+  },
+  {
+    id: "s039", question: "Which powerful Nigerian striker was famously nicknamed 'The Bull' for his brute strength, playing for Everton and Beşiktaş?",
+    options: ["Yakubu Aiyegbeni", "Daniel Amokachi", "Efan Ekoku", "Emmanuel Emenike"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Daniel 'The Bull' Amokachi scored the first-ever UEFA Champions League goal in the competition's new format in 1992 for Club Brugge."
+  },
+  {
+    id: "s040", question: "In what year did Lagos-born NBA Hall of Famer Hakeem 'The Dream' Olajuwon lead the Houston Rockets to their first NBA Championship?",
+    options: ["1992", "1994", "1996", "1998"],
+    answer: 1, category: "Sports", difficulty: "medium",
+    explanation: "Hakeem Olajuwon, pioneer of the unstoppable 'Dream Shake', won MVP, Defensive Player of the Year, and Finals MVP in 1994, defending the title in 1995."
+  },
+  {
+    id: "s041", question: "Which Nigerian athlete won individual Olympic Silver in the women's 100m hurdles at the 2000 Sydney Olympic Games?",
+    options: ["Gloria Alozie", "Angela Atede", "Tobi Amusan", "Chioma Ajunwa"],
+    answer: 0, category: "Sports", difficulty: "hard",
+    explanation: "Gloria Alozie won a courageous Silver medal in Sydney just weeks after the tragic death of her fiancé Hyginus Anugo in an accident in Sydney."
+  },
+  {
+    id: "s042", question: "Who was the goalkeeper when the Super Eagles won the 1994 AFCON and qualified for their maiden World Cup in the United States?",
+    options: ["Alloy Agu", "Peter Rufai", "Wilfred Agbonavbare", "Dosu Joseph"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Peter 'Dodomayana' Rufai, who was also royalty as the son of an Idimu tribal king, captained Nigeria and made 65 appearances in goal."
+  },
+  {
+    id: "s043", question: "Which Nigerian boxing icon was undisputed World Middleweight champion (1962–1963) and World Light-Heavyweight champion (1966–1968)?",
+    options: ["Hogan Bassey", "Dick Tiger", "Nojim Maiyegun", "Bash Ali"],
+    answer: 1, category: "Sports", difficulty: "medium",
+    explanation: "Richard Ihetu, known as Dick Tiger, is regarded by boxing historians as one of the greatest African pound-for-pound fighters of all time."
+  },
+  {
+    id: "s044", question: "Who became Nigeria's very first Olympic medalist in any sport by winning bronze in men's light-middleweight boxing at Tokyo 1964?",
+    options: ["Nojim Maiyegun", "Isaac Ikhouria", "Peter Konyegwachie", "David Izonritei"],
+    answer: 0, category: "Sports", difficulty: "hard",
+    explanation: "Nojim Maiyegun won bronze on October 21, 1964 in Tokyo, ending Nigeria's 12-year wait for an Olympic podium finish since debuting in 1952."
+  },
+  {
+    id: "s045", question: "Who was the teenage striker that netted a record 10 goals at the 2015 FIFA U-17 World Cup in Chile, breaking the tournament all-time record?",
+    options: ["Samuel Chukwueze", "Victor Osimhen", "Kelechi Nwakali", "Taiwo Awoniyi"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Victor Osimhen scored in all 7 matches in Chile, a feat never before accomplished in the history of the FIFA U-17 World Cup."
+  },
+  {
+    id: "s046", question: "Which iconic multi-purpose stadium in Surulere, Lagos hosted the 1973 All-Africa Games and the 1980 and 2000 AFCON finals?",
+    options: ["Mobolaji Johnson Arena", "National Stadium, Surulere", "Moshood Abiola Stadium", "Teslim Balogun Stadium"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Constructed in 1972, the National Stadium in Surulere was the beating heart of Nigerian sports for decades until Abuja's stadium was completed in 2003."
+  },
+  {
+    id: "s047", question: "Which Nigerian footballer scored both goals for Nigeria in the 2-1 victory over Zambia in the 1994 AFCON Final in Tunis?",
+    options: ["Rashidi Yekini", "Daniel Amokachi", "Emmanuel Amunike", "Mutiu Adepoju"],
+    answer: 2, category: "Sports", difficulty: "medium",
+    explanation: "Emmanuel Amunike made his tournament debut in the final and scored in the 5th and 47th minutes to secure Nigeria's second continental crown."
+  },
+  {
+    id: "s048", question: "Who was the coach that led Nigeria's U-23 men's team to Olympic Gold in Atlanta 1996?",
+    options: ["Clemens Westerhof", "Johannes Bonfrère", "Bora Milutinovic", "Philippe Troussier"],
+    answer: 1, category: "Sports", difficulty: "easy",
+    explanation: "Dutchman Jo Bonfrère, who had been Westerhof's assistant in 1994, took charge of the Dream Team and masterminded the historic victory in Atlanta."
+  },
+  {
+    id: "s049", question: "Which Nigerian club based in Ibadan won the inaugural African Cup Winners' Cup in 1976, Nigeria's first continental football club trophy?",
+    options: ["Rangers International", "Shooting Stars (3SC)", "Bendel Insurance", "Stationery Stores"],
+    answer: 1, category: "Sports", difficulty: "medium",
+    explanation: "Shooting Stars defeated Cameroon's Tonnerre Yaoundé 4-2 on aggregate in December 1976 with stars like Muda Lawal and Segun Odegbami."
+  },
+  {
+    id: "s050", question: "Who holds the record of participating in five consecutive Africa Cup of Nations finals tournaments (1976–1984) and scored in three of them?",
+    options: ["Muda Lawal", "Segun Odegbami", "Christian Chukwu", "Felix Owolabi"],
+    answer: 0, category: "Sports", difficulty: "hard",
+    explanation: "Midfield dynamo Mudashiru Babatunde Lawal played in five AFCON finals tournaments and was decorated with the national honour of MON for his service."
   },
 ];
 

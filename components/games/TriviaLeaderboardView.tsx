@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from "react";
 import { motion } from "framer-motion";
-import { ChevronRight, ArrowLeft, ChevronDown, ChevronUp, User, ShieldCheck, Sparkles, Flame } from "lucide-react";
+import { ChevronRight, ArrowLeft, ChevronDown, ChevronUp, User, ShieldCheck, Sparkles, Flame, Trophy } from "lucide-react";
+import Link from "next/link";
 import { useAppStore } from "@/store/useAppStore";
 import { getTriviaLeaderboard, type CloudTriviaScore } from "@/lib/trivia-leaderboard";
 import {
@@ -12,6 +13,11 @@ import {
   getChallengeTimeStatus,
   getLocalChallengeScores,
 } from "@/lib/trivia-challenge";
+import {
+  type FriendshipLeague,
+  getAllLocalLeagues,
+  getLeagueStatus,
+} from "@/lib/trivia-league";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/utils";
 
@@ -21,15 +27,16 @@ interface TriviaLeaderboardViewProps {
 
 export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewProps) {
   const { profile, triviaHistory = [], openClaimAccountPrompt } = useAppStore();
-  const [tab, setTab] = useState<"global" | "challenges" | "bests">("global");
+  const [tab, setTab] = useState<"global" | "challenges" | "leagues" | "bests">("global");
   const [cloudScores, setCloudScores] = useState<CloudTriviaScore[]>([]);
   const [isLiveSync, setIsLiveSync] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Group challenges
+  // Group challenges & leagues
   const [challenges, setChallenges] = useState<TriviaChallenge[]>([]);
   const [selectedChallenge, setSelectedChallenge] = useState<TriviaChallenge | null>(null);
   const [challengeScores, setChallengeScores] = useState<ChallengeParticipantScore[]>([]);
+  const [leagues, setLeagues] = useState<FriendshipLeague[]>([]);
 
   const INITIAL_LIMIT = 10;
   const [isExpandedGlobal, setIsExpandedGlobal] = useState(false);
@@ -80,6 +87,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
   useEffect(() => {
     fetchLeaderboard();
     setChallenges(getAllLocalChallenges());
+    setLeagues(getAllLocalLeagues());
   }, []);
 
   // Fetch scores when selectedChallenge changes
@@ -183,7 +191,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
           </div>
 
           {/* Quick Metrics */}
-          <div className="flex items-center gap-4 text-left sm:text-right">
+          <div className="flex items-center gap-4 text-left sm:text-right flex-wrap sm:flex-nowrap">
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)] block">
                 Trivia XP
@@ -200,6 +208,16 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                 {userEntry.gamesPlayed}
               </span>
             </div>
+            {userEntry.leagueDrops && userEntry.leagueDrops > 0 ? (
+              <div>
+                <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)] block">
+                  League Drops
+                </span>
+                <span className="font-space font-extrabold text-lg text-[var(--terra)] flex items-center gap-0.5">
+                  🏆 {userEntry.leagueDrops}
+                </span>
+              </div>
+            ) : null}
             <div>
               <span className="text-[10px] font-bold uppercase tracking-wider text-[var(--text-mute)] block">
                 High Run
@@ -294,6 +312,20 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
         </button>
         <button
           onClick={() => {
+            setTab("leagues");
+            setSelectedChallenge(null);
+          }}
+          className={cn(
+            "flex-1 py-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5",
+            tab === "leagues"
+              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+          )}
+        >
+          <span>🏆</span> Friendship Leagues ({leagues.length})
+        </button>
+        <button
+          onClick={() => {
             setTab("bests");
             setSelectedChallenge(null);
           }}
@@ -313,7 +345,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
         <div className="p-3 rounded-xl bg-[var(--olive)]/10 border border-[var(--olive)]/20 text-xs flex items-center gap-2 text-[var(--text-dim)]">
           <span className="text-base">🏆</span>
           <span>
-            <strong>Global Standing:</strong> Ranked primarily by <strong>Total Trivia XP</strong> accumulated across games and unique rounds completed. Single-trial group challenges award <strong>2.5x XP multipliers</strong>!
+            <strong>Global Standing:</strong> Ranked primarily by <strong>Total Trivia XP</strong> accumulated across solo games, friendship league drops, and unique rounds completed. Single-trial group challenges award <strong>2.5x XP multipliers</strong>!
           </span>
         </div>
       )}
@@ -416,8 +448,18 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                           </span>
                         )}
                       </div>
-                      <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
-                        {entry.title}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
+                          {entry.title}
+                        </span>
+                        {entry.leagueDrops && entry.leagueDrops > 0 ? (
+                          <span
+                            className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30 shrink-0"
+                            title={`${entry.leagueDrops} tournament drop${entry.leagueDrops === 1 ? "" : "s"} completed`}
+                          >
+                            🏆 {entry.leagueDrops} {entry.leagueDrops === 1 ? "drop" : "drops"}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -484,8 +526,18 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                           You
                         </span>
                       </div>
-                      <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
-                        {userEntry.title}
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <span className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
+                          {userEntry.title}
+                        </span>
+                        {userEntry.leagueDrops && userEntry.leagueDrops > 0 ? (
+                          <span
+                            className="text-[9px] px-1.5 py-0.2 rounded font-mono font-bold bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30 shrink-0"
+                            title={`${userEntry.leagueDrops} tournament drop${userEntry.leagueDrops === 1 ? "" : "s"} completed`}
+                          >
+                            🏆 {userEntry.leagueDrops} {userEntry.leagueDrops === 1 ? "drop" : "drops"}
+                          </span>
+                        ) : null}
                       </div>
                     </div>
                   </div>
@@ -848,6 +900,79 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
             )}
           </div>
         )
+      )}
+
+      {/* Tab: Friendship Leagues */}
+      {tab === "leagues" && (
+        <div className="space-y-3">
+          {leagues.length === 0 ? (
+            <div className="surface rounded-2xl p-8 border text-center space-y-3" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="text-3xl">🏆</div>
+              <h4 className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
+                No Active Friendship Leagues Found
+              </h4>
+              <p className="text-xs text-[var(--text-mute)] max-w-sm mx-auto leading-relaxed">
+                Friendship Leagues are multi-day squad tournaments where team members answer daily question drops. Drop results and velocity points count toward the Global Standings!
+              </p>
+              <Link
+                href="/games/trivia"
+                className="btn-terra px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center gap-1.5 shadow-xs"
+              >
+                <span>Go to Leagues Lounge</span>
+                <ChevronRight size={13} />
+              </Link>
+            </div>
+          ) : (
+            leagues.map((l) => {
+              const status = getLeagueStatus(l.startDate, l.durationDays);
+              const isCreator =
+                (l.creatorName || "").trim().toLowerCase() ===
+                (profile.username || "").trim().toLowerCase();
+
+              return (
+                <div
+                  key={l.code}
+                  className="surface rounded-2xl p-4 border flex flex-col sm:flex-row sm:items-center justify-between gap-3 transition-all hover:shadow-xs"
+                  style={{ borderColor: "var(--border-dim)" }}
+                >
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-mono text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-mute)]">
+                        {l.code}
+                      </span>
+                      <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--olive)]">
+                        {status.isCompleted ? "Completed" : `Day ${status.dayNumber} / ${l.durationDays}`}
+                      </span>
+                      {isCreator ? (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
+                          👑 Host
+                        </span>
+                      ) : (
+                        <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/15 text-[var(--olive)] border border-[var(--olive)]/30">
+                          👥 Team Scholar
+                        </span>
+                      )}
+                    </div>
+                    <h4 className="font-space font-bold text-base" style={{ color: "var(--text)" }}>
+                      {l.title}
+                    </h4>
+                    <p className="text-xs text-[var(--text-mute)]">
+                      Hosted by @{l.creatorName} · {l.questionsPerDay} Qs per drop · {l.durationDays} Days · {l.category === "all" ? "All Topics" : l.category}
+                    </p>
+                  </div>
+
+                  <Link
+                    href={`/games/trivia/league/${l.code}`}
+                    className="btn-terra px-4 py-2 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 shrink-0 shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    <span>Enter Tournament Arena</span>
+                    <ChevronRight size={13} />
+                  </Link>
+                </div>
+              );
+            })
+          )}
+        </div>
       )}
 
       {/* Tab 3: Personal Bests */}

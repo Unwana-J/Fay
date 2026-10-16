@@ -11,6 +11,7 @@ export interface TriviaScholarEntry {
   bestPct: number;
   gamesPlayed: number;
   triviaXP: number;
+  leagueDrops?: number;
   isUser: boolean;
   rank?: number;
   rankBadge?: string;
@@ -29,13 +30,14 @@ export interface CloudTriviaScore {
   challenge_id?: string;
   total_xp?: number;
   games_played?: number;
+  league_drops?: number;
 }
 
 /**
  * Computes leaderboard entries combining live Supabase cloud scores and the user's local stats.
  *
  * Ranking criteria:
- * 1. Total Accumulated Trivia XP (Points grinded from games & high-stakes challenges)
+ * 1. Total Accumulated Trivia XP (Points grinded from games, challenges & tournament drops)
  * 2. Number of unique games played (rewards consistency and active dedication)
  * 3. Best Accuracy % (Tie-breaker)
  * 4. Best raw score (Tie-breaker)
@@ -65,25 +67,39 @@ export function getTriviaLeaderboard(
   });
 
   const username = sanitizeScholarName(profile.username?.trim() || "You");
+
+  // Check if cloud leaderboard has aggregated data for current user (including league drops)
+  const userCloud = (cloudScores || []).find(
+    (c) => c.username && c.username.trim().toLowerCase() === username.toLowerCase()
+  );
+
+  const finalGamesPlayed = Math.max(gamesPlayed, userCloud?.games_played ?? 0);
+  const finalTriviaXP = Math.max(totalTriviaXP, userCloud?.total_xp ?? userCloud?.xp_earned ?? 0);
+  const finalBestPct = Math.max(bestPct, userCloud?.pct ?? 0);
+  const finalBestScore = Math.max(bestScore, userCloud?.score ?? 0);
+  const finalBestTotal = userCloud?.total ?? bestTotal;
+  const userLeagueDrops = userCloud?.league_drops ?? 0;
+
   const userEntry: TriviaScholarEntry = {
     id: "user-current",
     name: username,
     avatar: profile.avatar || "/avatars/avatar-scholar.svg",
     title:
-      totalTriviaXP >= 500
+      finalTriviaXP >= 500
         ? "Naija Grandmaster"
-        : totalTriviaXP >= 250
+        : finalTriviaXP >= 250
         ? "Naija Titan"
-        : totalTriviaXP >= 120
+        : finalTriviaXP >= 120
         ? "Rising Scholar"
-        : gamesPlayed > 0
+        : finalGamesPlayed > 0
         ? "Curious Learner"
         : "New Challenger",
-    bestScore,
-    bestTotal,
-    bestPct,
-    gamesPlayed,
-    triviaXP: totalTriviaXP,
+    bestScore: finalBestScore,
+    bestTotal: finalBestTotal,
+    bestPct: finalBestPct,
+    gamesPlayed: finalGamesPlayed,
+    triviaXP: finalTriviaXP,
+    leagueDrops: userLeagueDrops,
     isUser: true,
   };
 
@@ -118,6 +134,7 @@ export function getTriviaLeaderboard(
         bestPct: c.pct,
         gamesPlayed: games,
         triviaXP: earnedXP,
+        leagueDrops: c.league_drops ?? 0,
         isUser: false,
       };
     });

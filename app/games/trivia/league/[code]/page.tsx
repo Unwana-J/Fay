@@ -15,7 +15,7 @@ export async function generateMetadata({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams?: Promise<{ d?: string; q?: string; t?: string; c?: string; cat?: string; diff?: string }>;
+  searchParams?: Promise<{ d?: string; q?: string; t?: string; c?: string; cat?: string; diff?: string; pol?: string }>;
 }): Promise<Metadata> {
   const { code } = await params;
   const sp = searchParams ? await searchParams : {};
@@ -71,7 +71,7 @@ export default async function LeaguePage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams?: Promise<{ d?: string; q?: string; t?: string; c?: string; cat?: string; diff?: string }>;
+  searchParams?: Promise<{ d?: string; q?: string; t?: string; c?: string; cat?: string; diff?: string; pol?: string }>;
 }) {
   const { code } = await params;
   const sp = searchParams ? await searchParams : {};
@@ -103,6 +103,7 @@ export default async function LeaguePage({
           difficulty: leagueRow.difficulty,
           category: leagueRow.category,
           dailySeedMap: leagueRow.daily_seed_map,
+          attemptPolicy: leagueRow.daily_seed_map?._policy || "flexible",
           createdAt: leagueRow.created_at,
         };
 
@@ -142,6 +143,7 @@ export default async function LeaguePage({
     const creatorName = sp?.c ? decodeURIComponent(sp.c) : "Scholar";
     const category = sp?.cat || "all";
     const difficulty = sp?.diff || "mixed";
+    const attemptPolicy = (sp?.pol as any) || "flexible";
     const today = todayStr();
 
     league = {
@@ -155,6 +157,7 @@ export default async function LeaguePage({
       questionsPerDay,
       difficulty,
       category,
+      attemptPolicy,
       dailySeedMap: generateDailyLeagueQuestions(
         durationDays,
         questionsPerDay,

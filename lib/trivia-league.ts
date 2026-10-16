@@ -15,6 +15,8 @@ export interface FriendshipLeague {
   category: string; // "all" | TriviaCategory
   dailySeedMap: Record<string, string[]>; // { "day_1": ["h001", ...], "day_2": [...] }
   createdAt?: string;
+  attemptPolicy?: "flexible" | "strict" | "unlimited";
+  allowUnlimitedDrops?: boolean;
 }
 
 export interface LeagueDailyScore {
@@ -79,29 +81,31 @@ export function generateDailyLeagueQuestions(
 
   if (category !== "all") {
     const catPool = pool.filter((q) => q.category.toLowerCase() === category.toLowerCase());
-    if (catPool.length >= durationDays * questionsPerDay) {
+    if (catPool.length > 0) {
       pool = catPool;
     }
   }
 
   if (difficulty !== "mixed") {
     const diffPool = pool.filter((q) => q.difficulty === difficulty);
-    if (diffPool.length >= durationDays * questionsPerDay) {
+    if (diffPool.length > 0) {
       pool = diffPool;
     }
   }
 
-  // Deterministic or random shuffle
+  // Deterministic shuffle keyed by seedKey (league code)
   const rng = seedKey ? createSeededRandom(seedKey) : Math.random;
   const shuffled = [...pool].sort(() => rng() - 0.5);
-  const totalNeeded = durationDays * questionsPerDay;
-  const selected = shuffled.slice(0, totalNeeded);
 
   const dailyMap: Record<string, string[]> = {};
   for (let day = 1; day <= durationDays; day++) {
-    const start = (day - 1) * questionsPerDay;
-    const end = start + questionsPerDay;
-    dailyMap[`day_${day}`] = selected.slice(start, end).map((q) => q.id);
+    const dayQuestions: string[] = [];
+    for (let q = 0; q < questionsPerDay; q++) {
+      // Modulo wrap-around guarantees every single question in the pool is exhausted before cycling
+      const index = ((day - 1) * questionsPerDay + q) % shuffled.length;
+      dayQuestions.push(shuffled[index].id);
+    }
+    dailyMap[`day_${day}`] = dayQuestions;
   }
 
   return dailyMap;
@@ -282,7 +286,25 @@ export function getQuestionsForLeagueDay(
   league: FriendshipLeague,
   dayNumber: number
 ): TriviaQuestion[] {
-  const qIds = league.dailySeedMap[`day_${dayNumber}`] || [];
+  let qIds = league.dailySeedMap?.[`day_${dayNumber}`];
+
+  // If questions for this day are not yet in the seed map (e.g. extra drops added on the fly),
+  // generate deterministic questions from the league-wide sequence to prevent duplicate recycling
+  if (!qIds || qIds.length === 0) {
+    const seed = league.code || "LEAGUE";
+    const generatedMap = generateDailyLeagueQuestions(
+      dayNumber,
+      league.questionsPerDay || 5,
+      league.difficulty || "mixed",
+      league.category || "all",
+      seed
+    );
+    qIds = generatedMap[`day_${dayNumber}`] || [];
+    if (league.dailySeedMap) {
+      league.dailySeedMap[`day_${dayNumber}`] = qIds;
+    }
+  }
+
   const qMap = new Map(TRIVIA_QUESTIONS.map((q) => [q.id, q]));
   const questions: TriviaQuestion[] = [];
 
@@ -296,34 +318,56 @@ export function getQuestionsForLeagueDay(
 
 /**
  * Retrieve all leagues saved in this browser's localStorage.
+ * Checks direct fey_league_* keys and fey_recent_leagues for full persistence.
  */
 export function getAllLocalLeagues(): FriendshipLeague[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = localStorage.getItem("fey_recent_leagues");
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
-    const leagues: FriendshipLeague[] = [];
+    const codeMap = new Map<string, FriendshipLeague>();
 
-    // Handles array of codes or array of objects
-    if (Array.isArray(parsed)) {
-      for (const item of parsed) {
-        const code = typeof item === "string" ? item : item.code;
-        if (!code) continue;
-        const leagueRaw = localStorage.getItem(`fey_league_${code.toUpperCase()}`);
-        if (leagueRaw) {
-          try {
-            const leagueObj = JSON.parse(leagueRaw);
-            if (leagueObj && leagueObj.code) {
-              leagues.push(leagueObj);
+    // 1. Scan direct fey_league_* entries in localStorage
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && key.startsWith("fey_league_") && !key.startsWith("fey_league_scores_")) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (raw) {
+            const parsed = JSON.parse(raw);
+            if (parsed && parsed.code) {
+              codeMap.set(parsed.code.toUpperCase(), parsed);
             }
-          } catch {}
-        } else if (typeof item === "object" && item.title) {
-          leagues.push(item as FriendshipLeague);
-        }
+          }
+        } catch {}
       }
     }
-    return leagues;
+
+    // 2. Also check fey_recent_leagues
+    const raw = localStorage.getItem("fey_recent_leagues");
+    if (raw) {
+      try {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          for (const item of parsed) {
+            const code = typeof item === "string" ? item : item?.code;
+            if (code && !codeMap.has(code.toUpperCase())) {
+              const leagueRaw = localStorage.getItem(`fey_league_${code.toUpperCase()}`);
+              if (leagueRaw) {
+                try {
+                  const leagueObj = JSON.parse(leagueRaw);
+                  if (leagueObj && leagueObj.code) {
+                    codeMap.set(code.toUpperCase(), leagueObj);
+                  }
+                } catch {}
+              } else if (typeof item === "object" && item.title) {
+                codeMap.set(code.toUpperCase(), item as FriendshipLeague);
+              }
+            }
+          }
+        }
+      } catch {}
+    }
+
+    return Array.from(codeMap.values());
   } catch {
     return [];
   }
@@ -338,11 +382,32 @@ export function saveLocalLeague(league: FriendshipLeague) {
     const code = league.code.toUpperCase();
     localStorage.setItem(`fey_league_${code}`, JSON.stringify(league));
     const recentRaw = localStorage.getItem("fey_recent_leagues");
-    const recent: string[] = recentRaw ? JSON.parse(recentRaw) : [];
-    if (!recent.includes(code)) {
-      localStorage.setItem("fey_recent_leagues", JSON.stringify([code, ...recent].slice(0, 15)));
+    const recent: any[] = recentRaw ? JSON.parse(recentRaw) : [];
+    const cleanList = recent.map((item) => (typeof item === "string" ? item.toUpperCase() : item?.code?.toUpperCase())).filter(Boolean);
+    if (!cleanList.includes(code)) {
+      localStorage.setItem("fey_recent_leagues", JSON.stringify([code, ...cleanList].slice(0, 20)));
     }
   } catch {}
+}
+
+/**
+ * Build a robust share URL with complete parameters so any team member
+ * opening the link will see the complete arena even if not yet saved on their device.
+ */
+export function getLeagueShareUrl(league: FriendshipLeague): string {
+  const origin = typeof window !== "undefined" ? window.location.origin : "https://fey.lokinlabs.com.ng";
+  const params = new URLSearchParams({
+    t: league.title || "Friendship League",
+    c: league.creatorName || "Scholar",
+    d: String(league.durationDays || 5),
+    q: String(league.questionsPerDay || 5),
+    cat: league.category || "all",
+    diff: league.difficulty || "mixed",
+  });
+  if (league.attemptPolicy) {
+    params.set("pol", league.attemptPolicy);
+  }
+  return `${origin}/games/trivia/league/${league.code.toUpperCase()}?${params.toString()}`;
 }
 
 /**
@@ -398,7 +463,8 @@ export function computeUserLeagueSummary(
     (e) => (cleanName && (e.username || "").trim().toLowerCase() === cleanName) || (userId && e.userId === userId)
   );
 
-  const todayScoreRow = scores.find((s) => s.dayNumber === status.dayNumber && keyMatch(s));
+  const todayScoreRows = scores.filter((s) => s.dayNumber === status.dayNumber && keyMatch(s));
+  const todayScoreRow = todayScoreRows[0] || undefined;
 
   const hasCompletedToday = !!todayScoreRow;
   const userRank = userLeaderboardEntry?.rank ?? leaderboard.length + 1;
@@ -414,6 +480,7 @@ export function computeUserLeagueSummary(
     todayScore: todayScoreRow?.score,
     todayPoints: todayScoreRow?.points,
     todayTotalQuestions: todayScoreRow?.totalQuestions ?? league.questionsPerDay,
+    todayAttemptsCount: todayScoreRows.length,
     userRank,
     userTotalPoints,
     userTotalCorrect,

@@ -82,10 +82,10 @@ export async function GET(req: NextRequest) {
     }
 
     // ── CASE 2: GLOBAL SCHOLARS LEADERBOARD ───────────────────────────────────────
-    // Aggregates ALL games played by each scholar:
-    // - Total XP accumulated across games
-    // - Count of unique games played
-    // - Best high-score run (pct & score)
+    // Aggregates ALL games played by each scholar across:
+    // - Solo trivia rounds
+    // - High-stakes group challenges
+    // - Friendship league tournament drops
     const playerAggregates = new Map<
       string,
       {
@@ -99,10 +99,12 @@ export async function GET(req: NextRequest) {
         xp_earned: number;
         total_xp: number;
         games_played: number;
+        league_drops: number;
         created_at: string;
       }
     >();
 
+    // 1. Process regular trivia & group challenges
     (data || []).forEach((row) => {
       if (!row.username || isBlockedHateSpeech(row.username)) return;
       if (isBotPattern(row.username, row.grade_label) || isBannedIdentifier(row.username)) return;
@@ -128,6 +130,7 @@ export async function GET(req: NextRequest) {
           xp_earned: rowXp,
           total_xp: rowXp,
           games_played: 1,
+          league_drops: 0,
           created_at: row.created_at,
         });
       } else {
@@ -152,6 +155,81 @@ export async function GET(req: NextRequest) {
         }
       }
     });
+
+    // 2. Query and aggregate Friendship League tournament scores
+    try {
+      const { data: leagueData, error: leagueErr } = await supabase
+        .from("league_scores")
+        .select("id, created_at, username, avatar, score, total_questions, points, day_number, league_code")
+        .not("username", "ilike", "LoadTest-%")
+        .not("username", "ilike", "DbLoad-%")
+        .not("username", "ilike", "Crash-%")
+        .not("username", "ilike", "%VU%")
+        .order("created_at", { ascending: false })
+        .limit(1000);
+
+      if (leagueErr) {
+        console.warn("Could not query league_scores for global rankings:", leagueErr.message);
+      } else if (Array.isArray(leagueData)) {
+        leagueData.forEach((row: any) => {
+          if (!row.username || isBlockedHateSpeech(row.username)) return;
+          if (isBotPattern(row.username) || isBannedIdentifier(row.username)) return;
+          const cleanName = sanitizeScholarName(row.username);
+          if (isBannedIdentifier(cleanName)) return;
+          const key = cleanName.trim().toLowerCase();
+
+          const totalQ = row.total_questions || 5;
+          const rowScore = row.score || 0;
+          const rowPct = Math.round((rowScore / totalQ) * 100);
+          // Tournament drop points include speed velocity + accuracy bonus
+          const rowXp =
+            typeof row.points === "number" && row.points > 0
+              ? row.points
+              : rowScore * 25 + 50;
+
+          const existing = playerAggregates.get(key);
+
+          if (!existing) {
+            playerAggregates.set(key, {
+              id: row.id || `scholar-league-${key}`,
+              username: cleanName,
+              avatar: row.avatar || "/avatars/avatar-scholar.svg",
+              score: rowScore,
+              total: totalQ,
+              pct: rowPct,
+              grade_label: `League Drop (${row.league_code || ""})`,
+              xp_earned: rowXp,
+              total_xp: rowXp,
+              games_played: 1,
+              league_drops: 1,
+              created_at: row.created_at,
+            });
+          } else {
+            existing.games_played += 1;
+            existing.league_drops = (existing.league_drops || 0) + 1;
+            existing.total_xp += rowXp;
+            existing.xp_earned = existing.total_xp;
+
+            // Keep best high-water mark for accuracy display
+            if (
+              rowPct > existing.pct ||
+              (rowPct === existing.pct && rowScore > existing.score)
+            ) {
+              existing.score = rowScore;
+              existing.total = totalQ;
+              existing.pct = rowPct;
+              existing.grade_label = `League Drop (${row.league_code || ""})`;
+            }
+
+            if (row.avatar && !row.avatar.includes("default")) {
+              existing.avatar = row.avatar;
+            }
+          }
+        });
+      }
+    } catch (lErr: any) {
+      console.warn("Error processing league scores for leaderboard:", lErr?.message);
+    }
 
     // Rank primary: Total XP accumulated
     // Secondary: Games played (reward consistency and unique games)

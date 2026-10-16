@@ -30,6 +30,7 @@ export async function POST(req: NextRequest) {
       avatar,
       score,
       totalQuestions,
+      dayNumber: clientDayNumber,
       durationSeconds = 0,
       questionResults = [],
     } = body;
@@ -82,26 +83,38 @@ export async function POST(req: NextRequest) {
         if (status.isCompleted) {
           return NextResponse.json({ error: "This league tournament has ended." }, { status: 400 });
         }
-        dayNumber = status.dayNumber || 1;
+        if (
+          typeof clientDayNumber === "number" &&
+          clientDayNumber >= 1 &&
+          clientDayNumber <= (leagueRow.duration_days || 14)
+        ) {
+          dayNumber = clientDayNumber;
+        } else {
+          dayNumber = status.dayNumber || 1;
+        }
+      } else if (typeof clientDayNumber === "number" && clientDayNumber >= 1) {
+        dayNumber = clientDayNumber;
       }
 
-      // 2. Check if user has already submitted today's attempt (by user_id or username)
+      const leaguePolicy = leagueRow?.daily_seed_map?._policy || "flexible";
+
+      // 2. Check if user has already submitted an attempt for today
       const playerIdentifier = userId || cleanUsername.toLowerCase();
       const { data: existingAttempts } = await supabase
         .from("league_scores")
-        .select("id, user_id, username")
+        .select("id, user_id, username, points, score")
         .eq("league_code", cleanLeagueCode)
         .eq("day_number", dayNumber);
 
-      const alreadyAttempted = (existingAttempts || []).some(
-        (row) =>
+      const existingRecord = (existingAttempts || []).find(
+        (row: any) =>
           row.user_id === playerIdentifier ||
           (row.username && row.username.trim().toLowerCase() === cleanUsername.toLowerCase())
       );
 
-      if (alreadyAttempted) {
+      if (existingRecord) {
         return NextResponse.json({
-          error: "You have already completed your attempt for today's drop.",
+          error: `Drop ${dayNumber} has already been completed. Tournament drops cannot be reattempted to ensure fair and balanced scores.`,
           alreadyAttempted: true,
         }, { status: 409 });
       }

@@ -33,6 +33,8 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
   const [questionsPerDay, setQuestionsPerDay] = useState<number>(5);
   const [category, setCategory] = useState<string>("all");
   const [difficulty, setDifficulty] = useState<string>("mixed");
+  const [attemptPolicy, setAttemptPolicy] = useState<"flexible" | "strict" | "unlimited">("flexible");
+  const [allowExtraDrops, setAllowExtraDrops] = useState<boolean>(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [createdCode, setCreatedCode] = useState<string | null>(null);
@@ -62,6 +64,8 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
           questionsPerDay,
           difficulty,
           category,
+          attemptPolicy,
+          allowUnlimitedDrops: attemptPolicy === "unlimited" || allowExtraDrops,
         }),
       });
 
@@ -108,6 +112,7 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
     c: profile.username || "Scholar",
     cat: category,
     diff: difficulty,
+    pol: attemptPolicy,
   }).toString();
 
   const baseUrl = typeof window !== "undefined"
@@ -210,24 +215,48 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
 
                 {/* Duration */}
                 <div>
-                  <label className="text-xs font-semibold block mb-1.5" style={{ color: "var(--text)" }}>
-                    Tournament Duration
-                  </label>
-                  <div className="grid grid-cols-4 gap-2">
-                    {[3, 5, 7, 14].map((days) => (
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-xs font-semibold" style={{ color: "var(--text)" }}>
+                      Tournament Duration
+                    </label>
+                    {attemptPolicy === "unlimited" && (
+                      <span className="text-[10px] font-mono font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2 py-0.5 rounded-full border border-[var(--terra)]/30">
+                        Marathon Mode
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                    {[3, 5, 7, 14, 30].map((days) => (
                       <button
                         key={days}
                         type="button"
-                        onClick={() => setDurationDays(days)}
-                        className={`py-2 px-2 rounded-xl text-xs font-semibold border transition-all ${
-                          durationDays === days
+                        onClick={() => {
+                          setDurationDays(days);
+                          if (attemptPolicy === "unlimited") setAttemptPolicy("flexible");
+                        }}
+                        className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all ${
+                          durationDays === days && attemptPolicy !== "unlimited"
                             ? "border-[var(--olive)] bg-[var(--bg-input)] text-[var(--olive-text)] shadow-xs"
                             : "border-[var(--border-dim)] text-[var(--text-muted)] hover:text-[var(--text)]"
                         }`}
                       >
-                        {days} Days
+                        {days}D
                       </button>
                     ))}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setDurationDays(30);
+                        setAttemptPolicy("unlimited");
+                      }}
+                      className={`py-2 px-1 rounded-xl text-xs font-semibold border transition-all ${
+                        attemptPolicy === "unlimited"
+                          ? "border-[var(--terra)] bg-[var(--terra)]/15 text-[var(--terra)] shadow-xs"
+                          : "border-[var(--border-dim)] text-[var(--text-muted)] hover:text-[var(--text)]"
+                      }`}
+                    >
+                      ♾️ Extra
+                    </button>
                   </div>
                 </div>
 
@@ -284,11 +313,92 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                     className="w-full px-3 py-2 rounded-xl border text-xs font-medium focus:outline-none surface-input"
                     style={{ borderColor: "var(--border)", color: "var(--text)" }}
                   >
-                    <option value="all">🇳🇬 All Topics (History, Pop Culture, General Knowledge)</option>
+                    <option value="all">🇳🇬 All Topics (History, Pop Culture, Sports, General Knowledge)</option>
                     <option value="History">🏛️ Nigerian History & Politics</option>
                     <option value="Pop Culture">🎬 Pop Culture, Nollywood & Music</option>
+                    <option value="Sports">⚽ Nigerian Sports & Super Eagles Lore</option>
                     <option value="General Knowledge">💡 General Knowledge & Landmarks</option>
                   </select>
+                </div>
+
+                {/* Tournament Pacing Mode */}
+                <div>
+                  <label className="text-xs font-semibold block mb-1.5" style={{ color: "var(--text)" }}>
+                    Tournament Pacing & Drops Mode
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAttemptPolicy("flexible")}
+                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                        attemptPolicy === "flexible"
+                          ? "border-[var(--terra)] bg-[var(--terra)]/10 shadow-xs"
+                          : "border-[var(--border-dim)] bg-[var(--bg-input)] hover:border-[var(--border)]"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1">
+                        <span>⚡ Sequential</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">
+                        Drop 2 unlocks right after Drop 1 without 24h wait.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAttemptPolicy("strict")}
+                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                        attemptPolicy === "strict"
+                          ? "border-[var(--terra)] bg-[var(--terra)]/10 shadow-xs"
+                          : "border-[var(--border-dim)] bg-[var(--bg-input)] hover:border-[var(--border)]"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1">
+                        <span>⏳ Daily 24h</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">
+                        Paced cohort: 1 drop unlocks strictly every 24h at midnight.
+                      </p>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setAttemptPolicy("unlimited");
+                        setDurationDays(30);
+                      }}
+                      className={`p-2.5 rounded-xl text-left border transition-all cursor-pointer ${
+                        attemptPolicy === "unlimited"
+                          ? "border-[var(--terra)] bg-[var(--terra)]/10 shadow-xs"
+                          : "border-[var(--border-dim)] bg-[var(--bg-input)] hover:border-[var(--border)]"
+                      }`}
+                    >
+                      <div className="text-xs font-bold text-[var(--text)] flex items-center gap-1">
+                        <span>♾️ Unlimited</span>
+                      </div>
+                      <p className="text-[10px] text-[var(--text-dim)] mt-0.5 leading-tight">
+                        Continuous marathon with endless sequential drops.
+                      </p>
+                    </button>
+                  </div>
+
+                  {/* Allow Creator to add extra drops */}
+                  <div className="mt-2.5 pt-2 border-t border-[var(--border-dim)] flex items-center justify-between">
+                    <label className="text-xs font-semibold cursor-pointer flex items-center gap-2" style={{ color: "var(--text)" }}>
+                      <input
+                        type="checkbox"
+                        checked={allowExtraDrops}
+                        onChange={(e) => setAllowExtraDrops(e.target.checked)}
+                        className="rounded border-[var(--border)] text-[var(--terra)] focus:ring-[var(--terra)]"
+                      />
+                      <span>Allow Host to Add Extra / Unlimited Drops</span>
+                    </label>
+                    <span className="text-[10px] text-[var(--olive)] font-mono font-bold">Host Power</span>
+                  </div>
+
+                  <p className="text-[10px] text-[var(--text-mute)] mt-1.5 flex items-center gap-1 font-mono">
+                    <span>🛡️</span> Drops unlock one after another (Drop 2 requires Drop 1). Strictly 1-attempt per drop.
+                  </p>
                 </div>
 
                 {/* Actions */}

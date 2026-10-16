@@ -91,6 +91,7 @@ const CATEGORY_COLORS: Record<TriviaCategory, string> = {
   "History": "var(--terra)",
   "Pop Culture": "#7B3FC8",
   "General Knowledge": "var(--olive)",
+  "Sports": "#0284C7",
 };
 
 const OPTION_LABELS = ["A", "B", "C", "D"];
