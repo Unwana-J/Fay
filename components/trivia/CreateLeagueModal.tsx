@@ -23,6 +23,7 @@ import { useAppStore } from "@/store/useAppStore";
 import { FeyLogo } from "@/components/ui/FeyLogo";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
+import { saveLocalLeague, unmarkLocalLeagueDeleted } from "@/lib/trivia-league";
 
 interface CreateLeagueModalProps {
   isOpen: boolean;
@@ -85,12 +86,8 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
       // Save to localStorage immediately so this device always has full league configuration
       if (typeof window !== "undefined") {
         try {
-          localStorage.setItem(`fey_league_${data.league.code}`, JSON.stringify(data.league));
-          const recentRaw = localStorage.getItem("fey_recent_leagues");
-          const recent: string[] = recentRaw ? JSON.parse(recentRaw) : [];
-          if (!recent.includes(data.league.code)) {
-            localStorage.setItem("fey_recent_leagues", JSON.stringify([data.league.code, ...recent].slice(0, 10)));
-          }
+          unmarkLocalLeagueDeleted(data.league.code);
+          saveLocalLeague(data.league, true);
         } catch {}
       }
 

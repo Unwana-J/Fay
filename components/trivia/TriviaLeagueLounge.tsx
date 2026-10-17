@@ -33,6 +33,8 @@ import {
   computeUserLeagueSummary,
   removeLocalLeague,
   saveLocalLeague,
+  getDeletedLocalLeagues,
+  unmarkLocalLeagueDeleted,
   getLeagueShareUrl,
   type FriendshipLeague,
 } from "@/lib/trivia-league";
@@ -68,7 +70,12 @@ export default function TriviaLeagueLounge() {
         .then((res) => (res.ok ? res.json() : null))
         .then((data) => {
           if (data?.leagues && Array.isArray(data.leagues)) {
-            data.leagues.forEach((l: FriendshipLeague) => saveLocalLeague(l));
+            const deletedList = getDeletedLocalLeagues();
+            data.leagues.forEach((l: FriendshipLeague) => {
+              if (!deletedList.includes(l.code.toUpperCase())) {
+                saveLocalLeague(l);
+              }
+            });
             refreshLeagues();
           }
         })
@@ -117,7 +124,8 @@ export default function TriviaLeagueLounge() {
       if (res.ok) {
         const data = await res.json();
         if (data.league) {
-          saveLocalLeague(data.league);
+          unmarkLocalLeagueDeleted(clean);
+          saveLocalLeague(data.league, true);
           refreshLeagues();
         }
       }
@@ -134,11 +142,38 @@ export default function TriviaLeagueLounge() {
     }
   }
 
-  function handleRemove(code: string, e: React.MouseEvent) {
+  async function handleRemove(league: FriendshipLeague, e: React.MouseEvent) {
     e.stopPropagation();
-    if (confirm("Remove this league from your recent list?")) {
-      removeLocalLeague(code);
-      refreshLeagues();
+
+    const cleanUsername = (profile.username || "").trim().toLowerCase();
+    const creatorUser = (league.creatorName || "").trim().toLowerCase();
+    const isHost =
+      (league.creatorId && profile.id && league.creatorId === profile.id) ||
+      (cleanUsername && creatorUser === cleanUsername) ||
+      league.creatorId === "anonymous" ||
+      league.creatorId === "creator";
+
+    const message = isHost
+      ? `Permanently delete "${league.title}"? This will delete the tournament and its leaderboard for all scholars.`
+      : `Remove "${league.title}" from your tournaments?`;
+
+    if (!confirm(message)) return;
+
+    // Immediately remove locally and update UI state
+    removeLocalLeague(league.code);
+    setLeagues((prev) => prev.filter((l) => l.code !== league.code));
+
+    // Delete or leave on Supabase cloud
+    try {
+      const q = new URLSearchParams({ code: league.code });
+      if (profile.id) q.set("userId", profile.id);
+      if (profile.username) q.set("username", profile.username);
+
+      await fetch(`/api/trivia/league?${q.toString()}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("Failed to delete league in cloud:", err);
     }
   }
 
@@ -486,10 +521,10 @@ export default function TriviaLeagueLounge() {
 
                             <button
                               type="button"
-                              onClick={(e) => handleRemove(league.code, e)}
+                              onClick={(e) => handleRemove(league, e)}
                               className="p-2 rounded-xl border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300/60 hover:bg-rose-500/10 cursor-pointer bg-[var(--bg-input)] transition-all"
-                              title="Remove League"
-                              aria-label="Remove League"
+                              title={isHost ? "Delete Tournament" : "Remove League"}
+                              aria-label={isHost ? "Delete Tournament" : "Remove League"}
                             >
                               <Trash2 size={13} />
                             </button>
@@ -540,13 +575,22 @@ export default function TriviaLeagueLounge() {
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
+                      <div className="flex items-center gap-2 shrink-0">
                         {summary.userRank <= 3 && summary.userDaysCompleted > 0 && (
                           <div className="flex items-center gap-1.5 px-3 py-1 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-mono font-bold">
                             <Crown size={14} className="text-amber-500" />
                             <span>Finished #{summary.userRank} ({summary.userTotalPoints} pts)</span>
                           </div>
                         )}
+                        <button
+                          type="button"
+                          onClick={(e) => handleRemove(league, e)}
+                          className="p-2 rounded-xl border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300/60 hover:bg-rose-500/10 cursor-pointer bg-[var(--bg-input)] transition-all"
+                          title="Remove Tournament"
+                          aria-label="Remove Tournament"
+                        >
+                          <Trash2 size={13} />
+                        </button>
                         <div className="btn-secondary px-3 py-1.5 rounded-xl font-space font-bold text-xs flex items-center gap-1">
                           <span>Podium</span>
                           <ChevronRight size={13} />

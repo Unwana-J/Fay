@@ -25,8 +25,10 @@ import {
   Plus,
   Infinity,
   Crown,
+  Trash2,
 } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
 import { FeyLogo } from "@/components/ui/FeyLogo";
 import {
@@ -39,6 +41,7 @@ import {
   aggregateLeagueLeaderboard,
   generateDailyLeagueQuestions,
   saveLocalLeague,
+  removeLocalLeague,
   getLeagueShareUrl,
 } from "@/lib/trivia-league";
 import { TRIVIA_QUESTIONS, type TriviaQuestion } from "@/lib/trivia-questions";
@@ -60,6 +63,7 @@ export default function LeagueArenaClient({
   initialScores,
   initialLeaderboard,
 }: LeagueArenaClientProps) {
+  const router = useRouter();
   const { profile, addXP, saveTriviaRound, openClaimAccountPrompt } = useAppStore();
 
   const [league, setLeague] = useState<FriendshipLeague>(initialLeague);
@@ -287,6 +291,31 @@ export default function LeagueArenaClient({
     } finally {
       setIsUpdatingLeague(false);
     }
+  }
+
+  async function handleDeleteTournament() {
+    const isHost = isCreator;
+    const message = isHost
+      ? `Permanently delete "${league.title}"? This will delete the tournament and its leaderboard for all scholars.`
+      : `Remove "${league.title}" from your tournaments?`;
+
+    if (!confirm(message)) return;
+
+    removeLocalLeague(league.code);
+
+    try {
+      const q = new URLSearchParams({ code: league.code });
+      if (profile.id) q.set("userId", profile.id);
+      if (profile.username) q.set("username", profile.username);
+
+      await fetch(`/api/trivia/league?${q.toString()}`, {
+        method: "DELETE",
+      });
+    } catch (err) {
+      console.warn("Failed to delete tournament in cloud:", err);
+    }
+
+    router.push("/games/trivia");
   }
 
   // Countdown timer to midnight
@@ -592,6 +621,15 @@ export default function LeagueArenaClient({
           <span className="text-[11px] font-mono px-2.5 py-1 rounded-full border bg-[var(--bg-input)]" style={{ borderColor: "var(--border-dim)" }}>
             Code: <strong>{league.code}</strong>
           </span>
+          <button
+            type="button"
+            onClick={handleDeleteTournament}
+            className="p-1.5 rounded-xl border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300/60 hover:bg-rose-500/10 cursor-pointer bg-[var(--bg-input)] transition-all"
+            title={isCreator ? "Delete Tournament" : "Leave / Remove Tournament"}
+            aria-label={isCreator ? "Delete Tournament" : "Leave / Remove Tournament"}
+          >
+            <Trash2 size={13} />
+          </button>
         </div>
       </div>
 
@@ -912,6 +950,17 @@ export default function LeagueArenaClient({
                         Enable Unlimited Drops
                       </button>
                     )}
+
+                    <button
+                      type="button"
+                      onClick={handleDeleteTournament}
+                      disabled={isUpdatingLeague}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold border border-rose-500/40 text-rose-600 dark:text-rose-400 hover:bg-rose-500/10 transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                      title="Permanently delete this tournament"
+                    >
+                      <Trash2 size={12} />
+                      <span>Delete League</span>
+                    </button>
                   </div>
                 </div>
               )}

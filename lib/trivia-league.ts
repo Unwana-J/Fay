@@ -317,13 +317,54 @@ export function getQuestionsForLeagueDay(
 }
 
 /**
+ * Retrieve codes of leagues deleted or removed on this client.
+ */
+export function getDeletedLocalLeagues(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("fey_deleted_leagues");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Record a league as deleted on this client so cloud fetches do not resurrect it.
+ */
+export function markLocalLeagueDeleted(code: string) {
+  if (typeof window === "undefined" || !code) return;
+  try {
+    const clean = code.toUpperCase();
+    const list = getDeletedLocalLeagues();
+    if (!list.includes(clean)) {
+      localStorage.setItem("fey_deleted_leagues", JSON.stringify([...list, clean].slice(-100)));
+    }
+  } catch {}
+}
+
+/**
+ * Unmark a league as deleted (e.g. when explicitly joined or re-created).
+ */
+export function unmarkLocalLeagueDeleted(code: string) {
+  if (typeof window === "undefined" || !code) return;
+  try {
+    const clean = code.toUpperCase();
+    const list = getDeletedLocalLeagues().filter((c) => c !== clean);
+    localStorage.setItem("fey_deleted_leagues", JSON.stringify(list));
+  } catch {}
+}
+
+/**
  * Retrieve all leagues saved in this browser's localStorage.
  * Checks direct fey_league_* keys and fey_recent_leagues for full persistence.
+ * Filters out any leagues that were deleted locally.
  */
 export function getAllLocalLeagues(): FriendshipLeague[] {
   if (typeof window === "undefined") return [];
   try {
     const codeMap = new Map<string, FriendshipLeague>();
+    const deletedList = getDeletedLocalLeagues();
 
     // 1. Scan direct fey_league_* entries in localStorage
     for (let i = 0; i < localStorage.length; i++) {
@@ -334,7 +375,10 @@ export function getAllLocalLeagues(): FriendshipLeague[] {
           if (raw) {
             const parsed = JSON.parse(raw);
             if (parsed && parsed.code) {
-              codeMap.set(parsed.code.toUpperCase(), parsed);
+              const upper = parsed.code.toUpperCase();
+              if (!deletedList.includes(upper)) {
+                codeMap.set(upper, parsed);
+              }
             }
           }
         } catch {}
@@ -348,18 +392,19 @@ export function getAllLocalLeagues(): FriendshipLeague[] {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
           for (const item of parsed) {
-            const code = typeof item === "string" ? item : item?.code;
-            if (code && !codeMap.has(code.toUpperCase())) {
-              const leagueRaw = localStorage.getItem(`fey_league_${code.toUpperCase()}`);
+            const rawCode = typeof item === "string" ? item : item?.code;
+            const code = rawCode ? rawCode.toUpperCase() : null;
+            if (code && !deletedList.includes(code) && !codeMap.has(code)) {
+              const leagueRaw = localStorage.getItem(`fey_league_${code}`);
               if (leagueRaw) {
                 try {
                   const leagueObj = JSON.parse(leagueRaw);
                   if (leagueObj && leagueObj.code) {
-                    codeMap.set(code.toUpperCase(), leagueObj);
+                    codeMap.set(code, leagueObj);
                   }
                 } catch {}
               } else if (typeof item === "object" && item.title) {
-                codeMap.set(code.toUpperCase(), item as FriendshipLeague);
+                codeMap.set(code, item as FriendshipLeague);
               }
             }
           }
@@ -375,11 +420,19 @@ export function getAllLocalLeagues(): FriendshipLeague[] {
 
 /**
  * Persist league locally.
+ * If force is false and the league has been marked deleted, it will be skipped.
  */
-export function saveLocalLeague(league: FriendshipLeague) {
+export function saveLocalLeague(league: FriendshipLeague, force: boolean = false) {
   if (typeof window === "undefined" || !league?.code) return;
   try {
     const code = league.code.toUpperCase();
+    if (!force) {
+      const deletedList = getDeletedLocalLeagues();
+      if (deletedList.includes(code)) return;
+    } else {
+      unmarkLocalLeagueDeleted(code);
+    }
+
     localStorage.setItem(`fey_league_${code}`, JSON.stringify(league));
     const recentRaw = localStorage.getItem("fey_recent_leagues");
     const recent: any[] = recentRaw ? JSON.parse(recentRaw) : [];
@@ -411,18 +464,22 @@ export function getLeagueShareUrl(league: FriendshipLeague): string {
 }
 
 /**
- * Remove league from local storage.
+ * Remove league from local storage and record in deleted list.
  */
 export function removeLocalLeague(code: string) {
   if (typeof window === "undefined" || !code) return;
   try {
     const cleanCode = code.toUpperCase();
+    markLocalLeagueDeleted(cleanCode);
     localStorage.removeItem(`fey_league_${cleanCode}`);
     localStorage.removeItem(`fey_league_scores_${cleanCode}`);
     const recentRaw = localStorage.getItem("fey_recent_leagues");
     if (recentRaw) {
       const recent: any[] = JSON.parse(recentRaw);
-      const filtered = recent.filter((item) => (typeof item === "string" ? item : item.code) !== cleanCode);
+      const filtered = recent.filter((item) => {
+        const itemCode = typeof item === "string" ? item.toUpperCase() : item?.code?.toUpperCase();
+        return itemCode !== cleanCode;
+      });
       localStorage.setItem("fey_recent_leagues", JSON.stringify(filtered));
     }
   } catch {}

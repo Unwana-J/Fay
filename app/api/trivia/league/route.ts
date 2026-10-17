@@ -362,3 +362,86 @@ export async function PATCH(req: NextRequest) {
     return NextResponse.json({ error: err.message || "Failed to update league" }, { status: 500 });
   }
 }
+
+export async function DELETE(req: NextRequest) {
+  try {
+    const { searchParams } = new URL(req.url);
+    const code = searchParams.get("code")?.toUpperCase().trim();
+    const userId = searchParams.get("userId")?.trim();
+    const username = searchParams.get("username")?.trim();
+
+    if (!code) {
+      return NextResponse.json({ error: "League code is required." }, { status: 400 });
+    }
+
+    if (!isSupabaseConfigured || !supabase) {
+      return NextResponse.json({ success: true, message: "Deleted locally (cloud not configured)." });
+    }
+
+    // 1. Fetch league record to verify host vs participant
+    const { data: leagueRow, error: fetchError } = await supabase
+      .from("friendship_leagues")
+      .select("*")
+      .eq("code", code)
+      .maybeSingle();
+
+    if (fetchError) {
+      console.warn("Could not check league before delete:", fetchError);
+    }
+
+    const cleanUsername = (username || "").trim().toLowerCase();
+    const creatorUser = (leagueRow?.creator_name || "").trim().toLowerCase();
+
+    const isHost =
+      !leagueRow || // if already deleted or doesn't exist, allow cleanup
+      (userId && leagueRow.creator_id === userId) ||
+      (cleanUsername && creatorUser === cleanUsername) ||
+      leagueRow.creator_id === "anonymous" ||
+      leagueRow.creator_id === "creator";
+
+    if (isHost) {
+      // Host deleting: delete all scores and the tournament row
+      const { error: scoresErr } = await supabase
+        .from("league_scores")
+        .delete()
+        .eq("league_code", code);
+
+      if (scoresErr) {
+        console.warn("Could not delete scores for league:", scoresErr);
+      }
+
+      const { error: leagueErr } = await supabase
+        .from("friendship_leagues")
+        .delete()
+        .eq("code", code);
+
+      if (leagueErr) {
+        console.error("Supabase error deleting friendship_leagues:", leagueErr);
+        return NextResponse.json({ error: leagueErr.message }, { status: 500 });
+      }
+
+      return NextResponse.json({ success: true, mode: "deleted" });
+    } else {
+      // Participant leaving: remove participant scores so league won't appear on their dashboard
+      let q = supabase.from("league_scores").delete().eq("league_code", code);
+      if (userId && cleanUsername) {
+        q = q.or(`user_id.eq.${userId},username.ilike.${cleanUsername}`);
+      } else if (userId) {
+        q = q.eq("user_id", userId);
+      } else if (cleanUsername) {
+        q = q.ilike("username", cleanUsername);
+      }
+
+      const { error: leaveErr } = await q;
+      if (leaveErr) {
+        console.warn("Could not remove participant scores for league:", leaveErr);
+      }
+
+      return NextResponse.json({ success: true, mode: "left" });
+    }
+  } catch (err: any) {
+    console.error("Error in DELETE /api/trivia/league:", err);
+    return NextResponse.json({ error: err.message || "Failed to delete league" }, { status: 500 });
+  }
+}
+

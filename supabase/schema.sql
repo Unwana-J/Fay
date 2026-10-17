@@ -200,6 +200,16 @@ create policy "Allow public insert access on friendship_leagues"
   on public.friendship_leagues for insert
   with check (true);
 
+drop policy if exists "Allow public update access on friendship_leagues" on public.friendship_leagues;
+create policy "Allow public update access on friendship_leagues"
+  on public.friendship_leagues for update
+  using (true);
+
+drop policy if exists "Allow public delete access on friendship_leagues" on public.friendship_leagues;
+create policy "Allow public delete access on friendship_leagues"
+  on public.friendship_leagues for delete
+  using (true);
+
 -- 9. Create league_scores table for daily attempts & cumulative leaderboard
 create table if not exists public.league_scores (
   id uuid primary key default gen_random_uuid(),
@@ -229,6 +239,16 @@ drop policy if exists "Allow public insert access on league_scores" on public.le
 create policy "Allow public insert access on league_scores"
   on public.league_scores for insert
   with check (true);
+
+drop policy if exists "Allow public update access on league_scores" on public.league_scores;
+create policy "Allow public update access on league_scores"
+  on public.league_scores for update
+  using (true);
+
+drop policy if exists "Allow public delete access on league_scores" on public.league_scores;
+create policy "Allow public delete access on league_scores"
+  on public.league_scores for delete
+  using (true);
 
 create index if not exists idx_league_scores_lookup on public.league_scores (league_code, day_number);
 create index if not exists idx_league_scores_ranking on public.league_scores (league_code, points desc);
