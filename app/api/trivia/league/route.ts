@@ -31,6 +31,9 @@ export async function POST(req: NextRequest) {
       difficulty = "mixed",
       category = "all",
       attemptPolicy = "flexible",
+      timerMode = "per_question",
+      questionTimerSeconds = 25,
+      totalDropSeconds,
     } = body;
 
     if (!title || !creatorName) {
@@ -45,7 +48,11 @@ export async function POST(req: NextRequest) {
         ? numDuration
         : 5;
     const validQPerDay = [5, 10].includes(Number(questionsPerDay)) ? Number(questionsPerDay) : 5;
-    const validPolicy = ["flexible", "strict", "unlimited"].includes(attemptPolicy) ? attemptPolicy : "flexible";
+    const validPolicy = ["flexible", "strict", "unlimited", "host_controlled"].includes(attemptPolicy) ? attemptPolicy : "host_controlled";
+    const validTimerMode: "per_question" | "total_bank" = timerMode === "total_bank" ? "total_bank" : "per_question";
+    const validQTimer = [10, 15, 25, 40].includes(Number(questionTimerSeconds)) ? Number(questionTimerSeconds) : 25;
+    const defaultDropSeconds = validQPerDay * 30; // 150s (2m30) for 5 Qs, 300s (5m) for 10 Qs
+    const validTotalDropSeconds = Number(totalDropSeconds) > 0 ? Number(totalDropSeconds) : defaultDropSeconds;
 
     const today = todayStr();
     const startDate = today;
@@ -59,8 +66,12 @@ export async function POST(req: NextRequest) {
       category
     );
 
-    // Embed policy into seed map metadata for schema-safe persistence
+    // Embed policy & timer configuration into seed map metadata for schema-safe persistence
     (dailySeedMap as any)._policy = validPolicy;
+    (dailySeedMap as any)._timerMode = validTimerMode;
+    (dailySeedMap as any)._questionTimer = validQTimer;
+    (dailySeedMap as any)._totalDropSeconds = validTotalDropSeconds;
+    (dailySeedMap as any)._unlockedUpToDay = 1;
 
     const leagueData: FriendshipLeague = {
       code,
@@ -74,6 +85,10 @@ export async function POST(req: NextRequest) {
       difficulty,
       category,
       attemptPolicy: validPolicy,
+      unlockedUpToDay: 1,
+      timerMode: validTimerMode,
+      questionTimerSeconds: validQTimer,
+      totalDropSeconds: validTotalDropSeconds,
       dailySeedMap,
       createdAt: new Date().toISOString(),
     };
@@ -217,6 +232,10 @@ export async function GET(req: NextRequest) {
                 difficulty: row.difficulty,
                 category: row.category,
                 attemptPolicy: row.daily_seed_map?._policy || "flexible",
+                unlockedUpToDay: row.daily_seed_map?._unlockedUpToDay || 1,
+                timerMode: row.daily_seed_map?._timerMode || "per_question",
+                questionTimerSeconds: row.daily_seed_map?._questionTimer || 25,
+                totalDropSeconds: row.daily_seed_map?._totalDropSeconds || (row.questions_per_day * 30),
                 dailySeedMap: row.daily_seed_map,
                 createdAt: row.created_at,
               });
@@ -255,6 +274,10 @@ export async function GET(req: NextRequest) {
       difficulty: leagueRow.difficulty,
       category: leagueRow.category,
       attemptPolicy: leagueRow.daily_seed_map?._policy || "flexible",
+      unlockedUpToDay: leagueRow.daily_seed_map?._unlockedUpToDay || 1,
+      timerMode: leagueRow.daily_seed_map?._timerMode || "per_question",
+      questionTimerSeconds: leagueRow.daily_seed_map?._questionTimer || 25,
+      totalDropSeconds: leagueRow.daily_seed_map?._totalDropSeconds || (leagueRow.questions_per_day * 30),
       dailySeedMap: leagueRow.daily_seed_map,
       createdAt: leagueRow.created_at,
     };
@@ -301,7 +324,7 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { code, extraDrops, newDuration, attemptPolicy } = body;
+    const { code, extraDrops, newDuration, attemptPolicy, dailySeedMap } = body;
 
     if (!code) {
       return NextResponse.json({ error: "League code is required." }, { status: 400 });
@@ -315,6 +338,37 @@ export async function PATCH(req: NextRequest) {
         .maybeSingle();
 
       if (leagueRow) {
+        if (body.unlockedUpToDay) {
+          const map = dailySeedMap || leagueRow.daily_seed_map || {};
+          map._unlockedUpToDay = body.unlockedUpToDay;
+          await supabase
+            .from("friendship_leagues")
+            .update({
+              daily_seed_map: map,
+            })
+            .eq("code", code);
+
+          return NextResponse.json({
+            success: true,
+            unlockedUpToDay: body.unlockedUpToDay,
+            dailySeedMap: map,
+          });
+        }
+
+        if (dailySeedMap) {
+          await supabase
+            .from("friendship_leagues")
+            .update({
+              daily_seed_map: dailySeedMap,
+            })
+            .eq("code", code);
+
+          return NextResponse.json({
+            success: true,
+            dailySeedMap,
+          });
+        }
+
         const updatedDuration = newDuration || (leagueRow.duration_days + (extraDrops || 1));
         const updatedPolicy = attemptPolicy || leagueRow.daily_seed_map?._policy || "flexible";
         const currentSeedMap = leagueRow.daily_seed_map || {};

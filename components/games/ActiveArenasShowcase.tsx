@@ -154,10 +154,10 @@ export default function ActiveArenasShowcase({
         <div
           className="rounded-3xl p-5 sm:p-6 border relative overflow-hidden shadow-xs"
           style={{
-            borderColor: pendingDailyDrops.length > 0 ? "var(--terra)" : "var(--border-dim)",
+            borderColor: pendingDailyDrops.length > 0 ? "rgba(122, 28, 46, 0.3)" : "var(--border-dim)",
             background:
               pendingDailyDrops.length > 0
-                ? "linear-gradient(135deg, rgba(188, 108, 37, 0.12) 0%, rgba(221, 161, 94, 0.08) 100%)"
+                ? "rgba(122, 28, 46, 0.03)"
                 : "var(--bg-card)",
           }}
         >
@@ -173,11 +173,11 @@ export default function ActiveArenasShowcase({
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowActionModal(true)}
-                className="btn-terra px-3 py-1.5 rounded-xl font-space font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+                className="btn-terra px-3 py-1.5 rounded-xl font-space font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap"
                 title="Create League, Challenge, or Solo"
               >
                 <Plus size={13} strokeWidth={2.5} />
@@ -185,12 +185,12 @@ export default function ActiveArenasShowcase({
               </button>
 
               {onTabChange && (
-                <>
+                <div className="flex items-center gap-2">
                   {activeLeagues.length > 0 && (
                     <button
                       type="button"
                       onClick={() => onTabChange("league")}
-                      className="text-xs font-mono font-bold text-[var(--terra)] hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-mono font-bold text-[var(--terra)] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <span>Leagues ({activeLeagues.length})</span>
                       <ChevronRight size={13} />
@@ -200,13 +200,13 @@ export default function ActiveArenasShowcase({
                     <button
                       type="button"
                       onClick={() => onTabChange("challenge")}
-                      className="text-xs font-mono font-bold text-[var(--olive)] hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-xs font-mono font-bold text-[var(--olive)] hover:underline flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <span>Challenges ({activeChallenges.length})</span>
                       <ChevronRight size={13} />
                     </button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -219,7 +219,7 @@ export default function ActiveArenasShowcase({
                 key={league.code}
                 onClick={() => handleLeagueClick(league.code)}
                 className="p-4 rounded-2xl border surface flex flex-col justify-between gap-3 cursor-pointer hover:scale-[1.01] hover:shadow-sm transition-all relative group"
-                style={{ borderColor: "rgba(188, 108, 37, 0.4)" }}
+                style={{ borderColor: "rgba(122, 28, 46, 0.3)" }}
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1.5">
@@ -331,7 +331,7 @@ export default function ActiveArenasShowcase({
                         Score: {attempt.pct}% ({attempt.score}/{attempt.total})
                       </span>
                     ) : (
-                      "Challenge ready to play"
+                      "Ready to play"
                     )}
                   </span>
                   <div className="btn-primary px-3.5 py-1.5 rounded-xl font-space font-bold text-xs">

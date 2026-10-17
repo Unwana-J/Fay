@@ -23,6 +23,7 @@ import {
   Image as ImageIcon,
   Upload,
   Palette,
+  Maximize2,
 } from "lucide-react";
 import Link from "next/link";
 import { usePodiumStore } from "@/store/usePodiumStore";
@@ -331,7 +332,7 @@ function PodiumPageInner() {
 
   // ── Render ────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen" style={{ background: "var(--bg-base)" }}>
+    <div className="min-h-screen w-full max-w-full overflow-x-hidden" style={{ background: "var(--bg-base)" }}>
       <AnimatePresence mode="wait">
 
         {/* ════════════════════════════════════════
@@ -343,7 +344,7 @@ function PodiumPageInner() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
-            className="max-w-3xl mx-auto px-4 sm:px-8 py-12"
+            className="max-w-3xl mx-auto px-4 sm:px-8 py-6 sm:py-12 w-full max-w-full"
           >
             {/* Header */}
             <div className="mb-3">
@@ -354,22 +355,22 @@ function PodiumPageInner() {
                 <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
                 <span>Back to Games</span>
               </Link>
-              <div className="flex items-center gap-3.5 mb-4">
+              <div className="flex items-center gap-3 sm:gap-3.5 mb-4">
                 <div
-                  className="w-14 h-14 rounded-2xl flex items-center justify-center shadow-sm border relative group"
+                  className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl flex items-center justify-center shadow-sm border relative group shrink-0"
                   style={{ background: "rgba(166,124,30,0.12)", borderColor: "rgba(166,124,30,0.25)" }}
                 >
-                  <FeyLogo size={36} />
-                  <span className="absolute -bottom-1 -right-1 text-sm drop-shadow-sm">🎤</span>
+                  <FeyLogo size={32} />
+                  <span className="absolute -bottom-1 -right-1 text-xs sm:text-sm drop-shadow-sm">🎤</span>
                 </div>
-                <div>
+                <div className="min-w-0 flex-1">
                   <h1
-                    className="font-space text-4xl font-extrabold tracking-tight"
+                    className="font-space text-3xl sm:text-4xl font-extrabold tracking-tight"
                     style={{ color: "var(--text)" }}
                   >
                     The Podium
                   </h1>
-                  <p className="text-sm" style={{ color: "var(--text-dim)" }}>
+                  <p className="text-xs sm:text-sm leading-relaxed" style={{ color: "var(--text-dim)" }}>
                     Spin a topic · Jot your hot takes · Design slides with or without AI
                   </p>
                 </div>
@@ -377,7 +378,7 @@ function PodiumPageInner() {
             </div>
 
             {/* How it works */}
-            <div className="grid grid-cols-3 gap-4 mb-8">
+            <div className="grid grid-cols-3 gap-2 sm:gap-4 mb-8">
               {[
                 { icon: Shuffle, label: "Spin", desc: "Get a wild topic" },
                 { icon: PenLine, label: "Note", desc: "Jot your angle" },
@@ -385,17 +386,17 @@ function PodiumPageInner() {
               ].map(({ icon: Icon, label, desc }) => (
                 <div
                   key={label}
-                  className="p-4 rounded-2xl border text-center"
+                  className="p-2.5 sm:p-4 rounded-xl sm:rounded-2xl border text-center min-w-0"
                   style={{ background: "var(--bg-card)", borderColor: "var(--border-dim)" }}
                 >
-                  <Icon size={20} className="mx-auto mb-2" style={{ color: "var(--gold)" }} />
+                  <Icon size={18} className="mx-auto mb-1.5 sm:mb-2" style={{ color: "var(--gold)" }} />
                   <div
-                    className="font-space font-bold text-sm mb-1"
+                    className="font-space font-bold text-xs sm:text-sm mb-0.5 sm:mb-1 truncate"
                     style={{ color: "var(--text)" }}
                   >
                     {label}
                   </div>
-                  <div className="text-xs" style={{ color: "var(--text-mute)" }}>
+                  <div className="text-[10px] sm:text-xs leading-tight" style={{ color: "var(--text-mute)" }}>
                     {desc}
                   </div>
                 </div>
@@ -410,12 +411,12 @@ function PodiumPageInner() {
               >
                 Slide Style
               </p>
-              <div className="flex gap-3 flex-wrap">
+              <div className="flex gap-2 sm:gap-3 flex-wrap">
                 {(["bold", "minimal", "academic-chaos"] as const).map((s) => (
                   <button
                     key={s}
                     onClick={() => setSlideStyle(s)}
-                    className="px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer"
+                    className="px-3 sm:px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer whitespace-nowrap active:scale-95"
                     style={{
                       background: slideStyle === s ? "var(--gold)" : "var(--bg-card)",
                       color: slideStyle === s ? "#000" : "var(--text-dim)",
@@ -1395,6 +1396,103 @@ function PodiumPageInner() {
                                   }}
                                 />
                               </label>
+
+                              {/* Image Size Selector */}
+                              <div className="pt-2">
+                                <div className="flex items-center justify-between mb-1.5">
+                                  <span className="text-[11px] font-bold" style={{ color: "var(--text-dim)" }}>
+                                    Image Size
+                                  </span>
+                                  <span className="text-[10px] font-mono text-[var(--gold)] font-bold">
+                                    {editSlide.imageSize === "small"
+                                      ? "Compact (25%)"
+                                      : editSlide.imageSize === "large"
+                                      ? "Expanded (75%)"
+                                      : editSlide.imageSize === "fill"
+                                      ? "Fill Page (100%)"
+                                      : "Standard (50%)"}
+                                  </span>
+                                </div>
+                                <div
+                                  className="grid grid-cols-4 gap-1 p-1 rounded-xl border bg-[var(--bg-input)] shadow-inner"
+                                  style={{ borderColor: "var(--border-dim)" }}
+                                >
+                                  {[
+                                    { id: "small", label: "Small" },
+                                    { id: "medium", label: "Medium" },
+                                    { id: "large", label: "Large" },
+                                    { id: "fill", label: "Fill Page" },
+                                  ].map((sz) => {
+                                    const isSelected = (editSlide.imageSize || "medium") === sz.id;
+                                    return (
+                                      <button
+                                        key={sz.id}
+                                        type="button"
+                                        onClick={() => updateSlide(editingSlideIndex, { imageSize: sz.id as any })}
+                                        className={`py-1.5 px-1.5 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center active:scale-95 touch-manipulation select-none ${
+                                          isSelected
+                                            ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border)] ring-1 ring-[var(--gold)]/30 font-extrabold"
+                                            : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]/40 border border-transparent"
+                                        }`}
+                                      >
+                                        {sz.label}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+
+                              {/* Fill Mode Controls (when Fill Page is active) */}
+                              {editSlide.imageSize === "fill" && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -4 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="pt-1.5 space-y-1.5"
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-[11px] font-bold" style={{ color: "var(--text-dim)" }}>
+                                      Fill Display Mode
+                                    </span>
+                                    <span className="text-[10px] text-[var(--text-mute)]">
+                                      {(editSlide.imageFit || "contain") === "cover" ? "Full Bleed Wallpaper" : "Fit to Slide Content"}
+                                    </span>
+                                  </div>
+                                  <div
+                                    className="grid grid-cols-2 gap-1 p-1 rounded-xl border bg-[var(--bg-input)] shadow-inner"
+                                    style={{ borderColor: "var(--border-dim)" }}
+                                  >
+                                    <button
+                                      type="button"
+                                      onClick={() => updateSlide(editingSlideIndex, { imageFit: "contain" })}
+                                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center active:scale-95 flex items-center justify-center gap-1.5 ${
+                                        (editSlide.imageFit || "contain") === "contain"
+                                          ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border)] ring-1 ring-[var(--olive)]/30 font-extrabold"
+                                          : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]/40 border border-transparent"
+                                      }`}
+                                    >
+                                      <Maximize2 size={12} />
+                                      <span>Fit in Slide</span>
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => updateSlide(editingSlideIndex, { imageFit: "cover" })}
+                                      className={`py-1.5 px-2 rounded-lg text-[11px] font-bold transition-all cursor-pointer text-center active:scale-95 flex items-center justify-center gap-1.5 ${
+                                        editSlide.imageFit === "cover"
+                                          ? "bg-[var(--bg-card)] text-[var(--text)] shadow-sm border border-[var(--border)] ring-1 ring-[var(--terra)]/30 font-extrabold"
+                                          : "text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--bg-card)]/40 border border-transparent"
+                                      }`}
+                                    >
+                                      <Sparkles size={12} />
+                                      <span>Full Bleed</span>
+                                    </button>
+                                  </div>
+                                  <p className="text-[10px] text-[var(--text-mute)] leading-tight italic">
+                                    {(editSlide.imageFit || "contain") === "contain"
+                                      ? "Expands to maximum slide size without cropping."
+                                      : "Spans edge-to-edge behind the slide with dark contrast overlay."}
+                                  </p>
+                                </motion.div>
+                              )}
                             </div>
                           ) : (
                             <div className="space-y-2">

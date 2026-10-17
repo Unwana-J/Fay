@@ -15,8 +15,13 @@ export interface FriendshipLeague {
   category: string; // "all" | TriviaCategory
   dailySeedMap: Record<string, string[]>; // { "day_1": ["h001", ...], "day_2": [...] }
   createdAt?: string;
-  attemptPolicy?: "flexible" | "strict" | "unlimited";
+  attemptPolicy?: "flexible" | "strict" | "unlimited" | "host_controlled";
+  unlockedUpToDay?: number; // up to which day the host has unlocked for everyone (default 1)
+  allowHostExtraQuizzes?: boolean;
   allowUnlimitedDrops?: boolean;
+  timerMode?: "per_question" | "total_bank";
+  questionTimerSeconds?: number; // e.g. 10, 15, 25, 40
+  totalDropSeconds?: number; // e.g. 150 (2m 30s) or 300 (5m)
 }
 
 export interface LeagueDailyScore {
@@ -459,6 +464,18 @@ export function getLeagueShareUrl(league: FriendshipLeague): string {
   });
   if (league.attemptPolicy) {
     params.set("pol", league.attemptPolicy);
+  }
+  if (league.timerMode) {
+    params.set("tmode", league.timerMode);
+  }
+  if (league.questionTimerSeconds) {
+    params.set("tim", String(league.questionTimerSeconds));
+  }
+  if (league.totalDropSeconds) {
+    params.set("tot", String(league.totalDropSeconds));
+  }
+  if (league.unlockedUpToDay) {
+    params.set("u", String(league.unlockedUpToDay));
   }
   return `${origin}/games/trivia/league/${league.code.toUpperCase()}?${params.toString()}`;
 }

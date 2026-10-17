@@ -24,6 +24,27 @@ interface NewGameActionModalProps {
   onCreateSolo: () => void;
 }
 
+function PersonLaptopIcon({ size = 20, className = "" }: { size?: number; className?: string }) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <circle cx="12" cy="5" r="2.5" />
+      <path d="M6 17a6 6 0 0 1 12 0" />
+      <rect x="7.5" y="12.5" width="9" height="5.5" rx="1" />
+      <path d="M5 19.5h14" />
+    </svg>
+  );
+}
+
 export default function NewGameActionModal({
   isOpen,
   onClose,
@@ -35,13 +56,13 @@ export default function NewGameActionModal({
 
   return (
     <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs overflow-y-auto overscroll-contain">
         <motion.div
           initial={{ opacity: 0, scale: 0.95, y: 15 }}
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.2 }}
-          className="surface rounded-3xl p-6 sm:p-8 max-w-lg w-full border shadow-2xl relative overflow-hidden"
+          className="surface rounded-3xl p-5 sm:p-8 max-w-lg w-full border shadow-2xl relative max-h-[calc(100dvh-1.5rem)] overflow-y-auto my-auto"
           style={{ borderColor: "var(--border-dim)" }}
         >
           {/* Close button */}
@@ -81,8 +102,8 @@ export default function NewGameActionModal({
                 onClose();
                 onCreateLeague();
               }}
-              className="p-4 sm:p-5 rounded-2xl border surface cursor-pointer hover:scale-[1.01] hover:shadow-sm transition-all group relative overflow-hidden"
-              style={{ borderColor: "rgba(188, 108, 37, 0.35)" }}
+              className="p-4 sm:p-5 rounded-2xl border surface cursor-pointer hover:scale-[1.01] hover:shadow-sm hover:border-[var(--terra)]/40 transition-all group relative overflow-hidden"
+              style={{ borderColor: "var(--border-dim)" }}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3.5">
@@ -103,8 +124,8 @@ export default function NewGameActionModal({
                     </p>
                   </div>
                 </div>
-                <div className="btn-terra px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 self-center hidden sm:flex items-center gap-1 shadow-xs">
-                  <span>Start</span>
+                <div className="bg-[var(--terra)] hover:bg-[#8C2135] text-white px-3.5 py-1.5 rounded-xl text-xs font-space font-bold shrink-0 self-center hidden sm:flex items-center gap-1 shadow-xs transition-colors">
+                  <span>Create</span>
                   <ArrowRight size={12} />
                 </div>
               </div>
@@ -116,8 +137,8 @@ export default function NewGameActionModal({
                 onClose();
                 onCreateChallenge();
               }}
-              className="p-4 sm:p-5 rounded-2xl border surface cursor-pointer hover:scale-[1.01] hover:shadow-sm transition-all group relative overflow-hidden"
-              style={{ borderColor: "rgba(92, 106, 54, 0.35)" }}
+              className="p-4 sm:p-5 rounded-2xl border surface cursor-pointer hover:scale-[1.01] hover:shadow-sm hover:border-[var(--olive)]/40 transition-all group relative overflow-hidden"
+              style={{ borderColor: "var(--border-dim)" }}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3.5">
@@ -130,7 +151,7 @@ export default function NewGameActionModal({
                         Create Challenge
                       </h4>
                       <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-[var(--olive)]/15 text-[var(--olive)] border border-[var(--olive)]/30">
-                        1v1 Duel Link
+                        1v1 Challenge
                       </span>
                     </div>
                     <p className="text-xs text-[var(--text-dim)] leading-relaxed">
@@ -138,8 +159,8 @@ export default function NewGameActionModal({
                     </p>
                   </div>
                 </div>
-                <div className="btn-secondary px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 self-center hidden sm:flex items-center gap-1 shadow-xs">
-                  <span>Duel</span>
+                <div className="bg-[var(--olive)] hover:bg-[#535F36] text-white px-3.5 py-1.5 rounded-xl text-xs font-space font-bold shrink-0 self-center hidden sm:flex items-center gap-1 shadow-xs transition-colors">
+                  <span>Challenge</span>
                   <ArrowRight size={12} />
                 </div>
               </div>
@@ -151,20 +172,20 @@ export default function NewGameActionModal({
                 onClose();
                 onCreateSolo();
               }}
-              className="p-4 sm:p-5 rounded-2xl border surface cursor-pointer hover:scale-[1.01] hover:shadow-sm transition-all group relative overflow-hidden"
+              className="p-4 sm:p-5 rounded-2xl border surface cursor-pointer hover:scale-[1.01] hover:shadow-sm hover:border-[var(--gold)]/40 transition-all group relative overflow-hidden"
               style={{ borderColor: "var(--border-dim)" }}
             >
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3.5">
-                  <div className="w-11 h-11 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 dark:text-amber-400 shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
-                    <Sparkles size={20} />
+                  <div className="w-11 h-11 rounded-2xl bg-[var(--gold)]/15 border border-[var(--gold)]/30 flex items-center justify-center text-[var(--gold)] shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
+                    <PersonLaptopIcon size={20} />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">
                       <h4 className="font-space font-extrabold text-base text-[var(--text)] group-hover:text-[var(--gold)] transition-colors">
                         Solo Sprint
                       </h4>
-                      <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-700 dark:text-amber-300 border border-amber-500/25">
+                      <span className="text-[9px] font-mono font-bold uppercase px-2 py-0.5 rounded-full bg-[var(--gold)]/10 text-[var(--gold)] border border-[var(--gold)]/25">
                         Practice
                       </span>
                     </div>
@@ -173,8 +194,8 @@ export default function NewGameActionModal({
                     </p>
                   </div>
                 </div>
-                <div className="btn-primary px-3 py-1.5 rounded-xl text-xs font-bold shrink-0 self-center hidden sm:flex items-center gap-1 shadow-xs">
-                  <span>Play</span>
+                <div className="bg-[var(--gold)] hover:bg-[#B88A22] text-white px-3.5 py-1.5 rounded-xl text-xs font-space font-bold shrink-0 self-center hidden sm:flex items-center gap-1 shadow-xs transition-colors">
+                  <span>Play Solo</span>
                   <ArrowRight size={12} />
                 </div>
               </div>

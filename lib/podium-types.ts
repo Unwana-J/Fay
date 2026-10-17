@@ -7,6 +7,9 @@ export type SlideLayout =
 
 export type SlideStyle = "bold" | "minimal" | "academic-chaos";
 
+export type SlideImageSize = "small" | "medium" | "large" | "fill";
+export type SlideImageFit = "contain" | "cover";
+
 export interface PodiumSlide {
   layout: SlideLayout;
   title: string;
@@ -17,6 +20,8 @@ export interface PodiumSlide {
   attribution?: string;
   imageUrl?: string;
   imageAlt?: string;
+  imageSize?: SlideImageSize;
+  imageFit?: SlideImageFit;
   bgColor: string;
   textColor: string;
   accentColor: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, useTransition } from "react";
+import { useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Trophy,
@@ -10,11 +10,11 @@ import {
   CheckCircle2,
   XCircle,
   ArrowRight,
+  ArrowLeft,
   Share2,
   Copy,
   Check,
   Zap,
-  Sparkles,
   ChevronRight,
   Loader2,
   ShieldCheck,
@@ -26,6 +26,8 @@ import {
   Infinity,
   Crown,
   Trash2,
+  ShieldAlert,
+  X,
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -91,7 +93,111 @@ export default function LeagueArenaClient({
 
         // Hydrate local scores and merge with initialScores
         const storedScoresRaw = localStorage.getItem(`fey_league_scores_${leagueCode}`);
-        const localScores: LeagueDailyScore[] = storedScoresRaw ? JSON.parse(storedScoresRaw) : [];
+        let localScores: LeagueDailyScore[] = storedScoresRaw ? JSON.parse(storedScoresRaw) : [];
+
+        // Check for abandoned in-flight session from previous exit / page close
+        const inFlightRaw = localStorage.getItem(`fey_league_in_flight_${leagueCode}`);
+        if (inFlightRaw) {
+          try {
+            const session = JSON.parse(inFlightRaw);
+            if (session && session.dayNumber) {
+              const myUserKey = (profile.username || "Scholar").trim().toLowerCase();
+              const alreadyScored = localScores.some(
+                (s) =>
+                  s.dayNumber === session.dayNumber &&
+                  ((s.username || "").trim().toLowerCase() === myUserKey ||
+                    (profile.id && s.userId === profile.id))
+              );
+
+              if (!alreadyScored || session.isBonusRound) {
+                const answeredMap = new Map<string, { questionId: string; correct: boolean; selected: number }>(
+                  (session.questionResults || []).map((r: { questionId: string; correct: boolean; selected: number }) => [
+                    r.questionId,
+                    r,
+                  ])
+                );
+                const finalResults: Array<{ questionId: string; correct: boolean; selected: number }> = [];
+                for (const qId of session.questionIds || []) {
+                  if (answeredMap.has(qId)) {
+                    finalResults.push(answeredMap.get(qId)!);
+                  } else {
+                    finalResults.push({ questionId: qId, correct: false, selected: -1 });
+                  }
+                }
+
+                const roundCorrect = finalResults.filter((r) => r.correct).length;
+                const totalCorrect = session.isBonusRound
+                  ? (session.bonusBaseScore || 0) + roundCorrect
+                  : roundCorrect;
+                const totalQuestionsCount = session.isBonusRound
+                  ? (session.bonusBaseTotal || 0) + finalResults.length
+                  : finalResults.length;
+                const totalDuration = session.isBonusRound
+                  ? (session.bonusBaseDuration || 0) + (session.elapsedSeconds || 10)
+                  : (session.elapsedSeconds || 10);
+                const mergedResults = session.isBonusRound
+                  ? [...(session.existingBonusResults || []), ...finalResults]
+                  : finalResults;
+                const finalPoints = calculateLeaguePoints(totalCorrect, totalQuestionsCount, totalDuration);
+
+                const abandonedScore: LeagueDailyScore = {
+                  id: `score_${Date.now()}_abandoned`,
+                  leagueCode: activeLeague.code,
+                  userId: profile.id || myUserKey,
+                  username: profile.username || "Scholar",
+                  avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+                  dayNumber: session.dayNumber,
+                  date: todayStr(),
+                  score: totalCorrect,
+                  totalQuestions: totalQuestionsCount,
+                  points: finalPoints,
+                  durationSeconds: totalDuration,
+                  questionResults: mergedResults,
+                  createdAt: new Date().toISOString(),
+                };
+
+                localScores = [
+                  ...localScores.filter(
+                    (s) =>
+                      !(
+                        s.dayNumber === session.dayNumber &&
+                        ((s.username || "").trim().toLowerCase() === myUserKey ||
+                          (profile.id && s.userId === profile.id))
+                      )
+                  ),
+                  abandonedScore,
+                ];
+                localStorage.setItem(`fey_league_scores_${leagueCode}`, JSON.stringify(localScores));
+
+                fetch("/api/trivia/league/score", {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    leagueCode: activeLeague.code,
+                    userId: profile.id,
+                    username: profile.username || "Scholar",
+                    avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+                    dayNumber: session.dayNumber,
+                    score: totalCorrect,
+                    totalQuestions: totalQuestionsCount,
+                    durationSeconds: totalDuration,
+                    questionResults: mergedResults,
+                    isBonusExtension: !!session.isBonusRound,
+                  }),
+                }).catch(() => {});
+
+                setAttemptFeedback(
+                  `⚠️ An unfinished session for Drop ${session.dayNumber} was saved. Your score (${totalCorrect}/${totalQuestionsCount}) has been recorded and Drop ${session.dayNumber} is locked until the next drop unlocks.`
+                );
+              }
+            }
+          } catch (err) {
+            console.error("Failed to recover in-flight session:", err);
+          } finally {
+            localStorage.removeItem(`fey_league_in_flight_${leagueCode}`);
+          }
+        }
+
         if (localScores.length > 0) {
           const scoreMap = new Map<string, LeagueDailyScore>();
           for (const s of initialScores) {
@@ -112,7 +218,7 @@ export default function LeagueArenaClient({
         }
       } catch {}
     }
-  }, [code, initialLeague.code, initialScores]);
+  }, [code, initialLeague.code, initialScores, profile.username, profile.id]);
 
   const [phase, setPhase] = useState<"overview" | "playing" | "round_summary">("overview");
 
@@ -122,6 +228,14 @@ export default function LeagueArenaClient({
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
   const [elapsedRoundSeconds, setElapsedRoundSeconds] = useState(0);
+  const timerMode = league.timerMode || "per_question";
+  const defaultQTimer = league.questionTimerSeconds || 25;
+  const defaultDropBank = league.totalDropSeconds || ((league.questionsPerDay || 5) * 30);
+
+  const [questionTimeLeft, setQuestionTimeLeft] = useState<number>(defaultQTimer);
+  const [dropTimeLeft, setDropTimeLeft] = useState<number>(defaultDropBank);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
   const [correctCount, setCorrectCount] = useState(0);
   const [roundStartTime, setRoundStartTime] = useState(0);
   const [durationSeconds, setDurationSeconds] = useState(0);
@@ -132,6 +246,18 @@ export default function LeagueArenaClient({
   const [submitError, setSubmitError] = useState("");
   const [copied, setCopied] = useState(false);
   const [attemptFeedback, setAttemptFeedback] = useState<string>("");
+  const [showLeaveConfirm, setShowLeaveConfirm] = useState(false);
+
+  // Bonus Extension Round State
+  const [isBonusRound, setIsBonusRound] = useState(false);
+  const [bonusBaseScore, setBonusBaseScore] = useState(0);
+  const [bonusBaseTotal, setBonusBaseTotal] = useState(0);
+  const [bonusBaseDuration, setBonusBaseDuration] = useState(0);
+  const [existingBonusResults, setExistingBonusResults] = useState<
+    Array<{ questionId: string; correct: boolean; selected: number }>
+  >([]);
+
+  const unlockedUpToDay: number = Number(league.unlockedUpToDay || (league.dailySeedMap as Record<string, unknown>)?._unlockedUpToDay || 1);
 
   // Time remaining to next drop (midnight)
   const [timeToNextDrop, setTimeToNextDrop] = useState("");
@@ -339,16 +465,267 @@ export default function LeagueArenaClient({
     return () => clearInterval(interval);
   }, []);
 
-  // Round stopwatch during gameplay
+  // Host power: Unlock next drop for all players in this league
+  async function handleUnlockDrop(targetDay: number) {
+    if (isUpdatingLeague) return;
+    setIsUpdatingLeague(true);
+    try {
+      const updatedSeedMap: Record<string, any> = {
+        ...(league.dailySeedMap || {}),
+        _unlockedUpToDay: targetDay,
+      };
+
+      const updatedLeague: FriendshipLeague = {
+        ...league,
+        unlockedUpToDay: targetDay,
+        dailySeedMap: updatedSeedMap,
+      };
+
+      setLeague(updatedLeague);
+      saveLocalLeague(updatedLeague);
+
+      await fetch("/api/trivia/league", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: league.code,
+          unlockedUpToDay: targetDay,
+          dailySeedMap: updatedSeedMap,
+        }),
+      });
+
+      playAudioTone(880, "sine", 0.2);
+      setAttemptFeedback(`🎉 Drop ${targetDay} unlocked! All scholars can now play Drop ${targetDay}.`);
+    } catch (err) {
+      console.error("Failed to unlock drop:", err);
+    } finally {
+      setIsUpdatingLeague(false);
+    }
+  }
+
+  // Host power: Add dynamic bonus questions to any day's drop (reopening it for all players)
+  async function handleAddQuestionsToDay(targetDay: number, count: number) {
+    if (isUpdatingLeague) return;
+    setIsUpdatingLeague(true);
+    try {
+      const currentDayKey = `day_${targetDay}`;
+      const existingIds = new Set<string>(league.dailySeedMap?.[currentDayKey] || []);
+
+      const available = TRIVIA_QUESTIONS.filter((q) => {
+        if (existingIds.has(q.id)) return false;
+        if (league.category && league.category !== "all") {
+          return q.category.toLowerCase().includes(league.category.toLowerCase());
+        }
+        return true;
+      });
+
+      const pool = available.length >= count ? available : TRIVIA_QUESTIONS.filter((q) => !existingIds.has(q.id));
+      const shuffled = [...pool].sort(() => Math.random() - 0.5);
+      const chosen = shuffled.slice(0, count).map((q) => q.id);
+
+      const updatedSeedMap: Record<string, any> = {
+        ...(league.dailySeedMap || {}),
+        [currentDayKey]: [...(league.dailySeedMap?.[currentDayKey] || []), ...chosen],
+      };
+
+      const updatedLeague: FriendshipLeague = {
+        ...league,
+        dailySeedMap: updatedSeedMap,
+      };
+
+      setLeague(updatedLeague);
+      saveLocalLeague(updatedLeague);
+
+      await fetch("/api/trivia/league", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: league.code,
+          dailySeedMap: updatedSeedMap,
+        }),
+      });
+
+      playAudioTone(880, "sine", 0.2);
+      setAttemptFeedback(
+        `Added +${count} bonus questions to Drop ${targetDay}! Drop ${targetDay} is now reopened for all scholars.`
+      );
+    } catch (err) {
+      console.error("Failed to add bonus questions to drop:", err);
+    } finally {
+      setIsUpdatingLeague(false);
+    }
+  }
+
+  async function handleAddQuestionsToDrop(count: number) {
+    return handleAddQuestionsToDay(activeDropDay, count);
+  }
+
+  // Start bonus round for a reopened drop
+  function startBonusRound(targetDay: number) {
+    const existingScore = myScoresByDay.get(targetDay);
+    if (!existingScore) {
+      startDailyRound(targetDay);
+      return;
+    }
+
+    const allQuestions = getQuestionsForLeagueDay(league, targetDay);
+    const existingResults = existingScore.questionResults || [];
+    const answeredIds = new Set(existingResults.map((r) => r.questionId));
+    const bonusQuestions = allQuestions.filter((q) => !answeredIds.has(q.id));
+
+    if (bonusQuestions.length === 0) {
+      setAttemptFeedback(`You have already completed all available questions for Drop ${targetDay}.`);
+      return;
+    }
+
+    setActiveDropDay(targetDay);
+    setIsBonusRound(true);
+    setBonusBaseScore(existingScore.score);
+    setBonusBaseTotal(existingResults.length || existingScore.totalQuestions || 5);
+    setBonusBaseDuration(existingScore.durationSeconds || 0);
+    setExistingBonusResults(existingResults);
+
+    setQuestions(bonusQuestions);
+    setCurrentIndex(0);
+    setSelectedAnswer(null);
+    setIsAnswerRevealed(false);
+    setElapsedRoundSeconds(0);
+    setCorrectCount(0);
+    setQuestionResults([]);
+    setRoundStartTime(Date.now());
+    setAttemptFeedback("");
+    setQuestionTimeLeft(league.questionTimerSeconds || 25);
+    setDropTimeLeft(league.totalDropSeconds || (bonusQuestions.length * 30));
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          `fey_league_in_flight_${league.code}`,
+          JSON.stringify({
+            leagueCode: league.code,
+            dayNumber: targetDay,
+            isBonusRound: true,
+            bonusBaseScore: existingScore.score,
+            bonusBaseTotal: existingResults.length || existingScore.totalQuestions || 5,
+            bonusBaseDuration: existingScore.durationSeconds || 0,
+            existingBonusResults,
+            startTime: Date.now(),
+            elapsedSeconds: 0,
+            questionIds: bonusQuestions.map((q) => q.id),
+            questionResults: [],
+            totalQuestions: bonusQuestions.length,
+          })
+        );
+      } catch {}
+    }
+
+    setPhase("playing");
+  }
+
+  // Save in-flight progress to localStorage for recovery and anti-cheat enforcement
+  const saveInFlightProgress = useCallback(
+    (results: Array<{ questionId: string; correct: boolean; selected: number }>) => {
+      if (typeof window === "undefined") return;
+      try {
+        const raw = localStorage.getItem(`fey_league_in_flight_${league.code}`);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          parsed.questionResults = results;
+          parsed.elapsedSeconds = Math.max(5, Math.round((Date.now() - (parsed.startTime || Date.now())) / 1000));
+          localStorage.setItem(`fey_league_in_flight_${league.code}`, JSON.stringify(parsed));
+        }
+      } catch {}
+    },
+    [league.code]
+  );
+
+  // Browser exit / tab close warning during active game drop
+  useEffect(() => {
+    if (phase !== "playing") return;
+
+    const handleBeforeUnload = (e: BeforeUnloadEvent) => {
+      e.preventDefault();
+      e.returnValue = "Leaving now will save your current progress and permanently lock this drop.";
+      return e.returnValue;
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    return () => {
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+    };
+  }, [phase]);
+
+  // Handle question timeout in per_question mode
+  const handleQuestionTimeout = useCallback(() => {
+    if (isAnswerRevealed) return;
+    const currentQ = questions[currentIndex];
+    if (!currentQ) return;
+
+    setSelectedAnswer(-1);
+    setIsAnswerRevealed(true);
+    playAudioTone(220, "sawtooth", 0.25);
+
+    setQuestionResults((prev) => {
+      const next = [
+        ...prev,
+        { questionId: currentQ.id, correct: false, selected: -1 },
+      ];
+      saveInFlightProgress(next);
+      return next;
+    });
+  }, [isAnswerRevealed, questions, currentIndex, saveInFlightProgress]);
+
+  // Handle total drop clock expiration in total_bank mode
+  const handleDropTimeout = useCallback(() => {
+    const unanswered: Array<{ questionId: string; correct: boolean; selected: number }> = [];
+    for (let i = currentIndex; i < questions.length; i++) {
+      if (questions[i]) {
+        unanswered.push({
+          questionId: questions[i].id,
+          correct: false,
+          selected: -1,
+        });
+      }
+    }
+    const mergedResults = [...questionResults, ...unanswered];
+    setQuestionResults(mergedResults);
+    finishDailyRound(
+      "⏱️ Drop clock expired! All remaining questions were marked incomplete.",
+      mergedResults
+    );
+  }, [currentIndex, questions, questionResults]);
+
+  // Gameplay timer loop: handles countdown (per_question or total_bank) and stopwatch
   useEffect(() => {
     if (phase !== "playing") return;
 
     const timer = setInterval(() => {
       setElapsedRoundSeconds((prev) => prev + 1);
+
+      if (timerMode === "per_question") {
+        if (!isAnswerRevealed) {
+          setQuestionTimeLeft((prev) => {
+            if (prev <= 1) {
+              handleQuestionTimeout();
+              return 0;
+            }
+            return prev - 1;
+          });
+        }
+      } else {
+        // total_bank mode: untimed per question, hard total drop clock
+        setDropTimeLeft((prev) => {
+          if (prev <= 1) {
+            handleDropTimeout();
+            return 0;
+          }
+          return prev - 1;
+        });
+      }
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [phase]);
+  }, [phase, timerMode, isAnswerRevealed, handleQuestionTimeout, handleDropTimeout]);
 
   // If in unlimited drops marathon mode and user reaches the end, expand automatically
   useEffect(() => {
@@ -365,8 +742,22 @@ export default function LeagueArenaClient({
         ? targetDay
         : nextUncompletedDay ?? currentDay;
 
-    // Strict 1-trial integrity: Already completed drops cannot be retaken
+    // Check if drop is host locked
+    const isHostControlled = league.attemptPolicy === "host_controlled" || !!league.unlockedUpToDay || !!league.dailySeedMap?._unlockedUpToDay;
+    if (isHostControlled && dayToPlay > unlockedUpToDay) {
+      setAttemptFeedback(`Drop ${dayToPlay} is locked. Awaiting Host to unlock this round.`);
+      return;
+    }
+
+    // Strict 1-trial integrity: Check if already completed or has bonus questions
     if (myScoresByDay.has(dayToPlay)) {
+      const existingScore = myScoresByDay.get(dayToPlay);
+      const allQuestions = getQuestionsForLeagueDay(league, dayToPlay);
+      const answeredCount = existingScore?.questionResults?.length || (existingScore ? (existingScore.totalQuestions || (league.questionsPerDay || 5)) : 0);
+      if (allQuestions.length > answeredCount) {
+        startBonusRound(dayToPlay);
+        return;
+      }
       setAttemptFeedback(`Drop ${dayToPlay} is already completed. Scores are strictly locked to ensure tournament balance.`);
       return;
     }
@@ -378,6 +769,7 @@ export default function LeagueArenaClient({
     }
 
     setActiveDropDay(dayToPlay);
+    setIsBonusRound(false);
 
     let dropQuestions = getQuestionsForLeagueDay(league, dayToPlay);
     if (dropQuestions.length === 0) {
@@ -404,6 +796,31 @@ export default function LeagueArenaClient({
     setQuestionResults([]);
     setRoundStartTime(Date.now());
     setAttemptFeedback("");
+    setQuestionTimeLeft(league.questionTimerSeconds || 25);
+    setDropTimeLeft(league.totalDropSeconds || ((league.questionsPerDay || 5) * 30));
+
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.setItem(
+          `fey_league_in_flight_${league.code}`,
+          JSON.stringify({
+            leagueCode: league.code,
+            dayNumber: dayToPlay,
+            isBonusRound: false,
+            bonusBaseScore: 0,
+            bonusBaseTotal: 0,
+            bonusBaseDuration: 0,
+            existingBonusResults: [],
+            startTime: Date.now(),
+            elapsedSeconds: 0,
+            questionIds: dropQuestions.map((q) => q.id),
+            questionResults: [],
+            totalQuestions: dropQuestions.length,
+          })
+        );
+      } catch {}
+    }
+
     setPhase("playing");
   }
 
@@ -422,10 +839,14 @@ export default function LeagueArenaClient({
       playAudioTone(220, "sawtooth", 0.25);
     }
 
-    setQuestionResults((prev) => [
-      ...prev,
-      { questionId: currentQ.id, correct: isCorrect, selected: index },
-    ]);
+    setQuestionResults((prev) => {
+      const next = [
+        ...prev,
+        { questionId: currentQ.id, correct: isCorrect, selected: index },
+      ];
+      saveInFlightProgress(next);
+      return next;
+    });
   }
 
   function handleNextQuestion() {
@@ -433,31 +854,76 @@ export default function LeagueArenaClient({
       setCurrentIndex((idx) => idx + 1);
       setSelectedAnswer(null);
       setIsAnswerRevealed(false);
+      setQuestionTimeLeft(league.questionTimerSeconds || 25);
     } else {
       finishDailyRound();
     }
   }
 
-  async function finishDailyRound() {
+  function handleConfirmLeaveDrop() {
+    setShowLeaveConfirm(false);
+    const answeredIds = new Set(questionResults.map((r) => r.questionId));
+    const remaining: Array<{ questionId: string; correct: boolean; selected: number }> = [];
+    for (const q of questions) {
+      if (!answeredIds.has(q.id)) {
+        remaining.push({
+          questionId: q.id,
+          correct: false,
+          selected: -1,
+        });
+      }
+    }
+    const mergedResults = [...questionResults, ...remaining];
+    finishDailyRound(
+      `🚪 Drop ${activeDropDay} exited early. Your session was saved and Drop ${activeDropDay} is locked until the next drop unlocks.`,
+      mergedResults
+    );
+  }
+
+  async function finishDailyRound(
+    overrideFeedback?: string,
+    overrideResults?: Array<{ questionId: string; correct: boolean; selected: number }>
+  ) {
+    // Clear in-flight tracking so it's not treated as abandoned
+    if (typeof window !== "undefined") {
+      try {
+        localStorage.removeItem(`fey_league_in_flight_${league.code}`);
+      } catch {}
+    }
+
     const elapsedSeconds = Math.max(5, Math.round((Date.now() - roundStartTime) / 1000));
     setDurationSeconds(elapsedSeconds);
     setPhase("round_summary");
 
-    const finalPoints = calculateLeaguePoints(correctCount, questions.length, elapsedSeconds);
-    const xpBonus = correctCount * 25 + 50;
+    const finalResults = overrideResults || questionResults;
+    const roundCorrect = finalResults.filter((r) => r.correct).length;
+
+    const totalCorrect = isBonusRound ? (bonusBaseScore + roundCorrect) : roundCorrect;
+    const totalQuestionsCount = isBonusRound ? (bonusBaseTotal + questions.length) : questions.length;
+    const totalDuration = isBonusRound ? (bonusBaseDuration + elapsedSeconds) : elapsedSeconds;
+    const mergedResults = isBonusRound ? [...existingBonusResults, ...finalResults] : finalResults;
+
+    const finalPoints = calculateLeaguePoints(totalCorrect, totalQuestionsCount, totalDuration);
+    const xpBonus = roundCorrect * 25 + 50;
     addXP(xpBonus);
 
-    setAttemptFeedback(`Drop ${activeDropDay} recorded! You earned ${finalPoints} pts.`);
+    setAttemptFeedback(
+      overrideFeedback || (
+        isBonusRound
+          ? `🎉 Bonus round complete! +${roundCorrect}/${questions.length} answered. New Drop ${activeDropDay} score: ${totalCorrect}/${totalQuestionsCount} (${finalPoints} pts).`
+          : `Drop ${activeDropDay} recorded! You earned ${finalPoints} pts.`
+      )
+    );
 
     // Save as local trivia round to maintain user's app streak
     saveTriviaRound({
-      score: correctCount,
-      total: questions.length,
-      pct: Math.round((correctCount / questions.length) * 100),
-      gradeLabel: `${league.title} · Drop ${activeDropDay}`,
+      score: totalCorrect,
+      total: totalQuestionsCount,
+      pct: Math.round((totalCorrect / totalQuestionsCount) * 100),
+      gradeLabel: `${league.title} · Drop ${activeDropDay}${isBonusRound ? " (Bonus)" : ""}`,
       xpEarned: xpBonus,
-      durationMinutes: Math.round(elapsedSeconds / 60),
-      questionIds: questions.map((q) => q.id),
+      durationMinutes: Math.round(totalDuration / 60),
+      questionIds: mergedResults.map((q) => q.questionId),
       categoryBreakdown: [],
     });
 
@@ -469,11 +935,11 @@ export default function LeagueArenaClient({
       avatar: profile.avatar || "/avatars/avatar-scholar.svg",
       dayNumber: activeDropDay,
       date: todayStr(),
-      score: correctCount,
-      totalQuestions: questions.length,
+      score: totalCorrect,
+      totalQuestions: totalQuestionsCount,
       points: finalPoints,
-      durationSeconds: elapsedSeconds,
-      questionResults,
+      durationSeconds: totalDuration,
+      questionResults: mergedResults,
       createdAt: new Date().toISOString(),
     };
 
@@ -498,7 +964,7 @@ export default function LeagueArenaClient({
       return updated;
     });
 
-    if (correctCount >= Math.ceil(questions.length * 0.7)) {
+    if (roundCorrect >= Math.ceil(questions.length * 0.7)) {
       try {
         confetti({
           particleCount: 40,
@@ -521,10 +987,11 @@ export default function LeagueArenaClient({
           username: profile.username || "Scholar",
           avatar: profile.avatar || "/avatars/avatar-scholar.svg",
           dayNumber: activeDropDay,
-          score: correctCount,
-          totalQuestions: questions.length,
-          durationSeconds: elapsedSeconds,
-          questionResults,
+          score: totalCorrect,
+          totalQuestions: totalQuestionsCount,
+          durationSeconds: totalDuration,
+          questionResults: mergedResults,
+          isBonusExtension: isBonusRound,
         }),
       });
 
@@ -537,6 +1004,8 @@ export default function LeagueArenaClient({
       }
     } catch {
       setSubmittingScore(false);
+    } finally {
+      setIsBonusRound(false);
     }
   }
 
@@ -601,30 +1070,47 @@ export default function LeagueArenaClient({
   return (
     <div className="min-h-screen p-4 sm:p-8 max-w-4xl mx-auto space-y-6">
       {/* Top Breadcrumb */}
-      <div className="flex items-center justify-between">
-        <Link
-          href="/games/trivia"
-          className="text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors flex items-center gap-1.5"
-        >
-          ← Back to Trivia Arcade
-        </Link>
-        <div className="flex items-center gap-2">
+      <div className="flex items-center justify-between gap-2">
+        {phase === "playing" ? (
+          <button
+            type="button"
+            onClick={() => setShowLeaveConfirm(true)}
+            className="text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 group active:scale-95 cursor-pointer"
+          >
+            <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5 shrink-0" />
+            <span className="hidden sm:inline">Back to Trivia Arcade</span>
+            <span className="sm:hidden">Trivia</span>
+          </button>
+        ) : (
+          <Link
+            href="/games/trivia"
+            className="text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors inline-flex items-center gap-1.5 whitespace-nowrap shrink-0 group active:scale-95"
+          >
+            <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5 shrink-0" />
+            <span className="hidden sm:inline">Back to Trivia Arcade</span>
+            <span className="sm:hidden">Trivia</span>
+          </Link>
+        )}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {!profile?.hasClaimedAccount && (
             <button
               onClick={openClaimAccountPrompt}
-              className="text-[11px] font-space font-bold px-3 py-1 rounded-full border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 transition-colors cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1 h-8 px-2.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold font-space transition-colors cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
               title="Link free account to track your daily streak & protect tournament scores"
             >
-              <span>Track Streak</span>
+              <Flame size={12} className="text-amber-500 shrink-0" />
+              <span className="hidden sm:inline">Track Streak</span>
+              <span className="sm:hidden">Streak</span>
             </button>
           )}
-          <span className="text-[11px] font-mono px-2.5 py-1 rounded-full border bg-[var(--bg-input)]" style={{ borderColor: "var(--border-dim)" }}>
+          <span className="text-[11px] font-mono px-2.5 h-8 flex items-center rounded-xl border bg-[var(--bg-input)] whitespace-nowrap" style={{ borderColor: "var(--border-dim)" }}>
             Code: <strong>{league.code}</strong>
           </span>
           <button
             type="button"
+            disabled={isUpdatingLeague || phase === "playing"}
             onClick={handleDeleteTournament}
-            className="p-1.5 rounded-xl border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300/60 hover:bg-rose-500/10 cursor-pointer bg-[var(--bg-input)] transition-all"
+            className="h-8 w-8 flex items-center justify-center rounded-xl border border-[var(--border-dim)] text-[var(--text-mute)] hover:text-rose-600 hover:border-rose-300/60 hover:bg-rose-500/10 cursor-pointer bg-[var(--bg-input)] transition-all shrink-0 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
             title={isCreator ? "Delete Tournament" : "Leave / Remove Tournament"}
             aria-label={isCreator ? "Delete Tournament" : "Leave / Remove Tournament"}
           >
@@ -740,11 +1226,13 @@ export default function LeagueArenaClient({
                 <div className="space-y-1 text-center sm:text-left">
                   <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                     <span className="font-space font-bold text-lg text-[var(--text)]">
-                      {nextUncompletedDay
-                        ? `Drop ${nextUncompletedDay} ${nextUncompletedDay === 1 ? "Scheduled Drop" : "Sequential Drop"}`
+                      {status.isCompleted
+                        ? `Tournament Completed (${league.durationDays} Drops)`
+                        : nextUncompletedDay
+                        ? `Drop ${nextUncompletedDay}`
                         : `All ${league.durationDays} Tournament Drops Completed!`}
                     </span>
-                    {nextUncompletedDay ? (
+                    {nextUncompletedDay && !status.isCompleted ? (
                       <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2.5 py-0.5 rounded-full border border-[var(--terra)]/30">
                         <Flame size={12} /> Ready to Play
                       </span>
@@ -753,25 +1241,21 @@ export default function LeagueArenaClient({
                         <CheckCircle2 size={12} /> All Drops Done
                       </span>
                     )}
-                    {league.attemptPolicy === "unlimited" ? (
-                      <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
-                        ♾️ Unlimited Drops
-                      </span>
-                    ) : league.attemptPolicy === "strict" ? (
-                      <span className="text-[10px] font-mono text-[var(--text-mute)] px-2 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)]">
-                        Strict 24h Paced
-                      </span>
-                    ) : (
-                      <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/25">
-                        Flexible Drops
-                      </span>
-                    )}
+                    <span className="text-[10px] font-mono text-[var(--text-mute)] px-2 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)]">
+                      {league.attemptPolicy === "host_controlled"
+                        ? "Host-Paced"
+                        : league.attemptPolicy === "unlimited"
+                        ? "Continuous"
+                        : league.attemptPolicy === "strict"
+                        ? "Daily (24h)"
+                        : "Self-Paced"}
+                    </span>
                   </div>
                   <p className="text-xs text-[var(--text-dim)]">
                     {status.isCompleted
                       ? "This tournament has ended! Check out the final cumulative standings below."
                       : nextUncompletedDay
-                      ? `Drops progress sequentially (Drop 2 unlocks after Drop 1). Answer today's ${league.questionsPerDay} questions swiftly to earn velocity bonus points.`
+                      ? `Answer today's ${league.questionsPerDay} questions swiftly to earn velocity bonus points.`
                       : `You have completed all ${league.durationDays} tournament drops! Check the live cumulative standings below.`}
                   </p>
                 </div>
@@ -782,97 +1266,10 @@ export default function LeagueArenaClient({
                     onClick={() => startDailyRound(nextUncompletedDay)}
                     className="btn-terra px-6 py-3 rounded-2xl text-xs font-bold shadow-md shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
                   >
-                    <span>Start Drop {nextUncompletedDay}</span>
+                    <span>Play Drop {nextUncompletedDay}</span>
                   </button>
                 )}
               </div>
-
-              {/* ── Choice: Wait for Scheduled Drop vs Attempt Other Drops & Questions Now ── */}
-              {!status.isCompleted && (
-                <div className="pt-2 border-t border-[var(--border-dim)] grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  {/* Option A: Wait for Scheduled Drop */}
-                  <div
-                    className={cn(
-                      "p-4 rounded-2xl border surface space-y-2.5 flex flex-col justify-between transition-all",
-                      hasCompletedToday
-                        ? "bg-[var(--bg-input)]/70 border-[var(--border-dim)]"
-                        : "opacity-80 bg-[var(--bg-input)]/40 border-[var(--border-dim)]"
-                    )}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-space font-bold text-[var(--text)]">
-                          <Clock size={13} className="text-[var(--terra)]" />
-                          <span>Wait for Scheduled Drop</span>
-                        </div>
-                        {hasCompletedToday ? (
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                            Paced
-                          </span>
-                        ) : (
-                          <span className="text-[10px] font-mono text-[var(--text-mute)] px-2 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)]">
-                            24h Cadence
-                          </span>
-                        )}
-                      </div>
-                      <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
-                        Pace with the daily cohort. Day {Math.min(currentDay + 1, league.durationDays)} unlocks naturally at midnight:
-                      </p>
-                    </div>
-
-                    <div className="pt-2 flex items-center justify-between border-t border-[var(--border-dim)]/50">
-                      <span className="text-xs font-mono font-bold text-[var(--olive)] flex items-center gap-1">
-                        <Clock size={13} /> {timeToNextDrop || "Midnight"}
-                      </span>
-                      <span className="text-[10px] font-mono text-[var(--text-mute)]">
-                        {currentDay >= league.durationDays ? "Final drop day active" : `Next: Day ${currentDay + 1}`}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Option B: Sequential Drops Progression */}
-                  <div
-                    className={cn(
-                      "p-4 rounded-2xl border surface space-y-2.5 flex flex-col justify-between transition-all",
-                      "border-[var(--terra)]/40 bg-[var(--terra)]/5 shadow-xs"
-                    )}
-                  >
-                    <div className="space-y-1">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5 text-xs font-space font-bold text-[var(--text)]">
-                          <Zap size={14} className="text-[var(--terra)]" />
-                          <span>Sequential Progression</span>
-                        </div>
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--terra)]/15 text-[var(--terra)] border border-[var(--terra)]/30">
-                          One-by-One
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
-                        Drops open in sequence. Complete Drop 1 to open Drop 2, then Drop 3 without waiting 24 hours!
-                      </p>
-                    </div>
-
-                    <div className="pt-2 flex items-center justify-between gap-2 border-t border-[var(--border-dim)]/50">
-                      <span className="text-[10px] font-mono text-[var(--text-mute)]">
-                        {nextUncompletedDay ? `Next in queue: Drop ${nextUncompletedDay}` : "All drops completed"}
-                      </span>
-                      {nextUncompletedDay ? (
-                        <button
-                          type="button"
-                          onClick={() => startDailyRound(nextUncompletedDay)}
-                          className="btn-terra px-3.5 py-1.5 rounded-xl text-xs font-bold cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all shadow-xs"
-                        >
-                          <span>Play Drop {nextUncompletedDay}</span>
-                        </button>
-                      ) : (
-                        <span className="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300">
-                          ✓ All drops completed
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* ── All Tournament Drops (Choose & Attempt Drops) ── */}
@@ -920,6 +1317,20 @@ export default function LeagueArenaClient({
                   </div>
 
                   <div className="flex items-center gap-2 flex-wrap">
+                    {/* Unlock Next Drop Button */}
+                    {unlockedUpToDay < league.durationDays && (
+                      <button
+                        type="button"
+                        onClick={() => handleUnlockDrop(unlockedUpToDay + 1)}
+                        disabled={isUpdatingLeague}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold bg-[var(--olive)] text-white hover:opacity-90 transition-all cursor-pointer shadow-xs disabled:opacity-50 flex items-center gap-1.5"
+                        title={`Unlock Drop ${unlockedUpToDay + 1} for all scholars`}
+                      >
+                        <ShieldCheck size={13} />
+                        <span>Unlock Drop {unlockedUpToDay + 1}</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={() => handleAddExtraDrops(1)}
@@ -969,19 +1380,29 @@ export default function LeagueArenaClient({
                 {Array.from({ length: league.durationDays }, (_, i) => i + 1).map((dayNum) => {
                   const score = myScoresByDay.get(dayNum);
                   const isDone = !!score;
-                  const isNext = dayNum === nextUncompletedDay;
-                  const isLocked = !isDone && !isNext;
+                  const isHostControlled = league.attemptPolicy === "host_controlled" || !!league.unlockedUpToDay || !!league.dailySeedMap?._unlockedUpToDay;
+                  const isHostLocked = isHostControlled && dayNum > unlockedUpToDay;
+                  const dayQuestions = getQuestionsForLeagueDay(league, dayNum);
+                  const totalDayQuestions = dayQuestions.length || league.questionsPerDay || 5;
+                  const answeredCount = score?.questionResults?.length || (isDone ? (score.totalQuestions || totalDayQuestions) : 0);
+                  const hasBonusQuestions = isDone && totalDayQuestions > answeredCount;
+                  const bonusCount = totalDayQuestions - answeredCount;
+
+                  const isNext = !isDone && !isHostLocked && (dayNum === 1 || myScoresByDay.has(dayNum - 1));
+                  const isSequentialLocked = !isDone && !isHostLocked && !isNext;
 
                   return (
                     <div
                       key={dayNum}
                       className={cn(
-                        "p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[145px]",
-                        isDone
+                        "p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[160px]",
+                        hasBonusQuestions
+                          ? "border-amber-500/60 bg-amber-500/5 shadow-xs ring-1 ring-amber-500/25"
+                          : isDone
                           ? "border-[var(--olive)]/35 bg-[var(--olive)]/5"
                           : isNext
                           ? "border-[var(--terra)]/60 bg-[var(--terra)]/5 shadow-xs ring-1 ring-[var(--terra)]/20"
-                          : "border-[var(--border-dim)] bg-[var(--bg-card)]/40 opacity-60"
+                          : "border-[var(--border-dim)] bg-[var(--bg-card)]/40 opacity-70"
                       )}
                     >
                       <div className="space-y-1.5">
@@ -989,13 +1410,21 @@ export default function LeagueArenaClient({
                           <span className="font-space font-bold text-sm text-[var(--text)]">
                             Drop {dayNum}
                           </span>
-                          {isDone ? (
+                          {hasBonusQuestions ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-amber-700 dark:text-amber-300 bg-amber-500/15 px-2 py-0.5 rounded-full border border-amber-500/30">
+                              <Zap size={11} className="text-amber-500" /> +{bonusCount} Bonus Qs
+                            </span>
+                          ) : isDone ? (
                             <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
                               <CheckCircle2 size={11} /> Completed
                             </span>
                           ) : isNext ? (
                             <span className="text-[10px] font-mono font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2 py-0.5 rounded-full border border-[var(--terra)]/30">
                               Ready to Play
+                            </span>
+                          ) : isHostLocked ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)]">
+                              <Lock size={10} /> Locked by Host
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)]">
@@ -1005,22 +1434,79 @@ export default function LeagueArenaClient({
                         </div>
 
                         <div className="text-[11px] text-[var(--text-dim)] flex items-center gap-1.5">
-                          <span>{league.questionsPerDay} Questions</span>
+                          <span>{totalDayQuestions} Questions</span>
                           <span>•</span>
                           <span>{league.category === "all" ? "All Topics" : league.category}</span>
                         </div>
                       </div>
 
                       <div className="pt-3">
-                        {isDone ? (
-                          <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-xs font-mono">
-                            <span className="text-[var(--text-dim)]">
-                              Score: <strong className="text-[var(--text)]">{score.score}/{league.questionsPerDay}</strong>
-                            </span>
-                            <span className="font-bold text-[var(--olive)]">
-                              +{score.points} pts
-                            </span>
+                        {hasBonusQuestions ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between px-2.5 py-1 rounded-lg bg-[var(--bg-input)] border border-[var(--border-dim)] text-[11px] font-mono">
+                              <span className="text-[var(--text-dim)]">Current: <strong>{score.score}/{answeredCount}</strong></span>
+                              <span className="font-bold text-[var(--olive)]">+{score.points} pts</span>
+                            </div>
+                            <button
+                              type="button"
+                              onClick={() => startBonusRound(dayNum)}
+                              className="w-full btn-terra py-2 rounded-xl text-xs font-bold cursor-pointer hover:opacity-95 shadow-xs text-center flex items-center justify-center gap-1.5"
+                            >
+                              <span>Answer +{bonusCount} Bonus Questions</span>
+                              <ArrowRight size={13} />
+                            </button>
                           </div>
+                        ) : isDone ? (
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-xs font-mono">
+                              <span className="text-[var(--text-dim)]">
+                                Score: <strong className="text-[var(--text)]">{score.score}/{totalDayQuestions}</strong>
+                              </span>
+                              <span className="font-bold text-[var(--olive)]">
+                                +{score.points} pts
+                              </span>
+                            </div>
+                            {isCreator && (
+                              <div className="flex items-center justify-between pt-1 text-[10px]">
+                                <span className="text-[var(--text-mute)] font-mono">Host:</span>
+                                <div className="flex items-center gap-1">
+                                  <button
+                                    type="button"
+                                    disabled={isUpdatingLeague}
+                                    onClick={() => handleAddQuestionsToDay(dayNum, 3)}
+                                    className="px-2 py-0.5 rounded-md border border-[var(--border-dim)] hover:border-[var(--olive)] text-[var(--text-dim)] hover:text-[var(--olive)] font-bold transition-colors cursor-pointer"
+                                    title="Add 3 questions and reopen this drop for everyone"
+                                  >
+                                    +3 Qs
+                                  </button>
+                                  <button
+                                    type="button"
+                                    disabled={isUpdatingLeague}
+                                    onClick={() => handleAddQuestionsToDay(dayNum, 5)}
+                                    className="px-2 py-0.5 rounded-md border border-[var(--border-dim)] hover:border-[var(--olive)] text-[var(--text-dim)] hover:text-[var(--olive)] font-bold transition-colors cursor-pointer"
+                                    title="Add 5 questions and reopen this drop for everyone"
+                                  >
+                                    +5 Qs
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        ) : isHostLocked ? (
+                          isCreator ? (
+                            <button
+                              type="button"
+                              disabled={isUpdatingLeague}
+                              onClick={() => handleUnlockDrop(dayNum)}
+                              className="w-full py-2 rounded-xl border border-[var(--olive)] text-[var(--olive-text)] hover:bg-[var(--olive)] hover:text-white text-xs font-bold transition-all cursor-pointer shadow-xs text-center"
+                            >
+                              Unlock Drop {dayNum} for League
+                            </button>
+                          ) : (
+                            <div className="text-[11px] text-[var(--text-mute)] font-mono py-1">
+                              Awaiting Host to unlock Drop {dayNum}
+                            </div>
+                          )
                         ) : isNext ? (
                           <button
                             type="button"
@@ -1171,16 +1657,56 @@ export default function LeagueArenaClient({
             {/* Header / Timer Bar */}
             <div className="rounded-2xl p-4 surface border shadow-xs space-y-3" style={{ borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between text-xs font-semibold">
-                <span className="text-[var(--text-dim)]">
-                  Day {activeDropDay} Drop · Question {currentIndex + 1} of {questions.length}
-                </span>
-                <div className="flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded-xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--olive)]">
-                  <Clock size={13} className="text-[var(--olive)] animate-pulse" />
-                  <span>
-                    {Math.floor(elapsedRoundSeconds / 60)}:
-                    {String(elapsedRoundSeconds % 60).padStart(2, "0")}
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShowLeaveConfirm(true)}
+                    className="p-1 rounded-lg border border-[var(--border-dim)] hover:bg-rose-500/10 hover:border-rose-500/30 text-[var(--text-mute)] hover:text-rose-600 transition-colors cursor-pointer"
+                    title="Leave Drop"
+                    aria-label="Leave Drop"
+                  >
+                    <X size={13} />
+                  </button>
+                  <span className="text-[var(--text-dim)]">
+                    Day {activeDropDay} {isBonusRound ? "Bonus Extension" : "Drop"} · Question {currentIndex + 1} of {questions.length}
                   </span>
-                  <span className="text-[10px] text-[var(--text-mute)] font-normal uppercase ml-0.5">Stopwatch</span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  {/* Countdown Timer Badge */}
+                  <div
+                    className={cn(
+                      "flex items-center gap-1.5 font-mono text-xs font-bold px-2.5 py-1 rounded-xl border transition-colors",
+                      (timerMode === "per_question" ? questionTimeLeft <= 5 : dropTimeLeft <= 15)
+                        ? "bg-rose-500/10 border-rose-500/30 text-rose-600"
+                        : "bg-[var(--bg-input)] border-[var(--border-dim)] text-[var(--olive)]"
+                    )}
+                  >
+                    <Clock
+                      size={13}
+                      className={cn(
+                        (timerMode === "per_question" ? questionTimeLeft <= 5 : dropTimeLeft <= 15)
+                          ? "text-rose-600 animate-pulse"
+                          : "text-[var(--olive)]"
+                      )}
+                    />
+                    <span>
+                      {timerMode === "per_question"
+                        ? `${questionTimeLeft}s`
+                        : `${Math.floor(dropTimeLeft / 60)}:${String(dropTimeLeft % 60).padStart(2, "0")}`}
+                    </span>
+                    <span className="text-[10px] text-[var(--text-mute)] font-normal uppercase ml-0.5">
+                      {timerMode === "per_question" ? "Clock" : "Drop Bank"}
+                    </span>
+                  </div>
+
+                  {/* Stopwatch */}
+                  <div className="hidden sm:flex items-center gap-1 font-mono text-[11px] text-[var(--text-mute)] px-2 py-1 rounded-xl bg-[var(--bg-input)] border border-[var(--border-dim)]">
+                    <span>
+                      {Math.floor(elapsedRoundSeconds / 60)}:
+                      {String(elapsedRoundSeconds % 60).padStart(2, "0")}
+                    </span>
+                  </div>
                 </div>
               </div>
 
@@ -1248,6 +1774,13 @@ export default function LeagueArenaClient({
                   className="space-y-4 pt-2 border-t"
                   style={{ borderColor: "var(--border-dim)" }}
                 >
+                  {selectedAnswer === -1 && (
+                    <div className="p-3 rounded-xl bg-rose-500/10 border border-rose-500/30 text-rose-700 text-xs font-semibold flex items-center gap-2">
+                      <Clock size={14} className="text-rose-600 shrink-0" />
+                      Time expired on this question. The correct answer is highlighted above.
+                    </div>
+                  )}
+
                   {currentQ.explanation && (
                     <p className="text-xs leading-relaxed text-[var(--text-dim)] bg-[var(--bg-input)] p-3.5 rounded-xl border border-[var(--border-dim)]">
                       💡 <strong>Insight:</strong> {currentQ.explanation}
@@ -1292,7 +1825,7 @@ export default function LeagueArenaClient({
 
             <div>
               <h2 className="font-space text-2xl sm:text-3xl font-extrabold" style={{ color: "var(--text)" }}>
-                Day {activeDropDay} Drop Complete!
+                Day {activeDropDay} {isBonusRound ? "Bonus Round" : "Drop"} Complete!
               </h2>
               <p className="text-xs text-[var(--text-dim)] mt-1">
                 Your performance has been recorded into <strong>{league.title}</strong> standings.
@@ -1344,6 +1877,43 @@ export default function LeagueArenaClient({
               <p className="text-xs text-rose-600 font-semibold">{submitError}</p>
             )}
 
+            {/* Host End-of-Round Power: Add dynamic bonus questions */}
+            {isCreator && (
+              <div
+                className="p-4 rounded-2xl surface border text-left space-y-3 max-w-md mx-auto"
+                style={{ borderColor: "var(--border-dim)" }}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-[var(--olive)]" />
+                    <span className="text-xs font-bold" style={{ color: "var(--text)" }}>Host Controls</span>
+                  </div>
+                  <span className="text-[10px] uppercase font-bold text-[var(--text-mute)]">Day {activeDropDay} Drop</span>
+                </div>
+                <p className="text-xs text-[var(--text-dim)]">
+                  Add bonus questions to Day {activeDropDay} for all scholars in this league:
+                </p>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    disabled={isUpdatingLeague}
+                    onClick={() => handleAddQuestionsToDrop(3)}
+                    className="flex-1 py-2 px-3 rounded-xl border border-[var(--olive)] text-[var(--olive-text)] hover:bg-[var(--olive)] hover:text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    +3 Questions
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isUpdatingLeague}
+                    onClick={() => handleAddQuestionsToDrop(5)}
+                    className="flex-1 py-2 px-3 rounded-xl border border-[var(--olive)] text-[var(--olive-text)] hover:bg-[var(--olive)] hover:text-white text-xs font-bold transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    +5 Questions
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="pt-2 flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3">
               {nextUncompletedDay && nextUncompletedDay <= league.durationDays && (
                 <button
@@ -1351,7 +1921,7 @@ export default function LeagueArenaClient({
                   onClick={() => startDailyRound(nextUncompletedDay)}
                   className="w-full sm:w-auto btn-terra px-6 py-2.5 rounded-xl text-xs font-bold flex items-center justify-center gap-2 shadow-sm cursor-pointer"
                 >
-                  <Sparkles size={14} /> Attempt Drop {nextUncompletedDay} Now <ArrowRight size={14} />
+                  Play Drop {nextUncompletedDay}
                 </button>
               )}
               <button
@@ -1371,6 +1941,61 @@ export default function LeagueArenaClient({
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Leave Drop Confirmation Modal */}
+      <AnimatePresence>
+        {showLeaveConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-md surface border rounded-3xl p-6 shadow-2xl space-y-5"
+              style={{ borderColor: "var(--border)" }}
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-600 shrink-0">
+                  <ShieldAlert size={20} />
+                </div>
+                <div>
+                  <h3 className="font-space font-bold text-base text-[var(--text)]">
+                    Leave Current Drop?
+                  </h3>
+                  <p className="text-xs text-[var(--text-mute)]">
+                    Drop {activeDropDay} is currently in progress
+                  </p>
+                </div>
+              </div>
+
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/25 space-y-1.5 text-xs">
+                <div className="font-bold text-rose-700 dark:text-rose-400">
+                  Your session will be saved and permanently locked
+                </div>
+                <p className="text-[var(--text-dim)] leading-relaxed">
+                  If you leave now, your current score ({isBonusRound ? bonusBaseScore + questionResults.filter((r) => r.correct).length : questionResults.filter((r) => r.correct).length}/{isBonusRound ? bonusBaseTotal + questions.length : questions.length}) will be permanently recorded. You will not be able to replay this drop until the next drop unlocks.
+                </p>
+              </div>
+
+              <div className="flex items-center justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowLeaveConfirm(false)}
+                  className="px-4 py-2 rounded-xl text-xs font-semibold border border-[var(--border-dim)] hover:bg-[var(--bg-input)] text-[var(--text)] transition-colors cursor-pointer"
+                >
+                  Continue Quiz
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmLeaveDrop}
+                  className="px-4 py-2 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-700 transition-colors shadow-xs cursor-pointer"
+                >
+                  Save & Leave Drop
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
     </div>

@@ -166,13 +166,13 @@ export default function PreserveScholarshipModal() {
       : "Preserve Your Progress";
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 surface-modal backdrop-blur-md">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 surface-modal backdrop-blur-md overflow-y-auto overscroll-contain">
       <motion.div
         initial={{ opacity: 0, scale: 0.94, y: 16 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
         exit={{ opacity: 0, scale: 0.94, y: 16 }}
         transition={{ type: "spring", stiffness: 320, damping: 26 }}
-        className="w-full max-w-lg rounded-2xl p-6 sm:p-8 surface-raised shadow-2xl relative border overflow-hidden"
+        className="w-full max-w-lg rounded-2xl p-5 sm:p-8 surface-raised shadow-2xl relative border my-auto max-h-[calc(100dvh-1.5rem)] overflow-y-auto"
         style={{ borderColor: "var(--border)", background: "var(--bg-card)" }}
       >
         {/* Subtle decorative glow */}

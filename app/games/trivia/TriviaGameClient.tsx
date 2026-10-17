@@ -183,36 +183,29 @@ function SetupScreen({
 
   return (
     <div className="min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-center">
-      {/* Top Bar: Back Link & How to Play */}
-      <div className="flex items-center justify-between mb-6">
+      {/* Top Bar: Back Link & Action Header */}
+      <div className="flex items-center justify-between gap-2 mb-6">
         <Link
           href="/games"
-          className="flex items-center gap-1.5 text-xs font-semibold w-fit hover:text-[var(--text)] transition-colors"
-          style={{ color: "var(--text-dim)" }}
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors py-1.5 whitespace-nowrap shrink-0 group active:scale-95"
         >
-          <ArrowLeft size={13} /> Back to Games
+          <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5 shrink-0" />
+          <span className="hidden xs:inline sm:inline">Back to </span>
+          <span>Games</span>
         </Link>
 
-        <div className="flex items-center gap-2">
-          {/* + Create Action Button */}
-          <button
-            type="button"
-            onClick={() => setShowNewGameModal(true)}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl btn-terra text-xs font-bold font-space transition cursor-pointer shadow-xs hover:scale-[1.02] active:scale-[0.98]"
-            title="Create League, Challenge, or Solo Quiz"
-          >
-            <Plus size={13} strokeWidth={2.5} />
-            <span>Create</span>
-          </button>
-
+        {/* Action Controls: Streak -> How to Play -> Create */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           {!profile.hasClaimedAccount && (
             <button
               type="button"
               onClick={openClaimAccountPrompt}
-              className="px-3 py-1.5 rounded-xl border border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold font-space transition cursor-pointer shadow-xs"
+              className="inline-flex items-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-xl border border-amber-500/35 bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 text-xs font-bold font-space transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95 shrink-0"
               title="Link a free account to track your daily streak & ranking across devices"
             >
-              <span>Track Streak</span>
+              <Flame size={13} className="text-amber-500 shrink-0" />
+              <span className="hidden sm:inline">Track Streak</span>
+              <span className="sm:hidden">Streak</span>
             </button>
           )}
 
@@ -220,13 +213,25 @@ function SetupScreen({
             <button
               type="button"
               onClick={onOpenGuide}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-panel)] text-[var(--text)] text-xs font-bold font-space transition cursor-pointer shadow-xs"
+              className="inline-flex items-center justify-center gap-1.5 h-8 px-2.5 sm:px-3 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-panel)] text-[var(--text)] text-xs font-bold font-space transition-all cursor-pointer whitespace-nowrap shadow-2xs active:scale-95 shrink-0"
               title="How to Play Naija Trivia"
+              aria-label="How to Play Naija Trivia"
             >
-              <HelpCircle size={13} className="text-[var(--olive)]" />
-              <span>How to Play</span>
+              <HelpCircle size={14} className="text-[var(--olive)] shrink-0" />
+              <span className="hidden sm:inline">How to Play</span>
             </button>
           )}
+
+          {/* + Create Action Button */}
+          <button
+            type="button"
+            onClick={() => setShowNewGameModal(true)}
+            className="btn-terra inline-flex items-center gap-1.5 h-8 px-3 rounded-xl text-xs font-bold font-space transition-all cursor-pointer whitespace-nowrap shadow-xs hover:scale-[1.02] active:scale-95 shrink-0"
+            title="Create League, Challenge, or Solo Quiz"
+          >
+            <Plus size={13} strokeWidth={2.5} className="shrink-0" />
+            <span>Create</span>
+          </button>
         </div>
       </div>
 
@@ -252,21 +257,22 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("solo")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
             activeTab === "solo"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
           <Sparkles size={13} className="text-[var(--terra)] shrink-0" />
-          <span className="hidden sm:inline">Play</span>
+          <span className="hidden sm:inline">Play Solo</span>
+          <span className="sm:hidden">Solo</span>
         </button>
 
         {enableLeagues && (
         <button
           onClick={() => onTabChange("league")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
             activeTab === "league"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
@@ -281,14 +287,15 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("challenge")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative truncate touch-manipulation select-none active:scale-[0.98]",
             activeTab === "challenge"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
           <Swords size={13} className="text-[var(--olive)] shrink-0" />
-          <span>Challenges</span>
+          <span className="hidden sm:inline">Challenges</span>
+          <span className="sm:hidden">1v1</span>
           {activeChallenge && (
             <span className="w-1.5 h-1.5 rounded-full bg-[var(--terra)] animate-pulse shrink-0" />
           )}
@@ -299,29 +306,30 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("leaderboard")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
             activeTab === "leaderboard"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
           <Crown size={13} className="text-[var(--gold)] shrink-0" />
-          <span className="hidden sm:inline">Ranks</span>
-          <span className="sm:hidden">Top</span>
+          <span className="hidden sm:inline">Leaderboard</span>
+          <span className="sm:hidden">Ranks</span>
         </button>
         )}
 
         <button
           onClick={() => onTabChange("history")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate",
+            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
             activeTab === "history"
               ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
               : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
           <History size={12} className="shrink-0" />
-          <span>History{historyCount > 0 ? ` (${historyCount})` : ""}</span>
+          <span className="hidden sm:inline">History{historyCount > 0 ? ` (${historyCount})` : ""}</span>
+          <span className="sm:hidden">History</span>
         </button>
       </div>
 
@@ -721,7 +729,7 @@ function GameScreen({
   };
 
   return (
-    <div className="min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-between">
+    <div className={cn("min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-between", revealed && "pb-28 sm:pb-8")}>
       {/* Top Bar */}
       <div>
         <div className="flex items-center justify-between mb-3 text-xs font-semibold">
@@ -791,7 +799,7 @@ function GameScreen({
                 disabled={revealed || (reviewMode === "suspense" && selected !== null)}
                 onClick={() => handleSelect(idx)}
                 className={cn(
-                  "w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-center gap-3.5 font-semibold text-sm cursor-pointer shadow-xs",
+                  "w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-center gap-3.5 font-semibold text-sm cursor-pointer shadow-xs touch-manipulation select-none active:scale-[0.99]",
                   getOptionStyle(idx)
                 )}
                 style={{ color: "var(--text)" }}
@@ -832,17 +840,23 @@ function GameScreen({
             </motion.div>
           )}
 
-          {/* Next Button (Instant Mode) */}
+          {/* Next Button (Instant Mode) - Responsive Floating Anchor on Mobile */}
           {revealed && (
-            <motion.button
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              onClick={() => advance()}
-              className="w-full py-4 rounded-2xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="mt-4 sm:mt-0 fixed sm:static bottom-0 inset-x-0 p-4 sm:p-0 bg-[var(--bg-base)]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none border-t sm:border-t-0 border-[var(--border-dim)] z-30 pb-[max(1rem,env(safe-area-inset-bottom))]"
             >
-              <span>{isLast ? "Complete & View Results" : "Next Question"}</span>
-              <ChevronRight size={16} />
-            </motion.button>
+              <div className="max-w-2xl mx-auto">
+                <button
+                  onClick={() => advance()}
+                  className="w-full py-3.5 sm:py-4 rounded-2xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-[0.98] transition-transform touch-manipulation select-none"
+                >
+                  <span>{isLast ? "Complete & View Results" : "Next Question"}</span>
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </motion.div>
           )}
 
           {/* Skip Button (Suspense Mode only) */}

@@ -293,19 +293,21 @@ export default function RoomLobby({
               <button
                 type="button"
                 onClick={openClaimAccountPrompt}
-                className="px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition cursor-pointer shadow-2xs"
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-bold border border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-300 hover:bg-amber-500/20 transition cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
                 title="Link free account to track your daily streak & articulate rank"
               >
-                <span>Track Streak</span>
+                <Flame size={13} className="text-amber-500 shrink-0" />
+                <span className="hidden sm:inline">Track Streak</span>
+                <span className="sm:hidden">Streak</span>
               </button>
             )}
             <button
               type="button"
               onClick={() => setShowGuideModal(true)}
-              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-[var(--border-dim)] hover:border-[var(--terra)] bg-[var(--bg-card)] text-[var(--text)] transition cursor-pointer shadow-2xs"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold border border-[var(--border-dim)] hover:border-[var(--terra)] bg-[var(--bg-card)] text-[var(--text)] transition cursor-pointer whitespace-nowrap shadow-2xs active:scale-95"
               title="How to Play & Voice Call Guide"
             >
-              <HelpCircle className="w-3.5 h-3.5 text-[var(--terra)]" />
+              <HelpCircle className="w-3.5 h-3.5 text-[var(--terra)] shrink-0" />
               <span className="hidden sm:inline">How to Play</span>
               <span className="sm:hidden">Rules</span>
             </button>

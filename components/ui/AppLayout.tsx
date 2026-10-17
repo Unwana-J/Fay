@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/ui/Sidebar";
+import MobileBottomNav from "@/components/ui/MobileBottomNav";
 import AuthGate from "@/components/auth/AuthGate";
 import FloatingFeedbackWidget from "@/components/feedback/FloatingFeedbackWidget";
 import { useAppStore } from "@/store/useAppStore";
@@ -36,7 +37,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthGate>
-      <div className="flex min-h-screen">
+      <div className="flex min-h-screen w-full max-w-full overflow-x-hidden">
         {/* Mobile overlay backdrop */}
         {sidebarOpen && (
           <div
@@ -56,8 +57,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <Sidebar onClose={() => setSidebarOpen(false)} />
         </div>
 
-        {/* Main content — no left margin on mobile */}
-        <main className="flex-1 min-h-screen flex flex-col md:ml-60">
+        {/* Main content — no left margin on mobile, strictly constrained */}
+        <main className="flex-1 min-h-screen flex flex-col md:ml-60 w-full max-w-full min-w-0 overflow-x-hidden">
           {/* Mobile top bar with hamburger */}
           <div
             className="md:hidden sticky top-0 z-20 flex items-center justify-between px-4 h-14 border-b backdrop-blur-md bg-[var(--bg-base)]/90"
@@ -98,10 +99,11 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex-1">
+          <div className="flex-1 pb-16 md:pb-0">
             {children}
           </div>
         </main>
+        <MobileBottomNav />
         <FloatingFeedbackWidget />
       </div>
     </AuthGate>

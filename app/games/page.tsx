@@ -82,17 +82,17 @@ export default function GamesHub() {
               transition={{ delay: i * 0.1 }}
               whileHover="hover"
               whileTap={{ scale: 0.98 }}
-              className="relative h-full rounded-[2rem] p-8 flex flex-col surface border transition-shadow hover:shadow-lg cursor-pointer overflow-hidden group"
+              className="relative h-full rounded-[1.75rem] sm:rounded-[2rem] p-5 sm:p-8 flex flex-col surface border transition-shadow hover:shadow-lg cursor-pointer overflow-hidden group touch-manipulation select-none active:scale-[0.98]"
             >
               {/* Illustration Area */}
-              <div className="absolute right-0 top-0 bottom-0 w-1/2 overflow-hidden rounded-r-[2rem] pointer-events-none">
+              <div className="absolute right-0 top-0 bottom-0 w-1/2 overflow-hidden rounded-r-[1.75rem] sm:rounded-r-[2rem] pointer-events-none">
                 <div 
                   className="absolute -right-12 -top-12 w-64 h-64 rounded-full blur-3xl opacity-15 transition-opacity group-hover:opacity-30" 
                   style={{ backgroundColor: game.color }} 
                 />
                 
                 <motion.div 
-                  className="absolute right-6 top-16 text-7xl drop-shadow-2xl z-10"
+                  className="absolute right-4 sm:right-6 top-12 sm:top-16 text-6xl sm:text-7xl drop-shadow-2xl z-10"
                   variants={{
                     hover: { scale: 1.15, rotate: [0, -8, 8, -4, 4, 0], transition: { duration: 0.6 } }
                   }}
@@ -101,7 +101,7 @@ export default function GamesHub() {
                 </motion.div>
                 
                 <motion.div 
-                  className="absolute right-28 top-6 text-4xl opacity-50 drop-shadow-md blur-[1px]"
+                  className="absolute right-20 sm:right-28 top-4 sm:top-6 text-3xl sm:text-4xl opacity-50 drop-shadow-md blur-[1px]"
                   animate={{ y: [0, -10, 0], rotate: [0, 5, 0] }}
                   transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
                 >
@@ -109,7 +109,7 @@ export default function GamesHub() {
                 </motion.div>
 
                 <motion.div 
-                  className="absolute -right-2 top-36 text-5xl opacity-60 drop-shadow-md blur-[0.5px]"
+                  className="absolute -right-2 top-28 sm:top-36 text-4xl sm:text-5xl opacity-60 drop-shadow-md blur-[0.5px]"
                   animate={{ y: [0, 10, 0], rotate: [0, -10, 0] }}
                   transition={{ duration: 5, repeat: Infinity, ease: "easeInOut", delay: 1 }}
                 >
@@ -118,7 +118,7 @@ export default function GamesHub() {
               </div>
 
               {/* Top Badge */}
-              <div className="flex justify-between items-start mb-12 relative z-10">
+              <div className="flex justify-between items-start mb-6 sm:mb-12 relative z-10">
                 <div 
                   className="w-10 h-10 rounded-2xl flex items-center justify-center shadow-sm text-xl border"
                   style={{ backgroundColor: `${game.color}15`, color: game.color, borderColor: `${game.color}30` }}
@@ -133,11 +133,11 @@ export default function GamesHub() {
               </div>
 
               {/* Text Content */}
-              <div className="flex-1 relative z-10 w-[65%]">
-                <h2 className="font-space text-3xl font-extrabold mb-3 tracking-tight" style={{ color: "var(--text)" }}>
+              <div className="flex-1 relative z-10 w-[70%] sm:w-[65%]">
+                <h2 className="font-space text-2xl sm:text-3xl font-extrabold mb-2 sm:mb-3 tracking-tight" style={{ color: "var(--text)" }}>
                   {game.title}
                 </h2>
-                <p className="text-sm leading-relaxed mb-8" style={{ color: "var(--text-dim)" }}>
+                <p className="text-xs sm:text-sm leading-relaxed mb-6 sm:mb-8" style={{ color: "var(--text-dim)" }}>
                   {game.description}
                 </p>
               </div>

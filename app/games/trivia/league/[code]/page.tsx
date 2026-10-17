@@ -71,7 +71,19 @@ export default async function LeaguePage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams?: Promise<{ d?: string; q?: string; t?: string; c?: string; cat?: string; diff?: string; pol?: string }>;
+  searchParams?: Promise<{
+    d?: string;
+    q?: string;
+    t?: string;
+    c?: string;
+    cat?: string;
+    diff?: string;
+    pol?: string;
+    tmode?: string;
+    tim?: string;
+    tot?: string;
+    u?: string;
+  }>;
 }) {
   const { code } = await params;
   const sp = searchParams ? await searchParams : {};
@@ -104,6 +116,10 @@ export default async function LeaguePage({
           category: leagueRow.category,
           dailySeedMap: leagueRow.daily_seed_map,
           attemptPolicy: leagueRow.daily_seed_map?._policy || "flexible",
+          timerMode: leagueRow.daily_seed_map?._timerMode || "per_question",
+          questionTimerSeconds: leagueRow.daily_seed_map?._questionTimer || 25,
+          totalDropSeconds: leagueRow.daily_seed_map?._totalDropSeconds || (leagueRow.questions_per_day * 30),
+          unlockedUpToDay: leagueRow.daily_seed_map?._unlockedUpToDay || 1,
           createdAt: leagueRow.created_at,
         };
 
@@ -144,6 +160,9 @@ export default async function LeaguePage({
     const category = sp?.cat || "all";
     const difficulty = sp?.diff || "mixed";
     const attemptPolicy = (sp?.pol as any) || "flexible";
+    const timerMode = (sp?.tmode as any) === "total_bank" ? "total_bank" : "per_question";
+    const questionTimerSeconds = Number(sp?.tim) > 0 ? Number(sp.tim) : 25;
+    const totalDropSeconds = Number(sp?.tot) > 0 ? Number(sp.tot) : (questionsPerDay * 30);
     const today = todayStr();
 
     league = {
@@ -158,6 +177,10 @@ export default async function LeaguePage({
       difficulty,
       category,
       attemptPolicy,
+      unlockedUpToDay: Number(sp?.u) > 0 ? Number(sp.u) : 1,
+      timerMode,
+      questionTimerSeconds,
+      totalDropSeconds,
       dailySeedMap: generateDailyLeagueQuestions(
         durationDays,
         questionsPerDay,

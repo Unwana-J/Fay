@@ -102,7 +102,7 @@ export async function POST(req: NextRequest) {
       const playerIdentifier = userId || cleanUsername.toLowerCase();
       const { data: existingAttempts } = await supabase
         .from("league_scores")
-        .select("id, user_id, username, points, score")
+        .select("id, user_id, username, points, score, total_questions")
         .eq("league_code", cleanLeagueCode)
         .eq("day_number", dayNumber);
 
@@ -113,6 +113,34 @@ export async function POST(req: NextRequest) {
       );
 
       if (existingRecord) {
+        if (body.isBonusExtension || totalQuestions > (existingRecord.total_questions || 0)) {
+          const { data: updated, error: updateError } = await supabase
+            .from("league_scores")
+            .update({
+              score,
+              total_questions: totalQuestions,
+              points,
+              duration_seconds: durationSeconds,
+              question_results: questionResults,
+            })
+            .eq("id", existingRecord.id)
+            .select()
+            .maybeSingle();
+
+          if (updateError) {
+            console.error("Supabase league score update error:", updateError);
+          }
+
+          return NextResponse.json({
+            success: true,
+            stored: !updateError,
+            isBonusExtension: true,
+            dayNumber,
+            points,
+            data: updated,
+          });
+        }
+
         return NextResponse.json({
           error: `Drop ${dayNumber} has already been completed. Tournament drops cannot be reattempted to ensure fair and balanced scores.`,
           alreadyAttempted: true,
