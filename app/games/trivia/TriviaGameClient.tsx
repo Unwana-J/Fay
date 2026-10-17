@@ -25,6 +25,7 @@ import {
   Sprout,
   Scale,
   Crown,
+  Plus,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -44,6 +45,9 @@ import TriviaHistoryView from "@/components/games/TriviaHistoryView";
 import TriviaLeaderboardView from "@/components/games/TriviaLeaderboardView";
 import TriviaChallengeLounge from "@/components/games/TriviaChallengeLounge";
 import TriviaLeagueLounge from "@/components/trivia/TriviaLeagueLounge";
+import ActiveArenasShowcase from "@/components/games/ActiveArenasShowcase";
+import NewGameActionModal from "@/components/games/NewGameActionModal";
+import CreateLeagueModal from "@/components/trivia/CreateLeagueModal";
 import {
   type TriviaChallenge,
   decodeChallengeFromUrl,
@@ -140,6 +144,9 @@ function SetupScreen({
   const [duration, setDuration] = useState<DurationOption>(DURATION_OPTIONS[1]);
   const [mode, setMode] = useState<ReviewMode>("instant");
   const [difficulty, setDifficulty] = useState<TriviaDifficultyFilter>("random");
+  const [showNewGameModal, setShowNewGameModal] = useState(false);
+  const [showCreateLeagueModal, setShowCreateLeagueModal] = useState(false);
+  const [challengeCreateMode, setChallengeCreateMode] = useState(false);
 
   const profile = useAppStore((s) => s.profile);
   const openClaimAccountPrompt = useAppStore((s) => s.openClaimAccountPrompt);
@@ -187,6 +194,17 @@ function SetupScreen({
         </Link>
 
         <div className="flex items-center gap-2">
+          {/* + Create Action Button */}
+          <button
+            type="button"
+            onClick={() => setShowNewGameModal(true)}
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl btn-terra text-xs font-bold font-space transition cursor-pointer shadow-xs hover:scale-[1.02] active:scale-[0.98]"
+            title="Create League, Challenge, or Solo Quiz"
+          >
+            <Plus size={13} strokeWidth={2.5} />
+            <span>Create</span>
+          </button>
+
           {!profile.hasClaimedAccount && (
             <button
               type="button"
@@ -318,6 +336,7 @@ function SetupScreen({
           activeChallenge={activeChallenge}
           onSelectChallenge={onSelectChallenge}
           onPlayChallenge={onStartChallenge}
+          initialCreateMode={challengeCreateMode}
         />
       )}
 
@@ -339,6 +358,18 @@ function SetupScreen({
       {/* Tab: Solo Quiz Setup */}
       {activeTab === "solo" && (
         <div>
+          {/* Active Arenas, Leagues, Challenges & Parlor Games Showcase */}
+          <ActiveArenasShowcase
+            onTabChange={onTabChange}
+            onStartChallenge={onStartChallenge}
+            onCreateLeague={() => setShowCreateLeagueModal(true)}
+            onCreateChallenge={() => {
+              setChallengeCreateMode(true);
+              onTabChange("challenge");
+            }}
+            showParlorLinks={true}
+          />
+
           {/* Challenger Benchmark Banner */}
           {challenger && (
             <motion.div
@@ -414,7 +445,7 @@ function SetupScreen({
 
           <div className="space-y-6">
             {/* Duration Selector */}
-            <div className="surface rounded-2xl p-5 border">
+            <div id="solo-quiz-config" className="surface rounded-2xl p-5 border scroll-mt-6">
               <p
                 className="text-xs font-bold uppercase tracking-wider mb-3"
                 style={{ color: "var(--text-mute)" }}
@@ -579,6 +610,28 @@ function SetupScreen({
           </div>
         </div>
       )}
+
+      {/* ── New Game Action Modal (+ Button Options: League, Challenge, Solo) ── */}
+      <NewGameActionModal
+        isOpen={showNewGameModal}
+        onClose={() => setShowNewGameModal(false)}
+        onCreateLeague={() => setShowCreateLeagueModal(true)}
+        onCreateChallenge={() => {
+          setChallengeCreateMode(true);
+          onTabChange("challenge");
+        }}
+        onCreateSolo={() => {
+          onTabChange("solo");
+          const el = document.getElementById("solo-quiz-config");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }}
+      />
+
+      {/* ── Create League Modal ── */}
+      <CreateLeagueModal
+        isOpen={showCreateLeagueModal}
+        onClose={() => setShowCreateLeagueModal(false)}
+      />
     </div>
   );
 }

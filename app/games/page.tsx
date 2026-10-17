@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useEffect } from "react";
 import { ChevronRight, Sparkles } from "lucide-react";
 import { useFeatureStore } from "@/store/useFeatureStore";
+import ActiveArenasShowcase from "@/components/games/ActiveArenasShowcase";
 
 export default function GamesHub() {
   const { features, fetchFeatures } = useFeatureStore();
@@ -57,10 +58,13 @@ export default function GamesHub() {
 
   return (
     <div className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto">
-      <div className="mb-10">
-        <h1 className="font-space text-4xl font-bold mb-3" style={{ color: "var(--text)" }}>Games</h1>
-        <p style={{ color: "var(--text-dim)" }}>Take a break and challenge your mind with these games.</p>
+      <div className="mb-8">
+        <h1 className="font-space text-4xl font-bold mb-2" style={{ color: "var(--text)" }}>Games &amp; Arenas</h1>
+        <p style={{ color: "var(--text-dim)" }}>Take a break, challenge friends, or compete in daily tournament drops.</p>
       </div>
+
+      {/* ── Active Competitions & Game Creator Showcase ── */}
+      <ActiveArenasShowcase showParlorLinks={false} className="mb-10" />
 
       {games.length === 0 && (
         <div className="surface rounded-3xl p-10 border text-center" style={{ borderColor: "var(--border-dim)" }}>

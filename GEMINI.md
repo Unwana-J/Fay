@@ -2,7 +2,8 @@
 
 This file serves as the permanent persistent context and memory for AI assistants working on **Fey**. It captures the product vision, core architecture, key design decisions, and rules established throughout development.
 
-For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
+For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).  
+For the complete brand voice, design tokens, and UI standards, refer to [`docs/BRAND_IDENTITY.md`](./docs/BRAND_IDENTITY.md).
 
 ---
 
@@ -52,6 +53,25 @@ For the full specification, refer to [`docs/PRD.md`](./docs/PRD.md).
 - **Highlight-to-Tweet Tooltip**: Medium/Substack-style floating action pill on public dispatches; readers highlight any quote to tweet it formatted with attribution and source URL.
 - **The Feynman Rebuttal Challenge**: High-converting contextual CTA replacing generic sign-up banners on shared notes and slides ("Disagree? Articulate your take in 90 seconds"), launching visitors straight into a 90s sprint on the same topic.
 - **HTML5 Canvas Proof Card Generator (`lib/feynman-card-canvas.ts`)**: 1-click clipboard export of an aesthetic 1200x630 broadside proof card PNG for native image posting on social media.
+
+### 2.7. Brand Identity, Design System & Universal Copy Rules (MANDATORY)
+*Full reference: [`docs/BRAND_IDENTITY.md`](./docs/BRAND_IDENTITY.md)*
+- **Anti-Jargon Lexicon**: Always use plain, natural, dignified terminology. Never use pseudo-academic or intimidating jargon:
+  - Use `Challenge` instead of `Gauntlet` or `Invitational Gauntlet`.
+  - Use `Quiz Schedule` instead of `Tournament Pacing & Drops Mode`.
+  - Use `When Answers Are Shown` instead of `Review Cadence`.
+  - Use `Speaking Time` / `Turn Duration` instead of `Speaking Sprint Duration`.
+  - Use `Score to Win` instead of `Winning Target Score`.
+  - Use `Topic Categories` instead of `Intellectual Pillars`.
+  - Use `Shareable Score Cards` instead of `Broadside Proof Cards`.
+- **No-Emoji Rule for UI Controls**: Never embed raw emojis into action buttons, pills, timers, or tabs (e.g. use `30s`, `45s`, `60s` instead of `⚡ 30s`; use Lucide vector icons `<Crown />`, `<Users />`, `<Flame />`, `<ShieldCheck />` instead of emojis).
+- **Clean Action Buttons**: Do not clutter buttons with dual icons or icon sandwiches (e.g. no `<Sparkles /> Start Drop <ArrowRight />`). Use clean, punchy text: `Play Drop [X]`, `Start Solo Quiz`, `Create Room`.
+- **Single Source of Status Truth**: Avoid repeating the exact same status message twice in a single card (e.g. do not show both a top pill and bottom footer saying `Score Locked` or `Locked · Complete Drop X`).
+- **Color Semantics**:
+  - `--terra` (`#7A1C2E` / Wine Red): Primary CTAs and key actions ONLY.
+  - `--olive` (`#444E2C` / Forest Olive): Structural framing, badges, section titles, active states.
+  - `--gold` (`#A67C1E` / Bronze Gold): Rewards, XP, achievements, streaks ONLY.
+  - `--red` (`#B53A3A`): Urgency (<10s) and errors ONLY.
 
 ---
 

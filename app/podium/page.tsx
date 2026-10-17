@@ -349,10 +349,10 @@ function PodiumPageInner() {
             <div className="mb-3">
               <Link
                 href="/games"
-                className="flex items-center gap-1.5 text-xs mb-6 hover:opacity-70 transition-opacity"
-                style={{ color: "var(--text-dim)" }}
+                className="inline-flex items-center gap-1.5 text-xs font-semibold mb-6 text-[var(--text-dim)] hover:text-[var(--text)] transition-colors group"
               >
-                <ArrowLeft size={13} /> Games
+                <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
+                <span>Back to Games</span>
               </Link>
               <div className="flex items-center gap-3.5 mb-4">
                 <div

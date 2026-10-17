@@ -197,12 +197,14 @@ interface TriviaChallengeLoungeProps {
   activeChallenge: TriviaChallenge | null;
   onSelectChallenge: (challenge: TriviaChallenge | null) => void;
   onPlayChallenge: (challenge: TriviaChallenge) => void;
+  initialCreateMode?: boolean;
 }
 
 export default function TriviaChallengeLounge({
   activeChallenge,
   onSelectChallenge,
   onPlayChallenge,
+  initialCreateMode = false,
 }: TriviaChallengeLoungeProps) {
   const { profile, updateProfile } = useAppStore();
 
@@ -224,9 +226,16 @@ export default function TriviaChallengeLounge({
   }, [activeChallenge]);
 
   const [view, setView] = useState<"list" | "detail" | "create" | "standings">(() => {
+    if (initialCreateMode) return "create";
     if (activeChallenge) return "standings";
     return "list";
   });
+
+  useEffect(() => {
+    if (initialCreateMode) {
+      setView("create");
+    }
+  }, [initialCreateMode]);
 
   // Creation form state
   const [title, setTitle] = useState("");

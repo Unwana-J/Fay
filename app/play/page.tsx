@@ -10,7 +10,8 @@ import RoundResults from "./RoundResults";
 import GameOver from "./GameOver";
 import SpinnerView from "./SpinnerView";
 import { motion, AnimatePresence } from "framer-motion";
-import { Pause } from "lucide-react";
+import { Pause, ArrowLeft } from "lucide-react";
+import Link from "next/link";
 
 import BoardMap from "./BoardMap";
 import { type GamePhase } from "@/store/useGameStore";
@@ -133,6 +134,24 @@ export default function PlayPage() {
         <SetupScreen onStart={handleStartGame} />
       ) : (
         <div className="space-y-6">
+          {/* Back to Games link */}
+          <div>
+            <Link
+              href="/games"
+              onClick={(e) => {
+                if (!confirm("Leave this active match and return to Games Hub?")) {
+                  e.preventDefault();
+                } else {
+                  resetGame();
+                }
+              }}
+              className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors group"
+            >
+              <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
+              <span>Back to Games</span>
+            </Link>
+          </div>
+
           {/* Header */}
           <div className="flex justify-between items-center border-b border-[var(--border-dim)]/40 pb-3 flex-wrap gap-3">
             <div>

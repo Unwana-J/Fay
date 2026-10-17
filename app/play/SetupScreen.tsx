@@ -1,12 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAppStore, ArticulateHistoryItem } from "@/store/useAppStore";
 import { useGameStore } from "@/store/useGameStore";
 import { useFeatureStore } from "@/store/useFeatureStore";
 import { GAME_CATEGORIES, CATEGORY_COLORS, CATEGORY_ICONS } from "@/lib/game-words";
-import { Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Pause, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2, Volume2, HelpCircle } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, ArrowRight, Settings, Users, Gamepad2, Mic, Bot, Globe, Smartphone, Lock, Loader2, Sparkles, Play, Pause, Trophy, X, ChevronRight, Clock, Target, Eye, CheckCircle2, Volume2, HelpCircle } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { BuzzerSoundType, BUZZER_OPTIONS, calculateMatchPlayTime } from "@/lib/articulate-room";
 import { playBuzzerSound } from "@/lib/sound";
@@ -438,7 +439,18 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
   };
 
   return (
-    <div className="max-w-4xl mx-auto space-y-8">
+    <div className="max-w-4xl mx-auto space-y-6">
+      {/* Back Link to Games */}
+      <div>
+        <Link
+          href="/games"
+          className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors group"
+        >
+          <ArrowLeft size={13} className="transition-transform group-hover:-translate-x-0.5" />
+          <span>Back to Games</span>
+        </Link>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div className="flex items-center gap-3">
