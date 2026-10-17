@@ -18,7 +18,11 @@ export default function AuthGate({ children }: { children: React.ReactNode }) {
   const profile = useAppStore((s) => s.profile);
   const isSuspended = Boolean(profile.isBanned || profile.isDeactivated);
 
-  const isPublicNote = pathname?.startsWith("/note/");
+  const isPublicNote =
+    pathname?.startsWith("/note/") ||
+    pathname === "/about" ||
+    (pathname === "/" && !isOnboarded) ||
+    (typeof window !== "undefined" && window.location.search.includes("preview=1"));
   const isAdmin = pathname?.startsWith("/admin");
   const isPlayRoom = pathname?.startsWith("/play/room/");
 

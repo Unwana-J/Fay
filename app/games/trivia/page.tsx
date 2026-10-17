@@ -35,6 +35,7 @@ export async function generateMetadata({
       return {
         title,
         description,
+        alternates: { canonical: "/games/trivia" },
         openGraph: {
           title,
           description,
@@ -104,6 +105,8 @@ export async function generateMetadata({
   return {
     title,
     description,
+    keywords: ["Nigerian trivia", "Naija trivia", "trivia game online", "quiz game", "general knowledge quiz", "intellectual games"],
+    alternates: { canonical: "/games/trivia" },
     openGraph: {
       title,
       description,

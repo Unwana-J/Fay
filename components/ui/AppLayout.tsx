@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/ui/Sidebar";
 import MobileBottomNav from "@/components/ui/MobileBottomNav";
@@ -12,8 +12,14 @@ import { ShieldAlert, Sparkles } from "lucide-react";
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
+  const isOnboarded = useAppStore((s) => s.isOnboarded);
   const openFeedbackPrompt = useAppStore((s) => s.openFeedbackPrompt);
   const openSafetyModal = useAppStore((s) => s.openSafetyModal);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
 
   // Vatar / Lagos Life embedded games: complete isolation from AuthGate, sidebars, and widgets
   const isVatar = pathname?.startsWith("/vatar");
@@ -21,8 +27,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return <main className="min-h-screen flex flex-col w-full">{children}</main>;
   }
 
-  // Standalone routes (public shared notes & dedicated admin portal)
-  const isStandalone = pathname?.startsWith("/note/") || pathname?.startsWith("/admin");
+  // Standalone routes (public shared notes, public landing page, root landing for un-onboarded visitors & admin portal)
+  const isRootLanding = pathname === "/" && (!mounted || !isOnboarded);
+  const isStandalone = pathname?.startsWith("/note/") || pathname?.startsWith("/admin") || pathname === "/about" || isRootLanding;
 
   if (isStandalone) {
     return (

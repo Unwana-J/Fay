@@ -20,6 +20,8 @@ import UserAvatar from "@/components/ui/UserAvatar";
 import { getDailyQuests } from "@/lib/quests";
 import { analytics } from "@/lib/analytics";
 import { useFeatureStore } from "@/store/useFeatureStore";
+import LandingPageView from "@/components/marketing/LandingPageView";
+import OnboardingModal from "@/components/auth/OnboardingModal";
 
 const DAYS_ABBR = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
@@ -197,12 +199,14 @@ export default function Dashboard() {
     claimedQuestIds,
     claimQuestXP,
     updateSettings,
+    isOnboarded,
   } = useAppStore();
   const difficultyMode: Difficulty = (settings.difficultyMode as Difficulty) ?? "Scholar";
   const level     = getLevelForXP(profile.xp);
   const nextLevel = getNextLevel(profile.xp);
   const progress  = getLevelProgress(profile.xp);
   const [mounted, setMounted] = useState(false);
+  const [showOnboardingModal, setShowOnboardingModal] = useState(false);
   const [skippedToday, setSkippedToday] = useState<string[]>([]);
   const [spinning, setSpinning] = useState(false);
   const [focusCategory, setFocusCategory] = useState<string | null>(null);
@@ -216,7 +220,14 @@ export default function Dashboard() {
     fetchFeatures();
   }, [fetchFeatures]);
 
-  if (!mounted) return null;
+  if (!mounted || !isOnboarded) {
+    return (
+      <>
+        <LandingPageView onStartClick={() => setShowOnboardingModal(true)} />
+        {mounted && showOnboardingModal && <OnboardingModal isOpen={true} />}
+      </>
+    );
+  }
 
   const dailyQuests = getDailyQuests(sessions, streak, claimedQuestIds);
 

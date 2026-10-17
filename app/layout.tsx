@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Inter, Space_Grotesk, Lora } from "next/font/google";
 import "./globals.css";
+import { SITE_URL, SITE_NAME, SITE_TITLE, SITE_DESCRIPTION, SITE_KEYWORDS } from "@/lib/seo";
+import JsonLd, { siteJsonLd } from "@/components/seo/JsonLd";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -21,11 +23,32 @@ const lora = Lora({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://fey.lokinlabs.com.ng"),
-  title: "Fey — Think Deeper. Speak Better.",
-  description:
-    "A premium learning platform that challenges you to research, synthesize, and explain ideas in your own words. Build genuine understanding through active learning.",
-  keywords: ["learning", "critical thinking", "public speaking", "knowledge", "education"],
+  metadataBase: new URL(SITE_URL),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  keywords: SITE_KEYWORDS,
+  applicationName: SITE_NAME,
+  authors: [{ name: "Lokin Labs" }],
+  creator: "Lokin Labs",
+  publisher: "Lokin Labs",
+  category: "games",
+  openGraph: {
+    type: "website",
+    siteName: SITE_NAME,
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    locale: "en_NG",
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: { index: true, follow: true, "max-image-preview": "large", "max-snippet": -1 },
+  },
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "32x32" },
@@ -54,6 +77,7 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap"
           rel="stylesheet"
         />
+        <JsonLd data={siteJsonLd()} />
       </head>
       <body
         className={`${inter.variable} ${spaceGrotesk.variable} ${lora.variable} font-sans antialiased`}

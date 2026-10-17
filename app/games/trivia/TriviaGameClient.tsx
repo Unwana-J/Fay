@@ -1319,6 +1319,7 @@ export default function TriviaGameClient({
 
   // Automatically display the How to Play guide for new users who have never played before
   useEffect(() => {
+    if (typeof window !== "undefined" && window.location.search.includes("preview=1")) return;
     if (!hasSeenTriviaGuide && (!triviaHistory || triviaHistory.length === 0)) {
       setShowGuideModal(true);
     }
