@@ -343,63 +343,112 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1.5 p-1 rounded-xl bg-[var(--bg-input)] border" style={{ borderColor: "var(--border-dim)" }}>
+      <div className="flex items-center gap-1.5 p-1 rounded-xl bg-[var(--bg-input)] border overflow-x-auto no-scrollbar" style={{ borderColor: "var(--border-dim)" }}>
         <button
+          type="button"
           onClick={() => {
             setTab("global");
             setSelectedChallenge(null);
           }}
           className={cn(
-            "flex-1 py-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5",
+            "h-10 px-3 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap select-none",
             tab === "global"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+              ? "flex-auto sm:flex-1 bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+              : "flex-1 text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
+          title="Global Scholars"
         >
-          <Crown size={13} className="text-amber-500" />
-          <span>Global Scholars</span>
+          <Crown size={14} className="text-amber-500 shrink-0" />
+          {tab === "global" ? (
+            <span>Global Scholars</span>
+          ) : (
+            <>
+              <span className="hidden lg:inline">Global Scholars</span>
+              <span className="lg:hidden">Global</span>
+            </>
+          )}
         </button>
+
         <button
+          type="button"
           onClick={() => setTab("challenges")}
           className={cn(
-            "flex-1 py-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5",
+            "h-10 px-3 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap select-none",
             tab === "challenges"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+              ? "flex-auto sm:flex-1 bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+              : "flex-1 text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
+          title="Group Challenges"
         >
-          <Swords size={13} className="text-[var(--terra)]" />
-          <span>Group Challenges ({challenges.length})</span>
+          <Swords size={14} className="text-[var(--terra)] shrink-0" />
+          {tab === "challenges" ? (
+            <span>Group Challenges</span>
+          ) : (
+            <>
+              <span className="hidden lg:inline">Group Challenges</span>
+              <span className="lg:hidden">Challenges</span>
+            </>
+          )}
+          {challenges.length > 0 && (
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-dim)] shrink-0">
+              {challenges.length}
+            </span>
+          )}
         </button>
+
         <button
+          type="button"
           onClick={() => {
             setTab("leagues");
             setSelectedChallenge(null);
           }}
           className={cn(
-            "flex-1 py-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5",
+            "h-10 px-3 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap select-none",
             tab === "leagues"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+              ? "flex-auto sm:flex-1 bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+              : "flex-1 text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
+          title="Friendship Leagues"
         >
-          <Trophy size={13} className="text-amber-600 dark:text-amber-400" />
-          <span>Friendship Leagues ({leagues.length})</span>
+          <Trophy size={14} className="text-amber-600 dark:text-amber-400 shrink-0" />
+          {tab === "leagues" ? (
+            <span>Friendship Leagues</span>
+          ) : (
+            <>
+              <span className="hidden lg:inline">Friendship Leagues</span>
+              <span className="lg:hidden">Leagues</span>
+            </>
+          )}
+          {leagues.length > 0 && (
+            <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-dim)] shrink-0">
+              {leagues.length}
+            </span>
+          )}
         </button>
+
         <button
+          type="button"
           onClick={() => {
             setTab("bests");
             setSelectedChallenge(null);
           }}
           className={cn(
-            "flex-1 py-2 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5",
+            "h-10 px-3 rounded-lg text-xs font-bold transition-all text-center cursor-pointer flex items-center justify-center gap-1.5 whitespace-nowrap select-none",
             tab === "bests"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+              ? "flex-auto sm:flex-1 bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
+              : "flex-1 text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
+          title="My Personal Bests"
         >
-          <Sparkles size={13} className="text-[var(--olive)]" />
-          <span>My Personal Bests</span>
+          <Sparkles size={14} className="text-[var(--olive)] shrink-0" />
+          {tab === "bests" ? (
+            <span>My Personal Bests</span>
+          ) : (
+            <>
+              <span className="hidden lg:inline">My Personal Bests</span>
+              <span className="lg:hidden">Personal Bests</span>
+            </>
+          )}
         </button>
       </div>
 
