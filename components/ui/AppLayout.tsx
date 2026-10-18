@@ -1,24 +1,44 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { usePathname } from "next/navigation";
 import Sidebar from "@/components/ui/Sidebar";
 import MobileBottomNav from "@/components/ui/MobileBottomNav";
 import AuthGate from "@/components/auth/AuthGate";
 import FloatingFeedbackWidget from "@/components/feedback/FloatingFeedbackWidget";
+import CelestialAscensionOverlay from "@/components/ui/CelestialAscensionOverlay";
 import { useAppStore } from "@/store/useAppStore";
-import { ShieldAlert, Sparkles } from "lucide-react";
+import { Orbit, ShieldAlert, Sparkles } from "lucide-react";
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const [mobileConstellationPulse, setMobileConstellationPulse] = useState<string | null>(null);
   const isOnboarded = useAppStore((s) => s.isOnboarded);
   const openFeedbackPrompt = useAppStore((s) => s.openFeedbackPrompt);
   const openSafetyModal = useAppStore((s) => s.openSafetyModal);
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    function onPulse(e: Event) {
+      const custom = e as CustomEvent<{ kind?: "sun" | "moon" | "star" }>;
+      const kind = custom.detail?.kind || "star";
+      const label = kind === "sun" ? "+1 Sun" : kind === "moon" ? "+1 Moon" : "+1 Star";
+      setMobileConstellationPulse(label);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setMobileConstellationPulse(null), 6500);
+    }
+    window.addEventListener("fey:constellation-nav-pulse", onPulse);
+    return () => {
+      window.removeEventListener("fey:constellation-nav-pulse", onPulse);
+      if (timer) clearTimeout(timer);
+    };
   }, []);
 
   // Vatar / Lagos Life embedded games: complete isolation from AuthGate, sidebars, and widgets
@@ -38,6 +58,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </main>
         <FloatingFeedbackWidget />
+        <CelestialAscensionOverlay />
       </AuthGate>
     );
   }
@@ -87,6 +108,24 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <Link
+                href="/constellation"
+                data-constellation-nav="mobile"
+                className={`px-2.5 py-1 rounded-full text-xs font-mono font-semibold border transition-all flex items-center gap-1.5 ${
+                  mobileConstellationPulse
+                    ? "border-[var(--gold)] bg-[var(--gold-bg)] text-[var(--gold)] ring-2 ring-[var(--gold)]/30"
+                    : "border-[var(--border-dim)] hover:bg-[var(--bg-input)] text-[var(--text-dim)]"
+                }`}
+                title="Constellation"
+                aria-label="Constellation"
+              >
+                <Orbit size={13} className={mobileConstellationPulse ? "text-[var(--gold)] animate-spin" : "text-[var(--gold)]"} />
+                {mobileConstellationPulse && (
+                  <span className="text-[10px] font-bold text-[var(--gold)]">
+                    {mobileConstellationPulse}
+                  </span>
+                )}
+              </Link>
               <button
                 onClick={() => openFeedbackPrompt("mobile_top")}
                 className="px-2.5 py-1 rounded-full text-xs font-mono font-medium border border-[var(--border-dim)] hover:bg-[var(--bg-input)] transition-colors text-[var(--gold)] flex items-center gap-1 cursor-pointer"
@@ -112,6 +151,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         </main>
         <MobileBottomNav />
         <FloatingFeedbackWidget />
+        <CelestialAscensionOverlay />
       </div>
     </AuthGate>
   );

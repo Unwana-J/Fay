@@ -162,22 +162,22 @@ export default function ActiveArenasShowcase({
           }}
         >
           {/* Header */}
-          <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
-            <div className="flex items-center gap-2">
+          <div className="flex items-center justify-between gap-2.5 mb-4 flex-wrap">
+            <div className="flex items-center gap-2 min-w-0">
               <span className="w-2 h-2 rounded-full bg-[var(--terra)] shrink-0" />
-              <span className="font-space font-extrabold text-sm sm:text-base text-[var(--text)] tracking-tight">
-                Live Arenas &amp; Active Competitions
+              <span className="font-space font-extrabold text-sm sm:text-base text-[var(--text)] tracking-tight truncate">
+                Live Arenas
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--terra)]/15 text-[var(--terra)] font-bold border border-[var(--terra)]/30">
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--terra)]/15 text-[var(--terra)] font-bold border border-[var(--terra)]/30 whitespace-nowrap shrink-0">
                 {totalActiveCompetitions} Active
               </span>
             </div>
 
-            <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-2.5 shrink-0">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setShowActionModal(true)}
-                className="btn-terra px-3 py-1.5 rounded-xl font-space font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap"
+                className="btn-terra px-3 py-1.5 rounded-xl font-space font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all whitespace-nowrap"
                 title="Create League, Challenge, or Solo"
               >
                 <Plus size={13} strokeWidth={2.5} />
@@ -218,34 +218,29 @@ export default function ActiveArenasShowcase({
               <div
                 key={league.code}
                 onClick={() => handleLeagueClick(league.code)}
-                className="p-4 rounded-2xl border surface flex flex-col justify-between gap-3 cursor-pointer hover:scale-[1.01] hover:shadow-sm transition-all relative group"
+                className="p-3.5 sm:p-4 rounded-2xl border surface flex items-center justify-between gap-3 cursor-pointer hover:scale-[1.01] hover:shadow-sm transition-all relative group"
                 style={{ borderColor: "rgba(122, 28, 46, 0.3)" }}
               >
-                <div>
-                  <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[var(--terra)] text-white uppercase tracking-wider">
-                      <Zap size={11} /> Day {summary.status.dayNumber} of {league.durationDays} Drop
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 mb-1 flex-wrap">
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[var(--terra)] text-white uppercase tracking-wider whitespace-nowrap">
+                      <Zap size={10} /> Day {summary.status.dayNumber}/{league.durationDays}
                     </span>
-                    <span className="text-[10px] font-mono font-bold text-[var(--text-dim)]">
-                      Code: {league.code}
+                    <span className="text-[10px] font-mono text-[var(--text-mute)]">
+                      {league.code}
                     </span>
                   </div>
 
-                  <h4 className="font-space font-bold text-base text-[var(--text)] group-hover:text-[var(--terra)] transition-colors line-clamp-1">
+                  <h4 className="font-space font-bold text-sm sm:text-base text-[var(--text)] group-hover:text-[var(--terra)] transition-colors truncate">
                     {league.title}
                   </h4>
-                  <p className="text-[11px] text-[var(--text-dim)] mt-0.5">
-                    Hosted by @{league.creatorName} • {league.questionsPerDay} Qs daily
+                  <p className="text-[11px] text-[var(--text-dim)] truncate">
+                    @{league.creatorName} • {league.questionsPerDay} Qs
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-[var(--border-dim)]">
-                  <span className="text-[10px] font-mono font-bold text-[var(--terra)] inline-flex items-center gap-1">
-                    <Flame size={12} /> Today&apos;s Quiz Ready
-                  </span>
-                  <div className="btn-terra px-3.5 py-1.5 rounded-xl font-space font-bold text-xs shadow-xs">
-                    <span>Play Drop</span>
-                  </div>
+                <div className="btn-terra px-3 py-1.5 rounded-xl font-space font-bold text-xs shadow-xs shrink-0 whitespace-nowrap">
+                  <span>Play Drop</span>
                 </div>
               </div>
             ))}

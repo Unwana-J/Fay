@@ -5,6 +5,7 @@ import { checkNewAchievements, type AchievementStats } from "@/lib/achievements"
 import { todayStr, daysBetween, uid, formatDateToIso, getYesterdayStr } from "@/lib/utils";
 import { analytics } from "@/lib/analytics";
 import { renameLocalChallengeParticipant } from "@/lib/trivia-challenge";
+import { triggerCelestialAscension } from "@/lib/celestial-events";
 import {
   signUpWithEmail,
   signInWithEmail,
@@ -887,6 +888,16 @@ export const useAppStore = create<AppState>()(
           }).catch(() => {});
         }
 
+        triggerCelestialAscension({
+          kind: "sun",
+          orbitLabel: "Speaking · +1 Sun",
+          headline: "New Sun Added to Your Constellation",
+          activityTitle: topic.text,
+          badgeText: topic.category,
+          rewardText: `+${xpEarned + achievementXP} XP`,
+          category: topic.category,
+        });
+
         return { xpEarned: xpEarned + achievementXP, newAchievements: newAchievementIds };
       },
 
@@ -1070,6 +1081,45 @@ export const useAppStore = create<AppState>()(
             claimedQuestIds: state.claimedQuestIds,
           }).catch(() => {});
         }
+
+        const isLeagueDrop = Boolean(round.gradeLabel && round.gradeLabel.includes(" · Drop "));
+        const isChallenge = Boolean(round.challengerName);
+        const topCat =
+          round.categoryBreakdown && round.categoryBreakdown.length > 0
+            ? [...round.categoryBreakdown].sort((a, b) => b.total - a.total)[0].category
+            : "General Knowledge";
+
+        if (isLeagueDrop) {
+          triggerCelestialAscension({
+            kind: "moon",
+            orbitLabel: "Drop Completed · +1 Moon",
+            headline: "New Moon Added to Your Constellation",
+            activityTitle: round.gradeLabel,
+            badgeText: `${round.score}/${round.total} (${round.pct}%)`,
+            rewardText: `+${round.xpEarned} XP`,
+            category: topCat,
+          });
+        } else if (isChallenge) {
+          triggerCelestialAscension({
+            kind: "moon",
+            orbitLabel: "Challenge Completed · +1 Moon",
+            headline: "New Moon Added to Your Constellation",
+            activityTitle: `Challenge vs ${round.challengerName} (${round.score}/${round.total})`,
+            badgeText: `${round.pct}% Accuracy`,
+            rewardText: `+${round.xpEarned} XP`,
+            category: topCat,
+          });
+        } else {
+          triggerCelestialAscension({
+            kind: "star",
+            orbitLabel: "Quiz Completed · +1 Star",
+            headline: "New Star Added to Your Constellation",
+            activityTitle: `${topCat} Trivia Quiz (${round.score}/${round.total})`,
+            badgeText: `${round.pct}% · ${round.gradeLabel}`,
+            rewardText: `+${round.xpEarned} XP`,
+            category: topCat,
+          });
+        }
       },
 
       clearTriviaHistory: () =>
@@ -1079,6 +1129,9 @@ export const useAppStore = create<AppState>()(
         const state = get();
         const today = todayStr();
         const list = Array.isArray(state.articulateHistory) ? state.articulateHistory : [];
+        const wasAlreadyGameOver = list.some(
+          (r) => r.roomCode === item.roomCode && r.status === "game_over"
+        );
         const filtered = list.filter((r) => r.roomCode !== item.roomCode);
         const updatedStreak = advanceStreakState(state.streak, today);
         set({
@@ -1092,6 +1145,18 @@ export const useAppStore = create<AppState>()(
             settings: state.settings,
             claimedQuestIds: state.claimedQuestIds,
           }).catch(() => {});
+        }
+
+        if (item.status === "game_over" && !wasAlreadyGameOver) {
+          triggerCelestialAscension({
+            kind: "moon",
+            orbitLabel: "Party Match · +1 Moon",
+            headline: "New Moon Added to Your Constellation",
+            activityTitle: item.roomName || `Articulate Match (${item.roomCode})`,
+            badgeText: `${item.teamAName || "Team A"} ${item.scoreA} – ${item.scoreB} ${item.teamBName || "Team B"}`,
+            rewardText: `${Math.max(item.scoreA, item.scoreB)} pts`,
+            category: "Culture",
+          });
         }
       },
 

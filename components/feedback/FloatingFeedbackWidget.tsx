@@ -39,8 +39,8 @@ export default function FloatingFeedbackWidget() {
 
   return (
     <>
-      {/* ── High-Visibility Floating Scholar Pill (Bottom-Right) ── */}
-      <div className="fixed bottom-20 md:bottom-5 right-4 sm:right-5 z-40 select-none">
+      {/* ── High-Visibility Floating Scholar Pill (Desktop Bottom-Right; Mobile uses Top Header Bar) ── */}
+      <div className="hidden md:block fixed bottom-5 right-5 z-40 select-none">
         <AnimatePresence mode="wait">
           {hasSubmittedRecently ? (
             /* User already submitted within 30 days: Feedback trigger leaves the screen, only discreet Safety pill remains */

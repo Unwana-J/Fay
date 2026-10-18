@@ -350,6 +350,25 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
 
+  const [constellationPulse, setConstellationPulse] = useState<string | null>(null);
+
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    function onPulse(e: Event) {
+      const custom = e as CustomEvent<{ kind?: "sun" | "moon" | "star" }>;
+      const kind = custom.detail?.kind || "star";
+      const label = kind === "sun" ? "+1 Sun" : kind === "moon" ? "+1 Moon" : "+1 Star";
+      setConstellationPulse(label);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setConstellationPulse(null), 6500);
+    }
+    window.addEventListener("fey:constellation-nav-pulse", onPulse);
+    return () => {
+      window.removeEventListener("fey:constellation-nav-pulse", onPulse);
+      if (timer) clearTimeout(timer);
+    };
+  }, []);
+
   return (
     <>
       <aside className="h-screen w-60 surface-panel flex flex-col">
@@ -387,21 +406,50 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
         <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
           {NAV_ITEMS.map(({ href, label, icon: Icon }) => {
             const active = isActive(href);
+            const isConstellation = href === "/constellation";
             return (
               <Link key={href} href={href} onClick={onClose}>
                 <motion.div
+                  data-constellation-nav={isConstellation ? "desktop" : undefined}
                   whileHover={{ x: 3 }}
                   whileTap={{ scale: 0.98 }}
-                  className={cn("nav-item", active && "active")}
+                  animate={
+                    isConstellation && constellationPulse
+                      ? { scale: [1, 1.06, 1], transition: { duration: 0.55 } }
+                      : undefined
+                  }
+                  className={cn(
+                    "nav-item",
+                    active && "active",
+                    isConstellation && constellationPulse && "ring-2 ring-[var(--gold)] bg-[var(--gold-bg)]"
+                  )}
                 >
-                  <Icon size={15} strokeWidth={active ? 2.2 : 1.8} />
+                  <Icon
+                    size={15}
+                    strokeWidth={active ? 2.2 : 1.8}
+                    className={cn(isConstellation && constellationPulse && "text-[var(--gold)] animate-spin")}
+                  />
                   <span>{label}</span>
-                  {active && (
+                  {isConstellation && constellationPulse ? (
                     <motion.span
-                      layoutId="nav-dot"
-                      className="ml-auto w-1.5 h-1.5 rounded-full"
-                      style={{ background: "var(--terra)" }}
-                    />
+                      initial={{ scale: 0.6, opacity: 0 }}
+                      animate={{ scale: 1, opacity: 1 }}
+                      className="ml-auto px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold"
+                      style={{
+                        background: "var(--gold)",
+                        color: "#FDFCFA",
+                      }}
+                    >
+                      {constellationPulse}
+                    </motion.span>
+                  ) : (
+                    active && (
+                      <motion.span
+                        layoutId="nav-dot"
+                        className="ml-auto w-1.5 h-1.5 rounded-full"
+                        style={{ background: "var(--terra)" }}
+                      />
+                    )
                   )}
                 </motion.div>
               </Link>

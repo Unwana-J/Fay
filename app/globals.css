@@ -150,78 +150,80 @@ html, body {
    BUTTONS — Duolingo 3D bevel system
    ═══════════════════════════════════════════════════════════════════ */
 
-/* Primary CTA — burgundy, Duolingo-style 3D press */
-.btn-terra {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px 28px;
-  background: var(--terra);
-  color: #FFFFFF;
-  font-weight: 700;
-  font-size: 15px;
-  letter-spacing: 0.01em;
-  border: none;
-  border-bottom: 4px solid var(--terra-dk);
-  border-radius: 12px;
-  cursor: pointer;
-  user-select: none;
-  transition: transform 75ms ease, border-bottom-width 75ms ease, background 150ms;
-}
-.btn-terra:hover { background: #8C2135; }
-.btn-terra:active {
-  transform: translateY(3px);
-  border-bottom-width: 1px;
-}
-.btn-terra:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-  transform: none;
-}
+@layer components {
+  /* Primary CTA — burgundy, Duolingo-style 3D press */
+  .btn-terra {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 28px;
+    background: var(--terra);
+    color: #FFFFFF;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    border: none;
+    border-bottom: 3px solid var(--terra-dk);
+    border-radius: 12px;
+    cursor: pointer;
+    user-select: none;
+    transition: transform 75ms ease, border-bottom-width 75ms ease, background 150ms;
+  }
+  .btn-terra:hover { background: #8C2135; }
+  .btn-terra:active {
+    transform: translateY(2px);
+    border-bottom-width: 1px;
+  }
+  .btn-terra:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+  }
 
-/* Secondary — olive outline */
-.btn-olive {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 12px 24px;
-  background: transparent;
-  color: var(--olive-text);
-  font-weight: 600;
-  font-size: 14px;
-  border: 1.5px solid var(--olive);
-  border-radius: 10px;
-  cursor: pointer;
-  transition: background 150ms, color 150ms, border-color 150ms;
-}
-.btn-olive:hover {
-  background: rgba(92,106,54,0.05);
-  color: var(--olive-text);
-  border-color: var(--olive-br);
-}
+  /* Secondary — olive outline */
+  .btn-olive {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 24px;
+    background: transparent;
+    color: var(--olive-text);
+    font-weight: 600;
+    font-size: 14px;
+    border: 1.5px solid var(--olive);
+    border-radius: 10px;
+    cursor: pointer;
+    transition: background 150ms, color 150ms, border-color 150ms;
+  }
+  .btn-olive:hover {
+    background: rgba(92,106,54,0.05);
+    color: var(--olive-text);
+    border-color: var(--olive-br);
+  }
 
-/* Ghost */
-.btn-ghost {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  padding: 10px 16px;
-  background: var(--bg-card);
-  color: var(--text-dim);
-  font-weight: 500;
-  font-size: 13px;
-  border: 1px solid var(--olive-dim);
-  border-radius: 8px;
-  cursor: pointer;
-  transition: background 150ms, color 150ms, border-color 150ms;
-}
-.btn-ghost:hover {
-  background: var(--bg-panel);
-  color: var(--text);
-  border-color: var(--olive-br);
+  /* Ghost */
+  .btn-ghost {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 10px 16px;
+    background: var(--bg-card);
+    color: var(--text-dim);
+    font-weight: 500;
+    font-size: 13px;
+    border: 1px solid var(--olive-dim);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: background 150ms, color 150ms, border-color 150ms;
+  }
+  .btn-ghost:hover {
+    background: var(--bg-panel);
+    color: var(--text);
+    border-color: var(--olive-br);
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════

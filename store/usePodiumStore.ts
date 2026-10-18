@@ -4,6 +4,7 @@ import { type PodiumTopic, type PodiumDeck, type SlideStyle, type SlideLayout, t
 import { getRandomTopic } from "@/lib/podium-topics";
 import { encodePodiumDeck } from "@/lib/podium-share";
 import { PODIUM_THEMES } from "@/lib/podium-themes";
+import { triggerCelestialAscension } from "@/lib/celestial-events";
 
 export type PodiumPhase =
   | "lobby"
@@ -444,6 +445,15 @@ export const usePodiumStore = create<PodiumState>()(
         const alreadySaved = existing.some((d) => d.id === deck.id);
         if (!alreadySaved) {
           set({ savedDecks: [deck, ...existing].slice(0, 50) });
+          triggerCelestialAscension({
+            kind: "sun",
+            orbitLabel: "SOLAR ORBIT · PODIUM DECK",
+            headline: "New Sun Ignited in Your Constellation",
+            activityTitle: deck.topic,
+            badgeText: deck.category || "Podium",
+            rewardText: `${deck.slides.length} Slides`,
+            category: deck.category || "Culture",
+          });
         }
       },
 

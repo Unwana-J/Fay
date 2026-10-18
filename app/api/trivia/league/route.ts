@@ -196,7 +196,7 @@ export async function GET(req: NextRequest) {
       }
 
       // 2. Fetch leagues where user submitted scores (as a team member / player)
-      let queryScores = supabase.from("league_scores").select("league_code");
+      let queryScores = supabase.from("league_scores").select("*").order("created_at", { ascending: true });
       if (userId && username) {
         queryScores = queryScores.or(`user_id.eq.${userId},username.ilike.${username}`);
       } else if (userId) {
@@ -206,7 +206,27 @@ export async function GET(req: NextRequest) {
       }
 
       const { data: scoreLeagueRows } = await queryScores;
+      const userScores: LeagueDailyScore[] = [];
+
       if (scoreLeagueRows && Array.isArray(scoreLeagueRows)) {
+        for (const row of scoreLeagueRows) {
+          userScores.push({
+            id: row.id,
+            leagueCode: row.league_code,
+            userId: row.user_id,
+            username: row.username,
+            avatar: row.avatar,
+            dayNumber: row.day_number,
+            date: row.date,
+            score: row.score,
+            totalQuestions: row.total_questions,
+            points: row.points,
+            durationSeconds: row.duration_seconds,
+            questionResults: row.question_results,
+            createdAt: row.created_at,
+          });
+        }
+
         const participantCodes = Array.from(
           new Set(scoreLeagueRows.map((r: any) => r.league_code).filter(Boolean))
         ).filter((c) => !leaguesMap.has(c));
@@ -247,6 +267,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({
         success: true,
         leagues: Array.from(leaguesMap.values()),
+        userScores,
       });
     }
 

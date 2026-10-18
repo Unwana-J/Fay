@@ -10,6 +10,7 @@ import {
   DEFAULT_COMMUNITY_USER,
 } from "@/lib/mockCommunity";
 import { uid } from "@/lib/utils";
+import { triggerCelestialAscension } from "@/lib/celestial-events";
 
 interface CommunityState {
   rooms: ResearchRoom[];
@@ -160,6 +161,16 @@ export const useCommunityStore = create<CommunityState>()(
               : r
           ),
         }));
+
+        triggerCelestialAscension({
+          kind: "sun",
+          orbitLabel: "SOLAR ORBIT · SALON SPEECH",
+          headline: "New Sun Ignited in Your Constellation",
+          activityTitle: room.topicText,
+          badgeText: room.category,
+          rewardText: `${durationSec}s Speech`,
+          category: room.category,
+        });
       },
 
       voteOnSubmission: (submissionId, stars) => {

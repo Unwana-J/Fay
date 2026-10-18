@@ -106,18 +106,18 @@ export async function GET(req: NextRequest) {
     const username = searchParams.get("username");
 
     if (!username || !isSupabaseConfigured || !supabase) {
-      return NextResponse.json({ dates: [] });
+      return NextResponse.json({ dates: [], records: [] });
     }
 
     const { data, error } = await supabase
       .from("trivia_scores")
-      .select("created_at")
+      .select("id, score, total, pct, grade_label, xp_earned, challenge_id, question_ids, created_at")
       .ilike("username", username.trim())
       .order("created_at", { ascending: false })
       .limit(100);
 
     if (error || !data) {
-      return NextResponse.json({ dates: [] });
+      return NextResponse.json({ dates: [], records: [] });
     }
 
     const dates = Array.from(
@@ -128,10 +128,10 @@ export async function GET(req: NextRequest) {
       )
     );
 
-    return NextResponse.json({ dates });
+    return NextResponse.json({ dates, records: data });
   } catch (err) {
     console.error("Error fetching user scores dates:", err);
-    return NextResponse.json({ dates: [] });
+    return NextResponse.json({ dates: [], records: [] });
   }
 }
 

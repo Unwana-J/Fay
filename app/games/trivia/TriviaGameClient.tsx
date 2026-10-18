@@ -26,6 +26,8 @@ import {
   Scale,
   Crown,
   Plus,
+  Moon,
+  Sun,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -729,10 +731,10 @@ function GameScreen({
   };
 
   return (
-    <div className={cn("min-h-screen px-3 py-4 sm:p-8 max-w-2xl mx-auto flex flex-col justify-between", revealed && "pb-28 sm:pb-8")}>
+    <div className="min-h-[calc(100dvh-8rem)] md:min-h-screen px-3.5 py-4 sm:p-8 pb-20 md:pb-8 max-w-2xl mx-auto flex flex-col">
       {/* Top Bar */}
       <div>
-        <div className="flex items-center justify-between mb-3 text-xs font-semibold">
+        <div className="flex items-center justify-between mb-2.5 sm:mb-3 text-xs font-semibold">
           <span className="flex items-center gap-2" style={{ color: "var(--text-dim)" }}>
             <span className="font-space font-bold uppercase tracking-wider text-xs">{q.category}</span>
             <span
@@ -763,7 +765,7 @@ function GameScreen({
         </div>
 
         {/* Progress Bar */}
-        <div className="h-1.5 rounded-full overflow-hidden mb-8" style={{ background: "var(--bg-input)" }}>
+        <div className="h-1.5 rounded-full overflow-hidden mb-5 sm:mb-8" style={{ background: "var(--bg-input)" }}>
           <motion.div
             className="h-full rounded-full"
             style={{ background: CATEGORY_COLORS[q.category] }}
@@ -781,25 +783,25 @@ function GameScreen({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -12 }}
           transition={{ duration: 0.2 }}
-          className="my-auto py-4"
+          className="sm:my-auto py-1 sm:py-4"
         >
           {/* Question Text */}
           <h2
-            className="font-space font-bold text-2xl sm:text-3xl leading-snug mb-8 tracking-tight"
+            className="font-space font-bold text-xl sm:text-3xl leading-snug mb-5 sm:mb-8 tracking-tight"
             style={{ color: "var(--text)" }}
           >
             {q.question}
           </h2>
 
           {/* Options */}
-          <div className="space-y-3 mb-6">
+          <div className="space-y-2.5 sm:space-y-3 mb-4 sm:mb-6">
             {q.options.map((opt, idx) => (
               <button
                 key={idx}
                 disabled={revealed || (reviewMode === "suspense" && selected !== null)}
                 onClick={() => handleSelect(idx)}
                 className={cn(
-                  "w-full text-left p-4 sm:p-5 rounded-2xl border-2 transition-all flex items-center gap-3.5 font-semibold text-sm cursor-pointer shadow-xs touch-manipulation select-none active:scale-[0.99]",
+                  "w-full text-left p-3.5 sm:p-5 rounded-2xl border-2 transition-all flex items-center gap-3.5 font-semibold text-sm cursor-pointer shadow-xs touch-manipulation select-none active:scale-[0.99]",
                   getOptionStyle(idx)
                 )}
                 style={{ color: "var(--text)" }}
@@ -826,7 +828,7 @@ function GameScreen({
             <motion.div
               initial={{ opacity: 0, y: 6 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-5 rounded-2xl border text-xs leading-relaxed mb-5 shadow-xs"
+              className="p-4 sm:p-5 rounded-2xl border text-xs leading-relaxed mb-4 shadow-xs"
               style={{
                 background: "var(--bg-card)",
                 borderColor: "var(--border-dim)",
@@ -840,22 +842,20 @@ function GameScreen({
             </motion.div>
           )}
 
-          {/* Next Button (Instant Mode) - Responsive Floating Anchor on Mobile */}
+          {/* Next Button (Instant Mode) */}
           {revealed && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: 8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="mt-4 sm:mt-0 fixed sm:static bottom-0 inset-x-0 p-4 sm:p-0 bg-[var(--bg-base)]/95 sm:bg-transparent backdrop-blur-md sm:backdrop-blur-none border-t sm:border-t-0 border-[var(--border-dim)] z-30 pb-[max(1rem,env(safe-area-inset-bottom))]"
+              className="mt-2"
             >
-              <div className="max-w-2xl mx-auto">
-                <button
-                  onClick={() => advance()}
-                  className="w-full py-3.5 sm:py-4 rounded-2xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-[0.98] transition-transform touch-manipulation select-none"
-                >
-                  <span>{isLast ? "Complete & View Results" : "Next Question"}</span>
-                  <ChevronRight size={16} />
-                </button>
-              </div>
+              <button
+                onClick={() => advance()}
+                className="w-full py-3.5 sm:py-4 rounded-2xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md active:scale-[0.98] transition-transform touch-manipulation select-none"
+              >
+                <span>{isLast ? "Complete & View Results" : "Next Question"}</span>
+                <ChevronRight size={16} />
+              </button>
             </motion.div>
           )}
 
