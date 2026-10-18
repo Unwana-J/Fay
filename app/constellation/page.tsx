@@ -201,6 +201,8 @@ export interface CelestialBodyItem {
   };
   articulateData?: ArticulateHistoryItem;
   quizData?: TriviaHistoryItem;
+  clusterCount?: number;
+  clusterChildren?: CelestialBodyItem[];
 }
 
 // ─── Reference Sample Solar System Dataset ────────────────────────────────────
@@ -687,25 +689,38 @@ function getCategoryAccent(category: string): string {
 }
 
 // ─── Custom Node 1: Engraved Astrolabe Orbital Rings Backdrop ─────────────────
-const CENTER_X = 420;
-const CENTER_Y = 420;
-const ORBIT_RADII = {
+const CENTER_X = 600;
+const CENTER_Y = 600;
+const BASE_ORBIT_RADII = {
   sun: 125,
-  moon: 220,
-  star: 315,
+  moon: 225,
+  star: 325,
 };
 
-function OrbitBackdropNode() {
+interface OrbitBackdropData {
+  sunRadii?: number[];
+  moonRadii?: number[];
+  starRadii?: number[];
+  outerRimRadius?: number;
+}
+
+function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
+  const sunRadii = data?.sunRadii?.length ? data.sunRadii : [BASE_ORBIT_RADII.sun];
+  const moonRadii = data?.moonRadii?.length ? data.moonRadii : [BASE_ORBIT_RADII.moon];
+  const starRadii = data?.starRadii?.length ? data.starRadii : [BASE_ORBIT_RADII.star];
+  const outerRimRadius = data?.outerRimRadius || 385;
+
   const size = CENTER_X * 2;
   const cx = CENTER_X;
   const cy = CENTER_Y;
 
-  // Deterministic ambient background stars
+  // Deterministic ambient background stars scaled to outerRimRadius
   const ambientStars = useMemo(() => {
     const list = [];
-    for (let i = 0; i < 48; i++) {
+    const maxDist = Math.max(310, outerRimRadius - 65);
+    for (let i = 0; i < 60; i++) {
       const angle = (i * 137.5 * Math.PI) / 180;
-      const dist = 70 + ((i * 23) % 310);
+      const dist = 70 + ((i * 29) % maxDist);
       list.push({
         x: cx + Math.cos(angle) * dist,
         y: cy + Math.sin(angle) * dist,
@@ -714,7 +729,11 @@ function OrbitBackdropNode() {
       });
     }
     return list;
-  }, [cx, cy]);
+  }, [cx, cy, outerRimRadius]);
+
+  const primarySunR = sunRadii[0];
+  const primaryMoonR = moonRadii[0];
+  const primaryStarR = starRadii[0];
 
   return (
     <div
@@ -732,7 +751,7 @@ function OrbitBackdropNode() {
         </defs>
 
         {/* Warm celestial glow */}
-        <circle cx={cx} cy={cy} r={395} fill="url(#solarGlowBg)" />
+        <circle cx={cx} cy={cy} r={outerRimRadius + 25} fill="url(#solarGlowBg)" />
 
         {/* Ambient stardust */}
         {ambientStars.map((st, idx) => (
@@ -751,8 +770,8 @@ function OrbitBackdropNode() {
           const rad = (deg * Math.PI) / 180;
           const x1 = cx + Math.cos(rad) * 58;
           const y1 = cy + Math.sin(rad) * 58;
-          const x2 = cx + Math.cos(rad) * 375;
-          const y2 = cy + Math.sin(rad) * 375;
+          const x2 = cx + Math.cos(rad) * outerRimRadius;
+          const y2 = cy + Math.sin(rad) * outerRimRadius;
           return (
             <line
               key={deg}
@@ -772,7 +791,7 @@ function OrbitBackdropNode() {
         <circle
           cx={cx}
           cy={cy}
-          r={375}
+          r={outerRimRadius}
           stroke="#444E2C"
           strokeOpacity="0.26"
           strokeWidth="1.5"
@@ -781,8 +800,8 @@ function OrbitBackdropNode() {
           const deg = i * 5;
           const rad = (deg * Math.PI) / 180;
           const isMajor = deg % 30 === 0;
-          const rInner = isMajor ? 363 : 369;
-          const rOuter = 375;
+          const rInner = isMajor ? outerRimRadius - 12 : outerRimRadius - 6;
+          const rOuter = outerRimRadius;
           return (
             <line
               key={deg}
@@ -797,81 +816,93 @@ function OrbitBackdropNode() {
           );
         })}
 
-        {/* Orbit 1: Inner Solar Orbit (Speaking Sessions — Suns) */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={ORBIT_RADII.sun}
-          stroke="#A67C1E"
-          strokeOpacity="0.14"
-          strokeWidth="10"
-        />
-        <circle
-          cx={cx}
-          cy={cy}
-          r={ORBIT_RADII.sun}
-          stroke="#A67C1E"
-          strokeOpacity="0.72"
-          strokeWidth="2.4"
-          strokeDasharray="8 5"
-        />
+        {/* Orbit 1: Inner Solar Orbit(s) (Speaking Sessions — Suns) */}
+        {sunRadii.map((r, idx) => (
+          <g key={`sun-ring-${r}`}>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              stroke="#A67C1E"
+              strokeOpacity={idx === 0 ? 0.14 : 0.08}
+              strokeWidth={idx === 0 ? 10 : 6}
+            />
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              stroke="#A67C1E"
+              strokeOpacity={idx === 0 ? 0.72 : 0.45}
+              strokeWidth={idx === 0 ? 2.4 : 1.6}
+              strokeDasharray="8 5"
+            />
+          </g>
+        ))}
 
-        {/* Orbit 2: Middle Lunar Belt (Drops & Challenges — Moons) */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={ORBIT_RADII.moon}
-          stroke="#444E2C"
-          strokeOpacity="0.1"
-          strokeWidth="10"
-        />
-        <circle
-          cx={cx}
-          cy={cy}
-          r={ORBIT_RADII.moon}
-          stroke="#444E2C"
-          strokeOpacity="0.62"
-          strokeWidth="2.4"
-          strokeDasharray="10 6"
-        />
+        {/* Orbit 2: Middle Lunar Belt(s) (Drops & Challenges — Moons) */}
+        {moonRadii.map((r, idx) => (
+          <g key={`moon-ring-${r}`}>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              stroke="#444E2C"
+              strokeOpacity={idx === 0 ? 0.1 : 0.06}
+              strokeWidth={idx === 0 ? 10 : 6}
+            />
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              stroke="#444E2C"
+              strokeOpacity={idx === 0 ? 0.62 : 0.4}
+              strokeWidth={idx === 0 ? 2.4 : 1.6}
+              strokeDasharray="10 6"
+            />
+          </g>
+        ))}
 
-        {/* Orbit 3: Outer Stellar Belt (Quizzes — Stars) */}
-        <circle
-          cx={cx}
-          cy={cy}
-          r={ORBIT_RADII.star}
-          stroke="#7A1C2E"
-          strokeOpacity="0.1"
-          strokeWidth="10"
-        />
-        <circle
-          cx={cx}
-          cy={cy}
-          r={ORBIT_RADII.star}
-          stroke="#7A1C2E"
-          strokeOpacity="0.55"
-          strokeWidth="2.4"
-          strokeDasharray="4 6"
-        />
+        {/* Orbit 3: Outer Stellar Belt(s) (Quizzes — Stars) */}
+        {starRadii.map((r, idx) => (
+          <g key={`star-ring-${r}`}>
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              stroke="#7A1C2E"
+              strokeOpacity={idx === 0 ? 0.1 : 0.06}
+              strokeWidth={idx === 0 ? 10 : 6}
+            />
+            <circle
+              cx={cx}
+              cy={cy}
+              r={r}
+              stroke="#7A1C2E"
+              strokeOpacity={idx === 0 ? 0.55 : 0.36}
+              strokeWidth={idx === 0 ? 2.4 : 1.6}
+              strokeDasharray="4 6"
+            />
+          </g>
+        ))}
 
         {/* Crisp High-Contrast Orbit Labels */}
-        <g transform={`translate(${cx}, ${cy - ORBIT_RADII.sun})`}>
-          <rect x="-85" y="-12" width="170" height="24" rx="12" fill="#FDFCFA" stroke="#A67C1E" strokeOpacity="0.65" strokeWidth="1.5" />
-          <text x="0" y="4" textAnchor="middle" fill="#8C6210" fontSize="10" fontWeight="800" letterSpacing="1.2" fontFamily="monospace">
+        <g transform={`translate(${cx}, ${cy - primarySunR})`}>
+          <rect x="-78" y="-11" width="156" height="22" rx="11" fill="#FDFCFA" stroke="#A67C1E" strokeOpacity="0.65" strokeWidth="1.4" />
+          <text x="0" y="3.5" textAnchor="middle" fill="#8C6210" fontSize="9.5" fontWeight="800" letterSpacing="1.1" fontFamily="monospace">
             SUNS · SPEAKING
           </text>
         </g>
 
-        <g transform={`translate(${cx}, ${cy - ORBIT_RADII.moon})`}>
-          <rect x="-125" y="-12" width="250" height="24" rx="12" fill="#FDFCFA" stroke="#444E2C" strokeOpacity="0.6" strokeWidth="1.5" />
-          <text x="0" y="4" textAnchor="middle" fill="#444E2C" fontSize="10" fontWeight="800" letterSpacing="1.2" fontFamily="monospace">
+        <g transform={`translate(${cx}, ${cy - primaryMoonR})`}>
+          <rect x="-118" y="-11" width="236" height="22" rx="11" fill="#FDFCFA" stroke="#444E2C" strokeOpacity="0.6" strokeWidth="1.4" />
+          <text x="0" y="3.5" textAnchor="middle" fill="#444E2C" fontSize="9.5" fontWeight="800" letterSpacing="1.1" fontFamily="monospace">
             MOONS · DROPS &amp; CHALLENGES
           </text>
         </g>
 
-        <g transform={`translate(${cx}, ${cy - ORBIT_RADII.star})`}>
-          <rect x="-88" y="-12" width="176" height="24" rx="12" fill="#FDFCFA" stroke="#7A1C2E" strokeOpacity="0.6" strokeWidth="1.5" />
-          <text x="0" y="4" textAnchor="middle" fill="#7A1C2E" fontSize="10" fontWeight="800" letterSpacing="1.2" fontFamily="monospace">
+        <g transform={`translate(${cx}, ${cy - primaryStarR})`}>
+          <rect x="-82" y="-11" width="164" height="22" rx="11" fill="#FDFCFA" stroke="#7A1C2E" strokeOpacity="0.6" strokeWidth="1.4" />
+          <text x="0" y="3.5" textAnchor="middle" fill="#7A1C2E" fontSize="9.5" fontWeight="800" letterSpacing="1.1" fontFamily="monospace">
             STARS · QUIZZES
           </text>
         </g>
@@ -981,13 +1012,14 @@ function SunBodyNode({
 }) {
   const { item, isSelected } = data;
   const accent = getCategoryAccent(item.category);
-  const diameter = Math.round(58 + item.magnitude * 14); // 58px to 72px
+  const count = item.clusterCount || 1;
+  const diameter = Math.round(54 + item.magnitude * 12 + (count > 1 ? Math.min(10, count * 1.5) : 0));
 
   return (
     <div
       onClick={data.onClick}
-      className="cursor-pointer group relative flex items-center justify-center"
-      style={{ width: diameter + 24, height: diameter + 24 }}
+      className="cursor-pointer group relative flex items-center justify-center hover:z-40"
+      style={{ width: diameter + 22, height: diameter + 22 }}
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
@@ -1025,44 +1057,49 @@ function SunBodyNode({
           boxShadow: "0 4px 20px rgba(166,124,30,0.52)",
         }}
       >
-        <Mic size={Math.max(16, Math.round(diameter * 0.28))} className="text-[#1E2211] drop-shadow-2xs" />
-        <span className="font-mono font-extrabold text-[9px] uppercase tracking-tight text-[#1E2211] mt-0.5">
-          SUN
+        <Mic size={Math.max(15, Math.round(diameter * 0.28))} className="text-[#1E2211] drop-shadow-2xs" />
+        <span className="font-mono font-extrabold text-[8.5px] uppercase tracking-tight text-[#1E2211] mt-0.5">
+          {count > 1 ? `×${count}` : "SUN"}
         </span>
       </div>
 
-      {/* Persistent High-Contrast Label */}
-      <div
-        className="absolute -bottom-5 left-1/2 -translate-x-1/2 z-20 px-2.5 py-0.5 rounded-full text-[10px] font-space font-bold whitespace-nowrap border shadow-sm pointer-events-none"
-        style={{
-          background: "#FDFCFA",
-          borderColor: "#A67C1E",
-          color: "#1E2211",
-        }}
-      >
-        {item.category.length > 15 ? item.category.slice(0, 13) + "…" : item.category}
-      </div>
+      {/* Cluster Count Badge */}
+      {count > 1 && (
+        <div
+          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-sm pointer-events-none"
+          style={{
+            background: "#1E2211",
+            borderColor: "#FDFCFA",
+            color: "#FDFCFA",
+          }}
+        >
+          ×{count}
+        </div>
+      )}
 
-      {/* Rich Hover Card */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
+      {/* Rich Hover / Tap Tooltip */}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-40">
         <div
           className="rounded-xl px-3 py-2 text-xs w-56 surface-raised shadow-md"
           style={{ color: "var(--text)" }}
         >
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--gold)]">
-              Speaking Sun · {item.category}
+              {count > 1 ? `${count} Speeches` : "Speaking Sun"} · {item.category}
             </span>
             <span className="text-[9px] font-mono font-bold text-[var(--olive)]">{item.xpLabel}</span>
           </div>
           <p className="font-space font-bold text-[11px] leading-snug line-clamp-2">{item.title}</p>
+          <p className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+            {item.subtitle}
+          </p>
         </div>
       </div>
     </div>
   );
 }
 
-// ─── Custom Node 4: Completed Drop / Challenge (Luminous Moon) ────────────────
+// ─── Custom Node 4: Completed Drop / Challenge (Luminous Moon / Lunar System) ─
 function MoonBodyNode({
   data,
 }: {
@@ -1070,16 +1107,28 @@ function MoonBodyNode({
 }) {
   const { item, isSelected } = data;
   const accent = getCategoryAccent(item.category);
-  const diameter = Math.round(50 + item.magnitude * 12); // 50px to 62px
+  const count = item.clusterCount || 1;
+  const diameter = Math.round(44 + item.magnitude * 10 + (count > 1 ? Math.min(12, count * 1.4) : 0));
 
   return (
     <div
       onClick={data.onClick}
-      className="cursor-pointer group relative flex items-center justify-center"
+      className="cursor-pointer group relative flex items-center justify-center hover:z-40"
       style={{ width: diameter + 18, height: diameter + 18 }}
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+
+      {/* Outer Planetary Ring Halo when Clustered (×N) */}
+      {count > 1 && (
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none transition-transform duration-300 group-hover:scale-110"
+          style={{
+            border: `1.5px dashed ${accent}`,
+            opacity: 0.55,
+          }}
+        />
+      )}
 
       {/* Lunar Body with Crescent Highlight & Craters */}
       <div
@@ -1092,7 +1141,7 @@ function MoonBodyNode({
           height: diameter,
           background: "radial-gradient(circle at 28% 26%, #FDFCFA 0%, #E5DFD0 55%, #848C72 100%)",
           border: `2.5px solid ${accent}`,
-          boxShadow: "0 4px 18px rgba(68,78,44,0.38)",
+          boxShadow: "0 4px 16px rgba(68,78,44,0.34)",
         }}
       >
         {/* Crescent shadow & craters SVG */}
@@ -1108,33 +1157,35 @@ function MoonBodyNode({
         </svg>
 
         <Moon
-          size={Math.max(16, Math.round(diameter * 0.34))}
+          size={Math.max(15, Math.round(diameter * 0.34))}
           className="relative z-10"
           style={{ color: accent }}
         />
       </div>
 
-      {/* Persistent Drop / Challenge Badge */}
-      <div
-        className="absolute -bottom-4 left-1/2 -translate-x-1/2 z-20 px-2.5 py-0.5 rounded-full text-[10px] font-mono font-bold whitespace-nowrap border shadow-sm pointer-events-none"
-        style={{
-          background: "#FDFCFA",
-          borderColor: "#444E2C",
-          color: "#2C341B",
-        }}
-      >
-        {item.badgeText}
-      </div>
+      {/* Compact Top-Right Cluster Badge (Only when ×2 or more; zero bottom text clutter!) */}
+      {count > 1 && (
+        <div
+          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-sm pointer-events-none"
+          style={{
+            background: "#444E2C",
+            borderColor: "#FDFCFA",
+            color: "#FDFCFA",
+          }}
+        >
+          ×{count}
+        </div>
+      )}
 
-      {/* Hover Card */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2.5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
+      {/* Hover Card (Shows full details cleanly on hover/tap) */}
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-40">
         <div
           className="rounded-xl px-3 py-2 text-xs w-56 surface-raised shadow-md"
           style={{ color: "var(--text)" }}
         >
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--olive)]">
-              Lunar Drop · {item.badgeText}
+              {count > 1 ? `Moon Cluster (${count})` : `Moon · ${item.badgeText}`}
             </span>
             <span className="text-[9px] font-mono font-bold text-[var(--gold)]">{item.xpLabel}</span>
           </div>
@@ -1148,7 +1199,7 @@ function MoonBodyNode({
   );
 }
 
-// ─── Custom Node 5: Completed Solo Quiz (Celestial Star) ──────────────────────
+// ─── Custom Node 5: Completed Solo Quiz (Celestial Star / Star Cluster) ───────
 function StarBodyNode({
   data,
 }: {
@@ -1156,16 +1207,28 @@ function StarBodyNode({
 }) {
   const { item, isSelected } = data;
   const accent = getCategoryAccent(item.category);
-  const size = Math.round(52 + item.magnitude * 14); // 52px to 66px
+  const count = item.clusterCount || 1;
+  const size = Math.round(48 + item.magnitude * 12 + (count > 1 ? Math.min(14, count * 1.2) : 0));
 
   return (
     <div
       onClick={data.onClick}
-      className="cursor-pointer group relative flex items-center justify-center"
+      className="cursor-pointer group relative flex items-center justify-center hover:z-40"
       style={{ width: size + 16, height: size + 16 }}
     >
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
+
+      {/* Outer Stellar Cluster Halo when Clustered (×N) */}
+      {count > 1 && (
+        <div
+          className="absolute inset-0 rounded-full pointer-events-none transition-transform duration-300 group-hover:scale-110"
+          style={{
+            border: `1.5px dashed ${accent}`,
+            opacity: 0.5,
+          }}
+        />
+      )}
 
       {/* 8-Point Celestial Compass Star SVG */}
       <div
@@ -1186,9 +1249,9 @@ function StarBodyNode({
           <circle
             cx="40"
             cy="40"
-            r={isSelected ? 32 : 26}
+            r={isSelected ? 32 : 25}
             fill={accent}
-            opacity={isSelected ? 0.28 : 0.18}
+            opacity={isSelected ? 0.28 : 0.16}
           />
           {/* Secondary 45-deg minor star points */}
           <polygon
@@ -1205,38 +1268,40 @@ function StarBodyNode({
             strokeWidth="2.2"
           />
           {/* Center gem */}
-          <circle cx="40" cy="40" r="11" fill="#FDFCFA" opacity="0.96" />
+          <circle cx="40" cy="40" r="11.5" fill="#FDFCFA" opacity="0.96" />
         </svg>
 
         <span
-          className="absolute font-mono font-extrabold text-[9px] tracking-tighter"
+          className="absolute font-mono font-extrabold text-[8.5px] tracking-tighter"
           style={{ color: "#1E2211" }}
         >
           {item.badgeText}
         </span>
       </div>
 
-      {/* Persistent Category Label under Star */}
-      <div
-        className="absolute -bottom-3.5 left-1/2 -translate-x-1/2 z-20 px-2 py-0.5 rounded-full text-[9px] font-space font-bold whitespace-nowrap border shadow-2xs pointer-events-none"
-        style={{
-          background: "#FDFCFA",
-          borderColor: "rgba(122,28,46,0.45)",
-          color: "#1E2211",
-        }}
-      >
-        {item.category === "General Knowledge" ? "Gen. Knowledge" : item.category}
-      </div>
+      {/* Compact Top-Right Cluster Badge (Only when ×2 or more; zero bottom text clutter!) */}
+      {count > 1 && (
+        <div
+          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-sm pointer-events-none"
+          style={{
+            background: "#7A1C2E",
+            borderColor: "#FDFCFA",
+            color: "#FDFCFA",
+          }}
+        >
+          ×{count}
+        </div>
+      )}
 
       {/* Hover Card */}
-      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-30">
+      <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-40">
         <div
           className="rounded-xl px-3 py-2 text-xs w-56 surface-raised shadow-md"
           style={{ color: "var(--text)" }}
         >
           <div className="flex items-center justify-between gap-2 mb-1">
             <span className="text-[9px] font-mono font-bold uppercase tracking-wider text-[var(--terra)]">
-              Quiz Star · {item.category}
+              {count > 1 ? `Star Cluster (${count} Quizzes)` : `Quiz Star · ${item.category}`}
             </span>
             <span className="text-[9px] font-mono font-bold text-[var(--gold)]">{item.xpLabel}</span>
           </div>
@@ -1258,6 +1323,161 @@ const nodeTypes: NodeTypes = {
   starBody: StarBodyNode,
 };
 
+// ─── Smart Cluster Aggregator (Scales 50–500+ items into clean systems) ───────
+function buildClusteredBodies(items: CelestialBodyItem[]): CelestialBodyItem[] {
+  const suns = items.filter((i) => i.kind === "sun");
+  const moons = items.filter((i) => i.kind === "moon");
+  const stars = items.filter((i) => i.kind === "star");
+
+  const result: CelestialBodyItem[] = [];
+
+  // 1. SUNS: Keep individual if <= 10; otherwise group by Category into Solar Clusters
+  if (suns.length <= 10) {
+    result.push(...suns);
+  } else {
+    const sunGroups = new Map<string, CelestialBodyItem[]>();
+    suns.forEach((s) => {
+      const key = s.category || "General";
+      if (!sunGroups.has(key)) sunGroups.set(key, []);
+      sunGroups.get(key)!.push(s);
+    });
+    sunGroups.forEach((group, category) => {
+      const sorted = [...group].sort((a, b) => b.timestamp - a.timestamp);
+      if (sorted.length === 1) {
+        result.push(sorted[0]);
+      } else {
+        const totalXp = sorted.reduce((acc, i) => acc + (i.xpOrPoints || 0), 0);
+        const avgMag = sorted.reduce((acc, i) => acc + i.magnitude, 0) / sorted.length;
+        result.push({
+          ...sorted[0],
+          id: `cluster-sun-${category}`,
+          title: `${category} Speeches (${sorted.length})`,
+          subtitle: `${sorted.length} Speaking Sessions & Decks · +${totalXp} XP`,
+          badgeText: `×${sorted.length}`,
+          xpOrPoints: totalXp,
+          xpLabel: `+${totalXp} XP`,
+          magnitude: Math.min(1, avgMag + 0.1),
+          clusterCount: sorted.length,
+          clusterChildren: sorted,
+        });
+      }
+    });
+  }
+
+  // 2. MOONS: Group League Drops by League, Challenges into Challenge Clusters, and Articulate Matches into Party Cluster
+  const moonGroups = new Map<string, CelestialBodyItem[]>();
+  moons.forEach((m) => {
+    let key = m.id;
+    if (m.subType === "league_drop") {
+      const leagueKey =
+        m.groupId ||
+        m.dropData?.leagueCode ||
+        m.title.split(" · Drop ")[0].trim().toLowerCase();
+      key = `league:${leagueKey}`;
+    } else if (m.subType === "articulate_match") {
+      key = "articulate:matches";
+    } else if (m.subType === "challenge") {
+      key = `challenge:${m.category || "General Knowledge"}`;
+    }
+    if (!moonGroups.has(key)) moonGroups.set(key, []);
+    moonGroups.get(key)!.push(m);
+  });
+
+  moonGroups.forEach((group, key) => {
+    const sorted = [...group].sort((a, b) => b.timestamp - a.timestamp);
+    if (sorted.length === 1) {
+      result.push(sorted[0]);
+      return;
+    }
+
+    const latest = sorted[0];
+    const totalReward = sorted.reduce((acc, i) => acc + (i.xpOrPoints || 0), 0);
+    const avgMag = sorted.reduce((acc, i) => acc + i.magnitude, 0) / sorted.length;
+
+    if (key.startsWith("league:")) {
+      const leagueTitle =
+        latest.dropData?.leagueTitle || latest.title.split(" · Drop ")[0].trim();
+      const avgPct = Math.round(avgMag * 100);
+      result.push({
+        ...latest,
+        id: `cluster-moon-${key}`,
+        title: `${leagueTitle} (${sorted.length} Drops)`,
+        subtitle: `${sorted.length} Drops Completed · ${avgPct}% Avg Accuracy`,
+        badgeText: `${sorted.length} Drops`,
+        xpOrPoints: totalReward,
+        xpLabel: `+${totalReward} pts`,
+        magnitude: Math.min(1, avgMag + 0.12),
+        clusterCount: sorted.length,
+        clusterChildren: sorted,
+      });
+    } else if (key === "articulate:matches") {
+      result.push({
+        ...latest,
+        id: "cluster-moon-articulate",
+        title: `Articulate Party Matches (${sorted.length})`,
+        subtitle: `${sorted.length} Matches Played · ${totalReward} Total Team Pts`,
+        badgeText: `${sorted.length} Matches`,
+        xpOrPoints: totalReward,
+        xpLabel: `${totalReward} pts`,
+        magnitude: 0.85,
+        clusterCount: sorted.length,
+        clusterChildren: sorted,
+      });
+    } else {
+      result.push({
+        ...latest,
+        id: `cluster-moon-${key}`,
+        title: `${latest.category} Challenges (${sorted.length})`,
+        subtitle: `${sorted.length} Challenges Completed`,
+        badgeText: `${sorted.length} Challenges`,
+        xpOrPoints: totalReward,
+        xpLabel: `${sorted.length} Played`,
+        magnitude: Math.min(1, avgMag + 0.1),
+        clusterCount: sorted.length,
+        clusterChildren: sorted,
+      });
+    }
+  });
+
+  // 3. STARS: Group Solo Quizzes by Category into Star Clusters
+  const starGroups = new Map<string, CelestialBodyItem[]>();
+  stars.forEach((st) => {
+    const key = st.category || "General Knowledge";
+    if (!starGroups.has(key)) starGroups.set(key, []);
+    starGroups.get(key)!.push(st);
+  });
+
+  starGroups.forEach((group, category) => {
+    const sorted = [...group].sort((a, b) => b.timestamp - a.timestamp);
+    if (sorted.length === 1) {
+      result.push(sorted[0]);
+      return;
+    }
+
+    const latest = sorted[0];
+    const totalXp = sorted.reduce((acc, i) => acc + (i.xpOrPoints || 0), 0);
+    const avgPct = Math.round(
+      sorted.reduce((acc, i) => acc + (i.quizData?.pct ?? i.magnitude * 100), 0) /
+        sorted.length
+    );
+
+    result.push({
+      ...latest,
+      id: `cluster-star-${category}`,
+      title: `${category} Quizzes (${sorted.length})`,
+      subtitle: `${sorted.length} Quizzes Completed · ${avgPct}% Avg Score`,
+      badgeText: `${avgPct}%`,
+      xpOrPoints: totalXp,
+      xpLabel: `+${totalXp} XP`,
+      magnitude: Math.min(1, Math.max(0.45, avgPct / 100) + 0.1),
+      clusterCount: sorted.length,
+      clusterChildren: sorted,
+    });
+  });
+
+  return result;
+}
+
 // ─── Solar System Orbital Layout Engine ───────────────────────────────────────
 function buildSolarSystemGraph(
   items: CelestialBodyItem[],
@@ -1267,18 +1487,69 @@ function buildSolarSystemGraph(
     levelTitle: string;
     xp: number;
     streakDays: number;
+    sunTotal: number;
+    moonTotal: number;
+    starTotal: number;
     isPreview: boolean;
   },
   selectedId: string | null,
   onSelectCore: () => void,
   onSelectBody: (item: CelestialBodyItem) => void
-): { nodes: Node[]; edges: Edge[] } {
+): { nodes: Node[]; edges: Edge[]; outerRimRadius: number } {
   const nodes: Node[] = [];
   const edges: Edge[] = [];
 
   const suns = items.filter((i) => i.kind === "sun");
   const moons = items.filter((i) => i.kind === "moon");
   const stars = items.filter((i) => i.kind === "star");
+
+  // Dynamically compute concentric sub-rings so nodes NEVER overlap even at 50–100+ items
+  const computeZoneRings = (
+    zoneItems: CelestialBodyItem[],
+    startRadius: number,
+    minArcSpacingPx: number,
+    ringStepPx: number
+  ): { placements: { item: CelestialBodyItem; radius: number; angle: number }[]; radii: number[]; maxRadius: number } => {
+    if (zoneItems.length === 0) {
+      return { placements: [], radii: [startRadius], maxRadius: startRadius };
+    }
+
+    const placements: { item: CelestialBodyItem; radius: number; angle: number }[] = [];
+    const radii: number[] = [];
+    let remaining = [...zoneItems];
+    let currentRadius = startRadius;
+    let ringIdx = 0;
+
+    while (remaining.length > 0) {
+      radii.push(currentRadius);
+      const capacity = Math.max(8, Math.floor((2 * Math.PI * currentRadius) / minArcSpacingPx));
+      const slice = remaining.slice(0, capacity);
+      remaining = remaining.slice(capacity);
+
+      // Stagger angle offset slightly on alternating sub-rings so radial lines don't stack
+      const baseOffset = -Math.PI / 2.4 + ringIdx * (Math.PI / Math.max(slice.length, 6));
+      slice.forEach((item, idx) => {
+        // Avoid placing nodes directly at -90 deg (top center) where the orbit title badge sits
+        const rawAngle = baseOffset + (2 * Math.PI * idx) / Math.max(slice.length, 1);
+        placements.push({ item, radius: currentRadius, angle: rawAngle });
+      });
+
+      if (remaining.length > 0) {
+        currentRadius += ringStepPx;
+        ringIdx++;
+      }
+    }
+
+    return { placements, radii, maxRadius: currentRadius };
+  };
+
+  const sunZone = computeZoneRings(suns, BASE_ORBIT_RADII.sun, 74, 58);
+  const moonStartRadius = Math.max(BASE_ORBIT_RADII.moon, sunZone.maxRadius + 92);
+  const moonZone = computeZoneRings(moons, moonStartRadius, 68, 58);
+  const starStartRadius = Math.max(BASE_ORBIT_RADII.star, moonZone.maxRadius + 92);
+  const starZone = computeZoneRings(stars, starStartRadius, 68, 58);
+
+  const outerRimRadius = Math.max(385, starZone.maxRadius + 65);
 
   // 1. Background Astrolabe Orbital Rings Node
   nodes.push({
@@ -1288,7 +1559,12 @@ function buildSolarSystemGraph(
     selectable: false,
     draggable: false,
     zIndex: -10,
-    data: {},
+    data: {
+      sunRadii: sunZone.radii,
+      moonRadii: moonZone.radii,
+      starRadii: starZone.radii,
+      outerRimRadius,
+    },
   });
 
   // 2. Central Solar Core (The Scholar)
@@ -1300,29 +1576,19 @@ function buildSolarSystemGraph(
     zIndex: 20,
     data: {
       ...coreInfo,
-      sunCount: suns.length,
-      moonCount: moons.length,
-      starCount: stars.length,
+      sunCount: coreInfo.sunTotal,
+      moonCount: coreInfo.moonTotal,
+      starCount: coreInfo.starTotal,
       onClick: onSelectCore,
     },
   });
 
-  // Helper to place bodies along concentric rings
-  const placeRing = (
-    ringItems: CelestialBodyItem[],
-    baseRadius: number,
+  const addZoneNodes = (
+    placements: { item: CelestialBodyItem; radius: number; angle: number }[],
     nodeType: "sunBody" | "moonBody" | "starBody",
-    angleOffsetRad: number,
     nodeHalfSize: number
   ) => {
-    const count = ringItems.length;
-    ringItems.forEach((item, idx) => {
-      const tier = Math.floor(idx / 12);
-      const indexInTier = idx % 12;
-      const totalInTier = Math.min(12, count - tier * 12);
-      const radius = baseRadius + tier * 46;
-      const angle = angleOffsetRad + (2 * Math.PI * indexInTier) / Math.max(totalInTier, 1);
-
+    placements.forEach(({ item, radius, angle }) => {
       const x = CENTER_X + Math.cos(angle) * radius - nodeHalfSize;
       const y = CENTER_Y + Math.sin(angle) * radius - nodeHalfSize;
 
@@ -1340,14 +1606,9 @@ function buildSolarSystemGraph(
     });
   };
 
-  // Place Suns on Inner Solar Orbit
-  placeRing(suns, ORBIT_RADII.sun, "sunBody", -Math.PI / 3, 42);
-
-  // Place Moons on Middle Lunar Belt
-  placeRing(moons, ORBIT_RADII.moon, "moonBody", -Math.PI / 6, 36);
-
-  // Place Stars on Outer Stellar Belt
-  placeRing(stars, ORBIT_RADII.star, "starBody", -Math.PI / 2.2, 36);
+  addZoneNodes(sunZone.placements, "sunBody", 40);
+  addZoneNodes(moonZone.placements, "moonBody", 34);
+  addZoneNodes(starZone.placements, "starBody", 34);
 
   // 3. Celestial Edges:
   // A) Connect Suns to the Central Solar Core with warm golden gravitational filaments
@@ -1358,17 +1619,17 @@ function buildSolarSystemGraph(
       target: sun.id,
       style: {
         stroke: "#A67C1E",
-        strokeWidth: 2,
+        strokeWidth: 1.8,
         strokeDasharray: "4, 7",
-        opacity: 0.55,
+        opacity: 0.5,
       },
     });
   });
 
-  // B) Connect Moons belonging to the same League (`groupId`) sequentially
+  // B) Connect unclustered Moons belonging to the same League sequentially
   const leagueGroups: Record<string, CelestialBodyItem[]> = {};
   moons.forEach((m) => {
-    if (m.groupId) {
+    if (m.groupId && (!m.clusterCount || m.clusterCount === 1)) {
       if (!leagueGroups[m.groupId]) leagueGroups[m.groupId] = [];
       leagueGroups[m.groupId].push(m);
     }
@@ -1384,45 +1645,15 @@ function buildSolarSystemGraph(
         target: sorted[i].id,
         style: {
           stroke: "#444E2C",
-          strokeWidth: 2.2,
-          strokeDasharray: "6, 8",
-          animation: "edgePulse 1.6s linear infinite",
-          opacity: 0.65,
-        },
-        markerEnd: {
-          type: MarkerType.ArrowClosed,
-          color: "#444E2C",
-          width: 9,
-          height: 9,
-        },
-      });
-    }
-  });
-
-  // C) Connect Stars in the same category into outer constellation lines
-  const starCats: Record<string, CelestialBodyItem[]> = {};
-  stars.forEach((st) => {
-    if (!starCats[st.category]) starCats[st.category] = [];
-    starCats[st.category].push(st);
-  });
-  Object.entries(starCats).forEach(([cat, list]) => {
-    const color = getCategoryAccent(cat);
-    for (let i = 1; i < list.length; i++) {
-      edges.push({
-        id: `star-constellation-${list[i - 1].id}-${list[i].id}`,
-        source: list[i - 1].id,
-        target: list[i].id,
-        style: {
-          stroke: color,
           strokeWidth: 1.8,
-          strokeDasharray: "4, 6",
-          opacity: 0.52,
+          strokeDasharray: "5, 7",
+          opacity: 0.45,
         },
       });
     }
   });
 
-  return { nodes, edges };
+  return { nodes, edges, outerRimRadius };
 }
 
 // ─── Detail Panel for Speaking Session Sun ────────────────────────────────────
@@ -1831,12 +2062,21 @@ function SpeakingSessionDetail({
 
 // ─── Detail Panel for Moons (Drops & Challenges) & Stars (Quizzes) ────────────
 function CelestialActivityDetail({
-  item,
+  item: rootItem,
   onClose,
 }: {
   item: CelestialBodyItem;
   onClose: () => void;
 }) {
+  const [drilledChild, setDrilledChild] = useState<CelestialBodyItem | null>(null);
+
+  useEffect(() => {
+    setDrilledChild(null);
+  }, [rootItem.id]);
+
+  const isClusterRoot =
+    !drilledChild && Boolean(rootItem.clusterChildren && rootItem.clusterChildren.length > 1);
+  const item = drilledChild || rootItem;
   const isMoon = item.kind === "moon";
 
   return (
@@ -1848,6 +2088,17 @@ function CelestialActivityDetail({
       className="absolute right-0 top-0 h-full w-88 max-w-full overflow-y-auto z-30 p-6 flex flex-col gap-5 border-l shadow-xl"
       style={{ backgroundColor: "var(--bg-card)", borderColor: "var(--border)" }}
     >
+      {/* Back button when drilled into a child of a cluster */}
+      {drilledChild && rootItem.clusterChildren && (
+        <button
+          type="button"
+          onClick={() => setDrilledChild(null)}
+          className="self-start px-2.5 py-1 rounded-lg border border-[var(--border-dim)] bg-[var(--bg-input)] text-[11px] font-space font-bold text-[var(--text)] hover:border-[var(--olive)] transition-colors cursor-pointer"
+        >
+          ← Back to {rootItem.title}
+        </button>
+      )}
+
       {/* Header */}
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2.5">
@@ -1867,7 +2118,13 @@ function CelestialActivityDetail({
                 className="text-[10px] font-mono font-bold uppercase tracking-wider"
                 style={{ color: isMoon ? "var(--olive)" : "var(--terra)" }}
               >
-                {isMoon ? "Lunar Body · Drop / Challenge" : "Stellar Body · Solo Quiz"}
+                {isClusterRoot
+                  ? isMoon
+                    ? `Moon Cluster · ×${rootItem.clusterCount}`
+                    : `Star Cluster · ×${rootItem.clusterCount}`
+                  : isMoon
+                  ? "Moon · Drop / Challenge"
+                  : "Star · Solo Quiz"}
               </span>
               {item.isSample && (
                 <span className="text-[9px] font-mono uppercase px-1.5 py-0.5 rounded bg-[var(--bg-input)] text-[var(--text-dim)]">
@@ -1893,216 +2150,276 @@ function CelestialActivityDetail({
           {item.title}
         </h3>
         <div className="flex items-center gap-1.5 text-xs font-mono mt-1.5" style={{ color: "var(--text-mute)" }}>
-          <Calendar size={11} /> {relativeDate(item.date)} · {item.date}
+          <Calendar size={11} />{" "}
+          {isClusterRoot
+            ? `${rootItem.clusterCount} activities · Latest ${relativeDate(item.date)}`
+            : `${relativeDate(item.date)} · ${item.date}`}
         </div>
       </div>
 
-      {/* League Drop Details */}
-      {item.dropData && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl p-3 text-center surface">
-              <div className="font-mono font-bold text-base" style={{ color: "var(--text)" }}>
-                {item.dropData.score}/{item.dropData.totalQuestions}
-              </div>
-              <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                Correct
-              </div>
-            </div>
-            <div className="rounded-xl p-3 text-center surface">
-              <div className="font-mono font-bold text-base" style={{ color: "var(--olive)" }}>
-                {item.dropData.pct}%
-              </div>
-              <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                Accuracy
-              </div>
-            </div>
-            <div className="rounded-xl p-3 text-center surface">
-              <div className="font-mono font-bold text-base" style={{ color: "var(--gold)" }}>
-                +{item.dropData.points}
-              </div>
-              <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                League Pts
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl p-4 surface space-y-2">
-            <div className="text-label">League Drop Summary</div>
-            <div className="flex items-center justify-between text-xs">
-              <span style={{ color: "var(--text-dim)" }}>Tournament</span>
-              <span className="font-semibold" style={{ color: "var(--text)" }}>
-                {item.dropData.leagueTitle}
-              </span>
-            </div>
-            <div className="flex items-center justify-between text-xs">
-              <span style={{ color: "var(--text-dim)" }}>Drop Completed</span>
-              <span className="font-mono font-semibold" style={{ color: "var(--olive)" }}>
-                Drop {item.dropData.dayNumber}
-              </span>
-            </div>
-            {item.dropData.durationSeconds > 0 && (
-              <div className="flex items-center justify-between text-xs">
-                <span style={{ color: "var(--text-dim)" }}>Completion Time</span>
-                <span className="font-mono" style={{ color: "var(--text)" }}>
-                  {item.dropData.durationSeconds}s
-                </span>
-              </div>
-            )}
-          </div>
-
-          <Link
-            href={
-              item.isSample
-                ? "/games/trivia"
-                : `/games/trivia/league/${item.dropData.leagueCode}`
-            }
-            className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
-          >
-            {item.isSample ? "Explore Trivia Leagues" : "Open League Arena"}
-          </Link>
-        </div>
-      )}
-
-      {/* Challenge Details */}
-      {item.challengeData && (
+      {/* CLUSTER OVERVIEW & CHILD LIST */}
+      {isClusterRoot && rootItem.clusterChildren ? (
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-2">
             <div className="rounded-xl p-3 text-center surface">
               <div className="font-mono font-bold text-base" style={{ color: "var(--text)" }}>
-                {item.challengeData.score}/{item.challengeData.total}
+                ×{rootItem.clusterCount}
               </div>
               <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                Questions Correct
+                {isMoon ? "Drops / Matches" : "Quizzes Completed"}
               </div>
             </div>
             <div className="rounded-xl p-3 text-center surface">
               <div className="font-mono font-bold text-base" style={{ color: "var(--gold)" }}>
-                {item.challengeData.pct}%
+                {rootItem.xpLabel}
               </div>
               <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                Accuracy
+                Total Earned
               </div>
             </div>
           </div>
 
-          <Link
-            href="/games/trivia"
-            className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
-          >
-            Play Another Challenge
-          </Link>
-        </div>
-      )}
-
-      {/* Articulate Match Details */}
-      {item.articulateData && (
-        <div className="space-y-4">
-          <div className="rounded-xl p-4 surface space-y-2">
-            <div className="text-label">Match Scoreboard</div>
-            <div className="flex items-center justify-between text-xs">
-              <span style={{ color: "var(--text-dim)" }}>
-                {item.articulateData.teamAName || "Team A"}
-              </span>
-              <span className="font-mono font-bold" style={{ color: "var(--text)" }}>
-                {item.articulateData.scoreA} pts
-              </span>
+          <div className="space-y-2">
+            <div className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--text-mute)]">
+              Select an activity to inspect ({rootItem.clusterChildren.length})
             </div>
-            <div className="flex items-center justify-between text-xs">
-              <span style={{ color: "var(--text-dim)" }}>
-                {item.articulateData.teamBName || "Team B"}
-              </span>
-              <span className="font-mono font-bold" style={{ color: "var(--text)" }}>
-                {item.articulateData.scoreB} pts
-              </span>
-            </div>
-          </div>
-
-          <Link
-            href="/play"
-            className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
-          >
-            Play Word Description Game
-          </Link>
-        </div>
-      )}
-
-      {/* Solo Quiz Star Details */}
-      {item.quizData && (
-        <div className="space-y-4">
-          <div className="grid grid-cols-3 gap-2">
-            <div className="rounded-xl p-3 text-center surface">
-              <div className="font-mono font-bold text-base" style={{ color: "var(--text)" }}>
-                {item.quizData.score}/{item.quizData.total}
-              </div>
-              <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                Score
-              </div>
-            </div>
-            <div className="rounded-xl p-3 text-center surface">
-              <div className="font-mono font-bold text-base" style={{ color: "var(--terra)" }}>
-                {item.quizData.pct}%
-              </div>
-              <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                Accuracy
-              </div>
-            </div>
-            <div className="rounded-xl p-3 text-center surface">
-              <div className="font-mono font-bold text-base" style={{ color: "var(--gold)" }}>
-                +{item.quizData.xpEarned}
-              </div>
-              <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
-                XP Earned
-              </div>
-            </div>
-          </div>
-
-          <div className="rounded-xl p-4 surface space-y-2.5">
-            <div className="flex items-center justify-between">
-              <span className="text-label">Performance Grade</span>
-              <span className="text-xs font-space font-bold text-[var(--olive-text)]">
-                {item.quizData.gradeLabel}
-              </span>
-            </div>
-
-            {item.quizData.categoryBreakdown && item.quizData.categoryBreakdown.length > 0 && (
-              <div className="space-y-2 pt-2 border-t border-[var(--border-dim)]">
-                <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)]">
-                  Topic Category Breakdown
-                </div>
-                {item.quizData.categoryBreakdown.map((cb) => {
-                  const pct = cb.total > 0 ? Math.round((cb.correct / cb.total) * 100) : 0;
-                  return (
-                    <div key={cb.category} className="space-y-1">
-                      <div className="flex items-center justify-between text-xs">
-                        <span style={{ color: "var(--text-dim)" }}>{cb.category}</span>
-                        <span className="font-mono font-semibold" style={{ color: "var(--text)" }}>
-                          {cb.correct}/{cb.total} ({pct}%)
-                        </span>
-                      </div>
-                      <div className="w-full h-1.5 rounded-full bg-[var(--bg-input)] overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${pct}%`,
-                            backgroundColor: getCategoryAccent(cb.category),
-                          }}
-                        />
-                      </div>
+            <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+              {rootItem.clusterChildren.map((child) => (
+                <button
+                  key={child.id}
+                  type="button"
+                  onClick={() => setDrilledChild(child)}
+                  className="w-full text-left p-3 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-base)]/60 hover:border-[var(--olive)] transition-all flex items-center justify-between gap-2.5 cursor-pointer"
+                >
+                  <div className="min-w-0 flex-1">
+                    <div className="font-space font-bold text-xs text-[var(--text)] truncate">
+                      {child.title}
                     </div>
-                  );
-                })}
-              </div>
-            )}
+                    <div className="text-[11px] text-[var(--text-dim)] truncate mt-0.5">
+                      {child.subtitle}
+                    </div>
+                    <div className="text-[10px] font-mono text-[var(--text-mute)] mt-0.5">
+                      {child.date}
+                    </div>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--gold)] shrink-0">
+                    {child.xpLabel}
+                  </span>
+                </button>
+              ))}
+            </div>
           </div>
-
-          <Link
-            href="/games/trivia"
-            className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
-          >
-            Start Solo Quiz
-          </Link>
         </div>
+      ) : (
+        <>
+          {/* League Drop Details */}
+          {item.dropData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--text)" }}>
+                    {item.dropData.score}/{item.dropData.totalQuestions}
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    Correct
+                  </div>
+                </div>
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--olive)" }}>
+                    {item.dropData.pct}%
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    Accuracy
+                  </div>
+                </div>
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--gold)" }}>
+                    +{item.dropData.points}
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    League Pts
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl p-4 surface space-y-2">
+                <div className="text-label">League Drop Summary</div>
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: "var(--text-dim)" }}>Tournament</span>
+                  <span className="font-semibold" style={{ color: "var(--text)" }}>
+                    {item.dropData.leagueTitle}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: "var(--text-dim)" }}>Drop Completed</span>
+                  <span className="font-mono font-semibold" style={{ color: "var(--olive)" }}>
+                    Drop {item.dropData.dayNumber}
+                  </span>
+                </div>
+                {item.dropData.durationSeconds > 0 && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span style={{ color: "var(--text-dim)" }}>Completion Time</span>
+                    <span className="font-mono" style={{ color: "var(--text)" }}>
+                      {item.dropData.durationSeconds}s
+                    </span>
+                  </div>
+                )}
+              </div>
+
+              <Link
+                href={
+                  item.isSample
+                    ? "/games/trivia"
+                    : `/games/trivia/league/${item.dropData.leagueCode}`
+                }
+                className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
+              >
+                {item.isSample ? "Explore Trivia Leagues" : "Open League Arena"}
+              </Link>
+            </div>
+          )}
+
+          {/* Challenge Details */}
+          {item.challengeData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-2">
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--text)" }}>
+                    {item.challengeData.score}/{item.challengeData.total}
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    Questions Correct
+                  </div>
+                </div>
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--gold)" }}>
+                    {item.challengeData.pct}%
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    Accuracy
+                  </div>
+                </div>
+              </div>
+
+              <Link
+                href="/games/trivia"
+                className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
+              >
+                Play Another Challenge
+              </Link>
+            </div>
+          )}
+
+          {/* Articulate Match Details */}
+          {item.articulateData && (
+            <div className="space-y-4">
+              <div className="rounded-xl p-4 surface space-y-2">
+                <div className="text-label">Match Scoreboard</div>
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: "var(--text-dim)" }}>
+                    {item.articulateData.teamAName || "Team A"}
+                  </span>
+                  <span className="font-mono font-bold" style={{ color: "var(--text)" }}>
+                    {item.articulateData.scoreA} pts
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs">
+                  <span style={{ color: "var(--text-dim)" }}>
+                    {item.articulateData.teamBName || "Team B"}
+                  </span>
+                  <span className="font-mono font-bold" style={{ color: "var(--text)" }}>
+                    {item.articulateData.scoreB} pts
+                  </span>
+                </div>
+              </div>
+
+              <Link
+                href="/play"
+                className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
+              >
+                Play Word Description Game
+              </Link>
+            </div>
+          )}
+
+          {/* Solo Quiz Star Details */}
+          {item.quizData && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-3 gap-2">
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--text)" }}>
+                    {item.quizData.score}/{item.quizData.total}
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    Score
+                  </div>
+                </div>
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--terra)" }}>
+                    {item.quizData.pct}%
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    Accuracy
+                  </div>
+                </div>
+                <div className="rounded-xl p-3 text-center surface">
+                  <div className="font-mono font-bold text-base" style={{ color: "var(--gold)" }}>
+                    +{item.quizData.xpEarned}
+                  </div>
+                  <div className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
+                    XP Earned
+                  </div>
+                </div>
+              </div>
+
+              <div className="rounded-xl p-4 surface space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-label">Performance Grade</span>
+                  <span className="text-xs font-space font-bold text-[var(--olive-text)]">
+                    {item.quizData.gradeLabel}
+                  </span>
+                </div>
+
+                {item.quizData.categoryBreakdown && item.quizData.categoryBreakdown.length > 0 && (
+                  <div className="space-y-2 pt-2 border-t border-[var(--border-dim)]">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)]">
+                      Topic Category Breakdown
+                    </div>
+                    {item.quizData.categoryBreakdown.map((cb) => {
+                      const pct = cb.total > 0 ? Math.round((cb.correct / cb.total) * 100) : 0;
+                      return (
+                        <div key={cb.category} className="space-y-1">
+                          <div className="flex items-center justify-between text-xs">
+                            <span style={{ color: "var(--text-dim)" }}>{cb.category}</span>
+                            <span className="font-mono font-semibold" style={{ color: "var(--text)" }}>
+                              {cb.correct}/{cb.total} ({pct}%)
+                            </span>
+                          </div>
+                          <div className="w-full h-1.5 rounded-full bg-[var(--bg-input)] overflow-hidden">
+                            <div
+                              className="h-full rounded-full"
+                              style={{
+                                width: `${pct}%`,
+                                backgroundColor: getCategoryAccent(cb.category),
+                              }}
+                            />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <Link
+                href="/games/trivia"
+                className="btn-terra w-full py-2.5 px-4 rounded-xl text-xs font-space font-bold text-center block"
+              >
+                Start Solo Quiz
+              </Link>
+            </div>
+          )}
+        </>
       )}
 
       <div
@@ -2788,10 +3105,18 @@ export default function ConstellationPage() {
     [activeDataset]
   );
 
+  // Grouped Clusters (×N) vs All Individual Nodes toggle (defaults to Grouped for clean scaling)
+  const [isGroupedView, setIsGroupedView] = useState(true);
+
+  const displayBodies = useMemo(() => {
+    return isGroupedView ? buildClusteredBodies(filteredBodies) : filteredBodies;
+  }, [isGroupedView, filteredBodies]);
+
   const levelInfo = getLevelForXP(isPreviewMode ? 2850 : profile.xp);
 
   const rfInstanceRef = useRef<ReactFlowInstance | null>(null);
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
+  const outerRimRadiusRef = useRef<number>(385);
 
   const centerSolarSystem = useCallback(
     (duration = 320) => {
@@ -2803,12 +3128,13 @@ export default function ConstellationPage() {
       const h = container.clientHeight || window.innerHeight * 0.7;
       const isMobile = w < 640;
 
-      // Active solar system diameter is ~720px (outer Stellar Belt radius 315 * 2 + node labels)
-      const targetDiameter = filterKind === "sun" ? 360 : filterKind === "moon" ? 540 : 730;
+      const fullDiameter = Math.max(760, outerRimRadiusRef.current * 2 + 40);
+      const targetDiameter =
+        filterKind === "sun" ? 360 : filterKind === "moon" ? 560 : fullDiameter;
       const rawZoom = Math.min((w * 0.9) / targetDiameter, (h * 0.86) / targetDiameter);
       const zoom = isMobile
-        ? Math.max(0.42, Math.min(rawZoom, 0.85))
-        : Math.max(0.68, Math.min(rawZoom, 1.12));
+        ? Math.max(0.32, Math.min(rawZoom, 0.85))
+        : Math.max(0.45, Math.min(rawZoom, 1.12));
 
       // Offset Y slightly on mobile if preview banner is visible at bottom
       const yOffset = isPreviewMode ? (isMobile ? 25 : 18) : 0;
@@ -2819,14 +3145,17 @@ export default function ConstellationPage() {
 
   // Build ReactFlow nodes and edges whenever dataset or filters change
   useEffect(() => {
-    const { nodes: n, edges: e } = buildSolarSystemGraph(
-      filteredBodies,
+    const { nodes: n, edges: e, outerRimRadius } = buildSolarSystemGraph(
+      displayBodies,
       {
         username: isPreviewMode ? profile.username || "Scholar" : profile.username || "Scholar",
         level: levelInfo.level,
         levelTitle: levelInfo.title,
         xp: isPreviewMode ? 2850 : profile.xp,
         streakDays: isPreviewMode ? Math.max(streak.current, 5) : streak.current,
+        sunTotal,
+        moonTotal,
+        starTotal,
         isPreview: isPreviewMode,
       },
       selectedItem?.id || null,
@@ -2839,6 +3168,7 @@ export default function ConstellationPage() {
         setSelectedItem(item);
       }
     );
+    outerRimRadiusRef.current = outerRimRadius;
     setNodes(n);
     setEdges(e);
 
@@ -2847,11 +3177,14 @@ export default function ConstellationPage() {
     }, 50);
     return () => clearTimeout(t);
   }, [
-    filteredBodies,
+    displayBodies,
     isPreviewMode,
     profile.username,
     profile.xp,
     streak.current,
+    sunTotal,
+    moonTotal,
+    starTotal,
     levelInfo.level,
     levelInfo.title,
     selectedItem?.id,
@@ -2870,8 +3203,12 @@ export default function ConstellationPage() {
   // Keep selected item fresh if session audio or favorite is updated in store
   const activeDetailItem = useMemo(() => {
     if (!selectedItem) return null;
-    return activeDataset.find((i) => i.id === selectedItem.id) || selectedItem;
-  }, [selectedItem, activeDataset]);
+    return (
+      displayBodies.find((i) => i.id === selectedItem.id) ||
+      activeDataset.find((i) => i.id === selectedItem.id) ||
+      selectedItem
+    );
+  }, [selectedItem, displayBodies, activeDataset]);
 
   return (
     <div className="h-[calc(100dvh-3.5rem)] md:h-screen flex flex-col overflow-hidden">
@@ -3045,14 +3382,34 @@ export default function ConstellationPage() {
             );
           })}
 
-          <button
-            type="button"
-            onClick={() => centerSolarSystem(300)}
-            className="ml-auto px-2.5 py-1 rounded-xl text-[11px] font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:border-[var(--olive)] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer shrink-0"
-            title="Re-center Constellation"
-          >
-            Center View
-          </button>
+          <div className="ml-auto flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedItem(null);
+                setIsGroupedView((v) => !v);
+              }}
+              className={cn(
+                "px-2.5 py-1 rounded-xl text-[11px] font-space font-bold border transition-all flex items-center gap-1.5 cursor-pointer shrink-0",
+                isGroupedView
+                  ? "bg-[var(--olive)]/12 border-[var(--olive)] text-[var(--olive-text)]"
+                  : "bg-[var(--bg-card)] border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)]"
+              )}
+              title="Switch between Grouped Clusters (×N) and Individual Nodes"
+            >
+              <Layers size={12} />
+              <span>{isGroupedView ? "Grouped (×N)" : "All Nodes"}</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => centerSolarSystem(300)}
+              className="px-2.5 py-1 rounded-xl text-[11px] font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:border-[var(--olive)] text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer shrink-0"
+              title="Re-center Constellation"
+            >
+              Center View
+            </button>
+          </div>
         </div>
       </div>
 
