@@ -44,6 +44,20 @@ const memoryContests: AnswerContest[] = [];
 let overrideCache: { at: number; map: AnswerOverrideMap } | null = null;
 const OVERRIDE_TTL_MS = 30_000;
 
+async function withTimeout<T>(promise: Promise<T>, timeoutMs = 2500, fallback: T): Promise<T> {
+  let timer: NodeJS.Timeout;
+  const timeoutPromise = new Promise<T>((resolve) => {
+    timer = setTimeout(() => resolve(fallback), timeoutMs);
+  });
+  return Promise.race([
+    promise.then((res) => {
+      clearTimeout(timer);
+      return res;
+    }),
+    timeoutPromise,
+  ]);
+}
+
 export function findQuestion(questionId: string): TriviaQuestion | undefined {
   return TRIVIA_QUESTIONS.find((q) => q.id === questionId);
 }
@@ -73,13 +87,17 @@ function fromRow(d: any): AnswerContest {
 export async function listContests(): Promise<AnswerContest[]> {
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
-        .from(TABLE)
-        .select("*")
-        .order("created_at", { ascending: false })
-        .limit(500);
-      if (!error && data) return data.map(fromRow);
-      if (error) console.warn("[contests] list error, using memory:", error.message);
+      const fetchPromise = (async () => {
+        const { data, error } = await supabase!
+          .from(TABLE)
+          .select("*")
+          .order("created_at", { ascending: false })
+          .limit(500);
+        if (!error && data) return data.map(fromRow);
+        if (error) console.warn("[contests] list error, using memory:", error.message);
+        return memoryContests;
+      })();
+      return await withTimeout(fetchPromise, 2500, memoryContests);
     } catch (err) {
       console.warn("[contests] list exception, using memory:", err);
     }
@@ -111,32 +129,38 @@ export async function saveContest(c: Omit<AnswerContest, "id" | "createdAt">): P
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { data, error } = await supabase
-        .from(TABLE)
-        .insert([
-          {
-            question_id: item.questionId,
-            question_text: item.questionText,
-            official_answer: item.officialAnswer,
-            contested_answer: item.contestedAnswer,
-            reason: item.reason || null,
-            user_id: item.userId || null,
-            username: item.username || null,
-            league_code: item.leagueCode || null,
-            day_number: item.dayNumber ?? null,
-            status: item.status,
-            ai_verdict: item.aiVerdict || null,
-            ai_confidence: item.aiConfidence ?? null,
-            ai_reason: item.aiReason || null,
-          },
-        ])
-        .select()
-        .single();
-      if (!error && data) {
+      const insertPromise = (async () => {
+        const { data, error } = await supabase!
+          .from(TABLE)
+          .insert([
+            {
+              question_id: item.questionId,
+              question_text: item.questionText,
+              official_answer: item.officialAnswer,
+              contested_answer: item.contestedAnswer,
+              reason: item.reason || null,
+              user_id: item.userId || null,
+              username: item.username || null,
+              league_code: item.leagueCode || null,
+              day_number: item.dayNumber ?? null,
+              status: item.status,
+              ai_verdict: item.aiVerdict || null,
+              ai_confidence: item.aiConfidence ?? null,
+              ai_reason: item.aiReason || null,
+            },
+          ])
+          .select()
+          .single();
+        if (!error && data) return fromRow(data);
+        if (error) console.warn("[contests] insert error, using memory:", error.message);
+        return null;
+      })();
+
+      const saved = await withTimeout(insertPromise, 2500, null);
+      if (saved) {
         overrideCache = null;
-        return fromRow(data);
+        return saved;
       }
-      if (error) console.warn("[contests] insert error, using memory:", error.message);
     } catch (err) {
       console.warn("[contests] insert exception, using memory:", err);
     }
@@ -162,15 +186,16 @@ export async function updateContestStatus(
 
   if (isSupabaseConfigured && supabase) {
     try {
-      const { error } = await supabase
-        .from(TABLE)
-        .update({ status, reviewed_by: reviewedBy, updated_at: new Date().toISOString() })
-        .eq("id", id);
-      if (error) {
-        console.warn("[contests] update error:", error.message);
-        return !!mem;
-      }
-      return true;
+      const updatePromise = (async () => {
+        const { error } = await supabase!
+          .from(TABLE)
+          .update({ status, reviewed_by: reviewedBy, updated_at: new Date().toISOString() })
+          .eq("id", id);
+        return !error;
+      })();
+
+      const success = await withTimeout(updatePromise, 2500, false);
+      if (success) return true;
     } catch (err) {
       console.warn("[contests] update exception:", err);
     }
@@ -246,9 +271,15 @@ Respond ONLY with JSON: {"verdict":"selected_correct|official_correct|ambiguous"
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
+        signal: AbortSignal.timeout(6500),
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],
-          generationConfig: { responseMimeType: "application/json", temperature: 0, maxOutputTokens: 200 },
+          generationConfig: {
+            responseMimeType: "application/json",
+            temperature: 0.1,
+            maxOutputTokens: 100,
+            thinkingConfig: { thinkingBudget: 0 },
+          },
         }),
       }
     );
@@ -260,10 +291,10 @@ Respond ONLY with JSON: {"verdict":"selected_correct|official_correct|ambiguous"
       ? parsed.verdict
       : "ambiguous";
     const confidence = typeof parsed.confidence === "number" ? Math.max(0, Math.min(1, parsed.confidence)) : 0;
-    return { verdict, confidence, reason: String(parsed.reason || "").slice(0, 400) };
+    return { verdict, confidence, reason: String(parsed.reason || "").slice(0, 300) };
   } catch (err) {
-    console.error("[contests] AI review failed:", err);
-    return { verdict: "unavailable", confidence: 0, reason: "AI reviewer unavailable — sent to admin." };
+    console.error("[contests] AI review fast-fallback:", err);
+    return { verdict: "unavailable", confidence: 0, reason: "Sent for admin review." };
   }
 }
 

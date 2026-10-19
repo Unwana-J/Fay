@@ -671,8 +671,10 @@ function GameScreen({
   const isLast = current === questions.length - 1;
   const q = questions[current];
 
-  // Timer
+  // Timer: strictly paused when an answer is revealed (review / explanation / contesting)
   useEffect(() => {
+    if (revealed) return; // PAUSED during answer review, explanation, and contesting!
+
     timerRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
@@ -684,8 +686,7 @@ function GameScreen({
       });
     }, 1000);
     return () => clearInterval(timerRef.current!);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [revealed, answers, onComplete]);
 
   const formatTime = (s: number) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 
@@ -758,11 +759,17 @@ function GameScreen({
           </span>
           <span
             className={cn("font-mono font-bold text-xs flex items-center gap-1.5", {
-              "text-red-500 animate-pulse": timeLeft <= 30,
-              "text-[var(--text-dim)]": timeLeft > 30,
+              "text-amber-600 dark:text-amber-400": revealed,
+              "text-red-500 animate-pulse": !revealed && timeLeft <= 30,
+              "text-[var(--text-dim)]": !revealed && timeLeft > 30,
             })}
           >
             <Clock size={12} /> {formatTime(timeLeft)}
+            {revealed && (
+              <span className="text-[10px] font-sans font-semibold uppercase tracking-wider text-amber-700 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                Paused
+              </span>
+            )}
           </span>
         </div>
 

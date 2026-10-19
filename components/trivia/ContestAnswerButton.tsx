@@ -131,8 +131,11 @@ export default function ContestAnswerButton({
         className="w-full text-xs p-2.5 rounded-lg border bg-[var(--bg-card)] resize-none focus:outline-none focus:border-[var(--olive)]"
         style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
       />
+      <p className="text-[10px] text-[var(--text-mute)] flex items-center gap-1">
+        ⏱️ Clock is paused while you contest or review.
+      </p>
       {message && <p className="text-[11px] text-[var(--red)]">{message}</p>}
-      <div className="flex items-center justify-end gap-2">
+      <div className="flex items-center justify-end gap-2 pt-1">
         <button
           type="button"
           onClick={() => setOpen(false)}
@@ -148,7 +151,7 @@ export default function ContestAnswerButton({
           className="btn-terra px-3.5 py-1.5 rounded-lg text-[11px] font-bold inline-flex items-center gap-1.5 disabled:opacity-60"
         >
           {submitting && <Loader2 size={12} className="animate-spin" />}
-          {submitting ? "Reviewing" : "Submit Contest"}
+          {submitting ? "Referee Reviewing..." : "Submit Contest"}
         </button>
       </div>
     </div>

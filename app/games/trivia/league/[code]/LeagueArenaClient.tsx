@@ -789,23 +789,22 @@ export default function LeagueArenaClient({
     );
   }, [currentIndex, questions, questionResults]);
 
-  // Gameplay timer loop: handles countdown (per_question or total_bank) and stopwatch
+  // Gameplay timer loop: handles countdown (per_question or total_bank) and stopwatch.
+  // Strictly PAUSED whenever an answer is revealed for review / explanation / contest!
   useEffect(() => {
-    if (phase !== "playing") return;
+    if (phase !== "playing" || isAnswerRevealed) return;
 
     const timer = setInterval(() => {
       setElapsedRoundSeconds((prev) => prev + 1);
 
       if (timerMode === "per_question") {
-        if (!isAnswerRevealed) {
-          setQuestionTimeLeft((prev) => {
-            if (prev <= 1) {
-              handleQuestionTimeout();
-              return 0;
-            }
-            return prev - 1;
-          });
-        }
+        setQuestionTimeLeft((prev) => {
+          if (prev <= 1) {
+            handleQuestionTimeout();
+            return 0;
+          }
+          return prev - 1;
+        });
       } else {
         // total_bank mode: untimed per question, hard total drop clock
         setDropTimeLeft((prev) => {
@@ -1882,6 +1881,11 @@ export default function LeagueArenaClient({
                         ? `${questionTimeLeft}s`
                         : `${Math.floor(dropTimeLeft / 60)}:${String(dropTimeLeft % 60).padStart(2, "0")}`}
                     </span>
+                    {isAnswerRevealed && (
+                      <span className="text-[10px] font-sans font-semibold text-amber-700 bg-amber-500/15 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                        Paused
+                      </span>
+                    )}
                     <span className="text-[10px] text-[var(--text-mute)] font-normal uppercase ml-0.5">
                       {timerMode === "per_question" ? "Clock" : "Drop Bank"}
                     </span>
