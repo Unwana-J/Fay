@@ -47,7 +47,14 @@ import {
   saveLocalLeague,
   removeLocalLeague,
   getLeagueShareUrl,
+  normalizeLeagueScoreRow,
 } from "@/lib/trivia-league";
+import {
+  fetchAndApplyAnswerOverrides,
+  subscribeAnswerOverrides,
+  isAnswerAccepted,
+} from "@/lib/trivia-answer-overrides";
+import ContestAnswerButton from "@/components/trivia/ContestAnswerButton";
 import { TRIVIA_QUESTIONS, type TriviaQuestion } from "@/lib/trivia-questions";
 import { playAudioTone } from "@/lib/sound";
 import confetti from "canvas-confetti";
@@ -252,7 +259,7 @@ export default function LeagueArenaClient({
               scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
             }
           }
-          const merged = Array.from(scoreMap.values());
+          const merged = Array.from(scoreMap.values()).map(normalizeLeagueScoreRow);
           setScores(merged);
           const currentStatus = getLeagueStatus(activeLeague.startDate, activeLeague.durationDays);
           setLeaderboard(aggregateLeagueLeaderboard(merged, currentStatus.dayNumber));
@@ -260,6 +267,21 @@ export default function LeagueArenaClient({
       } catch {}
     }
   }, [code, initialLeague, initialScores, profile.username, profile.id]);
+
+  // Pull accepted answer contests and regrade scores + leaderboard whenever overrides change
+  useEffect(() => {
+    const regrade = () => {
+      setScores((prev) => {
+        const next = prev.map(normalizeLeagueScoreRow);
+        const st = getLeagueStatus(league.startDate, league.durationDays);
+        setLeaderboard(aggregateLeagueLeaderboard(next, st.dayNumber));
+        return next;
+      });
+    };
+    const unsubscribe = subscribeAnswerOverrides(regrade);
+    fetchAndApplyAnswerOverrides();
+    return unsubscribe;
+  }, [league.startDate, league.durationDays]);
 
   const [phase, setPhase] = useState<"overview" | "playing" | "round_summary">("overview");
 
@@ -902,7 +924,7 @@ export default function LeagueArenaClient({
     setSelectedAnswer(index);
     setIsAnswerRevealed(true);
 
-    const isCorrect = index === currentQ.answer;
+    const isCorrect = isAnswerAccepted(currentQ, index);
     if (isCorrect) {
       setCorrectCount((c) => c + 1);
       playAudioTone(880, "sine", 0.15);
@@ -917,6 +939,25 @@ export default function LeagueArenaClient({
       ];
       saveInFlightProgress(next);
       return next;
+    });
+  }
+
+  /** A contest on the current question was upheld: credit the point in the live round. */
+  function handleContestAccepted(questionId: string, selected: number) {
+    setQuestionResults((prev) => {
+      let changed = false;
+      const next = prev.map((r) => {
+        if (r.questionId === questionId && r.selected === selected && !r.correct) {
+          changed = true;
+          return { ...r, correct: true };
+        }
+        return r;
+      });
+      if (changed) {
+        setCorrectCount((c) => c + 1);
+        saveInFlightProgress(next);
+      }
+      return changed ? next : prev;
     });
   }
 
@@ -1883,7 +1924,7 @@ export default function LeagueArenaClient({
               <div className="grid grid-cols-1 gap-3">
                 {currentQ.options.map((option, idx) => {
                   const isSelected = selectedAnswer === idx;
-                  const isCorrect = idx === currentQ.answer;
+                  const isCorrect = isAnswerAccepted(currentQ, idx);
 
                   let btnStyle = "border-[var(--border-dim)] bg-[var(--bg-card)] hover:border-[var(--olive)]";
                   if (isAnswerRevealed) {
@@ -1931,6 +1972,17 @@ export default function LeagueArenaClient({
                     <p className="text-xs leading-relaxed text-[var(--text-dim)] bg-[var(--bg-input)] p-3.5 rounded-xl border border-[var(--border-dim)]">
                       💡 <strong>Insight:</strong> {currentQ.explanation}
                     </p>
+                  )}
+
+                  {selectedAnswer !== null && selectedAnswer >= 0 && !isAnswerAccepted(currentQ, selectedAnswer) && (
+                    <ContestAnswerButton
+                      key={`${currentQ.id}_${selectedAnswer}`}
+                      question={currentQ}
+                      selected={selectedAnswer}
+                      leagueCode={league.code}
+                      dayNumber={activeDropDay}
+                      onAccepted={handleContestAccepted}
+                    />
                   )}
 
                   <div className="flex justify-end">

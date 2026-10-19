@@ -39,6 +39,8 @@ import {
   type TriviaDifficultyFilter,
 } from "@/lib/trivia-questions";
 import { useAppStore } from "@/store/useAppStore";
+import { isAnswerAccepted, fetchAndApplyAnswerOverrides, subscribeAnswerOverrides } from "@/lib/trivia-answer-overrides";
+import ContestAnswerButton from "@/components/trivia/ContestAnswerButton";
 import { useFeatureStore } from "@/store/useFeatureStore";
 import { cn } from "@/lib/utils";
 import ShareTriviaModal from "@/components/games/ShareTriviaModal";
@@ -725,8 +727,8 @@ function GameScreen({
       if (selected === idx) return "border-[var(--terra)] bg-[var(--terra-bg)]";
       return "border-[var(--border-dim)] hover:border-[var(--border)] hover:bg-[var(--bg-card)]";
     }
-    if (idx === q.answer) return "border-green-600 bg-green-500/10 text-green-700 dark:text-green-400";
-    if (selected === idx && idx !== q.answer) return "border-red-500 bg-red-500/10 text-red-600";
+    if (isAnswerAccepted(q, idx)) return "border-green-600 bg-green-500/10 text-green-700 dark:text-green-400";
+    if (selected === idx && !isAnswerAccepted(q, idx)) return "border-red-500 bg-red-500/10 text-red-600";
     return "border-[var(--border-dim)] opacity-40";
   };
 
@@ -813,10 +815,10 @@ function GameScreen({
                   {OPTION_LABELS[idx]}
                 </span>
                 <span className="flex-1 leading-snug">{opt}</span>
-                {revealed && idx === q.answer && (
+                {revealed && isAnswerAccepted(q, idx) && (
                   <CheckCircle2 size={18} className="text-green-600 shrink-0" />
                 )}
-                {revealed && selected === idx && idx !== q.answer && (
+                {revealed && selected === idx && !isAnswerAccepted(q, idx) && (
                   <XCircle size={18} className="text-red-500 shrink-0" />
                 )}
               </button>
@@ -840,6 +842,13 @@ function GameScreen({
               </span>
               {q.explanation}
             </motion.div>
+          )}
+
+          {/* Contest a wrong answer key (Instant Mode) */}
+          {revealed && selected !== null && selected >= 0 && !isAnswerAccepted(q, selected) && (
+            <div className="mb-4">
+              <ContestAnswerButton key={`${q.id}_${selected}`} question={q} selected={selected} />
+            </div>
           )}
 
           {/* Next Button (Instant Mode) */}
@@ -907,7 +916,10 @@ function ResultsScreen({
   const [showShareModal, setShowShareModal] = useState(false);
   const profile = useAppStore((s) => s.profile);
   const openClaimAccountPrompt = useAppStore((s) => s.openClaimAccountPrompt);
-  const correct = answers.filter((a, i) => a === questions[i].answer).length;
+  // Re-render when an answer contest is upheld so the score and review update live
+  const [, setOverrideVersion] = useState(0);
+  useEffect(() => subscribeAnswerOverrides(() => setOverrideVersion((v) => v + 1)), []);
+  const correct = answers.filter((a, i) => a !== null && isAnswerAccepted(questions[i], a)).length;
   const total = questions.length;
   const pct = Math.round((correct / total) * 100);
 
@@ -915,7 +927,7 @@ function ResultsScreen({
     questions.reduce<Record<string, { correct: number; total: number }>>((acc, q, i) => {
       if (!acc[q.category]) acc[q.category] = { correct: 0, total: 0 };
       acc[q.category].total++;
-      if (answers[i] === q.answer) acc[q.category].correct++;
+      if (answers[i] !== null && isAnswerAccepted(q, answers[i] as number)) acc[q.category].correct++;
       return acc;
     }, {})
   ).map(([category, stat]) => ({
@@ -1198,7 +1210,7 @@ function ResultsScreen({
           </p>
           <div className="space-y-4 max-h-80 overflow-y-auto pr-1">
             {questions.map((q, i) => {
-              const isCorrect = answers[i] === q.answer;
+              const isCorrect = answers[i] !== null && isAnswerAccepted(q, answers[i] as number);
               return (
                 <div key={q.id} className="text-xs border-b pb-3.5" style={{ borderColor: "var(--border-dim)" }}>
                   <div className="flex items-start gap-2 mb-1.5">
@@ -1215,6 +1227,11 @@ function ResultsScreen({
                     <div className="text-green-700 font-semibold">Correct: {q.options[q.answer]}</div>
                     {!isCorrect && answers[i] !== null && (
                       <div className="text-red-600">Your answer: {q.options[answers[i]!]}</div>
+                    )}
+                    {!isCorrect && answers[i] !== null && (answers[i] as number) >= 0 && (
+                      <div className="pt-1.5">
+                        <ContestAnswerButton key={`${q.id}_${answers[i]}`} question={q} selected={answers[i] as number} />
+                      </div>
                     )}
                     {q.explanation && (
                       <div className="text-xs mt-1 text-[var(--text-dim)] leading-relaxed">
@@ -1316,6 +1333,11 @@ export default function TriviaGameClient({
   const [lastChallengeResult, setLastChallengeResult] = useState<RecordScoreResult | null>(null);
 
   const [showGuideModal, setShowGuideModal] = useState(false);
+
+  // Load accepted answer-contest overrides so grading reflects corrected answer keys
+  useEffect(() => {
+    fetchAndApplyAnswerOverrides();
+  }, []);
 
   // Automatically display the How to Play guide for new users who have never played before
   useEffect(() => {
@@ -1431,7 +1453,7 @@ export default function TriviaGameClient({
   }
 
   function handleComplete(finalAnswers: (number | null)[], timeLeft: number) {
-    const correct = finalAnswers.filter((a, i) => a === questions[i].answer).length;
+    const correct = finalAnswers.filter((a, i) => a !== null && isAnswerAccepted(questions[i], a)).length;
     const total = questions.length;
     const pct = Math.round((correct / total) * 100);
 
@@ -1466,7 +1488,7 @@ export default function TriviaGameClient({
       questions.reduce<Record<string, { correct: number; total: number }>>((acc, q, i) => {
         if (!acc[q.category]) acc[q.category] = { correct: 0, total: 0 };
         acc[q.category].total++;
-        if (finalAnswers[i] === q.answer) acc[q.category].correct++;
+        if (finalAnswers[i] !== null && isAnswerAccepted(q, finalAnswers[i] as number)) acc[q.category].correct++;
         return acc;
       }, {})
     ).map(([category, stat]) => ({

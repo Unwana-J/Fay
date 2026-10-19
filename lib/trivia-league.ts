@@ -1,4 +1,5 @@
 import { TRIVIA_QUESTIONS, type TriviaQuestion, type TriviaCategory, type TriviaDifficulty } from "@/lib/trivia-questions";
+import { isAnswerAccepted } from "@/lib/trivia-answer-overrides";
 import { daysBetween, todayStr } from "@/lib/utils";
 
 export interface FriendshipLeague {
@@ -189,6 +190,53 @@ export function calculateLeaguePoints(
   return basePoints + (score * speedMultiplier);
 }
 
+const QUESTION_ANSWER_MAP = new Map<string, number>(
+  TRIVIA_QUESTIONS.map((q) => [q.id, q.answer])
+);
+
+/**
+ * Reconcile a score record's questionResults against canonical TRIVIA_QUESTIONS answers
+ * and any accepted answer contests (overrides), so answer-key fixes (such as p107)
+ * automatically credit players who chose the right option without penalizing existing scores.
+ */
+export function normalizeLeagueScoreRow(s: LeagueDailyScore): LeagueDailyScore {
+  if (!s || !Array.isArray(s.questionResults) || s.questionResults.length === 0) {
+    return s;
+  }
+
+  let upgradedCount = 0;
+  const updatedResults = s.questionResults.map((r) => {
+    if (!r || typeof r.questionId !== "string" || r.correct) return r;
+    const canonicalAnswer = QUESTION_ANSWER_MAP.get(r.questionId);
+    if (canonicalAnswer === undefined) return r;
+    if (isAnswerAccepted({ id: r.questionId, answer: canonicalAnswer }, r.selected)) {
+      upgradedCount++;
+      return { ...r, correct: true };
+    }
+    return r;
+  });
+
+  if (upgradedCount === 0) {
+    return s;
+  }
+
+  const totalTrue = updatedResults.filter((r) => r && r.correct).length;
+  const newScore = Math.max(Number(s.score) || 0, totalTrue, (Number(s.score) || 0) + upgradedCount);
+  const totalQ = Number(s.totalQuestions) || updatedResults.length || 5;
+  const cappedScore = Math.min(newScore, totalQ);
+  const newPoints = Math.max(
+    Number(s.points) || 0,
+    calculateLeaguePoints(cappedScore, totalQ, Number(s.durationSeconds) || 30)
+  );
+
+  return {
+    ...s,
+    score: cappedScore,
+    points: newPoints,
+    questionResults: updatedResults,
+  };
+}
+
 /**
  * Aggregate individual score rows into a ranked leaderboard.
  * Deduplicates multiple scores by scholar username and ensures each tournament day
@@ -200,10 +248,11 @@ export function aggregateLeagueLeaderboard(
 ): LeagueLeaderboardEntry[] {
   const playerMap = new Map<string, LeagueLeaderboardEntry>();
 
-  for (const s of scores) {
-    if (!s || s.dayNumber <= 0 || s.username === "__LEAGUE_SYNC__" || String(s.userId || "").startsWith("__league_sync_")) {
+  for (const rawScore of scores) {
+    if (!rawScore || rawScore.dayNumber <= 0 || rawScore.username === "__LEAGUE_SYNC__" || String(rawScore.userId || "").startsWith("__league_sync_")) {
       continue;
     }
+    const s = normalizeLeagueScoreRow(rawScore);
     const rawName = (s.username || "").trim();
     // Normalize scholar key by username first, falling back to userId
     const key = rawName ? rawName.toLowerCase() : (s.userId || "scholar").trim().toLowerCase();
@@ -393,21 +442,23 @@ export function hydrateLeagueFromScoreRows(
       maxScoredDay = dayNum;
     }
 
-    playerScores.push({
-      id: row.id,
-      leagueCode: row.league_code,
-      userId: row.user_id,
-      username: row.username,
-      avatar: row.avatar,
-      dayNumber: dayNum,
-      date: row.date,
-      score: row.score,
-      totalQuestions: row.total_questions,
-      points: row.points,
-      durationSeconds: row.duration_seconds,
-      questionResults: row.question_results || [],
-      createdAt: row.created_at,
-    });
+    playerScores.push(
+      normalizeLeagueScoreRow({
+        id: row.id,
+        leagueCode: row.league_code,
+        userId: row.user_id,
+        username: row.username,
+        avatar: row.avatar,
+        dayNumber: dayNum,
+        date: row.date,
+        score: row.score,
+        totalQuestions: row.total_questions,
+        points: row.points,
+        durationSeconds: row.duration_seconds,
+        questionResults: row.question_results || [],
+        createdAt: row.created_at,
+      })
+    );
   }
 
   const status = getLeagueStatus(updatedLeague.startDate, updatedLeague.durationDays);
@@ -661,7 +712,8 @@ export function getLocalLeagueScores(code: string): LeagueDailyScore[] {
   if (typeof window === "undefined" || !code) return [];
   try {
     const raw = localStorage.getItem(`fey_league_scores_${code.toUpperCase()}`);
-    return raw ? JSON.parse(raw) : [];
+    const parsed: LeagueDailyScore[] = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.map(normalizeLeagueScoreRow) : [];
   } catch {
     return [];
   }

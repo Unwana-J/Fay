@@ -2037,7 +2037,7 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
   {
     id: "p107", question: "Mo' Hits Records was founded in 2004 by which iconic producer and artist duo in London/Lagos?",
     options: ["Olamide and Phyno", "Don Jazzy and D'banj", "Banky W and Wizkid", "MI Abaga and Jesse Jagz"],
-    answer: 0, category: "Pop Culture", difficulty: "easy",
+    answer: 1, category: "Pop Culture", difficulty: "easy",
     explanation: "Producer Michael Collins Ajereh (Don Jazzy) and Dapo Daniel Oyebanjo (D'banj) founded Mo' Hits Records."
   },
   {
@@ -2185,8 +2185,8 @@ export const TRIVIA_QUESTIONS: TriviaQuestion[] = [
     explanation: "Tems co-wrote 'Lift Me Up' with Rihanna, Ryan Coogler, and Ludwig G\u00f6ransson, earning Academy Award and Golden Globe nominations."
   },
   {
-    id: "p132", question: "In 2024, which Nigerian singer's global sensation 'Water' won the inaugural Grammy Award for Best African Music Performance?",
-    options: ["Ayra Starr", "Tyla (South African, but competing with Nigerian nominees)", "Tems", "Asake"],
+    id: "p132", question: "In 2024, which singer's global sensation 'Water' won the inaugural Grammy Award for Best African Music Performance over four Nigerian nominees?",
+    options: ["Ayra Starr", "Tyla", "Tems", "Asake"],
     answer: 1, category: "Pop Culture", difficulty: "hard",
     explanation: "South Africa's Tyla won with 'Water' against a heavily Nigerian field including Asake, Burna Boy, Davido, and Ayra Starr."
   },

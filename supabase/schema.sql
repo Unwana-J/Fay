@@ -356,3 +356,44 @@ values
   ('enableCommunitySalons', true)
 on conflict (key) do nothing;
 
+
+-- 14. Create trivia_answer_contests table (players flag answer keys; AI + admin review)
+create table if not exists public.trivia_answer_contests (
+  id uuid primary key default gen_random_uuid(),
+  question_id text not null,
+  question_text text,
+  official_answer integer not null,
+  contested_answer integer not null,
+  reason text,
+  user_id text,
+  username text,
+  league_code text,
+  day_number integer,
+  status text not null default 'pending', -- 'pending' | 'ai_accepted' | 'ai_rejected' | 'admin_accepted' | 'admin_rejected'
+  ai_verdict text,
+  ai_confidence real,
+  ai_reason text,
+  reviewed_by text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  updated_at timestamp with time zone
+);
+
+alter table public.trivia_answer_contests enable row level security;
+
+drop policy if exists "Allow public read on trivia_answer_contests" on public.trivia_answer_contests;
+create policy "Allow public read on trivia_answer_contests"
+  on public.trivia_answer_contests for select
+  using (true);
+
+drop policy if exists "Allow public insert on trivia_answer_contests" on public.trivia_answer_contests;
+create policy "Allow public insert on trivia_answer_contests"
+  on public.trivia_answer_contests for insert
+  with check (true);
+
+drop policy if exists "Allow public update on trivia_answer_contests" on public.trivia_answer_contests;
+create policy "Allow public update on trivia_answer_contests"
+  on public.trivia_answer_contests for update
+  using (true);
+
+create index if not exists idx_contests_question on public.trivia_answer_contests (question_id, contested_answer);
+create index if not exists idx_contests_status on public.trivia_answer_contests (status, created_at desc);

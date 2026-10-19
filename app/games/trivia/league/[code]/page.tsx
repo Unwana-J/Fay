@@ -10,6 +10,7 @@ import {
 } from "@/lib/trivia-league";
 import LeagueArenaClient from "./LeagueArenaClient";
 import { todayStr, formatDateToIso, addDaysToDate } from "@/lib/utils";
+import { loadAnswerOverrides } from "@/lib/trivia-contests";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,7 @@ export default async function LeaguePage({
           .eq("league_code", cleanCode)
           .order("created_at", { ascending: true });
 
+        await loadAnswerOverrides().catch(() => {});
         const hydrated = hydrateLeagueFromScoreRows(baseLeague, scoreRows || []);
         league = hydrated.league;
         scores = hydrated.scores;

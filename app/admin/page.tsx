@@ -34,7 +34,9 @@ import {
   ToggleRight,
   Swords,
   Trophy,
+  Flag,
 } from "lucide-react";
+import AnswerContestsAdminPanel from "@/components/trivia/AnswerContestsAdminPanel";
 import { useAppStore } from "@/store/useAppStore";
 import { useFeatureStore } from "@/store/useFeatureStore";
 import { FEATURE_DEFINITIONS, type FeatureFlags } from "@/lib/feature-flags";
@@ -53,8 +55,10 @@ export default function AdminPage() {
   const [passcode, setPasscode] = useState("");
   const [authError, setAuthError] = useState("");
 
-  // Tabs: overview | feedback | safety | users | features
-  const [activeTab, setActiveTab] = useState<"overview" | "feedback" | "safety" | "users" | "features">("overview");
+  // Tabs: overview | feedback | safety | users | features | contests
+  const [activeTab, setActiveTab] = useState<"overview" | "feedback" | "safety" | "users" | "features" | "contests">("overview");
+  const [adminKey, setAdminKey] = useState("");
+  const [pendingContests, setPendingContests] = useState(0);
 
   // Data states
   const [loading, setLoading] = useState(false);
@@ -78,6 +82,7 @@ export default function AdminPage() {
   // Check existing session auth on load
   useEffect(() => {
     const savedAuth = sessionStorage.getItem("fey_admin_auth");
+    setAdminKey(sessionStorage.getItem("fey_admin_key") || "");
     if (savedAuth === "true") {
       setIsAuthenticated(true);
     }
@@ -162,6 +167,8 @@ export default function AdminPage() {
     if (passcode.trim() === "fey2026" || passcode.trim() === "admin") {
       setIsAuthenticated(true);
       sessionStorage.setItem("fey_admin_auth", "true");
+      sessionStorage.setItem("fey_admin_key", passcode.trim());
+      setAdminKey(passcode.trim());
       setAuthError("");
     } else {
       setAuthError("Invalid administrative passcode.");
@@ -170,6 +177,7 @@ export default function AdminPage() {
 
   const handleLogout = () => {
     sessionStorage.removeItem("fey_admin_auth");
+    sessionStorage.removeItem("fey_admin_key");
     setIsAuthenticated(false);
   };
 
@@ -478,6 +486,22 @@ export default function AdminPage() {
               {features?.enablePassThePhone === false ? "Local: OFF" : "Live"}
             </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("contests")}
+            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-mono font-medium transition-colors cursor-pointer ${
+              activeTab === "contests" ? "bg-[var(--bg-card)] shadow-sm font-bold border" : "text-[var(--text-dim)] hover:bg-[var(--bg-input)]"
+            }`}
+            style={activeTab === "contests" ? { borderColor: "var(--border-dim)", color: "var(--olive)" } : {}}
+          >
+            <Flag size={15} />
+            <span>Answer Contests</span>
+            {pendingContests > 0 && (
+              <span className="px-1.5 py-0.2 rounded-full text-[10px] font-bold" style={{ background: "rgba(166, 124, 30, 0.2)", color: "var(--gold)" }}>
+                {pendingContests}
+              </span>
+            )}
+          </button>
         </div>
 
         {/* Global Toast / Feedback Banner for Feature Updates */}
@@ -506,6 +530,11 @@ export default function AdminPage() {
             </motion.div>
           )}
         </AnimatePresence>
+
+        {/* ── TAB: ANSWER CONTESTS ── */}
+        {activeTab === "contests" && (
+          <AnswerContestsAdminPanel adminKey={adminKey || "fey2026"} onPendingCount={setPendingContests} />
+        )}
 
         {/* ── TAB 1: STRATEGIC OVERVIEW ── */}
         {activeTab === "overview" && (

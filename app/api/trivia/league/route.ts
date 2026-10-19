@@ -10,6 +10,7 @@ import {
   type LeagueDailyScore,
 } from "@/lib/trivia-league";
 import { todayStr, addDaysToDate, formatDateToIso } from "@/lib/utils";
+import { loadAnswerOverrides } from "@/lib/trivia-contests";
 
 export const dynamic = "force-dynamic";
 
@@ -155,6 +156,9 @@ export async function GET(req: NextRequest) {
     if (!code && !userId && !username) {
       return NextResponse.json({ error: "League code or user identifier is required." }, { status: 400 });
     }
+
+    // Register accepted answer-contest overrides so stored scores are regraded on hydration
+    await loadAnswerOverrides().catch(() => {});
 
     if (!isSupabaseConfigured || !supabase) {
       return NextResponse.json({
