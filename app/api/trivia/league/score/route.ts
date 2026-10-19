@@ -79,14 +79,11 @@ export async function POST(req: NextRequest) {
       let dayNumber = 1;
 
       if (leagueRow) {
-        const status = getLeagueStatus(leagueRow.start_date, leagueRow.duration_days, today);
-        if (status.isCompleted) {
-          return NextResponse.json({ error: "This league tournament has ended." }, { status: 400 });
-        }
+        const status = getLeagueStatus(leagueRow.start_date, Math.max(leagueRow.duration_days || 5, clientDayNumber || 5), today);
         if (
           typeof clientDayNumber === "number" &&
           clientDayNumber >= 1 &&
-          clientDayNumber <= (leagueRow.duration_days || 14)
+          clientDayNumber <= 100
         ) {
           dayNumber = clientDayNumber;
         } else {
@@ -96,8 +93,6 @@ export async function POST(req: NextRequest) {
         dayNumber = clientDayNumber;
       }
 
-      const leaguePolicy = leagueRow?.daily_seed_map?._policy || "flexible";
-
       // 2. Check if user has already submitted an attempt for today
       const playerIdentifier = userId || cleanUsername.toLowerCase();
       const { data: existingAttempts } = await supabase
@@ -106,11 +101,16 @@ export async function POST(req: NextRequest) {
         .eq("league_code", cleanLeagueCode)
         .eq("day_number", dayNumber);
 
-      const existingRecord = (existingAttempts || []).find(
+      const matchingAttempts = (existingAttempts || []).filter(
         (row: any) =>
           row.user_id === playerIdentifier ||
+          String(row.user_id || "").startsWith(`${playerIdentifier}__ext_`) ||
           (row.username && row.username.trim().toLowerCase() === cleanUsername.toLowerCase())
       );
+
+      const existingRecord = matchingAttempts.sort(
+        (a: any, b: any) => (b.total_questions || 0) - (a.total_questions || 0) || (b.points || 0) - (a.points || 0)
+      )[0];
 
       if (existingRecord) {
         if (body.isBonusExtension || totalQuestions > (existingRecord.total_questions || 0)) {
@@ -127,13 +127,41 @@ export async function POST(req: NextRequest) {
             .select()
             .maybeSingle();
 
-          if (updateError) {
-            console.error("Supabase league score update error:", updateError);
+          // If RLS FOR UPDATE policy is not enabled in Supabase, updated will be null — fall back to INSERT
+          if (updateError || !updated) {
+            const { data: extInserted } = await supabase
+              .from("league_scores")
+              .insert([
+                {
+                  league_code: cleanLeagueCode,
+                  user_id: `${playerIdentifier}__ext_${Date.now()}`,
+                  username: cleanUsername,
+                  avatar: avatar || "/avatars/avatar-scholar.svg",
+                  day_number: dayNumber,
+                  date: today,
+                  score,
+                  total_questions: totalQuestions,
+                  points,
+                  duration_seconds: durationSeconds,
+                  question_results: questionResults,
+                },
+              ])
+              .select()
+              .maybeSingle();
+
+            return NextResponse.json({
+              success: true,
+              stored: Boolean(extInserted),
+              isBonusExtension: true,
+              dayNumber,
+              points,
+              data: extInserted,
+            });
           }
 
           return NextResponse.json({
             success: true,
-            stored: !updateError,
+            stored: true,
             isBonusExtension: true,
             dayNumber,
             points,

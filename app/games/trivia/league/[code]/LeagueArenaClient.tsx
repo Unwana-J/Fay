@@ -43,6 +43,7 @@ import {
   calculateLeaguePoints,
   aggregateLeagueLeaderboard,
   generateDailyLeagueQuestions,
+  mergeLeagueState,
   saveLocalLeague,
   removeLocalLeague,
   getLeagueShareUrl,
@@ -74,7 +75,7 @@ export default function LeagueArenaClient({
   const [leaderboard, setLeaderboard] = useState<LeagueLeaderboardEntry[]>(initialLeaderboard);
 
   // Hydrate custom league created locally & local scores if available.
-  // ALWAYS save locally so team members who join also see the arena in their dashboard!
+  // ALWAYS merge with server state so stale localStorage never clobbers host unlocks or bonus questions!
   useEffect(() => {
     const leagueCode = code || initialLeague.code;
     if (typeof window !== "undefined" && leagueCode) {
@@ -84,8 +85,43 @@ export default function LeagueArenaClient({
         if (stored) {
           const parsed = JSON.parse(stored);
           if (parsed && parsed.code) {
-            setLeague(parsed);
-            activeLeague = parsed;
+            activeLeague = mergeLeagueState(initialLeague, parsed);
+            setLeague(activeLeague);
+
+            // If this user is the Host and their local device had unlocked drops, added extra drops,
+            // or added bonus questions that haven't synced to the server yet, push them to cloud automatically!
+            const cleanUser = (profile.username || "Scholar").trim().toLowerCase();
+            const isHostUser =
+              (activeLeague.creatorName || "").trim().toLowerCase() === cleanUser ||
+              (profile.id && activeLeague.creatorId === profile.id);
+
+            const serverUnlocked = Number(
+              initialLeague.unlockedUpToDay || (initialLeague.dailySeedMap as any)?._unlockedUpToDay || 1
+            );
+            const mergedUnlocked = Number(
+              activeLeague.unlockedUpToDay || (activeLeague.dailySeedMap as any)?._unlockedUpToDay || 1
+            );
+            const hasMoreDrops = (activeLeague.durationDays || 5) > (initialLeague.durationDays || 5);
+            const hasMoreQuestions = Object.keys(activeLeague.dailySeedMap || {}).some((k) => {
+              if (!k.startsWith("day_")) return false;
+              const a = Array.isArray(activeLeague.dailySeedMap?.[k]) ? activeLeague.dailySeedMap[k].length : 0;
+              const b = Array.isArray(initialLeague.dailySeedMap?.[k]) ? initialLeague.dailySeedMap[k].length : 0;
+              return a > b;
+            });
+
+            if (isHostUser && (mergedUnlocked > serverUnlocked || hasMoreDrops || hasMoreQuestions)) {
+              fetch("/api/trivia/league", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  code: activeLeague.code,
+                  unlockedUpToDay: mergedUnlocked,
+                  newDuration: activeLeague.durationDays,
+                  attemptPolicy: activeLeague.attemptPolicy,
+                  dailySeedMap: activeLeague.dailySeedMap,
+                }),
+              }).catch(() => {});
+            }
           }
         }
 
@@ -199,7 +235,7 @@ export default function LeagueArenaClient({
           }
         }
 
-        if (localScores.length > 0) {
+        if (localScores.length > 0 || initialScores.length > 0) {
           const scoreMap = new Map<string, LeagueDailyScore>();
           for (const s of initialScores) {
             const playerKey = (s.username || s.userId || "").trim().toLowerCase();
@@ -208,7 +244,11 @@ export default function LeagueArenaClient({
           for (const s of localScores) {
             const playerKey = (s.username || s.userId || "").trim().toLowerCase();
             const existing = scoreMap.get(`${playerKey}_${s.dayNumber}`);
-            if (!existing || s.points >= existing.points) {
+            if (
+              !existing ||
+              (s.totalQuestions || 0) > (existing.totalQuestions || 0) ||
+              s.points >= existing.points
+            ) {
               scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
             }
           }
@@ -219,7 +259,7 @@ export default function LeagueArenaClient({
         }
       } catch {}
     }
-  }, [code, initialLeague.code, initialScores, profile.username, profile.id]);
+  }, [code, initialLeague, initialScores, profile.username, profile.id]);
 
   const [phase, setPhase] = useState<"overview" | "playing" | "round_summary">("overview");
 
@@ -258,13 +298,36 @@ export default function LeagueArenaClient({
     Array<{ questionId: string; correct: boolean; selected: number }>
   >([]);
 
-  const unlockedUpToDay: number = Number(league.unlockedUpToDay || (league.dailySeedMap as Record<string, unknown>)?._unlockedUpToDay || 1);
-
   // Time remaining to next drop (midnight)
   const [timeToNextDrop, setTimeToNextDrop] = useState("");
 
   const status = getLeagueStatus(league.startDate, league.durationDays);
   const currentDay = status.dayNumber;
+
+  const maxScoredDay = useMemo(() => {
+    let max = 1;
+    for (const s of scores) {
+      if (s.dayNumber > max) max = s.dayNumber;
+    }
+    return max;
+  }, [scores]);
+
+  const rawUnlockedUpToDay: number = Number(
+    league.unlockedUpToDay || (league.dailySeedMap as Record<string, unknown>)?._unlockedUpToDay || 1
+  );
+
+  const unlockedUpToDay: number = useMemo(() => {
+    if (league.attemptPolicy === "flexible" || league.attemptPolicy === "unlimited") {
+      return league.durationDays;
+    }
+    if (league.attemptPolicy === "strict") {
+      return Math.max(rawUnlockedUpToDay, currentDay, maxScoredDay);
+    }
+    return Math.max(rawUnlockedUpToDay, maxScoredDay);
+  }, [league.attemptPolicy, league.durationDays, rawUnlockedUpToDay, currentDay, maxScoredDay]);
+
+  const isPacedByHostOrSchedule =
+    league.attemptPolicy === "host_controlled" || league.attemptPolicy === "strict";
 
   const [activeDropDay, setActiveDropDay] = useState<number>(currentDay);
 
@@ -281,7 +344,11 @@ export default function LeagueArenaClient({
         (profile.id && s.userId === profile.id);
       if (match) {
         const existing = map.get(s.dayNumber);
-        if (!existing || s.points > existing.points) {
+        if (
+          !existing ||
+          (s.totalQuestions || 0) > (existing.totalQuestions || 0) ||
+          s.points > existing.points
+        ) {
           map.set(s.dayNumber, s);
         }
       }
@@ -299,6 +366,10 @@ export default function LeagueArenaClient({
     }
     return null;
   }, [league.durationDays, myScoresByDay]);
+
+  const isNextDayLockedByHost = Boolean(
+    isPacedByHostOrSchedule && nextUncompletedDay && nextUncompletedDay > unlockedUpToDay
+  );
 
   const [isUpdatingLeague, setIsUpdatingLeague] = useState(false);
 
@@ -744,8 +815,7 @@ export default function LeagueArenaClient({
         : nextUncompletedDay ?? currentDay;
 
     // Check if drop is host locked
-    const isHostControlled = league.attemptPolicy === "host_controlled" || !!league.unlockedUpToDay || !!league.dailySeedMap?._unlockedUpToDay;
-    if (isHostControlled && dayToPlay > unlockedUpToDay) {
+    if (isPacedByHostOrSchedule && dayToPlay > unlockedUpToDay) {
       setAttemptFeedback(`Drop ${dayToPlay} is locked. Awaiting Host to unlock this round.`);
       return;
     }
@@ -1010,14 +1080,20 @@ export default function LeagueArenaClient({
     }
   }
 
-  async function fetchLeagueData() {
+  const fetchLeagueData = useCallback(async () => {
+    if (!league.code) return;
     try {
-      const res = await fetch(`/api/trivia/league?code=${league.code}`);
+      const res = await fetch(`/api/trivia/league?code=${league.code}&_t=${Date.now()}`, {
+        cache: "no-store",
+      });
       if (res.ok) {
         const data = await res.json();
         if (data.league) {
-          setLeague(data.league);
-          saveLocalLeague(data.league);
+          setLeague((prev) => {
+            const mergedLeague = mergeLeagueState(prev, data.league);
+            saveLocalLeague(mergedLeague);
+            return mergedLeague;
+          });
         }
         if (data.scores && Array.isArray(data.scores)) {
           setScores((prevScores) => {
@@ -1029,7 +1105,11 @@ export default function LeagueArenaClient({
             for (const s of data.scores) {
               const playerKey = (s.username || s.userId || "").trim().toLowerCase();
               const existing = scoreMap.get(`${playerKey}_${s.dayNumber}`);
-              if (!existing || s.points >= existing.points) {
+              if (
+                !existing ||
+                (s.totalQuestions || 0) > (existing.totalQuestions || 0) ||
+                s.points >= existing.points
+              ) {
                 scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
               }
             }
@@ -1045,7 +1125,32 @@ export default function LeagueArenaClient({
         }
       }
     } catch {}
-  }
+  }, [league.code, currentDay]);
+
+  // Live background sync: poll every 8s when not actively answering a question, and on tab focus
+  useEffect(() => {
+    if (phase === "playing") return;
+    fetchLeagueData();
+
+    const interval = setInterval(() => {
+      fetchLeagueData();
+    }, 8000);
+
+    const handleVisibilityOrFocus = () => {
+      if (document.visibilityState === "visible") {
+        fetchLeagueData();
+      }
+    };
+
+    window.addEventListener("focus", handleVisibilityOrFocus);
+    document.addEventListener("visibilitychange", handleVisibilityOrFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleVisibilityOrFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityOrFocus);
+    };
+  }, [phase, fetchLeagueData]);
 
   const shareUrl = getLeagueShareUrl(league);
 
@@ -1215,12 +1320,33 @@ export default function LeagueArenaClient({
               </div>
             </div>
 
+            {attemptFeedback && (
+              <div
+                className="p-3.5 rounded-2xl border text-xs font-semibold flex items-center justify-between gap-3"
+                style={{
+                  backgroundColor: "rgba(92, 106, 54, 0.12)",
+                  borderColor: "var(--olive)",
+                  color: "var(--text)",
+                }}
+              >
+                <span>{attemptFeedback}</span>
+                <button
+                  type="button"
+                  onClick={() => setAttemptFeedback("")}
+                  className="p-1 rounded-lg hover:bg-black/10 text-[var(--text-mute)] hover:text-[var(--text)] cursor-pointer shrink-0"
+                  aria-label="Dismiss notification"
+                >
+                  <X size={13} />
+                </button>
+              </div>
+            )}
+
             {/* Daily Action Card */}
             <div
               className="rounded-3xl p-6 surface border shadow-sm space-y-4"
               style={{
-                borderColor: hasCompletedToday ? "var(--olive)" : "var(--terra)",
-                background: hasCompletedToday ? "rgba(92, 106, 54, 0.05)" : "var(--bg-card)",
+                borderColor: hasCompletedToday || isNextDayLockedByHost ? "var(--olive)" : "var(--terra)",
+                background: hasCompletedToday || isNextDayLockedByHost ? "rgba(92, 106, 54, 0.05)" : "var(--bg-card)",
               }}
             >
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
@@ -1234,9 +1360,15 @@ export default function LeagueArenaClient({
                         : `All ${league.durationDays} Tournament Drops Completed!`}
                     </span>
                     {nextUncompletedDay && !status.isCompleted ? (
-                      <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2.5 py-0.5 rounded-full border border-[var(--terra)]/30">
-                        <Flame size={12} /> Ready to Play
-                      </span>
+                      isNextDayLockedByHost ? (
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--text-mute)] bg-[var(--bg-input)] px-2.5 py-0.5 rounded-full border border-[var(--border-dim)]">
+                          <Lock size={11} /> Locked by Host
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-[11px] font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2.5 py-0.5 rounded-full border border-[var(--terra)]/30">
+                          <Flame size={12} /> Ready to Play
+                        </span>
+                      )
                     ) : (
                       <span className="flex items-center gap-1 text-[11px] font-bold text-emerald-600 bg-emerald-500/15 px-2.5 py-0.5 rounded-full border border-emerald-500/30">
                         <CheckCircle2 size={12} /> All Drops Done
@@ -1256,19 +1388,34 @@ export default function LeagueArenaClient({
                     {status.isCompleted
                       ? "This tournament has ended! Check out the final cumulative standings below."
                       : nextUncompletedDay
-                      ? `Answer today's ${league.questionsPerDay} questions swiftly to earn velocity bonus points.`
+                      ? isNextDayLockedByHost
+                        ? `You have completed all unlocked drops so far. Drop ${nextUncompletedDay} unlocks when the Host opens it or on Day ${nextUncompletedDay}.`
+                        : `Answer today's ${league.questionsPerDay} questions swiftly to earn velocity bonus points.`
                       : `You have completed all ${league.durationDays} tournament drops! Check the live cumulative standings below.`}
                   </p>
                 </div>
 
                 {nextUncompletedDay && !status.isCompleted && (
-                  <button
-                    type="button"
-                    onClick={() => startDailyRound(nextUncompletedDay)}
-                    className="btn-terra px-6 py-3 rounded-2xl text-xs font-bold shadow-md shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
-                  >
-                    <span>Play Drop {nextUncompletedDay}</span>
-                  </button>
+                  isNextDayLockedByHost ? (
+                    isCreator ? (
+                      <button
+                        type="button"
+                        disabled={isUpdatingLeague}
+                        onClick={() => handleUnlockDrop(nextUncompletedDay)}
+                        className="px-5 py-3 rounded-2xl text-xs font-bold bg-[var(--olive)] text-white hover:opacity-90 shadow-sm shrink-0 cursor-pointer transition-all"
+                      >
+                        <span>Unlock Drop {nextUncompletedDay}</span>
+                      </button>
+                    ) : null
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => startDailyRound(nextUncompletedDay)}
+                      className="btn-terra px-6 py-3 rounded-2xl text-xs font-bold shadow-md shrink-0 cursor-pointer hover:scale-[1.02] active:scale-[0.98] transition-all"
+                    >
+                      <span>Play Drop {nextUncompletedDay}</span>
+                    </button>
+                  )
                 )}
               </div>
             </div>
@@ -1381,8 +1528,7 @@ export default function LeagueArenaClient({
                 {Array.from({ length: league.durationDays }, (_, i) => i + 1).map((dayNum) => {
                   const score = myScoresByDay.get(dayNum);
                   const isDone = !!score;
-                  const isHostControlled = league.attemptPolicy === "host_controlled" || !!league.unlockedUpToDay || !!league.dailySeedMap?._unlockedUpToDay;
-                  const isHostLocked = isHostControlled && dayNum > unlockedUpToDay;
+                  const isHostLocked = isPacedByHostOrSchedule && dayNum > unlockedUpToDay;
                   const dayQuestions = getQuestionsForLeagueDay(league, dayNum);
                   const totalDayQuestions = dayQuestions.length || league.questionsPerDay || 5;
                   const answeredCount = score?.questionResults?.length || (isDone ? (score.totalQuestions || totalDayQuestions) : 0);
@@ -1390,7 +1536,6 @@ export default function LeagueArenaClient({
                   const bonusCount = totalDayQuestions - answeredCount;
 
                   const isNext = !isDone && !isHostLocked && (dayNum === 1 || myScoresByDay.has(dayNum - 1));
-                  const isSequentialLocked = !isDone && !isHostLocked && !isNext;
 
                   return (
                     <div

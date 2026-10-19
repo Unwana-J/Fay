@@ -6,9 +6,12 @@ import {
   getLeagueStatus,
   aggregateLeagueLeaderboard,
   generateDailyLeagueQuestions,
+  hydrateLeagueFromScoreRows,
 } from "@/lib/trivia-league";
 import LeagueArenaClient from "./LeagueArenaClient";
 import { todayStr, formatDateToIso, addDaysToDate } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 export async function generateMetadata({
   params,
@@ -102,7 +105,7 @@ export default async function LeaguePage({
         .maybeSingle();
 
       if (leagueRow) {
-        league = {
+        const baseLeague: FriendshipLeague = {
           id: leagueRow.id,
           code: leagueRow.code,
           title: leagueRow.title,
@@ -119,32 +122,20 @@ export default async function LeaguePage({
           timerMode: leagueRow.daily_seed_map?._timerMode || "per_question",
           questionTimerSeconds: leagueRow.daily_seed_map?._questionTimer || 25,
           totalDropSeconds: leagueRow.daily_seed_map?._totalDropSeconds || (leagueRow.questions_per_day * 30),
-          unlockedUpToDay: leagueRow.daily_seed_map?._unlockedUpToDay || 1,
+          unlockedUpToDay: Math.max(Number(leagueRow.daily_seed_map?._unlockedUpToDay) || 1, Number(sp?.u) || 1),
           createdAt: leagueRow.created_at,
         };
 
-        // 2. Fetch Scores
+        // 2. Fetch Scores & League Sync Metadata
         const { data: scoreRows } = await supabase
           .from("league_scores")
           .select("*")
           .eq("league_code", cleanCode)
           .order("created_at", { ascending: true });
 
-        scores = (scoreRows || []).map((row: any) => ({
-          id: row.id,
-          leagueCode: row.league_code,
-          userId: row.user_id,
-          username: row.username,
-          avatar: row.avatar,
-          dayNumber: row.day_number,
-          date: row.date,
-          score: row.score,
-          totalQuestions: row.total_questions,
-          points: row.points,
-          durationSeconds: row.duration_seconds,
-          questionResults: row.question_results || [],
-          createdAt: row.created_at,
-        }));
+        const hydrated = hydrateLeagueFromScoreRows(baseLeague, scoreRows || []);
+        league = hydrated.league;
+        scores = hydrated.scores;
       }
     } catch {
       // Supabase unavailable or table not created yet

@@ -201,6 +201,9 @@ export function aggregateLeagueLeaderboard(
   const playerMap = new Map<string, LeagueLeaderboardEntry>();
 
   for (const s of scores) {
+    if (!s || s.dayNumber <= 0 || s.username === "__LEAGUE_SYNC__" || String(s.userId || "").startsWith("__league_sync_")) {
+      continue;
+    }
     const rawName = (s.username || "").trim();
     // Normalize scholar key by username first, falling back to userId
     const key = rawName ? rawName.toLowerCase() : (s.userId || "scholar").trim().toLowerCase();
@@ -239,7 +242,11 @@ export function aggregateLeagueLeaderboard(
         totalQuestions: s.totalQuestions || 5,
         date: s.date,
       };
-    } else if (s.points > existingDay.points || (s.points === existingDay.points && s.score > existingDay.score)) {
+    } else if (
+      (s.totalQuestions || 0) > (existingDay.totalQuestions || 0) ||
+      s.points > existingDay.points ||
+      (s.points === existingDay.points && s.score > existingDay.score)
+    ) {
       entry.dailyBreakdown[s.dayNumber] = {
         score: s.score,
         points: s.points,
@@ -282,6 +289,151 @@ export function aggregateLeagueLeaderboard(
   });
 
   return entries;
+}
+
+/**
+ * Intelligently merge two FriendshipLeague states (e.g. server vs localStorage),
+ * preserving the highest unlockedUpToDay, longest durationDays, unlimited policy,
+ * and longest question arrays per day (so bonus questions or unlocked drops are never overwritten).
+ */
+export function mergeLeagueState(
+  base: FriendshipLeague,
+  incoming?: Partial<FriendshipLeague> | null
+): FriendshipLeague {
+  if (!incoming) return base;
+
+  const baseSeed: Record<string, any> = { ...(base.dailySeedMap || {}) };
+  const incSeed: Record<string, any> = { ...(incoming.dailySeedMap || {}) };
+
+  const mergedSeed: Record<string, any> = { ...baseSeed, ...incSeed };
+
+  // For each day_X key, keep whichever question list is longer (preserves +3/+5 bonus questions)
+  const allKeys = new Set([...Object.keys(baseSeed), ...Object.keys(incSeed)]);
+  for (const key of allKeys) {
+    if (key.startsWith("day_")) {
+      const a = Array.isArray(baseSeed[key]) ? baseSeed[key] : [];
+      const b = Array.isArray(incSeed[key]) ? incSeed[key] : [];
+      mergedSeed[key] = b.length >= a.length ? b : a;
+    }
+  }
+
+  const maxDuration = Math.max(Number(base.durationDays) || 5, Number(incoming.durationDays) || 5);
+  const maxUnlocked = Math.max(
+    Number(base.unlockedUpToDay) || 1,
+    Number(incoming.unlockedUpToDay) || 1,
+    Number(baseSeed._unlockedUpToDay) || 1,
+    Number(incSeed._unlockedUpToDay) || 1
+  );
+
+  const policy =
+    base.attemptPolicy === "unlimited" ||
+    incoming.attemptPolicy === "unlimited" ||
+    baseSeed._policy === "unlimited" ||
+    incSeed._policy === "unlimited"
+      ? "unlimited"
+      : incoming.attemptPolicy || base.attemptPolicy || incSeed._policy || baseSeed._policy || "flexible";
+
+  mergedSeed._unlockedUpToDay = maxUnlocked;
+  mergedSeed._policy = policy;
+
+  return {
+    ...base,
+    ...incoming,
+    code: base.code || incoming.code || "LEAGUE",
+    title: base.title || incoming.title || "Friendship League",
+    creatorName: base.creatorName || incoming.creatorName || "Scholar",
+    creatorId: base.creatorId || incoming.creatorId || "creator",
+    durationDays: maxDuration,
+    unlockedUpToDay: maxUnlocked,
+    attemptPolicy: policy,
+    dailySeedMap: mergedSeed,
+  };
+}
+
+/**
+ * Hydrate a league object and extract clean player scores from raw database `league_scores` rows.
+ * Also applies any `__LEAGUE_SYNC__` state-sync rows (used when Supabase RLS blocks direct UPDATE on `friendship_leagues`)
+ * and ensures `unlockedUpToDay` is at least the highest scored day or current calendar day for Daily (24h) leagues.
+ */
+export function hydrateLeagueFromScoreRows(
+  baseLeague: FriendshipLeague,
+  rawRows: any[]
+): { league: FriendshipLeague; scores: LeagueDailyScore[] } {
+  let updatedLeague = { ...baseLeague };
+  const playerScores: LeagueDailyScore[] = [];
+  let maxScoredDay = 1;
+
+  for (const row of rawRows || []) {
+    const isSyncRow =
+      row.day_number <= 0 ||
+      row.username === "__LEAGUE_SYNC__" ||
+      String(row.user_id || "").startsWith("__league_sync_");
+
+    if (isSyncRow) {
+      const metaList = Array.isArray(row.question_results) ? row.question_results : [row.question_results];
+      const meta = metaList.find((m: any) => m && (m._syncMeta || m.unlockedUpToDay || m.dailySeedMap || m.durationDays));
+      if (meta) {
+        updatedLeague = mergeLeagueState(updatedLeague, {
+          unlockedUpToDay: Number(meta.unlockedUpToDay || row.score || updatedLeague.unlockedUpToDay || 1),
+          durationDays: Number(meta.durationDays || row.total_questions || updatedLeague.durationDays || 5),
+          attemptPolicy: meta.attemptPolicy || updatedLeague.attemptPolicy,
+          dailySeedMap: meta.dailySeedMap || updatedLeague.dailySeedMap,
+        });
+      } else if (row.score > 0) {
+        updatedLeague = mergeLeagueState(updatedLeague, {
+          unlockedUpToDay: Number(row.score),
+          durationDays: Number(row.total_questions || updatedLeague.durationDays),
+        });
+      }
+      continue;
+    }
+
+    const dayNum = Number(row.day_number) || 1;
+    if (dayNum > maxScoredDay) {
+      maxScoredDay = dayNum;
+    }
+
+    playerScores.push({
+      id: row.id,
+      leagueCode: row.league_code,
+      userId: row.user_id,
+      username: row.username,
+      avatar: row.avatar,
+      dayNumber: dayNum,
+      date: row.date,
+      score: row.score,
+      totalQuestions: row.total_questions,
+      points: row.points,
+      durationSeconds: row.duration_seconds,
+      questionResults: row.question_results || [],
+      createdAt: row.created_at,
+    });
+  }
+
+  const status = getLeagueStatus(updatedLeague.startDate, updatedLeague.durationDays);
+  const currentUnlocked = Number(
+    updatedLeague.unlockedUpToDay ||
+    (updatedLeague.dailySeedMap as any)?._unlockedUpToDay ||
+    1
+  );
+
+  let effectiveUnlocked = Math.max(currentUnlocked, maxScoredDay);
+  if (updatedLeague.attemptPolicy === "strict") {
+    // Daily (24h) automatically unlocks each calendar day up to status.dayNumber
+    effectiveUnlocked = Math.max(effectiveUnlocked, status.dayNumber);
+  } else if (updatedLeague.attemptPolicy === "flexible" || updatedLeague.attemptPolicy === "unlimited") {
+    effectiveUnlocked = Math.max(effectiveUnlocked, updatedLeague.durationDays);
+  }
+
+  updatedLeague.unlockedUpToDay = effectiveUnlocked;
+  if (updatedLeague.dailySeedMap) {
+    (updatedLeague.dailySeedMap as any)._unlockedUpToDay = effectiveUnlocked;
+  }
+
+  return {
+    league: updatedLeague,
+    scores: playerScores,
+  };
 }
 
 /**

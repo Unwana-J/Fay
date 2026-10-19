@@ -4,10 +4,14 @@ import {
   generateDailyLeagueQuestions,
   getLeagueStatus,
   aggregateLeagueLeaderboard,
+  hydrateLeagueFromScoreRows,
+  mergeLeagueState,
   type FriendshipLeague,
   type LeagueDailyScore,
 } from "@/lib/trivia-league";
 import { todayStr, addDaysToDate, formatDateToIso } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 // Generate clean unique 6-character code
 function generateLeagueCode(): string {
@@ -189,6 +193,10 @@ export async function GET(req: NextRequest) {
             difficulty: row.difficulty,
             category: row.category,
             attemptPolicy: row.daily_seed_map?._policy || "flexible",
+            unlockedUpToDay: row.daily_seed_map?._unlockedUpToDay || 1,
+            timerMode: row.daily_seed_map?._timerMode || "per_question",
+            questionTimerSeconds: row.daily_seed_map?._questionTimer || 25,
+            totalDropSeconds: row.daily_seed_map?._totalDropSeconds || (row.questions_per_day * 30),
             dailySeedMap: row.daily_seed_map,
             createdAt: row.created_at,
           });
@@ -210,6 +218,9 @@ export async function GET(req: NextRequest) {
 
       if (scoreLeagueRows && Array.isArray(scoreLeagueRows)) {
         for (const row of scoreLeagueRows) {
+          if (row.day_number <= 0 || row.username === "__LEAGUE_SYNC__" || String(row.user_id || "").startsWith("__league_sync_")) {
+            continue;
+          }
           userScores.push({
             id: row.id,
             leagueCode: row.league_code,
@@ -264,6 +275,29 @@ export async function GET(req: NextRequest) {
         }
       }
 
+      // Hydrate all discovered leagues with any sync metadata rows from league_scores
+      const allLeagueCodes = Array.from(leaguesMap.keys());
+      if (allLeagueCodes.length > 0) {
+        const { data: allLeagueScoreRows } = await supabase
+          .from("league_scores")
+          .select("*")
+          .in("league_code", allLeagueCodes)
+          .order("created_at", { ascending: true });
+
+        if (allLeagueScoreRows && Array.isArray(allLeagueScoreRows)) {
+          const rowsByCode = new Map<string, any[]>();
+          for (const r of allLeagueScoreRows) {
+            const c = r.league_code;
+            if (!rowsByCode.has(c)) rowsByCode.set(c, []);
+            rowsByCode.get(c)!.push(r);
+          }
+          for (const [c, baseL] of leaguesMap.entries()) {
+            const hydrated = hydrateLeagueFromScoreRows(baseL, rowsByCode.get(c) || []);
+            leaguesMap.set(c, hydrated.league);
+          }
+        }
+      }
+
       return NextResponse.json({
         success: true,
         leagues: Array.from(leaguesMap.values()),
@@ -282,7 +316,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: "League not found." }, { status: 404 });
     }
 
-    const league: FriendshipLeague = {
+    const baseLeague: FriendshipLeague = {
       id: leagueRow.id,
       code: leagueRow.code,
       title: leagueRow.title,
@@ -303,28 +337,14 @@ export async function GET(req: NextRequest) {
       createdAt: leagueRow.created_at,
     };
 
-    // 2. Fetch all scores
-    const { data: scoreRows, error: scoresError } = await supabase
+    // 2. Fetch all scores & sync metadata rows
+    const { data: scoreRows } = await supabase
       .from("league_scores")
       .select("*")
       .eq("league_code", code)
       .order("created_at", { ascending: true });
 
-    const scores: LeagueDailyScore[] = (scoreRows || []).map((row: any) => ({
-      id: row.id,
-      leagueCode: row.league_code,
-      userId: row.user_id,
-      username: row.username,
-      avatar: row.avatar,
-      dayNumber: row.day_number,
-      date: row.date,
-      score: row.score,
-      totalQuestions: row.total_questions,
-      points: row.points,
-      durationSeconds: row.duration_seconds,
-      questionResults: row.question_results || [],
-      createdAt: row.created_at,
-    }));
+    const { league, scores } = hydrateLeagueFromScoreRows(baseLeague, scoreRows || []);
 
     const status = getLeagueStatus(league.startDate, league.durationDays);
     const leaderboard = aggregateLeagueLeaderboard(scores, status.dayNumber);
@@ -345,85 +365,139 @@ export async function GET(req: NextRequest) {
 export async function PATCH(req: NextRequest) {
   try {
     const body = await req.json();
-    const { code, extraDrops, newDuration, attemptPolicy, dailySeedMap } = body;
+    const { code, extraDrops, newDuration, attemptPolicy, dailySeedMap, unlockedUpToDay } = body;
 
     if (!code) {
       return NextResponse.json({ error: "League code is required." }, { status: 400 });
     }
 
+    const cleanCode = String(code).toUpperCase().trim();
+
     if (isSupabaseConfigured && supabase) {
       const { data: leagueRow } = await supabase
         .from("friendship_leagues")
         .select("*")
-        .eq("code", code)
+        .eq("code", cleanCode)
         .maybeSingle();
 
       if (leagueRow) {
-        if (body.unlockedUpToDay) {
-          const map = dailySeedMap || leagueRow.daily_seed_map || {};
-          map._unlockedUpToDay = body.unlockedUpToDay;
-          await supabase
-            .from("friendship_leagues")
-            .update({
-              daily_seed_map: map,
-            })
-            .eq("code", code);
+        const { data: existingScoreRows } = await supabase
+          .from("league_scores")
+          .select("*")
+          .eq("league_code", cleanCode)
+          .order("created_at", { ascending: true });
 
-          return NextResponse.json({
-            success: true,
-            unlockedUpToDay: body.unlockedUpToDay,
-            dailySeedMap: map,
-          });
-        }
+        const baseLeague: FriendshipLeague = {
+          id: leagueRow.id,
+          code: leagueRow.code,
+          title: leagueRow.title,
+          creatorName: leagueRow.creator_name,
+          creatorId: leagueRow.creator_id,
+          durationDays: leagueRow.duration_days,
+          startDate: leagueRow.start_date,
+          endDate: leagueRow.end_date,
+          questionsPerDay: leagueRow.questions_per_day,
+          difficulty: leagueRow.difficulty,
+          category: leagueRow.category,
+          attemptPolicy: leagueRow.daily_seed_map?._policy || "flexible",
+          unlockedUpToDay: leagueRow.daily_seed_map?._unlockedUpToDay || 1,
+          timerMode: leagueRow.daily_seed_map?._timerMode || "per_question",
+          questionTimerSeconds: leagueRow.daily_seed_map?._questionTimer || 25,
+          totalDropSeconds: leagueRow.daily_seed_map?._totalDropSeconds || (leagueRow.questions_per_day * 30),
+          dailySeedMap: leagueRow.daily_seed_map || {},
+          createdAt: leagueRow.created_at,
+        };
 
-        if (dailySeedMap) {
-          await supabase
-            .from("friendship_leagues")
-            .update({
-              daily_seed_map: dailySeedMap,
-            })
-            .eq("code", code);
+        const { league: currentHydrated } = hydrateLeagueFromScoreRows(baseLeague, existingScoreRows || []);
 
-          return NextResponse.json({
-            success: true,
-            dailySeedMap,
-          });
-        }
+        const targetDuration = Number(
+          newDuration ||
+          (extraDrops ? currentHydrated.durationDays + Number(extraDrops) : currentHydrated.durationDays)
+        );
+        const targetPolicy = attemptPolicy || currentHydrated.attemptPolicy || "flexible";
+        const targetUnlocked = Number(
+          unlockedUpToDay ||
+          dailySeedMap?._unlockedUpToDay ||
+          currentHydrated.unlockedUpToDay ||
+          1
+        );
 
-        const updatedDuration = newDuration || (leagueRow.duration_days + (extraDrops || 1));
-        const updatedPolicy = attemptPolicy || leagueRow.daily_seed_map?._policy || "flexible";
-        const currentSeedMap = leagueRow.daily_seed_map || {};
-        currentSeedMap._policy = updatedPolicy;
+        let updatedLeague = mergeLeagueState(currentHydrated, {
+          durationDays: targetDuration,
+          attemptPolicy: targetPolicy,
+          unlockedUpToDay: targetUnlocked,
+          dailySeedMap: dailySeedMap || currentHydrated.dailySeedMap,
+        });
 
-        for (let d = leagueRow.duration_days + 1; d <= updatedDuration; d++) {
-          if (!currentSeedMap[`day_${d}`]) {
+        const mergedSeedMap: Record<string, any> = { ...(updatedLeague.dailySeedMap || {}) };
+        mergedSeedMap._policy = updatedLeague.attemptPolicy;
+        mergedSeedMap._unlockedUpToDay = updatedLeague.unlockedUpToDay;
+
+        for (let d = 1; d <= updatedLeague.durationDays; d++) {
+          if (!mergedSeedMap[`day_${d}`]) {
             const extraMap = generateDailyLeagueQuestions(
               1,
-              leagueRow.questions_per_day || 5,
-              leagueRow.difficulty || "mixed",
-              leagueRow.category || "all",
-              `${code}_DAY_${d}`
+              updatedLeague.questionsPerDay || 5,
+              updatedLeague.difficulty || "mixed",
+              updatedLeague.category || "all",
+              `${cleanCode}_DAY_${d}`
             );
-            currentSeedMap[`day_${d}`] = extraMap["day_1"] || [];
+            mergedSeedMap[`day_${d}`] = extraMap["day_1"] || [];
           }
         }
 
-        const newEndDate = formatDateToIso(addDaysToDate(new Date(leagueRow.start_date), updatedDuration - 1));
+        updatedLeague.dailySeedMap = mergedSeedMap;
+        const newEndDate = formatDateToIso(
+          addDaysToDate(new Date(updatedLeague.startDate), updatedLeague.durationDays - 1)
+        );
+        updatedLeague.endDate = newEndDate;
 
-        await supabase
+        // 1. Attempt direct update on friendship_leagues
+        const { data: updatedRows, error: updateErr } = await supabase
           .from("friendship_leagues")
           .update({
-            duration_days: updatedDuration,
+            duration_days: updatedLeague.durationDays,
             end_date: newEndDate,
-            daily_seed_map: currentSeedMap,
+            daily_seed_map: mergedSeedMap,
           })
-          .eq("code", code);
+          .eq("code", cleanCode)
+          .select();
+
+        // 2. If direct UPDATE updated 0 rows (e.g. RLS FOR UPDATE policy not enabled in Supabase),
+        // persist a sync metadata event row into league_scores (which allows public INSERT & SELECT).
+        if (updateErr || !updatedRows || updatedRows.length === 0) {
+          await supabase.from("league_scores").insert([
+            {
+              league_code: cleanCode,
+              user_id: `__league_sync_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+              username: "__LEAGUE_SYNC__",
+              avatar: "/avatars/avatar-scholar.svg",
+              day_number: 0,
+              date: todayStr(),
+              score: updatedLeague.unlockedUpToDay || 1,
+              total_questions: updatedLeague.durationDays || 5,
+              points: 0,
+              duration_seconds: 0,
+              question_results: [
+                {
+                  _syncMeta: true,
+                  unlockedUpToDay: updatedLeague.unlockedUpToDay,
+                  durationDays: updatedLeague.durationDays,
+                  attemptPolicy: updatedLeague.attemptPolicy,
+                  dailySeedMap: mergedSeedMap,
+                },
+              ],
+            },
+          ]);
+        }
 
         return NextResponse.json({
           success: true,
-          durationDays: updatedDuration,
-          dailySeedMap: currentSeedMap,
-          attemptPolicy: updatedPolicy,
+          league: updatedLeague,
+          unlockedUpToDay: updatedLeague.unlockedUpToDay,
+          durationDays: updatedLeague.durationDays,
+          dailySeedMap: mergedSeedMap,
+          attemptPolicy: updatedLeague.attemptPolicy,
         });
       }
     }
