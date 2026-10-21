@@ -425,9 +425,9 @@ export default function LeagueArenaClient({
 
   const dropGridCols = useMemo(() => {
     if (league.durationDays <= 3) return "grid-cols-1 sm:grid-cols-3";
-    if (league.durationDays <= 5) return "grid-cols-2 sm:grid-cols-3 md:grid-cols-5";
-    if (league.durationDays <= 7) return "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7";
-    return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7";
+    if (league.durationDays <= 4) return "grid-cols-1 sm:grid-cols-2 md:grid-cols-4";
+    // For 5 to 7+ drops: use 3 columns on standard desktop (matching top section) and max 4 on wide screens
+    return "grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4";
   }, [league.durationDays]);
 
   const [activeDropDay, setActiveDropDay] = useState<number>(currentDay);
@@ -1961,18 +1961,18 @@ export default function LeagueArenaClient({
                                 <div className="flex items-center gap-2 flex-wrap">
                                   <div className="text-xs px-2.5 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] flex items-center gap-1.5 shadow-2xs">
                                     <span>Accuracy:</span>
-                                    <span className="font-bold font-mono text-[var(--text)]">
+                                    <span className="font-bold text-[var(--text)]">
                                       {entry.totalQuestions > 0
                                         ? Math.round((entry.totalCorrect / entry.totalQuestions) * 100)
                                         : 0}%
                                     </span>
-                                    <span className="text-[10px] text-[var(--text-mute)] font-mono">
+                                    <span className="text-[11px] text-[var(--text-mute)] font-sans">
                                       ({entry.totalCorrect}/{entry.totalQuestions || entry.daysCompleted * (league.questionsPerDay || 5)})
                                     </span>
                                   </div>
                                   <div className="text-xs px-2.5 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] flex items-center gap-1.5 shadow-2xs">
                                     <span>Average:</span>
-                                    <span className="font-bold font-mono text-[var(--olive)]">
+                                    <span className="font-bold text-[var(--olive)] font-sans">
                                       {entry.daysCompleted > 0
                                         ? Math.round(entry.totalPoints / entry.daysCompleted)
                                         : 0} pts
@@ -1994,7 +1994,7 @@ export default function LeagueArenaClient({
                               </div>
 
                               {/* Drop Cards Grid */}
-                              <div className={`grid ${dropGridCols} gap-2.5`}>
+                              <div className={`grid ${dropGridCols} gap-3`}>
                                 {Array.from({ length: league.durationDays }, (_, i) => i + 1).map((dayNum) => {
                                   const dropInfo = getScholarDropStatus(entry, dayNum);
                                   const dayQuestions = getQuestionsForLeagueDay(league, dayNum);
@@ -2004,31 +2004,31 @@ export default function LeagueArenaClient({
                                     return (
                                       <div
                                         key={dayNum}
-                                        className="p-3 rounded-2xl border border-[var(--olive)]/35 bg-[var(--bg-card)] shadow-2xs flex flex-col justify-between space-y-2.5"
+                                        className="p-3 rounded-2xl border border-[var(--olive)]/35 bg-[var(--bg-card)] shadow-2xs flex flex-col justify-between space-y-2.5 min-w-[150px]"
                                       >
                                         <div className="space-y-1.5">
-                                          <div className="flex items-center justify-between gap-1">
+                                          <div className="flex items-center justify-between gap-2">
                                             <span className="font-space font-bold text-xs text-[var(--text)]">
                                               Drop {dayNum}
                                             </span>
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full">
-                                              <CheckCircle2 size={10} /> Completed
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                                              <CheckCircle2 size={11} /> Completed
                                             </span>
                                           </div>
-                                          <div className="text-xs font-mono text-[var(--text-dim)] pt-0.5">
-                                            Score: <strong className="text-[var(--text)]">{dropInfo.stats.score}/{totalDayQ}</strong>
+
+                                          <div className="flex items-center justify-between px-2.5 py-1.5 rounded-xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-xs font-mono">
+                                            <span className="text-[var(--text-dim)]">
+                                              Score: <strong className="text-[var(--text)]">{dropInfo.stats.score}/{totalDayQ}</strong>
+                                            </span>
+                                            <span className="font-bold text-[var(--olive)]">
+                                              +{dropInfo.stats.points} pts
+                                            </span>
                                           </div>
                                         </div>
 
-                                        <div className="pt-2 border-t border-[var(--border-dim)] flex items-center justify-between text-xs font-mono">
-                                          <span className="font-bold text-[var(--olive)]">
-                                            +{dropInfo.stats.points} pts
-                                          </span>
-                                          {dropInfo.stats.durationSeconds ? (
-                                            <span className="text-[10px] text-[var(--text-mute)]">
-                                              {dropInfo.stats.durationSeconds}s
-                                            </span>
-                                          ) : null}
+                                        <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-mute)] pt-0.5 border-t border-[var(--border-dim)]/50">
+                                          <span>{dropInfo.stats.durationSeconds ? `${dropInfo.stats.durationSeconds}s duration` : "Completed"}</span>
+                                          <span className="text-emerald-600 font-semibold">Done</span>
                                         </div>
                                       </div>
                                     );
@@ -2038,24 +2038,26 @@ export default function LeagueArenaClient({
                                     return (
                                       <div
                                         key={dayNum}
-                                        className="p-3 rounded-2xl border border-[var(--terra)]/40 bg-[var(--terra)]/5 shadow-2xs flex flex-col justify-between space-y-2.5"
+                                        className="p-3 rounded-2xl border border-[var(--terra)]/40 bg-[var(--terra)]/5 shadow-2xs flex flex-col justify-between space-y-2.5 min-w-[150px]"
                                       >
                                         <div className="space-y-1.5">
-                                          <div className="flex items-center justify-between gap-1">
+                                          <div className="flex items-center justify-between gap-2">
                                             <span className="font-space font-bold text-xs text-[var(--text)]">
                                               Drop {dayNum}
                                             </span>
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2 py-0.5 rounded-full">
-                                              <Flame size={10} /> Ready
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
+                                              <Flame size={11} /> Ready
                                             </span>
                                           </div>
-                                          <div className="text-[11px] text-[var(--text-dim)] pt-0.5">
+
+                                          <div className="py-1.5 px-2.5 text-center text-xs font-medium text-[var(--text)] bg-[var(--bg-card)] rounded-xl border border-[var(--terra)]/25">
                                             {isMe ? "Ready to play" : "Next in line"}
                                           </div>
                                         </div>
 
-                                        <div className="pt-2 border-t border-[var(--terra)]/20 text-right text-[10px] font-mono text-[var(--text-mute)]">
-                                          Awaiting play
+                                        <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-mute)] pt-0.5 border-t border-[var(--border-dim)]/50">
+                                          <span>{totalDayQ} Questions</span>
+                                          <span className="text-[var(--terra)] font-semibold">Awaiting play</span>
                                         </div>
                                       </div>
                                     );
@@ -2065,24 +2067,26 @@ export default function LeagueArenaClient({
                                     return (
                                       <div
                                         key={dayNum}
-                                        className="p-3 rounded-2xl border border-rose-500/25 bg-rose-500/5 opacity-75 flex flex-col justify-between space-y-2.5"
+                                        className="p-3 rounded-2xl border border-rose-500/25 bg-rose-500/5 opacity-80 flex flex-col justify-between space-y-2.5 min-w-[150px]"
                                       >
                                         <div className="space-y-1.5">
-                                          <div className="flex items-center justify-between gap-1">
+                                          <div className="flex items-center justify-between gap-2">
                                             <span className="font-space font-bold text-xs text-rose-700 dark:text-rose-400">
                                               Drop {dayNum}
                                             </span>
-                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-rose-700 dark:text-rose-400 bg-rose-500/15 px-2 py-0.5 rounded-full">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-rose-700 dark:text-rose-400 bg-rose-500/15 px-2 py-0.5 rounded-full whitespace-nowrap shrink-0">
                                               <XCircle size={10} /> Missed
                                             </span>
                                           </div>
-                                          <div className="text-[11px] text-[var(--text-mute)] pt-0.5">
+
+                                          <div className="py-1.5 px-2.5 text-center text-xs text-rose-700/80 dark:text-rose-400/80 bg-[var(--bg-card)] rounded-xl border border-rose-500/20">
                                             Drop expired
                                           </div>
                                         </div>
 
-                                        <div className="pt-2 border-t border-rose-500/20 text-right text-[10px] font-mono text-[var(--text-mute)]">
-                                          0 pts
+                                        <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-mute)] pt-0.5 border-t border-rose-500/20">
+                                          <span>0 pts</span>
+                                          <span className="text-rose-600 font-semibold">Missed</span>
                                         </div>
                                       </div>
                                     );
@@ -2091,26 +2095,28 @@ export default function LeagueArenaClient({
                                   return (
                                     <div
                                       key={dayNum}
-                                      className="p-3 rounded-2xl border border-[var(--border-dim)] bg-[var(--bg-card)]/40 opacity-70 flex flex-col justify-between space-y-2.5"
+                                      className="p-3 rounded-2xl border border-[var(--border-dim)] bg-[var(--bg-card)]/40 opacity-70 flex flex-col justify-between space-y-2.5 min-w-[150px]"
                                     >
                                       <div className="space-y-1.5">
-                                        <div className="flex items-center justify-between gap-1">
+                                        <div className="flex items-center justify-between gap-2">
                                           <span className="font-space font-bold text-xs text-[var(--text-mute)]">
                                             Drop {dayNum}
                                           </span>
-                                          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)]">
-                                            <Lock size={9} /> Locked
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)] whitespace-nowrap shrink-0">
+                                            <Lock size={10} /> Locked
                                           </span>
                                         </div>
-                                        <div className="text-[11px] text-[var(--text-mute)] pt-0.5">
+
+                                        <div className="py-1.5 px-2 text-center text-xs text-[var(--text-mute)] bg-[var(--bg-input)]/40 rounded-xl border border-[var(--border-dim)]/50 truncate" title={dropInfo.status === "locked_host" ? "Locked by Host" : `Unlocks after Drop ${dayNum - 1}`}>
                                           {dropInfo.status === "locked_host"
                                             ? "Locked by Host"
                                             : `Unlocks after Drop ${dayNum - 1}`}
                                         </div>
                                       </div>
 
-                                      <div className="pt-2 border-t border-[var(--border-dim)] text-right text-[10px] font-mono text-[var(--text-mute)]">
-                                        Locked
+                                      <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-mute)] pt-0.5 border-t border-[var(--border-dim)]/50">
+                                        <span>{totalDayQ} Questions</span>
+                                        <span>Locked</span>
                                       </div>
                                     </div>
                                   );
