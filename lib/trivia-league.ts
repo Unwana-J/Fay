@@ -53,7 +53,16 @@ export interface LeagueLeaderboardEntry {
   todayScore?: number;
   todayPoints?: number;
   rank: number;
-  dailyBreakdown: Record<number, { score: number; points: number; totalQuestions?: number; date: string }>;
+  dailyBreakdown: Record<
+    number,
+    {
+      score: number;
+      points: number;
+      totalQuestions?: number;
+      durationSeconds?: number;
+      date: string;
+    }
+  >;
 }
 
 /**
@@ -289,6 +298,7 @@ export function aggregateLeagueLeaderboard(
         score: s.score,
         points: s.points,
         totalQuestions: s.totalQuestions || 5,
+        durationSeconds: s.durationSeconds,
         date: s.date,
       };
     } else if (
@@ -300,6 +310,7 @@ export function aggregateLeagueLeaderboard(
         score: s.score,
         points: s.points,
         totalQuestions: s.totalQuestions || existingDay.totalQuestions,
+        durationSeconds: s.durationSeconds || existingDay.durationSeconds,
         date: s.date,
       };
     }

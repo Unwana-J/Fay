@@ -16,6 +16,7 @@ import {
   Check,
   Zap,
   ChevronRight,
+  ChevronDown,
   Loader2,
   ShieldCheck,
   RotateCcw,
@@ -323,6 +324,43 @@ export default function LeagueArenaClient({
   // Time remaining to next drop (midnight)
   const [timeToNextDrop, setTimeToNextDrop] = useState("");
 
+  // Participant Scorecard Inspection State
+  const [expandedParticipants, setExpandedParticipants] = useState<Record<string, boolean>>({});
+  const [selectedParticipantModal, setSelectedParticipantModal] = useState<LeagueLeaderboardEntry | null>(null);
+
+  const toggleParticipantExpanded = useCallback((key: string) => {
+    setExpandedParticipants((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  }, []);
+
+  const getParticipantDayStats = useCallback(
+    (entry: LeagueLeaderboardEntry, dayNum: number) => {
+      if (entry.dailyBreakdown?.[dayNum]) {
+        return entry.dailyBreakdown[dayNum];
+      }
+      const cleanUser = (entry.username || "").trim().toLowerCase();
+      const raw = scores.find(
+        (s) =>
+          s.dayNumber === dayNum &&
+          ((s.username || "").trim().toLowerCase() === cleanUser ||
+            (entry.userId && s.userId === entry.userId))
+      );
+      if (raw) {
+        return {
+          score: raw.score,
+          points: raw.points,
+          totalQuestions: raw.totalQuestions || league.questionsPerDay || 5,
+          durationSeconds: raw.durationSeconds,
+          date: raw.date,
+        };
+      }
+      return null;
+    },
+    [scores, league.questionsPerDay]
+  );
+
   const status = getLeagueStatus(league.startDate, league.durationDays);
   const currentDay = status.dayNumber;
 
@@ -350,6 +388,47 @@ export default function LeagueArenaClient({
 
   const isPacedByHostOrSchedule =
     league.attemptPolicy === "host_controlled" || league.attemptPolicy === "strict";
+
+  // Helper to determine the status and data for each drop of a specific scholar
+  const getScholarDropStatus = useCallback(
+    (entry: LeagueLeaderboardEntry, dayNum: number) => {
+      const stats = getParticipantDayStats(entry, dayNum);
+      if (stats) {
+        return { status: "completed" as const, stats };
+      }
+
+      // Check if locked by host or schedule
+      const isHostLocked = isPacedByHostOrSchedule && dayNum > unlockedUpToDay;
+      if (isHostLocked) {
+        return { status: "locked_host" as const, stats: null };
+      }
+
+      // Check sequential progression (if day > 1 and previous drop not completed)
+      const isUnlimited = league.attemptPolicy === "unlimited";
+      if (!isUnlimited && dayNum > 1) {
+        const prevStats = getParticipantDayStats(entry, dayNum - 1);
+        if (!prevStats) {
+          return { status: "locked_sequential" as const, stats: null };
+        }
+      }
+
+      // Check strict mode missed drop
+      if (league.attemptPolicy === "strict" && dayNum < currentDay) {
+        return { status: "missed" as const, stats: null };
+      }
+
+      // Otherwise drop is ready/in-progress for this scholar
+      return { status: "ready" as const, stats: null };
+    },
+    [getParticipantDayStats, isPacedByHostOrSchedule, unlockedUpToDay, league.attemptPolicy, currentDay]
+  );
+
+  const dropGridCols = useMemo(() => {
+    if (league.durationDays <= 3) return "grid-cols-1 sm:grid-cols-3";
+    if (league.durationDays <= 5) return "grid-cols-2 sm:grid-cols-3 md:grid-cols-5";
+    if (league.durationDays <= 7) return "grid-cols-2 sm:grid-cols-4 lg:grid-cols-7";
+    return "grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7";
+  }, [league.durationDays]);
 
   const [activeDropDay, setActiveDropDay] = useState<number>(currentDay);
 
@@ -1716,11 +1795,16 @@ export default function LeagueArenaClient({
             {/* Live Standings Leaderboard */}
             <div className="rounded-3xl p-6 surface border shadow-sm space-y-4" style={{ borderColor: "var(--border)" }}>
               <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: "var(--border-dim)" }}>
-                <div className="flex items-center gap-2">
-                  <Trophy size={18} className="text-[var(--gold)]" />
-                  <h3 className="font-space font-bold text-base text-[var(--text)]">
-                    Cumulative Standings
-                  </h3>
+                <div className="space-y-0.5">
+                  <div className="flex items-center gap-2">
+                    <Trophy size={18} className="text-[var(--gold)]" />
+                    <h3 className="font-space font-bold text-base text-[var(--text)]">
+                      Cumulative Standings
+                    </h3>
+                  </div>
+                  <p className="text-xs text-[var(--text-dim)]">
+                    Select any scholar to view their score on each drop
+                  </p>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
@@ -1754,74 +1838,287 @@ export default function LeagueArenaClient({
                   </p>
                 </div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2.5">
                   {leaderboard.map((entry) => {
                     const isMe =
                       (entry.username || "").trim().toLowerCase() === myUsername ||
                       (profile.id && entry.userId === profile.id);
+                    const participantKey = (entry.username || entry.userId || "scholar").trim().toLowerCase();
+                    const isExpanded = !!expandedParticipants[participantKey];
 
                     return (
                       <div
-                        key={entry.username || entry.userId}
-                        className={`flex items-center justify-between p-3.5 rounded-2xl border transition-all ${
+                        key={participantKey}
+                        className={`rounded-2xl border transition-all overflow-hidden ${
                           isMe
                             ? "border-[var(--olive)] bg-[var(--olive)]/8 shadow-xs"
-                            : "border-[var(--border-dim)] bg-[var(--bg-card)]"
+                            : "border-[var(--border-dim)] bg-[var(--bg-card)] hover:border-[var(--olive)]/50"
                         }`}
                       >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {/* Rank Badge */}
-                          <div
-                            className={`w-7 h-7 rounded-full flex items-center justify-center font-mono font-bold text-xs ${
-                              entry.rank === 1
-                                ? "bg-amber-400/20 text-amber-600 border border-amber-400/40"
-                                : entry.rank === 2
-                                ? "bg-slate-300/30 text-slate-700 border border-slate-300"
-                                : entry.rank === 3
-                                ? "bg-amber-700/15 text-amber-800 border border-amber-700/30"
-                                : "bg-[var(--bg-input)] text-[var(--text-mute)] border border-[var(--border-dim)]"
-                            }`}
-                          >
-                            {entry.rank === 1 ? "🥇" : entry.rank === 2 ? "🥈" : entry.rank === 3 ? "🥉" : `#${entry.rank}`}
-                          </div>
+                        <button
+                          type="button"
+                          onClick={() => toggleParticipantExpanded(participantKey)}
+                          className="w-full flex items-center justify-between p-3.5 text-left cursor-pointer transition-colors hover:bg-[var(--bg-input)]/40 focus:outline-none"
+                          aria-expanded={isExpanded}
+                          title="Click to toggle drop scores breakdown"
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            {/* Rank Badge */}
+                            <div
+                              className={`w-7 h-7 rounded-full flex items-center justify-center font-mono font-bold text-xs shrink-0 ${
+                                entry.rank === 1
+                                  ? "bg-amber-400/20 text-amber-600 border border-amber-400/40"
+                                  : entry.rank === 2
+                                  ? "bg-slate-300/30 text-slate-700 border border-slate-300"
+                                  : entry.rank === 3
+                                  ? "bg-amber-700/15 text-amber-800 border border-amber-700/30"
+                                  : "bg-[var(--bg-input)] text-[var(--text-mute)] border border-[var(--border-dim)]"
+                              }`}
+                            >
+                              {entry.rank === 1 ? "🥇" : entry.rank === 2 ? "🥈" : entry.rank === 3 ? "🥉" : `#${entry.rank}`}
+                            </div>
 
-                          <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-[var(--border-dim)]">
-                            <img src={entry.avatar} alt="" className="w-full h-full object-cover" />
-                          </div>
+                            <div className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-[var(--border-dim)]">
+                              <img src={entry.avatar} alt="" className="w-full h-full object-cover" />
+                            </div>
 
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-space font-bold text-xs text-[var(--text)] truncate">
-                                {entry.username}
-                              </span>
-                              {isMe && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/20 text-[var(--olive)]">
-                                  You
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-1.5 flex-wrap">
+                                <span className="font-space font-bold text-xs text-[var(--text)] truncate">
+                                  {entry.username}
                                 </span>
-                              )}
-                            </div>
-                            <div className="text-[10px] text-[var(--text-mute)] flex items-center gap-2">
-                              <span>{entry.daysCompleted}/{league.durationDays} Days played</span>
-                              <span>•</span>
-                              <span>{entry.totalCorrect} Correct answers</span>
+                                {isMe && (
+                                  <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/20 text-[var(--olive)] shrink-0">
+                                    You
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[10px] text-[var(--text-mute)] flex items-center gap-2">
+                                <span>
+                                  {entry.daysCompleted}/{league.durationDays}{" "}
+                                  {league.attemptPolicy === "unlimited" ? "Drops" : "Days"} completed
+                                </span>
+                                <span>•</span>
+                                <span>
+                                  {entry.totalCorrect} {entry.totalCorrect === 1 ? "correct answer" : "correct answers"}
+                                </span>
+                              </div>
                             </div>
                           </div>
-                        </div>
 
-                        <div className="flex items-center gap-3 shrink-0 text-right">
-                          <div>
-                            <div className="font-mono font-bold text-sm text-[var(--terra)]">
-                              {entry.totalPoints} pts
+                          <div className="flex items-center gap-3 shrink-0 text-right">
+                            <div>
+                              <div className="font-mono font-bold text-sm text-[var(--terra)]">
+                                {entry.totalPoints} pts
+                              </div>
+                              <div className="text-[9px] font-semibold text-[var(--text-mute)]">
+                                {entry.completedToday ? (
+                                  <span className="text-emerald-600">Day {currentDay} Done</span>
+                                ) : (
+                                  <span className="text-amber-600">Pending Day {currentDay}</span>
+                                )}
+                              </div>
                             </div>
-                            <div className="text-[9px] font-semibold text-[var(--text-mute)]">
-                              {entry.completedToday ? (
-                                <span className="text-emerald-600">✅ Day {currentDay} Done</span>
-                              ) : (
-                                <span className="text-amber-600">⏳ Pending Day {currentDay}</span>
-                              )}
+
+                            {/* Chevron expand/collapse indicator */}
+                            <div
+                              className={`px-2.5 py-1 rounded-xl flex items-center gap-1.5 border border-[var(--border-dim)] bg-[var(--bg-input)]/80 text-[var(--text-mute)] text-[11px] font-semibold transition-all shrink-0 ${
+                                isExpanded
+                                  ? "bg-[var(--olive)]/15 border-[var(--olive)]/40 text-[var(--olive)] shadow-2xs"
+                                  : "hover:bg-[var(--bg-card)] hover:text-[var(--text)]"
+                              }`}
+                            >
+                              <span className="hidden sm:inline">{isExpanded ? "Hide" : "Drops"}</span>
+                              <ChevronDown
+                                size={13}
+                                className={`transition-transform duration-200 ${isExpanded ? "rotate-180" : ""}`}
+                              />
                             </div>
                           </div>
-                        </div>
+                        </button>
+
+                        {/* Drop-by-Drop Accordion Breakdown */}
+                        <AnimatePresence>
+                          {isExpanded && (
+                            <motion.div
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              transition={{ duration: 0.2 }}
+                              className="border-t border-[var(--border-dim)] bg-[var(--bg-input)]/30 px-4 py-3.5 space-y-3"
+                            >
+                              {/* Scholar summary stats */}
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs pb-1">
+                                <div className="space-y-0.5">
+                                  <h4 className="font-space font-bold text-xs text-[var(--text)]">
+                                    {isMe ? "Your Tournament Progress" : `${entry.username}'s Progress`}
+                                  </h4>
+                                  <p className="text-[11px] text-[var(--text-dim)]">
+                                    {entry.daysCompleted} of {league.durationDays} drops completed
+                                  </p>
+                                </div>
+
+                                <div className="flex items-center gap-2 flex-wrap">
+                                  <div className="text-xs px-2.5 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] flex items-center gap-1.5 shadow-2xs">
+                                    <span>Accuracy:</span>
+                                    <span className="font-bold font-mono text-[var(--text)]">
+                                      {entry.totalQuestions > 0
+                                        ? Math.round((entry.totalCorrect / entry.totalQuestions) * 100)
+                                        : 0}%
+                                    </span>
+                                    <span className="text-[10px] text-[var(--text-mute)] font-mono">
+                                      ({entry.totalCorrect}/{entry.totalQuestions || entry.daysCompleted * (league.questionsPerDay || 5)})
+                                    </span>
+                                  </div>
+                                  <div className="text-xs px-2.5 py-1 rounded-xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] flex items-center gap-1.5 shadow-2xs">
+                                    <span>Average:</span>
+                                    <span className="font-bold font-mono text-[var(--olive)]">
+                                      {entry.daysCompleted > 0
+                                        ? Math.round(entry.totalPoints / entry.daysCompleted)
+                                        : 0} pts
+                                    </span>
+                                  </div>
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedParticipantModal(entry);
+                                    }}
+                                    className="text-xs font-semibold px-3 py-1 rounded-xl border border-[var(--border-dim)] hover:border-[var(--olive)] hover:bg-[var(--olive)]/10 text-[var(--text)] hover:text-[var(--olive)] transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                                    title="Open full scorecard"
+                                  >
+                                    <span>Scorecard</span>
+                                    <ArrowRight size={11} />
+                                  </button>
+                                </div>
+                              </div>
+
+                              {/* Drop Cards Grid */}
+                              <div className={`grid ${dropGridCols} gap-2.5`}>
+                                {Array.from({ length: league.durationDays }, (_, i) => i + 1).map((dayNum) => {
+                                  const dropInfo = getScholarDropStatus(entry, dayNum);
+                                  const dayQuestions = getQuestionsForLeagueDay(league, dayNum);
+                                  const totalDayQ = dropInfo.stats?.totalQuestions || dayQuestions.length || league.questionsPerDay || 5;
+
+                                  if (dropInfo.status === "completed" && dropInfo.stats) {
+                                    return (
+                                      <div
+                                        key={dayNum}
+                                        className="p-3 rounded-2xl border border-[var(--olive)]/35 bg-[var(--bg-card)] shadow-2xs flex flex-col justify-between space-y-2.5"
+                                      >
+                                        <div className="space-y-1.5">
+                                          <div className="flex items-center justify-between gap-1">
+                                            <span className="font-space font-bold text-xs text-[var(--text)]">
+                                              Drop {dayNum}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                                              <CheckCircle2 size={10} /> Completed
+                                            </span>
+                                          </div>
+                                          <div className="text-xs font-mono text-[var(--text-dim)] pt-0.5">
+                                            Score: <strong className="text-[var(--text)]">{dropInfo.stats.score}/{totalDayQ}</strong>
+                                          </div>
+                                        </div>
+
+                                        <div className="pt-2 border-t border-[var(--border-dim)] flex items-center justify-between text-xs font-mono">
+                                          <span className="font-bold text-[var(--olive)]">
+                                            +{dropInfo.stats.points} pts
+                                          </span>
+                                          {dropInfo.stats.durationSeconds ? (
+                                            <span className="text-[10px] text-[var(--text-mute)]">
+                                              {dropInfo.stats.durationSeconds}s
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+
+                                  if (dropInfo.status === "ready") {
+                                    return (
+                                      <div
+                                        key={dayNum}
+                                        className="p-3 rounded-2xl border border-[var(--terra)]/40 bg-[var(--terra)]/5 shadow-2xs flex flex-col justify-between space-y-2.5"
+                                      >
+                                        <div className="space-y-1.5">
+                                          <div className="flex items-center justify-between gap-1">
+                                            <span className="font-space font-bold text-xs text-[var(--text)]">
+                                              Drop {dayNum}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2 py-0.5 rounded-full">
+                                              <Flame size={10} /> Ready
+                                            </span>
+                                          </div>
+                                          <div className="text-[11px] text-[var(--text-dim)] pt-0.5">
+                                            {isMe ? "Ready to play" : "Next in line"}
+                                          </div>
+                                        </div>
+
+                                        <div className="pt-2 border-t border-[var(--terra)]/20 text-right text-[10px] font-mono text-[var(--text-mute)]">
+                                          Awaiting play
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+
+                                  if (dropInfo.status === "missed") {
+                                    return (
+                                      <div
+                                        key={dayNum}
+                                        className="p-3 rounded-2xl border border-rose-500/25 bg-rose-500/5 opacity-75 flex flex-col justify-between space-y-2.5"
+                                      >
+                                        <div className="space-y-1.5">
+                                          <div className="flex items-center justify-between gap-1">
+                                            <span className="font-space font-bold text-xs text-rose-700 dark:text-rose-400">
+                                              Drop {dayNum}
+                                            </span>
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-rose-700 dark:text-rose-400 bg-rose-500/15 px-2 py-0.5 rounded-full">
+                                              <XCircle size={10} /> Missed
+                                            </span>
+                                          </div>
+                                          <div className="text-[11px] text-[var(--text-mute)] pt-0.5">
+                                            Drop expired
+                                          </div>
+                                        </div>
+
+                                        <div className="pt-2 border-t border-rose-500/20 text-right text-[10px] font-mono text-[var(--text-mute)]">
+                                          0 pts
+                                        </div>
+                                      </div>
+                                    );
+                                  }
+
+                                  return (
+                                    <div
+                                      key={dayNum}
+                                      className="p-3 rounded-2xl border border-[var(--border-dim)] bg-[var(--bg-card)]/40 opacity-70 flex flex-col justify-between space-y-2.5"
+                                    >
+                                      <div className="space-y-1.5">
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className="font-space font-bold text-xs text-[var(--text-mute)]">
+                                            Drop {dayNum}
+                                          </span>
+                                          <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)]">
+                                            <Lock size={9} /> Locked
+                                          </span>
+                                        </div>
+                                        <div className="text-[11px] text-[var(--text-mute)] pt-0.5">
+                                          {dropInfo.status === "locked_host"
+                                            ? "Locked by Host"
+                                            : `Unlocks after Drop ${dayNum - 1}`}
+                                        </div>
+                                      </div>
+
+                                      <div className="pt-2 border-t border-[var(--border-dim)] text-right text-[10px] font-mono text-[var(--text-mute)]">
+                                        Locked
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
                     );
                   })}
@@ -2143,6 +2440,189 @@ export default function LeagueArenaClient({
               </button>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Detailed Scholar Scorecard Modal */}
+      <AnimatePresence>
+        {selectedParticipantModal && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/75 backdrop-blur-md"
+            onClick={() => setSelectedParticipantModal(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="w-full max-w-xl surface border rounded-3xl p-6 shadow-2xl space-y-5 max-h-[90vh] overflow-y-auto"
+              style={{ borderColor: "var(--border)" }}
+              onClick={(e) => e.stopPropagation()}
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between pb-3 border-b" style={{ borderColor: "var(--border-dim)" }}>
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-full overflow-hidden border border-[var(--border-dim)] shrink-0">
+                    <img src={selectedParticipantModal.avatar} alt="" className="w-full h-full object-cover" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-space font-bold text-base text-[var(--text)]">
+                        {selectedParticipantModal.username}
+                      </h3>
+                      {((selectedParticipantModal.username || "").trim().toLowerCase() === myUsername ||
+                        (profile.id && selectedParticipantModal.userId === profile.id)) && (
+                        <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-[var(--olive)]/20 text-[var(--olive)]">
+                          You
+                        </span>
+                      )}
+                      <span className="font-mono text-xs font-bold px-2 py-0.5 rounded-full bg-amber-400/20 text-amber-700 dark:text-amber-400 border border-amber-400/30">
+                        Rank #{selectedParticipantModal.rank}
+                      </span>
+                    </div>
+                    <p className="text-xs text-[var(--text-dim)]">
+                      Friendship League Drop-by-Drop Scorecard
+                    </p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => setSelectedParticipantModal(null)}
+                  className="p-1.5 rounded-xl border border-[var(--border-dim)] hover:bg-[var(--bg-input)] text-[var(--text-mute)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                  title="Close scorecard"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              {/* 4-Stat Metric Summary */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                <div className="p-3 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-center space-y-0.5">
+                  <div className="text-[10px] text-[var(--text-mute)] uppercase font-mono">Total Points</div>
+                  <div className="font-mono font-bold text-base text-[var(--terra)]">
+                    {selectedParticipantModal.totalPoints}
+                  </div>
+                </div>
+                <div className="p-3 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-center space-y-0.5">
+                  <div className="text-[10px] text-[var(--text-mute)] uppercase font-mono">Drops Played</div>
+                  <div className="font-mono font-bold text-base text-[var(--text)]">
+                    {selectedParticipantModal.daysCompleted}/{league.durationDays}
+                  </div>
+                </div>
+                <div className="p-3 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-center space-y-0.5">
+                  <div className="text-[10px] text-[var(--text-mute)] uppercase font-mono">Accuracy</div>
+                  <div className="font-mono font-bold text-base text-emerald-600">
+                    {selectedParticipantModal.totalQuestions > 0
+                      ? Math.round((selectedParticipantModal.totalCorrect / selectedParticipantModal.totalQuestions) * 100)
+                      : 0}%
+                  </div>
+                </div>
+                <div className="p-3 rounded-2xl bg-[var(--bg-input)] border border-[var(--border-dim)] text-center space-y-0.5">
+                  <div className="text-[10px] text-[var(--text-mute)] uppercase font-mono">Avg / Drop</div>
+                  <div className="font-mono font-bold text-base text-[var(--gold)]">
+                    {selectedParticipantModal.daysCompleted > 0
+                      ? Math.round(selectedParticipantModal.totalPoints / selectedParticipantModal.daysCompleted)
+                      : 0}
+                  </div>
+                </div>
+              </div>
+
+              {/* Drop-by-Drop List */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-xs font-semibold text-[var(--text-dim)]">
+                  <span className="uppercase tracking-wider font-mono text-[11px]">Individual Drops</span>
+                  <span className="font-mono text-[11px]">
+                    {selectedParticipantModal.totalCorrect} correct answers overall
+                  </span>
+                </div>
+
+                <div className="space-y-1.5">
+                  {Array.from({ length: league.durationDays }, (_, i) => i + 1).map((dayNum) => {
+                    const dropInfo = getScholarDropStatus(selectedParticipantModal, dayNum);
+                    const dayQuestions = getQuestionsForLeagueDay(league, dayNum);
+                    const totalDayQ = dropInfo.stats?.totalQuestions || dayQuestions.length || league.questionsPerDay || 5;
+
+                    return (
+                      <div
+                        key={dayNum}
+                        className={`flex items-center justify-between p-3 rounded-2xl border text-xs font-mono transition-all ${
+                          dropInfo.status === "completed"
+                            ? "border-[var(--olive)]/35 bg-[var(--bg-card)]"
+                            : dropInfo.status === "ready"
+                            ? "border-[var(--terra)]/40 bg-[var(--terra)]/5"
+                            : dropInfo.status === "missed"
+                            ? "border-rose-500/25 bg-rose-500/5 opacity-80"
+                            : "border-[var(--border-dim)] bg-[var(--bg-input)]/40 opacity-60"
+                        }`}
+                      >
+                        <div className="flex items-center gap-3">
+                          <span className="font-space font-bold text-xs text-[var(--text)]">
+                            Drop {dayNum}
+                          </span>
+                          {dropInfo.status === "completed" ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full">
+                              <CheckCircle2 size={11} /> Completed
+                            </span>
+                          ) : dropInfo.status === "ready" ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-[var(--terra)] bg-[var(--terra)]/15 px-2 py-0.5 rounded-full">
+                              <Flame size={10} /> Ready
+                            </span>
+                          ) : dropInfo.status === "missed" ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-rose-700 dark:text-rose-400 bg-rose-500/15 px-2 py-0.5 rounded-full">
+                              <XCircle size={10} /> Missed
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] text-[var(--text-mute)] bg-[var(--bg-input)] px-2 py-0.5 rounded-full border border-[var(--border-dim)]">
+                              <Lock size={10} /> Locked
+                            </span>
+                          )}
+                        </div>
+
+                        <div className="flex items-center gap-4 text-right">
+                          {dropInfo.status === "completed" && dropInfo.stats ? (
+                            <>
+                              <div className="text-[var(--text-dim)]">
+                                {dropInfo.stats.score}/{totalDayQ} Correct
+                                {dropInfo.stats.durationSeconds ? ` • ${dropInfo.stats.durationSeconds}s` : ""}
+                              </div>
+                              <div className="font-bold text-[var(--olive)] text-sm">
+                                +{dropInfo.stats.points} pts
+                              </div>
+                            </>
+                          ) : dropInfo.status === "ready" ? (
+                            <div className="text-[var(--text-dim)] font-sans">
+                              Ready to play
+                            </div>
+                          ) : dropInfo.status === "missed" ? (
+                            <div className="text-rose-700 dark:text-rose-400">
+                              Expired • 0 pts
+                            </div>
+                          ) : (
+                            <div className="text-[var(--text-mute)] font-sans">
+                              {dropInfo.status === "locked_host"
+                                ? "Locked by Host"
+                                : `Unlocks after Drop ${dayNum - 1}`}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Close Button */}
+              <div className="pt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setSelectedParticipantModal(null)}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold bg-[var(--bg-input)] hover:bg-[var(--border-dim)] text-[var(--text)] transition-colors cursor-pointer"
+                >
+                  Close Scorecard
+                </button>
+              </div>
+            </motion.div>
+          </div>
         )}
       </AnimatePresence>
 
