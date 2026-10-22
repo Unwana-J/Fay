@@ -27,7 +27,7 @@ import { useRouter, usePathname } from "next/navigation";
 export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { createAccount, loginWithCloud } = useAppStore();
+  const { createAccount, loginWithCloud, pendingTopic } = useAppStore();
   const [mode, setMode] = useState<"create" | "signin">("create");
   const [signInType, setSignInType] = useState<"cloud" | "guest">("cloud");
   const [step, setStep] = useState<1 | 2 | 3>(1);
@@ -401,6 +401,27 @@ export default function OnboardingModal({ isOpen }: { isOpen: boolean }) {
                   Log In
                 </button>
               </div>
+
+              {/* Accepted Topic Banner from Landing Spinner */}
+              {pendingTopic && (
+                <div
+                  className="p-3.5 rounded-2xl border text-xs flex items-center gap-3"
+                  style={{
+                    background: "rgba(122, 28, 46, 0.05)",
+                    borderColor: "var(--terra)",
+                  }}
+                >
+                  <span className="text-base shrink-0">🎯</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="font-bold font-mono uppercase text-[10px] tracking-wider" style={{ color: "var(--terra)" }}>
+                      Accepted Challenge
+                    </div>
+                    <div className="font-serif font-bold text-xs truncate mt-0.5" style={{ color: "var(--text)" }}>
+                      &ldquo;{pendingTopic.text}&rdquo;
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Avatar Selector */}
               <div>

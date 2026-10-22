@@ -343,6 +343,8 @@ export interface AppState {
   // Sessions
   sessions: CompletedSession[];
   activeSession: ActiveSession | null;
+  pendingTopic: Topic | null;
+  setPendingTopic: (topic: Topic | null) => void;
 
   // Streak
   streak: StreakData;
@@ -468,6 +470,8 @@ export const useAppStore = create<AppState>()(
       },
       sessions: [],
       activeSession: null,
+      pendingTopic: null,
+      setPendingTopic: (topic) => set({ pendingTopic: topic }),
       streak: {
         current: 0,
         longest: 0,
@@ -775,6 +779,7 @@ export const useAppStore = create<AppState>()(
       startSession: (topic, researchMin, initialStage = "research") => {
         const id = uid();
         set({
+          pendingTopic: null,
           activeSession: {
             id,
             topic,

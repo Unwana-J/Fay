@@ -200,6 +200,8 @@ export default function Dashboard() {
     claimQuestXP,
     updateSettings,
     isOnboarded,
+    pendingTopic,
+    setPendingTopic,
   } = useAppStore();
   const difficultyMode: Difficulty = (settings.difficultyMode as Difficulty) ?? "Scholar";
   const level     = getLevelForXP(profile.xp);
@@ -218,6 +220,12 @@ export default function Dashboard() {
   useEffect(() => {
     setMounted(true);
     fetchFeatures();
+    if (typeof window !== "undefined") {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get("accepted") === "1" || urlParams.get("onboard") === "1") {
+        setShowOnboardingModal(true);
+      }
+    }
   }, [fetchFeatures]);
 
   if (!mounted || !isOnboarded) {
@@ -255,6 +263,11 @@ export default function Dashboard() {
   const allTopics = [...TOPIC_BANK, ...(customTopics || [])];
 
   const suggestedTopic = (() => {
+    // 0. If user accepted a topic from the landing spinner
+    if (pendingTopic) {
+      return pendingTopic;
+    }
+
     const excluded = new Set([...completedTopicIds, ...skippedToday]);
 
     // 1. If user chose a specific focus category via the modal
@@ -326,6 +339,9 @@ export default function Dashboard() {
 
   function handleSkipTopic() {
     if (spinning) return;
+    if (pendingTopic) {
+      setPendingTopic(null);
+    }
     analytics.trackRouletteSpun({
       category: suggestedTopic.category,
       difficulty: suggestedTopic.difficulty,
@@ -507,6 +523,37 @@ export default function Dashboard() {
                 )}
               </div>
             </div>
+
+            {/* Accepted Challenge Banner from Landing Page */}
+            {pendingTopic && suggestedTopic.id === pendingTopic.id && (
+              <div
+                className="mb-4 p-3.5 rounded-2xl border flex items-center justify-between gap-3 flex-wrap"
+                style={{
+                  background: "rgba(122, 28, 46, 0.06)",
+                  borderColor: "var(--terra)",
+                }}
+              >
+                <div className="flex items-center gap-2.5">
+                  <span className="text-base">🎯</span>
+                  <div>
+                    <div className="text-xs font-bold font-mono uppercase tracking-wider" style={{ color: "var(--terra)" }}>
+                      Your Accepted Challenge
+                    </div>
+                    <div className="text-xs" style={{ color: "var(--text-dim)" }}>
+                      You accepted this topic from the parlor roulette. Ready to articulate?
+                    </div>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPendingTopic(null)}
+                  className="text-xs font-semibold underline underline-offset-4 cursor-pointer"
+                  style={{ color: "var(--text-mute)" }}
+                >
+                  Clear & use today&apos;s daily topic
+                </button>
+              </div>
+            )}
 
             {/* ── Difficulty Mode Toggle ── */}
             <div className="flex items-center gap-1.5 mb-4">

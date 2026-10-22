@@ -86,6 +86,93 @@ export const CATEGORY_ICONS: Record<string, string> = {
   "Sex & Sexuality": "🌸",
 };
 
+export const ACCESSIBLE_ONBOARDING_TOPICS: Topic[] = [
+  {
+    id: "sp-procrastination",
+    text: "Why do we procrastinate on things we genuinely want to achieve?",
+    category: "Psychology",
+    difficulty: "Novice",
+    tags: ["habits", "psychology", "behavior"],
+  },
+  {
+    id: "sp-choices",
+    text: "Does having more choices make us happier, or just more anxious?",
+    category: "Psychology",
+    difficulty: "Novice",
+    tags: ["decision making", "happiness", "mind"],
+  },
+  {
+    id: "sp-ai-creativity",
+    text: "Can artificial intelligence ever be truly creative, or is it only remixing?",
+    category: "Artificial Intelligence",
+    difficulty: "Novice",
+    tags: ["ai", "creativity", "technology"],
+  },
+  {
+    id: "sp-music-memory",
+    text: "Why does hearing an old song bring back memories faster than a photograph?",
+    category: "Science",
+    difficulty: "Novice",
+    tags: ["neuroscience", "music", "memory"],
+  },
+  {
+    id: "sp-remote-work",
+    text: "Is remote work making us more productive, or simply more isolated?",
+    category: "Culture",
+    difficulty: "Novice",
+    tags: ["work", "future", "society"],
+  },
+  {
+    id: "sp-money-happiness",
+    text: "Can money buy happiness—or does it just eliminate everyday anxiety?",
+    category: "Economics",
+    difficulty: "Novice",
+    tags: ["wealth", "wellbeing", "money"],
+  },
+  {
+    id: "sp-bad-habits",
+    text: "Why do bad habits form effortlessly, while good ones require constant discipline?",
+    category: "Psychology",
+    difficulty: "Novice",
+    tags: ["discipline", "neuroscience", "habits"],
+  },
+  {
+    id: "sp-storytelling",
+    text: "What makes a great story memorable across centuries?",
+    category: "Culture",
+    difficulty: "Novice",
+    tags: ["narrative", "communication", "art"],
+  },
+  {
+    id: "sp-public-speaking",
+    text: "Should speaking and articulating your thoughts clearly be taught in early school?",
+    category: "Public Speaking",
+    difficulty: "Novice",
+    tags: ["articulation", "education", "speech"],
+  },
+  {
+    id: "sp-algorithms",
+    text: "How do social media recommendation algorithms shape what we believe is true?",
+    category: "Technology",
+    difficulty: "Novice",
+    tags: ["algorithms", "internet", "information"],
+  },
+  {
+    id: "sp-admitting-wrong",
+    text: "Why is it so psychologically painful to admit when you are wrong in an argument?",
+    category: "Philosophy",
+    difficulty: "Novice",
+    tags: ["ego", "truth", "debate"],
+  },
+  {
+    id: "sp-success",
+    text: "What does it actually mean to live a successful life in the modern world?",
+    category: "Philosophy",
+    difficulty: "Novice",
+    tags: ["meaning", "life", "values"],
+  },
+];
+
 export const TOPIC_BANK: Topic[] = [
   // ─── Artificial Intelligence (35 topics) ───────────────────────────────────────────────
   { id: "ai-1", text: "What is artificial intelligence, and why does it matter now?", category: "Artificial Intelligence", difficulty: "Novice", tags: ["foundations","overview"] },
