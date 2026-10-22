@@ -240,8 +240,8 @@ export default function ParlorShowcaseDeck() {
   return (
     <div className="w-full">
       {/* ── Top Category Switcher Tabs ── */}
-      <div className="relative mb-6">
-        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none no-scrollbar">
+      <div className="relative mb-6 w-full min-w-0 overflow-hidden">
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-2 scrollbar-none no-scrollbar w-full min-w-0">
           {PARLOR_EXPERIENCES.map((item, idx) => {
             const isActive = idx === currentIndex;
             const TabIcon = item.Icon;
@@ -270,7 +270,7 @@ export default function ParlorShowcaseDeck() {
 
       {/* ── The Slideshow Card with Real In-App Preview ── */}
       <div
-        className="relative overflow-hidden"
+        className="relative overflow-hidden w-full min-w-0"
         onTouchStart={handleTouchStart}
         onTouchEnd={handleTouchEnd}
       >
@@ -282,16 +282,16 @@ export default function ParlorShowcaseDeck() {
             initial="enter"
             animate="center"
             exit="exit"
-            className="surface rounded-3xl p-5 sm:p-8 shadow-sm"
+            className="surface rounded-3xl p-5 sm:p-8 shadow-sm w-full max-w-full min-w-0 box-border overflow-hidden"
             style={{
               background: "var(--bg-card)",
               border: `1.5px solid ${currentItem.accentBorder}`,
               borderTop: `5px solid ${currentItem.accent}`,
             }}
           >
-            <div className="grid gap-6 lg:grid-cols-12 items-center">
+            <div className="grid gap-6 lg:grid-cols-12 items-center w-full min-w-0">
               {/* Left Column: Details & Actions */}
-              <div className="lg:col-span-5 flex flex-col justify-between">
+              <div className="lg:col-span-5 flex flex-col justify-between w-full min-w-0">
                 <div>
                   <div className="flex items-center gap-3 mb-4 flex-wrap">
                     <span
@@ -323,12 +323,12 @@ export default function ParlorShowcaseDeck() {
                     </span>
                   </div>
 
-                  <h3 className="font-serif text-2xl sm:text-3xl font-bold mb-3 tracking-tight">
+                  <h3 className="font-serif text-2xl sm:text-3xl font-bold mb-3 tracking-tight break-words">
                     {currentItem.title}
                   </h3>
 
                   <p
-                    className="text-sm leading-relaxed mb-5"
+                    className="text-sm leading-relaxed mb-5 break-words"
                     style={{ color: "var(--text-dim)" }}
                   >
                     {currentItem.description}
@@ -380,9 +380,9 @@ export default function ParlorShowcaseDeck() {
               </div>
 
               {/* Right Column: In-App Browser Window Mockup */}
-              <div className="lg:col-span-7">
+              <div className="lg:col-span-7 w-full min-w-0">
                 <div
-                  className="rounded-2xl overflow-hidden border shadow-sm flex flex-col surface"
+                  className="rounded-2xl overflow-hidden border shadow-sm flex flex-col surface w-full min-w-0"
                   style={{
                     borderColor: "var(--border)",
                     background: "var(--bg-base)",
@@ -390,27 +390,27 @@ export default function ParlorShowcaseDeck() {
                 >
                   {/* Browser Chrome Header */}
                   <div
-                    className="px-3.5 py-2.5 border-b flex items-center justify-between"
+                    className="px-3 py-2.5 sm:px-3.5 border-b flex items-center justify-between gap-2 min-w-0"
                     style={{
                       background: "var(--bg-card)",
                       borderColor: "var(--border-dim)",
                     }}
                   >
-                    <div className="flex items-center gap-1.5">
+                    <div className="flex items-center gap-1.5 min-w-0 flex-1">
                       <span
-                        className="w-2.5 h-2.5 rounded-full"
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ background: "var(--terra)" }}
                       />
                       <span
-                        className="w-2.5 h-2.5 rounded-full"
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ background: "var(--gold)" }}
                       />
                       <span
-                        className="w-2.5 h-2.5 rounded-full"
+                        className="w-2.5 h-2.5 rounded-full shrink-0"
                         style={{ background: "var(--olive)" }}
                       />
                       <span
-                        className="ml-2 font-mono text-[11px] truncate max-w-[190px] sm:max-w-none"
+                        className="ml-1.5 font-mono text-[11px] truncate min-w-0 flex-1"
                         style={{ color: "var(--text-mute)" }}
                       >
                         {currentItem.urlPath}
@@ -428,7 +428,7 @@ export default function ParlorShowcaseDeck() {
                   </div>
 
                   {/* Real Screenshot Preview */}
-                  <div className="relative aspect-[1280/820] w-full bg-[var(--bg-base)]">
+                  <div className="relative aspect-[1280/820] w-full min-w-0 bg-[var(--bg-base)]">
                     <Image
                       src={currentItem.image}
                       alt={`${currentItem.title} interface screenshot`}
@@ -441,20 +441,20 @@ export default function ParlorShowcaseDeck() {
 
                   {/* Bottom Info Strip */}
                   <div
-                    className="px-4 py-2.5 border-t flex items-center justify-between text-xs"
+                    className="px-3 py-2 sm:px-4 sm:py-2.5 border-t flex items-center justify-between gap-2 text-xs min-w-0"
                     style={{
                       background: "var(--bg-card)",
                       borderColor: "var(--border-dim)",
                     }}
                   >
                     <span
-                      className="font-mono text-[11px] truncate mr-2"
+                      className="font-mono text-[10px] sm:text-[11px] truncate min-w-0 flex-1"
                       style={{ color: "var(--text-dim)" }}
                     >
                       {currentItem.stat}
                     </span>
                     <span
-                      className="font-mono text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shrink-0"
+                      className="font-mono text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
                       style={{
                         background: currentItem.accentBg,
                         color: currentItem.accent,
@@ -471,7 +471,7 @@ export default function ParlorShowcaseDeck() {
       </div>
 
       {/* ── Slide Navigation Bar (Counter, Dots, Arrows) ── */}
-      <div className="flex items-center justify-between gap-4 mt-5 px-1">
+      <div className="flex items-center justify-between gap-3 mt-5 px-1 w-full min-w-0">
         {/* Slide Counter */}
         <div
           className="font-mono text-xs font-medium"
