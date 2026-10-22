@@ -132,6 +132,17 @@ export function reconcileStreakState(state: any): StreakData {
     }
   }
 
+  if (Array.isArray(state?.mathleticsHistory)) {
+    for (const m of state.mathleticsHistory) {
+      if (m?.date) {
+        activityDates.add(m.date);
+      } else if (m?.timestamp) {
+        const d = new Date(m.timestamp);
+        activityDates.add(formatDateToIso(d));
+      }
+    }
+  }
+
   if (Array.isArray(state?.streak?.history)) {
     for (const h of state.streak.history) {
       if (h?.date) activityDates.add(h.date);
@@ -248,6 +259,23 @@ export interface TriviaHistoryItem {
   challengerPct?: number;
 }
 
+export interface MathleticsHistoryItem {
+  id: string;
+  timestamp: number;
+  date: string;
+  score: number;
+  total: number;
+  pct: number;
+  gradeLabel: string;
+  xpEarned: number;
+  agilityScore: number;
+  questionIds: string[];
+  categoryBreakdown: { category: string; correct: number; total: number }[];
+  difficultyMode?: "random" | "easy" | "medium" | "hard";
+  challengerName?: string;
+  challengerScore?: number;
+}
+
 export interface ArticulateHistoryItem {
   id: string; // room code
   roomCode: string;
@@ -343,6 +371,10 @@ export interface AppState {
   seenTriviaQuestionIds: string[];
   triviaHistory: TriviaHistoryItem[];
 
+  // Mathletics tracking & history
+  seenMathleticsQuestionIds: string[];
+  mathleticsHistory: MathleticsHistoryItem[];
+
   // Actions
   startSession: (topic: Topic, researchMin: number, initialStage?: "research" | "speaking") => string;
   updateActiveSessionStage: (stage: ActiveSession["stage"]) => void;
@@ -366,6 +398,10 @@ export interface AppState {
   resetSeenTriviaQuestions: () => void;
   saveTriviaRound: (round: Omit<TriviaHistoryItem, "id" | "timestamp" | "date">) => void;
   clearTriviaHistory: () => void;
+  markMathleticsQuestionsSeen: (ids: string[]) => void;
+  resetSeenMathleticsQuestions: () => void;
+  saveMathleticsRound: (round: Omit<MathleticsHistoryItem, "id" | "timestamp" | "date">) => void;
+  clearMathleticsHistory: () => void;
 
   // Articulate online room history
   articulateHistory: ArticulateHistoryItem[];
@@ -458,6 +494,8 @@ export const useAppStore = create<AppState>()(
       customTopics: [],
       seenTriviaQuestionIds: [],
       triviaHistory: [],
+      seenMathleticsQuestionIds: [],
+      mathleticsHistory: [],
       articulateHistory: [],
       hasSeenArticulateGuide: false,
       hasSeenTriviaGuide: false,
@@ -1124,6 +1162,72 @@ export const useAppStore = create<AppState>()(
 
       clearTriviaHistory: () =>
         set({ triviaHistory: [] }),
+
+      markMathleticsQuestionsSeen: (ids) =>
+        set((s) => {
+          const current = s.seenMathleticsQuestionIds || [];
+          const merged = Array.from(new Set([...current, ...ids]));
+          return { seenMathleticsQuestionIds: merged };
+        }),
+
+      resetSeenMathleticsQuestions: () =>
+        set({ seenMathleticsQuestionIds: [] }),
+
+      saveMathleticsRound: (round) => {
+        const state = get();
+        const today = todayStr();
+        const item: MathleticsHistoryItem = {
+          ...round,
+          id: uid(),
+          timestamp: Date.now(),
+          date: today,
+        };
+        const existing = Array.isArray(state.mathleticsHistory) ? state.mathleticsHistory : [];
+        const updatedStreak = advanceStreakState(state.streak, today);
+        set({
+          mathleticsHistory: [item, ...existing].slice(0, 100),
+          streak: updatedStreak,
+        });
+        if (state.authUserId) {
+          syncStateToCloud(state.authUserId, {
+            profile: state.profile,
+            streak: updatedStreak,
+            settings: state.settings,
+            claimedQuestIds: state.claimedQuestIds,
+          }).catch(() => {});
+        }
+
+        const isChallenge = Boolean(round.challengerName);
+        const topCat =
+          round.categoryBreakdown && round.categoryBreakdown.length > 0
+            ? [...round.categoryBreakdown].sort((a, b) => b.total - a.total)[0].category
+            : "Mathematics";
+
+        if (isChallenge) {
+          triggerCelestialAscension({
+            kind: "moon",
+            orbitLabel: "Mathletics Duel · +1 Moon",
+            headline: "New Moon Added to Your Constellation",
+            activityTitle: `Mathletics vs ${round.challengerName} (${round.score}/${round.total})`,
+            badgeText: `${round.pct}% Accuracy`,
+            rewardText: `+${round.xpEarned} XP`,
+            category: topCat,
+          });
+        } else {
+          triggerCelestialAscension({
+            kind: "star",
+            orbitLabel: "Mathletics Sprint · +1 Star",
+            headline: "New Star Added to Your Constellation",
+            activityTitle: `${topCat} Sprint (${round.score}/${round.total})`,
+            badgeText: `${round.pct}% · ${round.gradeLabel}`,
+            rewardText: `+${round.xpEarned} XP`,
+            category: topCat,
+          });
+        }
+      },
+
+      clearMathleticsHistory: () =>
+        set({ mathleticsHistory: [] }),
 
       saveArticulateRoom: (item) => {
         const state = get();

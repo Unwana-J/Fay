@@ -6,6 +6,7 @@ export interface FeatureFlags {
   enableOnlineArticulate: boolean; // Online Rooms on /play
   enablePodium: boolean; // The Podium slide deck game on /podium
   enableTrivia: boolean; // Naija Trivia Arcade on /games/trivia
+  enableMathletics: boolean; // Mathletics Mental Arena on /games/mathletics
   enableCommunitySalons: boolean; // Community Audio Salons on /community
 
   // Game Sub-Menus & Modes (Revamp / Temporary Maintenance Controls)
@@ -19,6 +20,7 @@ export const DEFAULT_FEATURE_FLAGS: FeatureFlags = {
   enableOnlineArticulate: true,
   enablePodium: true,
   enableTrivia: true,
+  enableMathletics: true,
   enableCommunitySalons: true,
   enableTriviaChallenges: true,
   enableTriviaLeagues: true,
@@ -74,6 +76,16 @@ export const FEATURE_DEFINITIONS: FeatureDefinition[] = [
     route: "/games/trivia",
     userImpact: "Controls access to the Naija Trivia Arcade across the dashboard and games hub.",
     iconName: "help-circle",
+  },
+  {
+    key: "enableMathletics",
+    name: "Mathletics Arena",
+    category: "Party Games",
+    description: "Rapid mental arithmetic, algebra, probability, and geometry challenges with 25-second rounds.",
+    route: "/games/mathletics",
+    userImpact: "Controls access to the Mathletics Arena across the dashboard and games hub.",
+    iconName: "trophy",
+    isPrimary: true,
   },
   {
     key: "enableTriviaChallenges",

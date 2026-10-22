@@ -52,6 +52,19 @@ export default function GamesHub() {
       tags: ["Party", "Presentation", "Hot Takes"],
       isNew: true,
       enabled: features?.enablePodium ?? true,
+    },
+    {
+      id: "mathletics",
+      title: "Mathletics",
+      description: "25-second mental math, algebra, probability, and geometry challenges. Sharpen your quantitative intuition.",
+      mainEmoji: "📐",
+      bgEmoji1: "⚡",
+      bgEmoji2: "🎲",
+      href: "/games/mathletics",
+      color: "var(--olive)",
+      tags: ["Mental Math", "Logic", "Speed Duel"],
+      isNew: true,
+      enabled: features?.enableMathletics ?? true,
     }
   ];
   const games = allGames.filter((g) => g.enabled);
