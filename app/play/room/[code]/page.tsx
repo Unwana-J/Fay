@@ -121,6 +121,10 @@ export default function ArticulateRoomPage({
   const myAvatar = profile?.avatar || "/avatars/avatar-scholar.svg";
 
   const [room, setRoom] = useState<ArticulateRoom | null>(null);
+  const roomVersionRef = useRef<number | undefined>(undefined);
+  useEffect(() => {
+    roomVersionRef.current = room?.version;
+  }, [room?.version]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isSpectator, setIsSpectator] = useState(false);
@@ -239,7 +243,9 @@ export default function ArticulateRoomPage({
   const fetchRoomState = useCallback(async (isInitial = false) => {
     try {
       const reqStart = Date.now();
-      const res = await fetch(`/api/articulate/room?code=${roomCode}`, {
+      const currentVer = roomVersionRef.current;
+      const vQuery = !isInitial && typeof currentVer === "number" && currentVer > 0 ? `&v=${currentVer}` : "";
+      const res = await fetch(`/api/articulate/room?code=${roomCode}${vQuery}`, {
         cache: "no-store",
         signal: AbortSignal.timeout(8000),
       });
@@ -255,7 +261,11 @@ export default function ArticulateRoomPage({
       if (typeof data.serverTime === "number") {
         recordServerTimeOffset(data.serverTime, reqStart, reqEnd);
       }
+      if (data.unchanged) {
+        return null;
+      }
       if (data.room) {
+        roomVersionRef.current = data.room.version;
         setRoom((prev) => mergeIncomingRoom(prev, data.room));
         setError(null);
         return data.room as ArticulateRoom;
@@ -757,10 +767,10 @@ export default function ArticulateRoomPage({
   }, [effectivePlayerName, isRealtimeConnected, myAvatar, myPlayerId, room?.host_id]);
 
   // 5. Adaptive Polling Fallback
-  // Broadcasts are fire-and-forget, so during live play we sanity-poll every 5s even when connected.
+  // Broadcasts are fire-and-forget, so during live play we sanity-poll every 15s even when connected.
   const isLivePlay = room?.status === "playing";
   useEffect(() => {
-    const pollInterval = !isRealtimeConnected ? 3000 : isLivePlay ? 5000 : 25000;
+    const pollInterval = !isRealtimeConnected ? 4000 : isLivePlay ? 15000 : 35000;
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       fetchRoomState();

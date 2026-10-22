@@ -75,10 +75,17 @@ export async function GET(req: NextRequest) {
         return b.score - a.score;
       });
 
-      return NextResponse.json({
-        configured: true,
-        scores: challengeRanked,
-      });
+      return NextResponse.json(
+        {
+          configured: true,
+          scores: challengeRanked,
+        },
+        {
+          headers: {
+            "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+          },
+        }
+      );
     }
 
     // ── CASE 2: GLOBAL SCHOLARS LEADERBOARD ───────────────────────────────────────
@@ -242,10 +249,17 @@ export async function GET(req: NextRequest) {
       return b.score - a.score;
     });
 
-    return NextResponse.json({
-      configured: true,
-      scores: globalRanked,
-    });
+    return NextResponse.json(
+      {
+        configured: true,
+        scores: globalRanked,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=30, stale-while-revalidate=60",
+        },
+      }
+    );
   } catch (err) {
     console.error("Error fetching leaderboard:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

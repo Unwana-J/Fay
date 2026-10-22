@@ -353,13 +353,20 @@ export async function GET(req: NextRequest) {
     const status = getLeagueStatus(league.startDate, league.durationDays);
     const leaderboard = aggregateLeagueLeaderboard(scores, status.dayNumber);
 
-    return NextResponse.json({
-      success: true,
-      league,
-      scores,
-      leaderboard,
-      status,
-    });
+    return NextResponse.json(
+      {
+        success: true,
+        league,
+        scores,
+        leaderboard,
+        status,
+      },
+      {
+        headers: {
+          "Cache-Control": "public, s-maxage=5, stale-while-revalidate=15",
+        },
+      }
+    );
   } catch (err: any) {
     console.error("Error fetching league:", err);
     return NextResponse.json({ error: err.message || "Internal server error" }, { status: 500 });

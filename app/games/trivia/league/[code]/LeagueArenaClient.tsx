@@ -1202,9 +1202,7 @@ export default function LeagueArenaClient({
   const fetchLeagueData = useCallback(async () => {
     if (!league.code) return;
     try {
-      const res = await fetch(`/api/trivia/league?code=${league.code}&_t=${Date.now()}`, {
-        cache: "no-store",
-      });
+      const res = await fetch(`/api/trivia/league?code=${league.code}`);
       if (res.ok) {
         const data = await res.json();
         if (data.league) {
@@ -1246,14 +1244,15 @@ export default function LeagueArenaClient({
     } catch {}
   }, [league.code, currentDay]);
 
-  // Live background sync: poll every 8s when not actively answering a question, and on tab focus
+  // Live background sync: poll every 25s when not actively answering a question (skips hidden tabs)
   useEffect(() => {
     if (phase === "playing") return;
     fetchLeagueData();
 
     const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       fetchLeagueData();
-    }, 8000);
+    }, 25000);
 
     const handleVisibilityOrFocus = () => {
       if (document.visibilityState === "visible") {

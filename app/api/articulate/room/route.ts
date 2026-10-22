@@ -123,6 +123,7 @@ export async function GET(req: NextRequest) {
     }
 
     const code = codeParam.toUpperCase().trim();
+    const clientVersion = searchParams.get("v");
     let room: ArticulateRoom | null = null;
 
     // 1. Query Supabase for authoritative live state across serverless instances
@@ -136,6 +137,21 @@ export async function GET(req: NextRequest) {
 
         if (!error && data) {
           const rawTeams = data.teams || {};
+
+          // If client already holds the authoritative server version, return lightweight 200 unchanged
+          if (clientVersion !== null && clientVersion !== "" && !isNaN(Number(clientVersion))) {
+            const numClientVer = Number(clientVersion);
+            const serverVer = typeof rawTeams._version === "number" ? rawTeams._version : 0;
+            if (numClientVer >= serverVer && serverVer > 0) {
+              return NextResponse.json({
+                success: true,
+                unchanged: true,
+                version: serverVer,
+                serverTime: Date.now(),
+              });
+            }
+          }
+
           const effectiveHostId = rawTeams.host_id || data.host_id;
           const effectiveHostName = rawTeams.host_name || data.host_name;
           room = {

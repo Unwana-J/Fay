@@ -3,6 +3,7 @@ import { ImageResponse } from "next/og";
 export const alt = "Fey: A Daily Learning and Speaking Habit for Curious Minds";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
+export const revalidate = 604800; // Cache for 7 days
 
 /** Default share card for every page that doesn't define its own OG image. */
 export default function OpengraphImage() {
@@ -47,6 +48,11 @@ export default function OpengraphImage() {
         </div>
       </div>
     ),
-    size,
+    {
+      ...size,
+      headers: {
+        "Cache-Control": "public, immutable, no-transform, max-age=604800, s-maxage=604800",
+      },
+    },
   );
 }
