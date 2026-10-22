@@ -73,6 +73,17 @@ For the complete brand voice, design tokens, and UI standards, refer to [`docs/B
   - `--gold` (`#A67C1E` / Bronze Gold): Rewards, XP, achievements, streaks ONLY.
   - `--red` (`#B53A3A`): Urgency (<10s) and errors ONLY.
 
+### 2.8. Continuous Architecture & Product Decision Logging (Building in Public)
+*Full reference log: [`docs/DECISIONS_LOG.md`](./docs/DECISIONS_LOG.md)*
+- **Automatic Logging Rule (MANDATORY)**: Whenever a smart, non-obvious product, design, or engineering decision is identified or landed during conversations and development, **proactively log it into `docs/DECISIONS_LOG.md`**.
+- **Entry Structure**:
+  - **Feature / Decision Title**
+  - **Date / Phase**
+  - **The Problem / Context** (Why the default/naive approach failed or what friction existed)
+  - **User Insight & Guiding Philosophy** (The exact angle, user requirement, or product perspective)
+  - **Architectural & Product Landing** (How we solved it technically, trade-offs, schemas, protocols)
+  - **"Building in Public" Content Takeaway** (Tweetable headline, lesson for tech builders, thought leadership angle)
+
 ---
 
 ## 3. Tech Stack & State Management
