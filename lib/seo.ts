@@ -42,6 +42,8 @@ export const SITE_KEYWORDS = [
   "microlearning",
   "intellectual games",
   "Naija trivia",
+  "Mathletics",
+  "mental math game",
   "learning app Nigeria",
 ];
 
@@ -159,6 +161,15 @@ export const GAMES: Feature[] = [
       "Spin a hot-take topic, jot your angle, and AI builds a 5-slide deck you present to the room. A fun way to practise thinking on your feet.",
     genre: ["Party", "Presentation", "Debate"],
     players: "2 or more",
+  },
+  {
+    slug: "mathletics",
+    name: "Mathletics",
+    path: "/games/mathletics",
+    description:
+      "25-second rapid mental math, algebra, probability, and geometry challenges. Spot the Socratic shortcut and compete on the Titans leaderboard.",
+    genre: ["Math", "Mental Calculation", "Educational", "Puzzle"],
+    players: "1 or more (1v1 duels)",
   },
 ];
 

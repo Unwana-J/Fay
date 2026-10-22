@@ -11,6 +11,7 @@ import Link from "next/link";
 import {
   Compass, Zap, Mic, Share2, Flame, Briefcase, Heart, GraduationCap,
   Users, Brain, MessagesSquare, Presentation, Timer, ArrowRight, BookOpen,
+  Calculator,
 } from "lucide-react";
 import FeyLogo from "@/components/ui/FeyLogo";
 import {
@@ -22,7 +23,7 @@ const QUICK_STRIP = [
   {
     step: "01",
     title: "Pick a topic or game",
-    detail: "Daily 90s speaking topic, trivia, or party game",
+    detail: "Daily 90s speaking topic, trivia, mathletics, or party game",
     Icon: Compass,
   },
   {
@@ -87,6 +88,20 @@ const FEATURED_CARDS = [
     accentBorder: "rgba(68, 78, 44, 0.28)",
     tags: ["1,000+ Questions", "1v1 Challenges", "Leaderboard"],
     Icon: Brain,
+  },
+  {
+    id: "mathletics",
+    badge: "Speed Arena",
+    title: "Mathletics",
+    description:
+      "25-second rapid mental math and quantitative reasoning duels. Spot the Socratic shortcut across algebra, probability, and geometry before time expires.",
+    href: "/games/mathletics",
+    cta: "Play Mathletics",
+    accent: "var(--olive)",
+    accentBg: "rgba(68, 78, 44, 0.09)",
+    accentBorder: "rgba(68, 78, 44, 0.28)",
+    tags: ["25s Clock", "Mental Math", "Titans Leaderboard"],
+    Icon: Calculator,
   },
   {
     id: "articulate",
@@ -678,6 +693,7 @@ export default function LandingPageView({
             <Link href="/community" className="hover:underline">Community</Link>
             <Link href="/games" className="hover:underline">Games</Link>
             <Link href="/games/trivia" className="hover:underline">Naija Trivia</Link>
+            <Link href="/games/mathletics" className="hover:underline">Mathletics</Link>
             <Link href="/podium" className="hover:underline">The Podium</Link>
             <Link href="/about" className="hover:underline">About</Link>
           </span>

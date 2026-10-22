@@ -615,7 +615,8 @@ export default function Dashboard() {
         const enablePodium = features?.enablePodium ?? true;
         const enableTrivia = features?.enableTrivia ?? true;
         const enableArticulate = (features?.enableOnlineArticulate ?? true) || (features?.enablePassThePhone ?? true);
-        const activeParlorCount = (enablePodium ? 1 : 0) + (enableArticulate ? 1 : 0) + (enableTrivia ? 1 : 0);
+        const enableMathletics = features?.enableMathletics ?? true;
+        const activeParlorCount = (enablePodium ? 1 : 0) + (enableArticulate ? 1 : 0) + (enableTrivia ? 1 : 0) + (enableMathletics ? 1 : 0);
 
         if (activeParlorCount === 0) return null;
 
@@ -649,7 +650,9 @@ export default function Dashboard() {
 
             <div className={cn(
               "grid gap-3",
-              activeParlorCount === 3
+              activeParlorCount >= 4
+                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+                : activeParlorCount === 3
                 ? "grid-cols-1 md:grid-cols-3"
                 : activeParlorCount === 2
                 ? "grid-cols-1 md:grid-cols-2"
@@ -766,6 +769,45 @@ export default function Dashboard() {
                       <span>Speed Quiz</span>
                       <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
                         Challenge <ChevronRight size={12} />
+                      </span>
+                    </div>
+                  </div>
+                </Link>
+              )}
+
+              {/* Card 4: Mathletics */}
+              {enableMathletics && (
+                <Link href="/games/mathletics" className="group">
+                  <div
+                    className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
+                    style={{
+                      background: "linear-gradient(135deg, rgba(68, 78, 44, 0.08) 0%, var(--bg-card) 100%)",
+                      borderColor: "var(--border-dim)",
+                    }}
+                  >
+                    <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                      📐
+                    </div>
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--olive)15", borderColor: "var(--olive)30" }}>
+                          📐
+                        </div>
+                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--terra)] shadow-xs">
+                          ★ New
+                        </span>
+                      </div>
+                      <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--olive)] transition-colors" style={{ color: "var(--text)" }}>
+                        Mathletics
+                      </h4>
+                      <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                        25s rapid mental calculation, algebra, and geometry speed duels.
+                      </p>
+                    </div>
+                    <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--olive)]" style={{ borderColor: "var(--border-dim)" }}>
+                      <span>Speed Arena</span>
+                      <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                        Play <ChevronRight size={12} />
                       </span>
                     </div>
                   </div>
