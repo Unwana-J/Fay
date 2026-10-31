@@ -6,10 +6,14 @@ import {
   resetFeatureFlagsToDefaults,
   FeatureFlags,
 } from "@/lib/feature-flags";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const features = await getFeatureFlags();
     return NextResponse.json({
@@ -29,6 +33,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const body = await req.json();
 

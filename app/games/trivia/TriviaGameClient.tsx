@@ -1595,6 +1595,7 @@ export default function TriviaGameClient({
           : (challenger?.questionIds?.join(",") || undefined),
         questionIds: questions.map((q) => q.id),
         deviceId: profile?.id,
+        durationSeconds: Math.max(5, totalSeconds - timeLeft),
       }),
     }).catch(() => {});
 

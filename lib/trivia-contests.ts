@@ -304,7 +304,8 @@ export function statusFromAi(verdict: NonNullable<AnswerContest["aiVerdict"]>, c
   return "pending";
 }
 
+import { verifyAdminPasscode } from "@/lib/admin-auth";
+
 export function isAdminRequest(headerKey: string | null): boolean {
-  const expected = process.env.ADMIN_PASSCODE || "fey2026";
-  return !!headerKey && (headerKey === expected || headerKey === "admin");
+  return verifyAdminPasscode(headerKey);
 }

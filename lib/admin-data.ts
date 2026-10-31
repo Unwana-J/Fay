@@ -38,6 +38,7 @@ export interface AdminUserItem {
   isDeactivated: boolean;
   createdAt: string;
   lastActive?: string;
+  lastActiveIso?: string;
 }
 
 // ─── Live In-Memory Cache (Initialized Empty, Populated Strictly by Real Submissions & Supabase) ──
@@ -233,6 +234,7 @@ export async function getAllUsers(): Promise<AdminUserItem[]> {
           isDeactivated: Boolean(p.is_deactivated),
           createdAt: p.created_at || new Date().toISOString(),
           lastActive: p.updated_at ? new Date(p.updated_at).toLocaleDateString() : "Recent",
+          lastActiveIso: p.updated_at || p.created_at || undefined,
         }));
       }
       if (!error && data) {

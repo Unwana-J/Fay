@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 import { getClientIp, checkRateLimit, isBannedIdentifier } from "@/lib/security-guard";
 import {
   aiReviewContest,
@@ -92,7 +93,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ success: true, overrides });
     }
 
-    if (!isAdminRequest(req.headers.get("x-admin-key"))) {
+    if (!isAdminAuthorized(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const contests = await listContests();
@@ -105,7 +106,7 @@ export async function GET(req: NextRequest) {
 
 export async function PATCH(req: NextRequest) {
   try {
-    if (!isAdminRequest(req.headers.get("x-admin-key"))) {
+    if (!isAdminAuthorized(req)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
     const { id, decision } = await req.json();

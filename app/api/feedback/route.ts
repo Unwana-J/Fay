@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { saveFeedback, getAllFeedback } from "@/lib/admin-data";
+import { isAdminAuthorized } from "@/lib/admin-auth";
 
 export const dynamic = "force-dynamic";
 
@@ -32,7 +33,10 @@ export async function POST(req: NextRequest) {
   }
 }
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const items = await getAllFeedback();
     return NextResponse.json({ success: true, items });

@@ -488,3 +488,67 @@ create policy "Allow public update on trivia_answer_contests"
 
 create index if not exists idx_contests_question on public.trivia_answer_contests (question_id, contested_answer);
 create index if not exists idx_contests_status on public.trivia_answer_contests (status, created_at desc);
+
+-- ==============================================================================
+-- FEY PLATFORM: ARTICULATE MATCH LEDGER (all-time hours played)
+-- ==============================================================================
+
+-- 15. One row per finished Articulate match. articulate_rooms is overwritten in place and
+--     "Play Again" wipes the match clock, so this append-only ledger is the durable source for
+--     game-hours / player-hours milestones in the admin console.
+create table if not exists public.articulate_matches (
+  id uuid primary key default gen_random_uuid(),
+  room_code text not null,
+  room_name text,
+  host_name text,
+  started_at timestamp with time zone not null,
+  ended_at timestamp with time zone,
+  play_seconds integer not null default 0,     -- active match time (idle gaps > 10m capped)
+  player_count integer not null default 1,
+  player_seconds integer not null default 0,   -- play_seconds * player_count
+  player_ids text[] default '{}'::text[],
+  rounds integer default 0,
+  team_scores jsonb default '{}'::jsonb,
+  winner text,
+  timer_seconds integer,
+  end_reason text,                             -- 'finished' | 'reset'
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  unique (room_code, started_at)
+);
+
+-- Server-only: written and read with SUPABASE_SERVICE_ROLE_KEY (bypasses RLS).
+-- No public policies, so players cannot inflate or read the ledger directly.
+alter table public.articulate_matches enable row level security;
+
+create index if not exists idx_articulate_matches_ended on public.articulate_matches (ended_at desc);
+
+-- ==============================================================================
+-- FEY PLATFORM: UNIFIED PLAY SESSIONS LEDGER (cross-game hours & Top Scholars)
+-- ==============================================================================
+
+-- Optional exact duration column on trivia_scores (solo & challenge rounds)
+alter table public.trivia_scores add column if not exists duration_seconds integer;
+
+-- 16. Unified per-session ledger across all games (sprint, trivia, mathletics, articulate, podium)
+create table if not exists public.play_sessions (
+  id uuid primary key default gen_random_uuid(),
+  user_id text,
+  device_id text,
+  username text,
+  avatar text,
+  game text not null,                   -- 'sprint' | 'trivia' | 'mathletics' | 'articulate' | 'podium'
+  mode text default 'solo',             -- 'solo' | 'challenge' | 'league' | 'room'
+  duration_seconds integer not null default 0,
+  player_count integer not null default 1,
+  score integer,
+  total integer,
+  xp_earned integer default 0,
+  source_table text,                    -- e.g. 'trivia_scores' | 'league_scores' | 'mathletics_scores' | 'articulate_matches'
+  meta jsonb default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.play_sessions enable row level security;
+
+create index if not exists idx_play_sessions_game_created on public.play_sessions (game, created_at desc);
+create index if not exists idx_play_sessions_user on public.play_sessions (user_id, created_at desc);

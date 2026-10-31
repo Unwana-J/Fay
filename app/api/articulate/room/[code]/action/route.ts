@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { memoryRooms, ArticulateRoom, RoomTeam, getNextSpeakerForTeam, sanitizeRoomPlayers, toClientRoom } from "@/lib/articulate-room";
 import { buildDeck } from "@/lib/game-words";
+import { logArticulateMatch } from "@/lib/articulate-matches";
 
 /** Thrown when another request modified the room between our read and write. */
 class RoomConflictError extends Error {}
@@ -1086,6 +1087,8 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
           room.match_ended_at = new Date().toISOString();
         }
         await persistRoom(room);
+        // Append to the durable match ledger (powers all-time Articulate hours in admin)
+        await logArticulateMatch(room, "finished");
         return actionResponse({ success: true, room });
       }
 
@@ -1093,6 +1096,14 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
       // 7. RESET GAME
       // -------------------------------------------------------------
       case "reset_game": {
+        // "Play Again" wipes the match clock below, so log the outgoing match first.
+        // Upsert keyed by (room_code, started_at), so an already-finished match is not double counted.
+        if (room.match_started_at) {
+          await logArticulateMatch(
+            { ...room, teams: { ...room.teams } } as ArticulateRoom,
+            room.match_ended_at ? "finished" : "reset"
+          );
+        }
         room.status = "lobby";
         room.locked = false;
         room.match_started_at = undefined;

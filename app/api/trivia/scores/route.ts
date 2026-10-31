@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sanitizeScholarName } from "@/lib/name-moderation";
+import { logPlaySession } from "@/lib/play-sessions";
 import {
   getClientIp,
   checkRateLimit,
@@ -34,6 +35,7 @@ export async function POST(req: NextRequest) {
       challengeId,
       questionIds,
       deviceId,
+      durationSeconds,
     } = body;
 
     if (!username || typeof score !== "number" || typeof total !== "number") {
@@ -73,25 +75,53 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { data, error } = await supabase.from("trivia_scores").insert([
-      {
-        username: cleanUsername,
-        avatar: avatar || "/avatars/avatar-scholar.svg",
-        score,
-        total,
-        pct: pct ?? Math.round((score / total) * 100),
-        grade_label: gradeLabel || null,
-        xp_earned: xpEarned || 0,
-        challenge_id: challengeId || null,
-        question_ids: questionIds || [],
-        device_id: deviceId || null,
-      },
-    ]).select();
+    const baseRow = {
+      username: cleanUsername,
+      avatar: avatar || "/avatars/avatar-scholar.svg",
+      score,
+      total,
+      pct: pct ?? Math.round((score / total) * 100),
+      grade_label: gradeLabel || null,
+      xp_earned: xpEarned || 0,
+      challenge_id: challengeId || null,
+      question_ids: questionIds || [],
+      device_id: deviceId || null,
+    };
+
+    const cleanDuration =
+      typeof durationSeconds === "number" && durationSeconds > 0
+        ? Math.min(3600, Math.max(3, Math.round(durationSeconds)))
+        : null;
+
+    let { data, error } = await supabase
+      .from("trivia_scores")
+      .insert([cleanDuration ? { ...baseRow, duration_seconds: cleanDuration } : baseRow])
+      .select();
+
+    if (error && cleanDuration && error.message?.includes("duration_seconds")) {
+      const retry = await supabase.from("trivia_scores").insert([baseRow]).select();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error("Supabase insert error:", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
+
+    await logPlaySession({
+      userId: deviceId || null,
+      deviceId: deviceId || null,
+      username: cleanUsername,
+      avatar: avatar || "/avatars/avatar-scholar.svg",
+      game: "trivia",
+      mode: challengeId ? "challenge" : "solo",
+      durationSeconds: cleanDuration ?? Math.max(15, total * 18),
+      score,
+      total,
+      xpEarned: xpEarned || 0,
+      sourceTable: "trivia_scores",
+    });
 
     return NextResponse.json({ success: true, stored: true, data });
   } catch (err) {

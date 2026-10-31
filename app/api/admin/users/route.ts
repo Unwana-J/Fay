@@ -1,29 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAllUsers, moderateUser } from "@/lib/admin-data";
+import { isAdminAuthorized } from "@/lib/admin-auth";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const users = await getAllUsers();
-    const { lastUsersQueryError } = await import("@/lib/admin-data");
     return NextResponse.json({
       success: true,
       users,
-      debug: {
-        supabaseConfigured: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-        supabaseUrlSet: Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL),
-        anonKeySet: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY),
-        queryResult: lastUsersQueryError,
-      }
+      supabaseConnected: isSupabaseConfigured,
     });
   } catch (err: any) {
     console.error("Error fetching admin users:", err);
-    return NextResponse.json({ error: "Internal server error", message: err?.message }, { status: 500 });
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }
 }
 
 export async function POST(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
   try {
     const body = await req.json();
     const { userId, action, reason } = body;

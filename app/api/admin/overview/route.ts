@@ -1,14 +1,26 @@
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 import { getAllFeedback, getAllIncidents, getAllUsers } from "@/lib/admin-data";
+import { getAdminEngagement, type AdminRange } from "@/lib/admin-engagement";
+import { isAdminAuthorized } from "@/lib/admin-auth";
+import { isSupabaseConfigured } from "@/lib/supabase";
 
 export const dynamic = "force-dynamic";
 
-export async function GET() {
+export async function GET(req: NextRequest) {
+  if (!isAdminAuthorized(req)) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+
   try {
-    const [feedback, incidents, users] = await Promise.all([
+    const rangeParam = req.nextUrl.searchParams.get("range");
+    const range: AdminRange =
+      rangeParam === "7d" || rangeParam === "30d" ? rangeParam : "all";
+
+    const [feedback, incidents, users, engagement] = await Promise.all([
       getAllFeedback(),
       getAllIncidents(),
       getAllUsers(),
+      getAdminEngagement(range),
     ]);
 
     // Rating distribution
@@ -19,9 +31,10 @@ export async function GET() {
     });
 
     const totalRatings = feedback.length;
-    const avgRating = totalRatings > 0
-      ? (feedback.reduce((sum, f) => sum + f.rating, 0) / totalRatings).toFixed(1)
-      : "0";
+    const avgRating =
+      totalRatings > 0
+        ? (feedback.reduce((sum, f) => sum + f.rating, 0) / totalRatings).toFixed(1)
+        : "0";
 
     const promoters = feedback.filter((f) => f.rating >= 4).length;
     const detractors = feedback.filter((f) => f.rating <= 3).length;
@@ -32,17 +45,24 @@ export async function GET() {
     const investigatingIncidents = incidents.filter((i) => i.status === "investigating").length;
     const resolvedIncidents = incidents.filter((i) => i.status === "resolved").length;
 
-    // Users
+    // Users (consistent breakdown across card and tab badge)
     const activeUsers = users.filter((u) => !u.isBanned && !u.isDeactivated).length;
     const bannedUsers = users.filter((u) => u.isBanned).length;
     const deactivatedUsers = users.filter((u) => u.isDeactivated && !u.isBanned).length;
+    const registeredUsers = users.filter((u) => u.isRegistered || Boolean(u.email)).length;
+    const guestUsers = users.length - registeredUsers;
 
     const posthogConfigured = Boolean(process.env.NEXT_PUBLIC_POSTHOG_KEY);
     const posthogHost = process.env.NEXT_PUBLIC_POSTHOG_HOST || "https://us.i.posthog.com";
+    const posthogProjectId = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_ID || "";
+    const dashboardUrl = posthogProjectId
+      ? `https://us.posthog.com/project/${posthogProjectId}/dashboard`
+      : "https://us.posthog.com";
 
     return NextResponse.json({
       success: true,
       data: {
+        supabaseConnected: isSupabaseConfigured,
         csat: {
           average: Number(avgRating),
           total: totalRatings,
@@ -50,7 +70,9 @@ export async function GET() {
           detractors,
           csatPercent,
           ratingCounts,
+          lowSample: totalRatings < 30,
         },
+        recentFeedback: feedback.slice(0, 3),
         incidents: {
           total: incidents.length,
           pending: pendingIncidents,
@@ -62,15 +84,18 @@ export async function GET() {
           active: activeUsers,
           banned: bannedUsers,
           deactivated: deactivatedUsers,
+          registered: registeredUsers,
+          guest: guestUsers,
         },
+        engagement,
         posthog: {
           configured: posthogConfigured,
           host: posthogHost,
-          dashboardUrl: "https://us.posthog.com/project",
+          dashboardUrl,
         },
       },
     });
-  } catch (err: any) {
+  } catch (err: unknown) {
     console.error("Error generating admin overview:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
   }

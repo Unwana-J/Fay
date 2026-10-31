@@ -26,10 +26,10 @@ function statusTone(s: ContestStatus) {
  * answer for that question, which regrades every stored score that picked it.
  */
 export default function AnswerContestsAdminPanel({
-  adminKey,
+  adminKey = "",
   onPendingCount,
 }: {
-  adminKey: string;
+  adminKey?: string;
   onPendingCount?: (n: number) => void;
 }) {
   const [contests, setContests] = useState<AnswerContest[]>([]);
@@ -44,7 +44,10 @@ export default function AnswerContestsAdminPanel({
     setLoading(true);
     setError("");
     try {
-      const res = await fetch("/api/trivia/contest", { headers: { "x-admin-key": adminKey }, cache: "no-store" });
+      const res = await fetch("/api/trivia/contest", {
+        headers: adminKey ? { "x-admin-key": adminKey } : undefined,
+        cache: "no-store",
+      });
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Failed to load contests");
       setContests(data.contests || []);
@@ -68,7 +71,10 @@ export default function AnswerContestsAdminPanel({
     try {
       const res = await fetch("/api/trivia/contest", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json", "x-admin-key": adminKey },
+        headers: {
+          "Content-Type": "application/json",
+          ...(adminKey ? { "x-admin-key": adminKey } : {}),
+        },
         body: JSON.stringify({ id, decision }),
       });
       if (res.ok) {
