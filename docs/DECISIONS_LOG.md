@@ -24,6 +24,10 @@
 14. [Client-Side HTML5 Canvas Broadside Proof Cards](#14-client-side-html5-canvas-broadside-proof-cards)
 15. [The Two-Minute Impromptu Rule (Exposing Explanatory Depth)](#15-the-two-minute-impromptu-rule-exposing-explanatory-depth)
 16. [Episodic Pacing: Sequential Drop Unlocks in Friendship Leagues](#16-episodic-pacing-sequential-drop-unlocks-in-friendship-leagues)
+17. [Dual-Mode Mathletics: Bridging Real-Time 1v1 Duels and Multi-Day Marathon Leagues](#17-dual-mode-mathletics-bridging-real-time-1v1-duels-and-multi-day-marathon-leagues)
+18. [Physical Continuity & Design Engineering Standards Across the Fey Parlor](#18-physical-continuity--design-engineering-standards-across-the-fey-parlor)
+19. [Configurable Calculation Velocity: The 25-Second Mental Math Floor](#19-configurable-calculation-velocity-the-25-second-mental-math-floor)
+20. [Spatial Partitioning: The Study vs. The Parlor (Resolving Dashboard Cognitive Overload & Progressive Day 0 Disclosure)](#20-spatial-partitioning-the-study-vs-the-parlor-resolving-dashboard-cognitive-overload--progressive-day-0-disclosure)
 
 ---
 
@@ -339,5 +343,41 @@
 - **Content Angle / Lesson for Builders**:
   > *"Give users agency without sacrificing your product's core constraint: How establishing a 25-second minimum floor let players customize pacing while preserving genuine mental math velocity."*
 
+---
 
+## 20. Spatial Partitioning: The Study vs. The Parlor (Resolving Dashboard Cognitive Overload & Progressive Day 0 Disclosure)
+
+- **Date / Phase**: Phase 2 — UX Architecture & First-Time User Experience
+- **The Problem / Context**:
+  Early user feedback revealed that first-time visitors felt intimidated and overwhelmed upon onboarding. A newcomer with 0 sessions was greeted by a dense dashboard presenting a multi-control topic card, 4 flashy multiplayer game showcases (The Podium, Articulate, Naija Trivia, Mathletics), 3 unstarted daily quests, an empty ledger displaying 0s across the board, and 9 locked achievement icons. The actual explanation of the Feynman ritual (*01 Read 15m → 02 Speak 90s → 03 Review*) was buried at the bottom below the games. As a result, the app's primary purpose was lost to the arcade games.
+- **User Insight & Reason**:
+  Virality and community games are crucial growth engines (bringing groups to Fey), but they must not compromise or overshadow the product's core identity: deep intellectual inquiry and vocal articulation. A new user needs crystal-clear spatial hierarchy: **The Study** for daily personal habit formation, and **The Parlor** for social sparring and party play.
+- **Architectural Landing**:
+  1. **Spatial Separation via Fluid Spring Tabbed Navigation**: Introduced a high-taste segmented switcher (`layoutId="active-dashboard-tab"`, `SPRING_PILL`) cleanly partitioning the dashboard into **`Daily Practice & Study`** (accented with wine red `--terra` and `Feynman Sprint` badge) and **`The Parlor & Games`** (accented with bronze gold `--gold` and live indicator `● 4 Games`).
+  2. **Day 0 Welcome & Progressive Disclosure**: For scholars with 0 completed sessions, an animated orientation banner delivers human, welcoming copy: *"Ready to find your voice? Pick today's topic and explain it in your own words."*
+  3. **Elevated Feynman Ritual Orientation**: The 3-step walkthrough (*01 Deep Research → 02 Vocal Synthesis → 03 Reflect & Expand*) was elevated directly beneath Today's Question, giving newcomers immediate clarity on the loop before any scrolling.
+  4. **De-Cluttered Daily Inquiry Card**: Purged the redundant `Games` button from the inquiry action bar, centering the user on two clear CTAs: `Begin Research (15m)` or `Quick Test: Impromptu (90s)`.
+  5. **Framer Motion Variant Cascade**: Created `tabContentVariants` with named variants (`hidden`, `visible`, `exit`) to ensure smooth staggered transition across tab switches without blocking Framer Motion variant inheritance down to child cards.
+- **Content Angle / Lesson for Builders**:
+  > *"When your product combines a solo daily habit with viral multiplayer games, don't sandwich them on one page. How spatial partitioning ('The Study' vs. 'The Parlor') and progressive Day 0 onboarding cut cognitive overload without sacrificing viral community growth."*
+
+
+
+
+---
+
+## 21. Articulate Match Ledger: Counting Hours That "Play Again" Used to Erase
+
+- **Date / Phase**: Phase 2 — Admin Analytics & Milestones
+- **The Problem / Context**:
+  We wanted to celebrate a "500 hours played on Articulate" milestone, but couldn't trust any number. `articulate_rooms` holds one mutable row per room, and the `reset_game` ("Play Again") action wiped `active_play_seconds`. A group that played five back-to-back matches in one room counted as one, so naively summing room rows would always undercount.
+- **User Insight & Guiding Philosophy**:
+  Milestones are a community story ("Scholars have spent 500 hours on Articulate"), so the number has to be both durable and generous in the right way. *Player hours* (match time × players) is the headline metric games use to celebrate; *game hours* (wall-clock match time) is kept alongside it for honesty.
+- **Architectural & Product Landing**:
+  1. **Append-only `articulate_matches` ledger**, upserted on `(room_code, started_at)` when a match finishes *and* just before "Play Again" resets the room, so retries and double triggers never double count.
+  2. **No migration needed for the past**: totals = logged matches + any match still living inside a room row (in progress, abandoned, or finished before the ledger existed), reusing the existing `calculateMatchPlayTime` with its 10-minute idle cap.
+  3. **Server-only table** (RLS on, no public policies, written with the service role) so players can't inflate the milestone.
+  4. **Admin milestone card** with a progress bar to the next milestone ladder step (100 → 250 → 500 → 1000 hrs) and a visible data-quality note (logged vs. estimated matches).
+- **"Building in Public" Content Takeaway**:
+  > *"If your game has a 'Play Again' button, check what it deletes. Ours silently erased the history we needed to celebrate our first big milestone — the fix was a 30-line append-only ledger."*
 

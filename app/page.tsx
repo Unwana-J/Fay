@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   Zap, BookOpen, Mic, ArrowRight,
@@ -185,6 +185,25 @@ const cardVariants = {
   }
 };
 
+const tabContentVariants = {
+  hidden: { opacity: 0, y: 8 },
+  visible: {
+    opacity: 1,
+    y: 0,
+    transition: {
+      duration: 0.2,
+      staggerChildren: 0.04,
+    }
+  },
+  exit: {
+    opacity: 0,
+    y: -6,
+    transition: {
+      duration: 0.12,
+    }
+  }
+};
+
 /* ─── Dashboard ──────────────────────────────────────────────────── */
 export default function Dashboard() {
   const router = useRouter();
@@ -214,6 +233,7 @@ export default function Dashboard() {
   const [focusCategory, setFocusCategory] = useState<string | null>(null);
   const [showFocusModal, setShowFocusModal] = useState(false);
   const [spinOffset, setSpinOffset] = useState(0);
+  const [activeTab, setActiveTab] = useState<"practice" | "parlor">("practice");
 
   const { features, fetchFeatures } = useFeatureStore();
 
@@ -224,6 +244,9 @@ export default function Dashboard() {
       const urlParams = new URLSearchParams(window.location.search);
       if (urlParams.get("accepted") === "1" || urlParams.get("onboard") === "1") {
         setShowOnboardingModal(true);
+      }
+      if (urlParams.get("tab") === "parlor" || urlParams.get("parlor") === "1") {
+        setActiveTab("parlor");
       }
     }
   }, [fetchFeatures]);
@@ -367,6 +390,207 @@ export default function Dashboard() {
   const heroCat = activeSession ? activeSession.topic.category : suggestedTopic.category;
   const catColor = CATEGORY_COLORS[heroCat] || "var(--terra)";
 
+  const enablePodium = features?.enablePodium ?? true;
+  const enableTrivia = features?.enableTrivia ?? true;
+  const enableArticulate = (features?.enableOnlineArticulate ?? true) || (features?.enablePassThePhone ?? true);
+  const enableMathletics = features?.enableMathletics ?? true;
+  const activeParlorCount = (enablePodium ? 1 : 0) + (enableArticulate ? 1 : 0) + (enableTrivia ? 1 : 0) + (enableMathletics ? 1 : 0);
+
+  function renderParlorCards() {
+    return (
+      <div className={cn(
+        "grid gap-3.5",
+        activeParlorCount >= 4
+          ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
+          : activeParlorCount === 3
+          ? "grid-cols-1 md:grid-cols-3"
+          : activeParlorCount === 2
+          ? "grid-cols-1 md:grid-cols-2"
+          : "grid-cols-1"
+      )}>
+        {/* Card 1: The Podium */}
+        {enablePodium && (
+          <Link href="/podium" className="group">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.015 }}
+              whileTap={{ scale: 0.985 }}
+              transition={{ type: "spring", stiffness: 420, damping: 26 }}
+              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(166, 124, 30, 0.14) 0%, rgba(166, 124, 30, 0.04) 50%, var(--bg-card) 100%)",
+                borderColor: "rgba(166, 124, 30, 0.3)",
+              }}
+            >
+              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                🎤
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
+                    style={{ background: "rgba(166, 124, 30, 0.2)", borderColor: "rgba(166, 124, 30, 0.4)" }}
+                  >
+                    🎤
+                  </div>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--gold)] shadow-xs">
+                    ★ Party Slides
+                  </span>
+                </div>
+                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--gold)] transition-colors" style={{ color: "var(--text)" }}>
+                  The Podium
+                </h4>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  Spin a spicy topic, jot your angle & let Fay-re build your slide deck.
+                </p>
+              </div>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--gold)]" style={{ borderColor: "rgba(166, 124, 30, 0.2)" }}>
+                <span>Present Deck</span>
+                <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                  Start <ChevronRight size={12} />
+                </span>
+              </div>
+            </motion.div>
+          </Link>
+        )}
+
+        {/* Card 2: Online Articulate */}
+        {enableArticulate && (
+          <Link href="/play" className="group">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.015 }}
+              whileTap={{ scale: 0.985 }}
+              transition={{ type: "spring", stiffness: 420, damping: 26 }}
+              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(122, 28, 46, 0.14) 0%, rgba(122, 28, 46, 0.04) 50%, var(--bg-card) 100%)",
+                borderColor: "rgba(122, 28, 46, 0.3)",
+              }}
+            >
+              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                🎭
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
+                    style={{ background: "rgba(122, 28, 46, 0.2)", borderColor: "rgba(122, 28, 46, 0.4)" }}
+                  >
+                    🎭
+                  </div>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--terra)] shadow-xs">
+                    Multiplayer
+                  </span>
+                </div>
+                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--terra)] transition-colors" style={{ color: "var(--text)" }}>
+                  Online Articulate
+                </h4>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  Fast-paced word describing game with speech recognition & AI referee.
+                </p>
+              </div>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--terra)]" style={{ borderColor: "rgba(122, 28, 46, 0.2)" }}>
+                <span>House Party</span>
+                <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                  Play Room <ChevronRight size={12} />
+                </span>
+              </div>
+            </motion.div>
+          </Link>
+        )}
+
+        {/* Card 3: Naija Trivia */}
+        {enableTrivia && (
+          <Link href="/games/trivia" className="group">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.015 }}
+              whileTap={{ scale: 0.985 }}
+              transition={{ type: "spring", stiffness: 420, damping: 26 }}
+              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(68, 78, 44, 0.14) 0%, rgba(68, 78, 44, 0.04) 50%, var(--bg-card) 100%)",
+                borderColor: "rgba(68, 78, 44, 0.3)",
+              }}
+            >
+              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                🇳🇬
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
+                    style={{ background: "rgba(68, 78, 44, 0.2)", borderColor: "rgba(68, 78, 44, 0.4)" }}
+                  >
+                    🇳🇬
+                  </div>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--olive)] shadow-xs">
+                    Trivia Arcade
+                  </span>
+                </div>
+                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--olive)] transition-colors" style={{ color: "var(--text)" }}>
+                  Naija Trivia
+                </h4>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  Test your mastery of Nigerian history, culture & general knowledge.
+                </p>
+              </div>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--olive)]" style={{ borderColor: "rgba(68, 78, 44, 0.2)" }}>
+                <span>Speed Quiz</span>
+                <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                  Challenge <ChevronRight size={12} />
+                </span>
+              </div>
+            </motion.div>
+          </Link>
+        )}
+
+        {/* Card 4: Mathletics */}
+        {enableMathletics && (
+          <Link href="/games/mathletics" className="group">
+            <motion.div
+              whileHover={{ y: -4, scale: 1.015 }}
+              whileTap={{ scale: 0.985 }}
+              transition={{ type: "spring", stiffness: 420, damping: 26 }}
+              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              style={{
+                background: "linear-gradient(135deg, rgba(45, 106, 79, 0.14) 0%, rgba(45, 106, 79, 0.04) 50%, var(--bg-card) 100%)",
+                borderColor: "rgba(45, 106, 79, 0.3)",
+              }}
+            >
+              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
+                📐
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-2.5">
+                  <div
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
+                    style={{ background: "rgba(45, 106, 79, 0.2)", borderColor: "rgba(45, 106, 79, 0.4)" }}
+                  >
+                    📐
+                  </div>
+                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-emerald-700 shadow-xs">
+                    ★ Speed Run
+                  </span>
+                </div>
+                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-emerald-700 transition-colors" style={{ color: "var(--text)" }}>
+                  Mathletics
+                </h4>
+                <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  25s rapid mental calculation, algebra, and geometry speed duels.
+                </p>
+              </div>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-emerald-700" style={{ borderColor: "rgba(45, 106, 79, 0.2)" }}>
+                <span>Speed Arena</span>
+                <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
+                  Duel <ChevronRight size={12} />
+                </span>
+              </div>
+            </motion.div>
+          </Link>
+        )}
+      </div>
+    );
+  }
+
   return (
     <motion.div
       variants={containerVariants}
@@ -375,9 +599,9 @@ export default function Dashboard() {
       className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto"
     >
       {/* ── Editorial Folio Header ── */}
-      <motion.div variants={cardVariants} className="mb-8">
+      <motion.div variants={cardVariants} className="mb-6">
         {/* Folio top dateline */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-2.5 mb-4 gap-1" style={{ borderColor: "var(--border-dim)" }}>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-2.5 mb-4 gap-2" style={{ borderColor: "var(--border-dim)" }}>
           <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-mute)" }}>
             <span>Daily Dispatch</span>
             <span>·</span>
@@ -425,12 +649,186 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* ── The Centerpiece: Today's Feynman Inquiry ── */}
-      <motion.div
-        variants={cardVariants}
-        className="surface rounded-2xl p-7 md:p-8 mb-6 border relative overflow-hidden"
-        style={{ borderColor: "var(--border)" }}
-      >
+      {/* ── Day 0 Welcome Orientation Banner (Crisp, Warm & Animated) ── */}
+      {sessions.length === 0 && (
+        <motion.div
+          variants={cardVariants}
+          className="surface rounded-2xl p-5 sm:p-6 mb-6 border relative overflow-hidden group"
+          style={{
+            borderColor: "rgba(68, 78, 44, 0.35)",
+            background: "linear-gradient(135deg, rgba(68, 78, 44, 0.1) 0%, rgba(166, 124, 30, 0.05) 50%, var(--bg-card) 100%)",
+            boxShadow: "0 8px 24px -4px rgba(68, 78, 44, 0.08)",
+          }}
+        >
+          {/* Subtle atmospheric ambient glow */}
+          <div
+            className="absolute -top-16 -right-16 w-44 h-44 rounded-full blur-3xl pointer-events-none opacity-20"
+            style={{ background: "var(--gold)" }}
+          />
+          <div className="flex items-start gap-4 relative z-10">
+            <motion.div
+              animate={{ rotate: [0, 6, -6, 0] }}
+              transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
+              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border mt-0.5 shadow-xs"
+              style={{
+                background: "linear-gradient(135deg, rgba(68, 78, 44, 0.2) 0%, rgba(166, 124, 30, 0.18) 100%)",
+                borderColor: "rgba(68, 78, 44, 0.35)",
+              }}
+            >
+              <Sparkles size={20} className="text-[var(--gold)]" />
+            </motion.div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                <span className="font-mono text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md bg-[var(--olive)]/12 text-[var(--olive)] border border-[var(--olive)]/20">
+                  First Sprint Orientation
+                </span>
+                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-input)] font-medium" style={{ color: "var(--text-mute)" }}>
+                  Day 0 Scholar
+                </span>
+              </div>
+              <h2 className="font-serif font-bold text-xl sm:text-2xl mb-1.5 tracking-tight" style={{ color: "var(--text)" }}>
+                Welcome, {profile.username || "Scholar"}!
+              </h2>
+              <p className="text-xs sm:text-sm leading-relaxed max-w-2xl text-[var(--text-dim)]">
+                Ready to find your voice? Pick today&apos;s topic and explain it in your own words.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Dashboard Tab Bar (High-Taste Animated Segmented Control) ── */}
+      <motion.div variants={cardVariants} className="mb-6">
+        <div
+          className="relative flex p-1.5 rounded-2xl border bg-[var(--bg-input)]/70 gap-2 shadow-inner backdrop-blur-xs"
+          style={{ borderColor: "var(--border-dim)" }}
+        >
+          {/* Tab 1: Daily Practice & Study */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("practice")}
+            className={cn(
+              "relative flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer select-none z-10",
+              activeTab === "practice"
+                ? "text-[var(--text)] font-bold"
+                : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            )}
+          >
+            {activeTab === "practice" && (
+              <motion.div
+                layoutId="active-dashboard-tab"
+                className="absolute inset-0 rounded-xl shadow-md border"
+                style={{
+                  background: "linear-gradient(135deg, rgba(122, 28, 46, 0.08) 0%, var(--bg-card) 100%)",
+                  borderColor: "rgba(122, 28, 46, 0.35)",
+                  boxShadow: "0 4px 16px -2px rgba(122, 28, 46, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.05)",
+                }}
+                transition={{ type: "spring", stiffness: 480, damping: 36 }}
+              />
+            )}
+            <span className="relative z-10 flex items-center gap-2">
+              <BookOpen
+                size={16}
+                className={cn(
+                  "transition-transform duration-200",
+                  activeTab === "practice" ? "text-[var(--terra)] scale-110" : "opacity-60"
+                )}
+              />
+              <span>Daily Practice & Study</span>
+            </span>
+          </button>
+
+          {/* Tab 2: The Parlor & Games */}
+          <button
+            type="button"
+            onClick={() => setActiveTab("parlor")}
+            className={cn(
+              "relative flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer select-none z-10",
+              activeTab === "parlor"
+                ? "text-[var(--text)] font-bold"
+                : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            )}
+          >
+            {activeTab === "parlor" && (
+              <motion.div
+                layoutId="active-dashboard-tab"
+                className="absolute inset-0 rounded-xl shadow-md border"
+                style={{
+                  background: "linear-gradient(135deg, rgba(166, 124, 30, 0.09) 0%, var(--bg-card) 100%)",
+                  borderColor: "rgba(166, 124, 30, 0.4)",
+                  boxShadow: "0 4px 16px -2px rgba(166, 124, 30, 0.15), 0 2px 6px -1px rgba(0, 0, 0, 0.05)",
+                }}
+                transition={{ type: "spring", stiffness: 480, damping: 36 }}
+              />
+            )}
+            <span className="relative z-10 flex items-center gap-2">
+              <Gamepad2
+                size={16}
+                className={cn(
+                  "transition-transform duration-200",
+                  activeTab === "parlor" ? "text-[var(--gold)] scale-110" : "opacity-60"
+                )}
+              />
+              <span>The Parlor & Games</span>
+            </span>
+          </button>
+        </div>
+      </motion.div>
+
+      {/* ── Animated Tab Content Transition ── */}
+      <AnimatePresence mode="wait">
+        {activeTab === "parlor" ? (
+          <motion.div
+            key="parlor-tab-content"
+            variants={tabContentVariants}
+            initial="hidden"
+            animate="visible"
+            exit="exit"
+            className="space-y-6"
+          >
+          <div
+            className="surface rounded-2xl p-6 border relative overflow-hidden"
+            style={{ borderColor: "var(--border-dim)" }}
+          >
+            <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
+              <div className="flex items-center gap-3">
+                <span className="text-2xl select-none">🎮</span>
+                <div>
+                  <h3 className="font-serif font-bold text-lg sm:text-xl" style={{ color: "var(--text)" }}>
+                    The Scholar&apos;s Parlor
+                  </h3>
+                  <p className="text-xs sm:text-sm" style={{ color: "var(--text-dim)" }}>
+                    Party slide presentations, multiplayer word games, speed arithmetic, and cultural trivia.
+                  </p>
+                </div>
+              </div>
+
+              <Link
+                href="/games"
+                className="text-xs font-mono font-bold flex items-center gap-1 text-[var(--gold)] hover:underline"
+              >
+                <span>Full Games Hub ({activeParlorCount})</span>
+                <ChevronRight size={13} />
+              </Link>
+            </div>
+
+            {renderParlorCards()}
+          </div>
+        </motion.div>
+      ) : (
+        <motion.div
+          key="practice-tab-content"
+          variants={tabContentVariants}
+          initial="hidden"
+          animate="visible"
+          exit="exit"
+        >
+          {/* ── The Centerpiece: Today's Feynman Inquiry ── */}
+          <motion.div
+            variants={cardVariants}
+            className="surface rounded-2xl p-7 md:p-8 mb-6 border relative overflow-hidden"
+            style={{ borderColor: "var(--border)" }}
+          >
         {activeSession ? (
           /* Resume in-progress session */
           <div className="flex items-center justify-between flex-wrap gap-4">
@@ -639,14 +1037,6 @@ export default function Dashboard() {
                 <Shuffle size={13} /> Next Topic
               </button>
 
-              <Link
-                href="/games"
-                className="btn-ghost text-xs cursor-pointer font-mono flex items-center gap-1.5"
-                title="Explore parlor games, party presentations & trivia"
-              >
-                <Gamepad2 size={13} style={{ color: "var(--gold)" }} /> Games
-              </Link>
-
               <div className="ml-auto text-[11px] font-mono hidden md:flex items-center gap-2" style={{ color: "var(--text-mute)" }}>
                 <span>15m Notes</span>
                 <span>·</span>
@@ -657,213 +1047,60 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* ── Games & Parlor Showcase (Direct Access to Games) ── */}
-      {(() => {
-        const enablePodium = features?.enablePodium ?? true;
-        const enableTrivia = features?.enableTrivia ?? true;
-        const enableArticulate = (features?.enableOnlineArticulate ?? true) || (features?.enablePassThePhone ?? true);
-        const enableMathletics = features?.enableMathletics ?? true;
-        const activeParlorCount = (enablePodium ? 1 : 0) + (enableArticulate ? 1 : 0) + (enableTrivia ? 1 : 0) + (enableMathletics ? 1 : 0);
+      {/* ── Day 0 Orientation Guide: Elevated to sit with Today's Inquiry ── */}
+      {sessions.length === 0 && (
+        <motion.div
+          variants={cardVariants}
+          className="surface rounded-2xl p-6 mb-6 border"
+          style={{ borderColor: "var(--border-dim)" }}
+        >
+          <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+            <div>
+              <span className="text-[10px] font-mono uppercase tracking-wider font-semibold block mb-0.5" style={{ color: "var(--olive)" }}>
+                The Feynman Ritual
+              </span>
+              <h3 className="font-serif text-lg font-semibold" style={{ color: "var(--text)" }}>
+                How your articulation practice works
+              </h3>
+            </div>
+            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[var(--bg-input)] font-medium" style={{ color: "var(--text-mute)" }}>
+              First Sprint
+            </span>
+          </div>
 
-        if (activeParlorCount === 0) return null;
-
-        return (
-          <motion.div
-            variants={cardVariants}
-            className="surface rounded-xl p-5 mb-6 border overflow-hidden relative"
-            style={{ borderColor: "var(--border-dim)" }}
-          >
-            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
-              <div className="flex items-center gap-2.5">
-                <span className="text-base select-none">🎮</span>
-                <div>
-                  <span className="font-serif font-semibold text-sm block" style={{ color: "var(--text)" }}>
-                    The Parlor & Games
-                  </span>
-                  <span className="text-[11px]" style={{ color: "var(--text-dim)" }}>
-                    Take a break, challenge friends, or present unhinged hot takes
-                  </span>
-                </div>
+          <div className="grid md:grid-cols-3 gap-3.5 pt-1">
+            <div className="p-4 rounded-xl border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
+              <div className="font-mono text-xs font-bold mb-1.5 flex items-center gap-2" style={{ color: "var(--terra)" }}>
+                <span>01</span>
+                <span>Deep Research (15m)</span>
               </div>
-
-              <Link
-                href="/games"
-                className="text-xs font-mono font-semibold flex items-center gap-1 hover:gap-1.5 transition-all text-[var(--gold)]"
-              >
-                <span>Explore All ({activeParlorCount})</span>
-                <ChevronRight size={13} />
-              </Link>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                Read the prompt, outline core tenets in the distraction-free editor, and organize key analogies without rote memorization.
+              </p>
             </div>
 
-            <div className={cn(
-              "grid gap-3",
-              activeParlorCount >= 4
-                ? "grid-cols-1 sm:grid-cols-2 lg:grid-cols-4"
-                : activeParlorCount === 3
-                ? "grid-cols-1 md:grid-cols-3"
-                : activeParlorCount === 2
-                ? "grid-cols-1 md:grid-cols-2"
-                : "grid-cols-1"
-            )}>
-              {/* Card 1: The Podium */}
-              {enablePodium && (
-                <Link href="/podium" className="group">
-                  <div
-                    className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(166, 124, 30, 0.08) 0%, var(--bg-card) 100%)",
-                      borderColor: "var(--border-dim)",
-                    }}
-                  >
-                    <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                      🎤
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--gold)15", borderColor: "var(--gold)30" }}>
-                          🎤
-                        </div>
-                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--terra)] shadow-xs">
-                          ★ New
-                        </span>
-                      </div>
-                      <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--gold)] transition-colors" style={{ color: "var(--text)" }}>
-                        The Podium
-                      </h4>
-                      <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
-                        Spin a spicy topic, jot your angle & let Fay-re build your slide deck.
-                      </p>
-                    </div>
-                    <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--gold)]" style={{ borderColor: "var(--border-dim)" }}>
-                      <span>Party Slides</span>
-                      <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                        Present <ChevronRight size={12} />
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              )}
-
-              {/* Card 2: Online Articulate */}
-              {enableArticulate && (
-                <Link href="/play" className="group">
-                  <div
-                    className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(122, 28, 46, 0.08) 0%, var(--bg-card) 100%)",
-                      borderColor: "var(--border-dim)",
-                    }}
-                  >
-                    <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                      🎭
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--terra)15", borderColor: "var(--terra)30" }}>
-                          🎭
-                        </div>
-                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}>
-                          Multiplayer
-                        </span>
-                      </div>
-                      <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--terra)] transition-colors" style={{ color: "var(--text)" }}>
-                        Online Articulate
-                      </h4>
-                      <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
-                        Fast-paced word describing game with speech recognition & AI referee.
-                      </p>
-                    </div>
-                    <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--terra)]" style={{ borderColor: "var(--border-dim)" }}>
-                      <span>House Party</span>
-                      <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                        Play <ChevronRight size={12} />
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              )}
-
-              {/* Card 3: Naija Trivia */}
-              {enableTrivia && (
-                <Link href="/games/trivia" className="group">
-                  <div
-                    className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(45, 106, 79, 0.08) 0%, var(--bg-card) 100%)",
-                      borderColor: "var(--border-dim)",
-                    }}
-                  >
-                    <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                      🇳🇬
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--olive)15", borderColor: "var(--olive)30" }}>
-                          🇳🇬
-                        </div>
-                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full" style={{ background: "var(--bg-input)", color: "var(--text-mute)" }}>
-                          Trivia Arcade
-                        </span>
-                      </div>
-                      <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--olive)] transition-colors" style={{ color: "var(--text)" }}>
-                        Naija Trivia
-                      </h4>
-                      <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
-                        Test your mastery of Nigerian history, culture & general knowledge.
-                      </p>
-                    </div>
-                    <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--olive)]" style={{ borderColor: "var(--border-dim)" }}>
-                      <span>Speed Quiz</span>
-                      <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                        Challenge <ChevronRight size={12} />
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              )}
-
-              {/* Card 4: Mathletics */}
-              {enableMathletics && (
-                <Link href="/games/mathletics" className="group">
-                  <div
-                    className="p-4 rounded-xl border h-full flex flex-col justify-between transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer relative overflow-hidden"
-                    style={{
-                      background: "linear-gradient(135deg, rgba(68, 78, 44, 0.08) 0%, var(--bg-card) 100%)",
-                      borderColor: "var(--border-dim)",
-                    }}
-                  >
-                    <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                      📐
-                    </div>
-                    <div>
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="w-8 h-8 rounded-lg flex items-center justify-center text-lg border" style={{ background: "var(--olive)15", borderColor: "var(--olive)30" }}>
-                          📐
-                        </div>
-                        <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--terra)] shadow-xs">
-                          ★ New
-                        </span>
-                      </div>
-                      <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--olive)] transition-colors" style={{ color: "var(--text)" }}>
-                        Mathletics
-                      </h4>
-                      <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
-                        25s rapid mental calculation, algebra, and geometry speed duels.
-                      </p>
-                    </div>
-                    <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--olive)]" style={{ borderColor: "var(--border-dim)" }}>
-                      <span>Speed Arena</span>
-                      <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
-                        Play <ChevronRight size={12} />
-                      </span>
-                    </div>
-                  </div>
-                </Link>
-              )}
+            <div className="p-4 rounded-xl border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
+              <div className="font-mono text-xs font-bold mb-1.5 flex items-center gap-2" style={{ color: "var(--olive)" }}>
+                <span>02</span>
+                <span>Vocal Synthesis (90s)</span>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                Explain the concept aloud under pressure using real microphone capture. Listen back, re-record if needed, and refine your delivery.
+              </p>
             </div>
-          </motion.div>
-        );
-      })()}
+
+            <div className="p-4 rounded-xl border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
+              <div className="font-mono text-xs font-bold mb-1.5 flex items-center gap-2" style={{ color: "var(--gold)" }}>
+                <span>03</span>
+                <span>Reflect & Expand</span>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                Rate your understanding. Each completed sprint unlocks new nodes on your interactive Constellation Graph and lights up your activity ledger.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* ── Daily Vows (Duolingo Habit Engine: 3 Daily Quests) ── */}
       <motion.div
@@ -1010,56 +1247,20 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* ── Day 0 Orientation vs. Active Scholar Activity ── */}
+      {/* ── Day 0 Milestone Tracker vs. Active Activity Heatmap ── */}
       {sessions.length === 0 ? (
-        /* Day 0: Thoughtful onboarding orientation guide */
         <motion.div
           variants={cardVariants}
-          className="surface rounded-xl p-6 mb-6 border"
+          className="surface rounded-2xl p-6 mb-6 border text-center py-8"
           style={{ borderColor: "var(--border-dim)" }}
         >
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider font-semibold block mb-0.5" style={{ color: "var(--olive)" }}>
-                The Feynman Ritual
-              </span>
-              <h3 className="font-serif text-lg font-semibold" style={{ color: "var(--text)" }}>
-                How your articulation practice works
-              </h3>
-            </div>
-            <span className="text-xs font-mono px-2 py-0.5 rounded bg-[var(--bg-input)]/50" style={{ color: "var(--text-mute)" }}>
-              First Sprint
-            </span>
-          </div>
-
-          <div className="grid md:grid-cols-3 gap-4 pt-1">
-            <div className="p-4 rounded-lg border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
-              <div className="font-mono text-xs font-bold mb-1.5" style={{ color: "var(--terra)" }}>
-                01 / Deep Research (15m)
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
-                Read the prompt, outline core tenets in the distraction-free editor, and organize key analogies without rote memorization.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-lg border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
-              <div className="font-mono text-xs font-bold mb-1.5" style={{ color: "var(--olive)" }}>
-                02 / Vocal Synthesis (90s)
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
-                Explain the concept aloud under pressure using real microphone capture. Listen back, re-record if needed, and refine your delivery.
-              </p>
-            </div>
-
-            <div className="p-4 rounded-lg border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
-              <div className="font-mono text-xs font-bold mb-1.5" style={{ color: "var(--gold)" }}>
-                03 / Reflect & Expand
-              </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
-                Rate your understanding. Each completed sprint unlocks new nodes on your interactive Constellation Graph and lights up your activity ledger.
-              </p>
-            </div>
-          </div>
+          <div className="text-3xl mb-2 opacity-40 select-none">🌌</div>
+          <h4 className="font-serif font-bold text-base mb-1" style={{ color: "var(--text)" }}>
+            Your Consistency Ledger & Heatmap
+          </h4>
+          <p className="text-xs max-w-md mx-auto leading-relaxed" style={{ color: "var(--text-dim)" }}>
+            Complete your first 90-second voice sprint above to activate your daily habit streak, light up your Constellation graph, and record your vocal progress.
+          </p>
         </motion.div>
       ) : (
         /* Active Scholar: Genuine Activity Heatmap & Weekly Rhythm */
@@ -1250,6 +1451,38 @@ export default function Dashboard() {
           )}
         </motion.div>
       </div>
+
+          {/* ── Tabbed Footer Companion Callout ── */}
+          {activeParlorCount > 0 && (
+            <motion.div
+              variants={cardVariants}
+              className="mt-6 p-4 sm:p-5 rounded-2xl border flex items-center justify-between gap-4 flex-wrap surface"
+              style={{ borderColor: "var(--border-dim)" }}
+            >
+              <div className="flex items-center gap-3">
+                <span className="text-2xl select-none">🎮</span>
+                <div>
+                  <div className="font-serif font-bold text-sm" style={{ color: "var(--text)" }}>
+                    Want to practice with peers?
+                  </div>
+                  <div className="text-xs" style={{ color: "var(--text-dim)" }}>
+                    Head to The Parlor for party slides, multiplayer word guessing, speed trivia & mental math.
+                  </div>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActiveTab("parlor")}
+                className="btn-terra !text-xs !py-2 !px-3.5 flex items-center gap-1 cursor-pointer font-mono"
+              >
+                <span>Enter The Parlor</span>
+                <ChevronRight size={13} />
+              </button>
+            </motion.div>
+          )}
+        </motion.div>
+      )}
+      </AnimatePresence>
 
       {/* Topic Focus Modal */}
       <FocusCategoryModal
