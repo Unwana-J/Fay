@@ -337,9 +337,14 @@ export default function TriviaChallengeLounge({
 
   function handleCreateChallenge(e: React.FormEvent) {
     e.preventDefault();
+    const effectiveCreatorName =
+      (profile?.username && profile.username !== "Scholar" && profile.username !== "Learner"
+        ? profile.username
+        : "") || "Host";
+
     const challenge = createTriviaChallenge({
-      title: title.trim() || `${profile?.username || "Scholar"}'s Trivia Challenge`,
-      creatorName: profile?.username || "Scholar",
+      title: title.trim() || `${effectiveCreatorName}'s Trivia Challenge`,
+      creatorName: effectiveCreatorName,
       durationHours,
       questionCount,
       difficulty,
@@ -524,7 +529,7 @@ export default function TriviaChallengeLounge({
                           <span>{c.questionCount} Questions</span>
                           <span>•</span>
                           <span className="flex items-center gap-1 font-semibold text-[var(--text)]">
-                            <Users size={12} /> {cScores.length} {cScores.length === 1 ? "Scholar" : "Scholars"}
+                            <Users size={12} /> {cScores.length} {cScores.length === 1 ? "Player" : "Players"}
                           </span>
                         </div>
                       </div>
@@ -793,7 +798,7 @@ export default function TriviaChallengeLounge({
               </h2>
 
               <p className="text-xs sm:text-sm text-[var(--text-dim)]">
-                Host: <strong>Scholar {currentChallenge.creatorName}</strong> • {currentChallenge.questionCount} Questions •{" "}
+                Host: <strong>{currentChallenge.creatorName && currentChallenge.creatorName !== "Scholar" ? currentChallenge.creatorName : "Host"}</strong> • {currentChallenge.questionCount} Questions •{" "}
                 <span className="capitalize">{currentChallenge.difficulty}</span> pool
               </p>
             </div>
@@ -918,7 +923,7 @@ export default function TriviaChallengeLounge({
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder={`e.g. ${profile?.username || "Scholar"}'s Naija History Challenge`}
+          placeholder={`e.g. ${profile?.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Your"}'s Naija History Challenge`}
           className="w-full px-4 py-3.5 rounded-2xl border text-sm bg-[var(--bg-base)] focus:outline-none focus:border-[var(--olive)] transition-colors shadow-xs"
           style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
         />

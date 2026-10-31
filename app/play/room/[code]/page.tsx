@@ -97,7 +97,12 @@ export default function ArticulateRoomPage({
 
   const [savedLocalName, setSavedLocalName] = useState<string>(() => {
     if (typeof window !== "undefined") {
-      return localStorage.getItem("fey_player_name") || "";
+      const saved = localStorage.getItem("fey_player_name");
+      if (saved === "Scholar" || saved === "Learner" || saved?.startsWith("Scholar (")) {
+        localStorage.removeItem("fey_player_name");
+        return "";
+      }
+      return saved || "";
     }
     return "";
   });
@@ -116,8 +121,17 @@ export default function ArticulateRoomPage({
     }
   }, [profile?.id, devicePlayerId]);
 
+  const cleanProfileUsername =
+    profile?.username && profile.username !== "Scholar" && profile.username !== "Learner"
+      ? profile.username
+      : "";
+  const cleanSavedLocalName =
+    savedLocalName && savedLocalName !== "Scholar" && savedLocalName !== "Learner"
+      ? savedLocalName
+      : "";
+
   const myPlayerId = profile?.id || devicePlayerId;
-  const myPlayerName = profile?.username || savedLocalName || "Scholar";
+  const myPlayerName = cleanProfileUsername || cleanSavedLocalName || "Player";
   const myAvatar = profile?.avatar || "/avatars/avatar-scholar.svg";
 
   const [room, setRoom] = useState<ArticulateRoom | null>(null);
@@ -319,15 +333,16 @@ export default function ArticulateRoomPage({
     [recordServerTimeOffset, roomCode]
   );
 
-  const storedUsername = (profile?.username || savedLocalName)?.trim();
+  const storedUsername = (cleanProfileUsername || cleanSavedLocalName)?.trim();
   const effectivePlayerName =
-    storedUsername && storedUsername !== "Scholar" && storedUsername !== "Learner"
+    storedUsername
       ? storedUsername
       : room?.player_details?.[myPlayerId]?.name &&
         room.player_details[myPlayerId].name !== "Scholar" &&
-        room.player_details[myPlayerId].name !== "Learner"
+        room.player_details[myPlayerId].name !== "Learner" &&
+        !room.player_details[myPlayerId].name.startsWith("Scholar (")
       ? room.player_details[myPlayerId].name
-      : savedLocalName || "Scholar";
+      : cleanSavedLocalName || "Player";
 
   // 3. Initial Mount & Join
   useEffect(() => {
@@ -582,11 +597,11 @@ export default function ArticulateRoomPage({
       return {
         id: pId,
         name:
-          detail?.name && detail.name !== "Scholar" && detail.name !== "Learner"
+          detail?.name && detail.name !== "Scholar" && detail.name !== "Learner" && !detail.name.startsWith("Scholar (")
             ? detail.name
-            : pId === room.host_id
+            : pId === room.host_id && room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host"
             ? room.host_name
-            : `Scholar (${pId.replace(/^guest-/, "").slice(0, 5)})`,
+            : `Player (${pId.replace(/^guest-/, "").slice(0, 5)})`,
         avatar: detail?.avatar || "/avatars/avatar-scholar.svg",
         team,
         isHost: pId === room.host_id,
@@ -667,7 +682,7 @@ export default function ArticulateRoomPage({
           if (list && list[0]) {
             players.push({
               id: list[0].id || key,
-              name: list[0].name || "Scholar",
+              name: list[0].name && list[0].name !== "Scholar" ? list[0].name : "Player",
               avatar: list[0].avatar || "/avatars/avatar-scholar.svg",
               team: list[0].team || null,
               isHost: Boolean(list[0].isHost),
@@ -1251,13 +1266,13 @@ export default function ArticulateRoomPage({
         const known = knownNames[id];
         const cleanId = id.replace(/^guest-/, "");
         const name =
-          detail?.name && detail.name !== "Scholar" && detail.name !== "Learner"
+          detail?.name && detail.name !== "Scholar" && detail.name !== "Learner" && !detail.name.startsWith("Scholar (")
             ? detail.name
-            : pres?.name && pres.name !== "Scholar" && pres.name !== "Learner"
+            : pres?.name && pres.name !== "Scholar" && pres.name !== "Learner" && !pres.name.startsWith("Scholar (")
             ? pres.name
-            : known?.name && known.name !== "Scholar" && known.name !== "Learner"
+            : known?.name && known.name !== "Scholar" && known.name !== "Learner" && !known.name.startsWith("Scholar (")
             ? known.name
-            : detail?.name || pres?.name || `Scholar (${cleanId.slice(0, 5)})`;
+            : `Player (${cleanId.slice(0, 5)})`;
         const avatar =
           detail?.avatar || pres?.avatar || known?.avatar || "/avatars/avatar-scholar.svg";
         const isOnline = Boolean(pres);
@@ -1574,20 +1589,27 @@ export default function ArticulateRoomPage({
       : speakerId
       ? room.player_details?.[speakerId]?.name &&
         room.player_details[speakerId].name !== "Scholar" &&
+        room.player_details[speakerId].name !== "Learner" &&
         !room.player_details[speakerId].name.startsWith("Scholar (")
         ? room.player_details[speakerId].name
         : presencePlayers?.find((p) => p.id === speakerId)?.name &&
           presencePlayers.find((p) => p.id === speakerId)!.name !== "Scholar" &&
+          presencePlayers.find((p) => p.id === speakerId)!.name !== "Learner" &&
           !presencePlayers.find((p) => p.id === speakerId)!.name.startsWith("Scholar (")
         ? presencePlayers.find((p) => p.id === speakerId)!.name
         : knownNames?.[speakerId]?.name &&
           knownNames[speakerId].name !== "Scholar" &&
+          knownNames[speakerId].name !== "Learner" &&
           !knownNames[speakerId].name.startsWith("Scholar (")
         ? knownNames[speakerId].name
-        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar"
+        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host"
         ? room.host_name
-        : rawSpeakerName || "Scholar"
-      : rawSpeakerName || "Scholar";
+        : rawSpeakerName && rawSpeakerName !== "Scholar" && rawSpeakerName !== "Learner" && !rawSpeakerName.startsWith("Scholar (")
+        ? rawSpeakerName
+        : "Speaker"
+      : rawSpeakerName && rawSpeakerName !== "Scholar" && rawSpeakerName !== "Learner" && !rawSpeakerName.startsWith("Scholar (")
+      ? rawSpeakerName
+      : "Speaker";
 
   return (
     <div className="min-h-screen p-3.5 sm:p-6 md:p-8 max-w-6xl mx-auto flex flex-col justify-center relative overflow-hidden">
@@ -1689,7 +1711,7 @@ export default function ArticulateRoomPage({
             <span className="hidden sm:inline">{isRefreshing ? "Syncing..." : "Sync"}</span>
           </button>
 
-          {/* Lobby & Scholar Roster Queue Button */}
+          {/* Lobby & Player Roster Queue Button */}
           <button
             type="button"
             onClick={() => setShowLobbyQueueModal(true)}
@@ -1698,7 +1720,7 @@ export default function ArticulateRoomPage({
                 ? "bg-[var(--gold)]/15 hover:bg-[var(--gold)]/25 text-[var(--gold)] border-[var(--gold)]/30 font-extrabold"
                 : "bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border-dim)]"
             }`}
-            title="View Lobby & Waiting Scholars Queue"
+            title="View Lobby & Waiting Players Queue"
           >
             <Users className="w-3.5 h-3.5 text-[var(--olive)]" />
             <span className="hidden sm:inline">Lobby</span>
@@ -1989,7 +2011,7 @@ export default function ArticulateRoomPage({
                     Transfer Host Privileges
                   </h3>
                   <p className="text-xs text-[var(--text-dim)] leading-relaxed">
-                    You are the room host. Before leaving, please select someone to become the new host so other scholars can continue playing.
+                    You are the room host. Before leaving, please select someone to become the new host so other players can continue playing.
                   </p>
                 </div>
 
@@ -2079,7 +2101,7 @@ export default function ArticulateRoomPage({
                         <Crown className="w-4 h-4" />
                         <span>
                           Transfer to{" "}
-                          {otherScholars.find((s) => s.id === selectedSuccessorId)?.name || "Selected Scholar"}{" "}
+                          {otherScholars.find((s) => s.id === selectedSuccessorId)?.name || "Selected Player"}{" "}
                           & Leave
                         </span>
                       </>
@@ -2118,7 +2140,7 @@ export default function ArticulateRoomPage({
                     Leave Match?
                   </h3>
                   <p className="text-xs text-[var(--text-dim)]">
-                    You are the host and only scholar currently in this room. Leaving will end your session.
+                    You are the host and only player currently in this room. Leaving will end your session.
                   </p>
                 </div>
 

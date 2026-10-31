@@ -61,20 +61,27 @@ export default function RoomGuesserView({
       : speakerId
       ? room.player_details?.[speakerId]?.name &&
         room.player_details[speakerId].name !== "Scholar" &&
+        room.player_details[speakerId].name !== "Learner" &&
         !room.player_details[speakerId].name.startsWith("Scholar (")
         ? room.player_details[speakerId].name
         : presencePlayers?.find((p) => p.id === speakerId)?.name &&
           presencePlayers.find((p) => p.id === speakerId)!.name !== "Scholar" &&
+          presencePlayers.find((p) => p.id === speakerId)!.name !== "Learner" &&
           !presencePlayers.find((p) => p.id === speakerId)!.name.startsWith("Scholar (")
         ? presencePlayers.find((p) => p.id === speakerId)!.name
         : knownNames?.[speakerId]?.name &&
           knownNames[speakerId].name !== "Scholar" &&
+          knownNames[speakerId].name !== "Learner" &&
           !knownNames[speakerId].name.startsWith("Scholar (")
         ? knownNames[speakerId].name
-        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar"
+        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host"
         ? room.host_name
-        : rawSpeakerName || "Scholar"
-      : rawSpeakerName || "Scholar";
+        : rawSpeakerName && rawSpeakerName !== "Scholar" && rawSpeakerName !== "Learner" && !rawSpeakerName.startsWith("Scholar (")
+        ? rawSpeakerName
+        : "Speaker"
+      : rawSpeakerName && rawSpeakerName !== "Scholar" && rawSpeakerName !== "Learner" && !rawSpeakerName.startsWith("Scholar (")
+      ? rawSpeakerName
+      : "Speaker";
 
   const isMyTeam =
     myTeam

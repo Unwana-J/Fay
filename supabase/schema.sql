@@ -250,6 +250,97 @@ create policy "Allow public delete access on league_scores"
   on public.league_scores for delete
   using (true);
 
+create index if not exists idx_league_scores_code on public.league_scores (league_code);
+create index if not exists idx_league_scores_user on public.league_scores (user_id);
+
+-- ==============================================================================
+-- FEY PLATFORM: MATHLETICS LEAGUES (SPRINT DUELS & MARATHON TOURNAMENTS)
+-- ==============================================================================
+
+-- 10. Create mathletics_leagues table
+create table if not exists public.mathletics_leagues (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  title text not null,
+  creator_name text not null,
+  creator_id text not null,
+  format text not null default 'sprint_duel', -- 'sprint_duel' or 'marathon'
+  duration_days integer not null default 1,
+  start_date text not null,
+  end_date text not null,
+  questions_per_day integer not null default 10,
+  difficulty text not null default 'random',
+  category text not null default 'all',
+  daily_seed_map jsonb not null default '{}'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table public.mathletics_leagues enable row level security;
+
+drop policy if exists "Allow public read access on mathletics_leagues" on public.mathletics_leagues;
+create policy "Allow public read access on mathletics_leagues"
+  on public.mathletics_leagues for select
+  using (true);
+
+drop policy if exists "Allow public insert access on mathletics_leagues" on public.mathletics_leagues;
+create policy "Allow public insert access on mathletics_leagues"
+  on public.mathletics_leagues for insert
+  with check (true);
+
+drop policy if exists "Allow public update access on mathletics_leagues" on public.mathletics_leagues;
+create policy "Allow public update access on mathletics_leagues"
+  on public.mathletics_leagues for update
+  using (true);
+
+drop policy if exists "Allow public delete access on mathletics_leagues" on public.mathletics_leagues;
+create policy "Allow public delete access on mathletics_leagues"
+  on public.mathletics_leagues for delete
+  using (true);
+
+-- 11. Create mathletics_scores table for sprint results & agility leaderboard
+create table if not exists public.mathletics_scores (
+  id uuid primary key default gen_random_uuid(),
+  league_code text references public.mathletics_leagues(code) on delete cascade not null,
+  user_id text not null,
+  username text not null,
+  avatar text default '/avatars/avatar-scholar.svg',
+  day_number integer not null default 1,
+  date text not null,
+  score integer not null,
+  total_questions integer not null default 10,
+  agility_score integer not null default 0,
+  points integer not null default 0,
+  duration_seconds integer default 0,
+  question_results jsonb default '[]'::jsonb,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  constraint uq_mathletics_user_day unique (league_code, user_id, day_number)
+);
+
+alter table public.mathletics_scores enable row level security;
+
+drop policy if exists "Allow public read access on mathletics_scores" on public.mathletics_scores;
+create policy "Allow public read access on mathletics_scores"
+  on public.mathletics_scores for select
+  using (true);
+
+drop policy if exists "Allow public insert access on mathletics_scores" on public.mathletics_scores;
+create policy "Allow public insert access on mathletics_scores"
+  on public.mathletics_scores for insert
+  with check (true);
+
+drop policy if exists "Allow public update access on mathletics_scores" on public.mathletics_scores;
+create policy "Allow public update access on mathletics_scores"
+  on public.mathletics_scores for update
+  using (true);
+
+drop policy if exists "Allow public delete access on mathletics_scores" on public.mathletics_scores;
+create policy "Allow public delete access on mathletics_scores"
+  on public.mathletics_scores for delete
+  using (true);
+
+create index if not exists idx_mathletics_scores_code on public.mathletics_scores (league_code);
+create index if not exists idx_mathletics_scores_user on public.mathletics_scores (user_id);
+
 create index if not exists idx_league_scores_lookup on public.league_scores (league_code, day_number);
 create index if not exists idx_league_scores_ranking on public.league_scores (league_code, points desc);
 

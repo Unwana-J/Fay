@@ -78,7 +78,7 @@ export default function LobbyQueueModal({
 
   const getPlayerDisplay = (pId: string) => {
     const detail = room.player_details?.[pId];
-    if (detail?.name && detail.name !== "Scholar" && detail.name !== "Learner") {
+    if (detail?.name && detail.name !== "Scholar" && detail.name !== "Learner" && !detail.name.startsWith("Scholar (")) {
       return {
         id: pId,
         name: detail.name,
@@ -88,7 +88,7 @@ export default function LobbyQueueModal({
       };
     }
     const pres = presencePlayers.find((p) => p.id === pId);
-    if (pres?.name && pres.name !== "Scholar" && pres.name !== "Learner") {
+    if (pres?.name && pres.name !== "Scholar" && pres.name !== "Learner" && !pres.name.startsWith("Scholar (")) {
       return {
         id: pId,
         name: pres.name,
@@ -98,7 +98,7 @@ export default function LobbyQueueModal({
       };
     }
     const known = knownNames[pId];
-    if (known?.name && known.name !== "Scholar" && known.name !== "Learner") {
+    if (known?.name && known.name !== "Scholar" && known.name !== "Learner" && !known.name.startsWith("Scholar (")) {
       return {
         id: pId,
         name: known.name,
@@ -108,9 +108,10 @@ export default function LobbyQueueModal({
       };
     }
     if (pId === room.host_id) {
+      const hostDisplay = room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host" ? room.host_name : "Host";
       return {
         id: pId,
-        name: room.host_name || "Host",
+        name: hostDisplay,
         avatar: "/avatars/avatar-scholar.svg",
         isHost: true,
         joinedAt: detail?.joinedAt || Date.now(),
@@ -119,7 +120,7 @@ export default function LobbyQueueModal({
     const clean = pId.replace(/^guest-/, "");
     return {
       id: pId,
-      name: detail?.name || `Scholar (${clean.slice(0, 5)})`,
+      name: `Player (${clean.slice(0, 5)})`,
       avatar: detail?.avatar || "/avatars/avatar-scholar.svg",
       isHost: false,
       joinedAt: detail?.joinedAt || Date.now(),
@@ -178,7 +179,7 @@ export default function LobbyQueueModal({
               <div>
                 <div className="flex items-center gap-2">
                   <h2 className="font-space font-extrabold text-base sm:text-lg text-[var(--text)]">
-                    Lobby & Scholar Roster
+                    Lobby & Player Roster
                   </h2>
                   <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--olive)]/15 text-[var(--olive)]">
                     {sortedWaitingScholars.length} in Queue
@@ -273,7 +274,7 @@ export default function LobbyQueueModal({
             {sortedWaitingScholars.length === 0 ? (
               <div className="surface rounded-2xl p-6 border border-[var(--border-dim)] text-center space-y-1">
                 <p className="font-space font-bold text-xs text-[var(--text-dim)]">
-                  No scholars currently waiting in the lobby queue
+                  No players currently waiting in the lobby queue
                 </p>
                 <p className="text-[11px] text-[var(--text-mute)]">
                   When new friends click your room invite link, they will appear here in arrival order.

@@ -787,7 +787,7 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         }
 
         if (!speakerId) {
-          speakerId = rawTeamPlayerIds[0] || room.host_id || "guest-scholar";
+          speakerId = rawTeamPlayerIds[0] || room.host_id || "guest-player";
           speakerIndex = 0;
         }
 
@@ -803,9 +803,9 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
             ? speakerDetails.name
             : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host"
             ? room.host_name
-            : speakerDetails?.name && speakerDetails.name !== "Scholar"
+            : speakerDetails?.name && speakerDetails.name !== "Scholar" && speakerDetails.name !== "Learner" && !speakerDetails.name.startsWith("Scholar (")
             ? speakerDetails.name
-            : `Scholar (${speakerId.replace(/^guest-/, "").slice(0, 5)})`;
+            : `Player (${speakerId.replace(/^guest-/, "").slice(0, 5)})`;
 
         // Ensure deck exists and has enough words with deduplication
         if (!room.deck || !Array.isArray(room.deck) || room.deck.length === 0 || (room.current_word_index || 0) >= room.deck.length - 15) {

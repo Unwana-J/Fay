@@ -43,6 +43,8 @@ import {
 } from "@/lib/mathletics-leaderboard";
 import { generateMathleticsCardCanvas } from "@/lib/mathletics-card-canvas";
 import { useAppStore } from "@/store/useAppStore";
+import MathleticsLeagueLounge from "@/components/mathletics/MathleticsLeagueLounge";
+import CreateMathleticsLeagueModal from "@/components/mathletics/CreateMathleticsLeagueModal";
 
 export interface ChallengerInfo {
   name: string;
@@ -72,12 +74,18 @@ export default function MathleticsGameClient({
   } = useAppStore();
 
   // Mode & Navigation
-  const [activeTab, setActiveTab] = useState<"arena" | "titans">("arena");
+  const [activeTab, setActiveTab] = useState<"arena" | "titans" | "leagues">("arena");
   const [gameState, setGameState] = useState<"setup" | "playing" | "summary">("setup");
+  const [showCreateDuelModal, setShowCreateDuelModal] = useState(false);
 
   // Setup options
   const [selectedDifficulty, setSelectedDifficulty] = useState<MathleticsDifficultyFilter>(
     initialChallenge?.difficulty || "random"
+  );
+  const [questionTimerSeconds, setQuestionTimerSeconds] = useState<number>(
+    initialChallenge?.questionTimerSeconds && initialChallenge.questionTimerSeconds >= 25
+      ? initialChallenge.questionTimerSeconds
+      : 25
   );
   const [selectedCategory, setSelectedCategory] = useState<MathleticsCategory | "all">("all");
   const [questionCount] = useState<number>(10);
@@ -87,7 +95,11 @@ export default function MathleticsGameClient({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [selectedOption, setSelectedOption] = useState<number | null>(null);
   const [isAnswerRevealed, setIsAnswerRevealed] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(QUESTION_TIME_LIMIT);
+  const [timeLeft, setTimeLeft] = useState(
+    initialChallenge?.questionTimerSeconds && initialChallenge.questionTimerSeconds >= 25
+      ? initialChallenge.questionTimerSeconds
+      : 25
+  );
   const [isTimerActive, setIsTimerActive] = useState(false);
 
   // Scores and Timing Metrics
@@ -160,7 +172,7 @@ export default function MathleticsGameClient({
     setIsAnswerRevealed(false);
     setUserAnswers([]);
     setAgilityScore(0);
-    setTimeLeft(QUESTION_TIME_LIMIT);
+    setTimeLeft(questionTimerSeconds);
     setIsTimerActive(true);
     setGameState("playing");
   };
@@ -191,12 +203,12 @@ export default function MathleticsGameClient({
 
     const currentQ = questions[currentIndex];
     const isCorrect = optionIndex === currentQ.answer;
-    const timeSpent = QUESTION_TIME_LIMIT - timeLeft;
+    const timeSpent = questionTimerSeconds - timeLeft;
 
     // Speed bonus: up to +50 points for quick answers
     let bonus = 0;
     if (isCorrect) {
-      const speedRatio = Math.max(0, timeLeft / QUESTION_TIME_LIMIT);
+      const speedRatio = Math.max(0, timeLeft / questionTimerSeconds);
       bonus = Math.round(speedRatio * 50);
       setAgilityScore((prev) => prev + 100 + bonus);
     }
@@ -227,7 +239,7 @@ export default function MathleticsGameClient({
         question: currentQ,
         selected: -1,
         isCorrect: false,
-        timeSpentSeconds: QUESTION_TIME_LIMIT,
+        timeSpentSeconds: questionTimerSeconds,
         bonusPoints: 0,
       },
     ]);
@@ -239,7 +251,7 @@ export default function MathleticsGameClient({
       setCurrentIndex((prev) => prev + 1);
       setSelectedOption(null);
       setIsAnswerRevealed(false);
-      setTimeLeft(QUESTION_TIME_LIMIT);
+      setTimeLeft(questionTimerSeconds);
       setIsTimerActive(true);
     } else {
       finishRound();
@@ -336,12 +348,13 @@ export default function MathleticsGameClient({
 
     const challengePayload: MathleticsChallenge = {
       id: "math-" + Date.now(),
-      title: "Mathletics 25s Challenge",
+      title: `Mathletics ${questionTimerSeconds}s Challenge`,
       creatorName: profile.username || "Scholar",
       createdAt: Date.now(),
       questionIds: questions.map((q) => q.id),
       questionCount: totalQuestions,
       difficulty: selectedDifficulty,
+      questionTimerSeconds,
       creatorScore: {
         score: correctCount,
         total: totalQuestions,
@@ -409,8 +422,8 @@ export default function MathleticsGameClient({
   }, [profile, mathleticsHistory]);
 
   const currentQ = questions[currentIndex];
-  const timerRatio = timeLeft / QUESTION_TIME_LIMIT;
-  const isTimeCritical = timeLeft <= 7;
+  const timerRatio = timeLeft / questionTimerSeconds;
+  const isTimeCritical = timeLeft <= Math.min(7, Math.round(questionTimerSeconds * 0.25));
 
   return (
     <div className="min-h-screen py-8 px-4 sm:px-6 max-w-4xl mx-auto">
@@ -429,7 +442,7 @@ export default function MathleticsGameClient({
               Mental Arena
             </span>
             <span className="text-xs" style={{ color: "var(--text-dim)" }}>
-              25s Sprint
+              {questionTimerSeconds}s Sprint
             </span>
           </div>
           <h1 className="font-space text-3xl sm:text-4xl font-bold" style={{ color: "var(--text)" }}>
@@ -439,32 +452,73 @@ export default function MathleticsGameClient({
 
         {/* Navigation Tabs */}
         <div
-          className="flex p-1 rounded-2xl border self-start sm:self-auto"
+          className="flex p-1 rounded-2xl border self-start sm:self-auto relative"
           style={{ borderColor: "var(--border-dim)", backgroundColor: "var(--surface)" }}
         >
           <button
             onClick={() => setActiveTab("arena")}
-            className={`px-4 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
-              activeTab === "arena"
-                ? "bg-[var(--terra)] text-white shadow-sm"
-                : "text-[var(--text-dim)] hover:text-[var(--text)]"
-            }`}
+            className="relative px-4 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer z-10"
           >
-            Arena
+            {activeTab === "arena" && (
+              <motion.div
+                layoutId="activeMathleticsTab"
+                transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                className="absolute inset-0 rounded-xl z-[-1] shadow-xs"
+                style={{ backgroundColor: "var(--terra)" }}
+              />
+            )}
+            <span className={activeTab === "arena" ? "text-white" : "text-[var(--text-dim)] hover:text-[var(--text)]"}>
+              Arena
+            </span>
           </button>
+
+          <button
+            onClick={() => setActiveTab("leagues")}
+            className="relative flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer z-10"
+          >
+            {activeTab === "leagues" && (
+              <motion.div
+                layoutId="activeMathleticsTab"
+                transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                className="absolute inset-0 rounded-xl z-[-1] shadow-xs"
+                style={{ backgroundColor: "var(--terra)" }}
+              />
+            )}
+            <Swords className={`w-3.5 h-3.5 ${activeTab === "leagues" ? "text-white" : "text-[var(--text-dim)]"}`} />
+            <span className={activeTab === "leagues" ? "text-white" : "text-[var(--text-dim)] hover:text-[var(--text)]"}>
+              Leagues
+            </span>
+          </button>
+
           <button
             onClick={() => setActiveTab("titans")}
-            className={`flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-xl transition-colors ${
-              activeTab === "titans"
-                ? "bg-[var(--olive)] text-white shadow-sm"
-                : "text-[var(--text-dim)] hover:text-[var(--text)]"
-            }`}
+            className="relative flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer z-10"
           >
-            <Crown className="w-3.5 h-3.5" />
-            Titans
+            {activeTab === "titans" && (
+              <motion.div
+                layoutId="activeMathleticsTab"
+                transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                className="absolute inset-0 rounded-xl z-[-1] shadow-xs"
+                style={{ backgroundColor: "var(--olive)" }}
+              />
+            )}
+            <Crown className={`w-3.5 h-3.5 ${activeTab === "titans" ? "text-white" : "text-[var(--text-dim)]"}`} />
+            <span className={activeTab === "titans" ? "text-white" : "text-[var(--text-dim)] hover:text-[var(--text)]"}>
+              Titans
+            </span>
           </button>
         </div>
       </div>
+
+      {/* ── LEAGUES TAB VIEW ── */}
+      {activeTab === "leagues" && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <MathleticsLeagueLounge />
+        </motion.div>
+      )}
 
       {/* ── TITANS TAB VIEW ── */}
       {activeTab === "titans" && (
@@ -586,7 +640,7 @@ export default function MathleticsGameClient({
                       Challenge from {activeChallengerName}
                     </h3>
                     <p className="text-xs sm:text-sm mt-0.5" style={{ color: "var(--text-dim)" }}>
-                      Scored <strong style={{ color: "var(--terra)" }}>{activeChallengerScore}/{activeChallengerTotal}</strong> ({activeChallengerPct}% accuracy) on these exact questions. Can you out-calculate them in 25 seconds?
+                      Scored <strong style={{ color: "var(--terra)" }}>{activeChallengerScore}/{activeChallengerTotal}</strong> ({activeChallengerPct}% accuracy) on these exact questions. Can you out-calculate them in {questionTimerSeconds} seconds?
                     </p>
                   </div>
                 </div>
@@ -596,11 +650,50 @@ export default function MathleticsGameClient({
               <div className="surface rounded-3xl p-6 sm:p-8 border" style={{ borderColor: "var(--border-dim)" }}>
                 <div className="max-w-2xl">
                   <h2 className="font-space text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>
-                    25-Second Mental Calculation
+                    {questionTimerSeconds}-Second Mental Calculation
                   </h2>
                   <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-dim)" }}>
                     No scratchpad, no calculators. Test your mathematical intuition, order-of-magnitude estimation, and Socratic shortcuts against a running clock.
                   </p>
+
+                  {/* Turn Duration Selector (Min 25s) */}
+                  <div className="mb-6">
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>
+                        Question Duration
+                      </label>
+                      <span className="text-xs font-semibold" style={{ color: "var(--olive)" }}>
+                        Min 25s per question
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-4 gap-2">
+                      {[
+                        { sec: 25, label: "25s", desc: "Blitz" },
+                        { sec: 45, label: "45s", desc: "Standard" },
+                        { sec: 60, label: "60s", desc: "Deliberate" },
+                        { sec: 90, label: "90s", desc: "Extended" },
+                      ].map((d) => (
+                        <button
+                          key={d.sec}
+                          type="button"
+                          onClick={() => {
+                            setQuestionTimerSeconds(d.sec);
+                            setTimeLeft(d.sec);
+                          }}
+                          className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-all text-center cursor-pointer ${
+                            questionTimerSeconds === d.sec
+                              ? "bg-[var(--terra)] text-white border-[var(--terra)] shadow-xs"
+                              : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--text-dim)]"
+                          }`}
+                        >
+                          <span className="font-bold block">{d.label}</span>
+                          <span className={`text-[10px] block mt-0.5 ${questionTimerSeconds === d.sec ? "text-white/80" : "text-[var(--text-dim)]"}`}>
+                            {d.desc}
+                          </span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
 
                   {/* Difficulty Selector */}
                   <div className="mb-6">
@@ -895,7 +988,7 @@ export default function MathleticsGameClient({
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 mb-10">
                   <button
                     onClick={handleStartRound}
-                    className="w-full sm:w-auto px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                    className="w-full sm:w-auto px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                     style={{ backgroundColor: "var(--terra)" }}
                   >
                     <RotateCcw className="w-4 h-4" />
@@ -903,18 +996,18 @@ export default function MathleticsGameClient({
                   </button>
 
                   <button
-                    onClick={handleCopyChallengeLink}
-                    className="w-full sm:w-auto px-5 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 transition-all"
+                    onClick={() => setShowCreateDuelModal(true)}
+                    className="w-full sm:w-auto px-5 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 transition-all surface cursor-pointer hover:border-[var(--text-dim)]"
                     style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
                   >
-                    {copiedLink ? <Check className="w-4 h-4 text-green-600" /> : <Share2 className="w-4 h-4" />}
-                    <span>{copiedLink ? "Challenge Link Copied!" : "Challenge a Friend"}</span>
+                    <Swords className="w-4 h-4 text-[var(--terra)]" />
+                    <span>Create Friend Duel</span>
                   </button>
 
                   <button
                     onClick={handleCopyProofCard}
                     disabled={isExportingCard}
-                    className="w-full sm:w-auto px-5 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 transition-all"
+                    className="w-full sm:w-auto px-5 py-3 rounded-2xl font-bold text-sm border flex items-center justify-center gap-2 transition-all surface cursor-pointer hover:border-[var(--text-dim)]"
                     style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
                   >
                     {cardCopied ? <Check className="w-4 h-4 text-green-600" /> : <Download className="w-4 h-4" />}
@@ -995,6 +1088,43 @@ export default function MathleticsGameClient({
           )}
         </>
       )}
+
+      {/* Preloaded Sprint Duel Modal */}
+      <CreateMathleticsLeagueModal
+        isOpen={showCreateDuelModal}
+        onClose={() => setShowCreateDuelModal(false)}
+        preloadedQuestionIds={questions.map((q) => q.id)}
+        preloadedDifficulty={selectedDifficulty}
+        preloadedCategory={selectedCategory}
+        preloadedTimerSeconds={questionTimerSeconds}
+        onLeagueCreated={(createdLeague) => {
+          // Immediately register creator's finished score into the new league!
+          const correctCount = userAnswers.filter((a) => a.isCorrect).length;
+          const totalQuestions = questions.length || 10;
+          const totalDuration = userAnswers.reduce((sum, a) => sum + (a.timeSpentSeconds || 0), 0);
+
+          fetch("/api/mathletics/league/score", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              leagueCode: createdLeague.code,
+              userId: profile.id || profile.username || "Scholar",
+              username: profile.username || "Scholar",
+              avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+              dayNumber: 1,
+              score: correctCount,
+              totalQuestions,
+              durationSeconds: totalDuration,
+              questionResults: userAnswers.map((a) => ({
+                questionId: a.question.id,
+                correct: a.isCorrect,
+                selected: a.selected,
+                timeSpentSeconds: a.timeSpentSeconds,
+              })),
+            }),
+          }).catch(() => {});
+        }}
+      />
     </div>
   );
 }

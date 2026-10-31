@@ -126,20 +126,27 @@ export default function SpectatorLounge({
       : speakerId
       ? room.player_details?.[speakerId]?.name &&
         room.player_details[speakerId].name !== "Scholar" &&
+        room.player_details[speakerId].name !== "Learner" &&
         !room.player_details[speakerId].name.startsWith("Scholar (")
         ? room.player_details[speakerId].name
         : presencePlayers.find((p) => p.id === speakerId)?.name &&
           presencePlayers.find((p) => p.id === speakerId)!.name !== "Scholar" &&
+          presencePlayers.find((p) => p.id === speakerId)!.name !== "Learner" &&
           !presencePlayers.find((p) => p.id === speakerId)!.name.startsWith("Scholar (")
         ? presencePlayers.find((p) => p.id === speakerId)!.name
         : knownNames[speakerId]?.name &&
           knownNames[speakerId].name !== "Scholar" &&
+          knownNames[speakerId].name !== "Learner" &&
           !knownNames[speakerId].name.startsWith("Scholar (")
         ? knownNames[speakerId].name
-        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar"
+        : speakerId === room.host_id && room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host"
         ? room.host_name
-        : rawSpeakerName || "Active Scholar"
-      : rawSpeakerName || "Active Scholar";
+        : rawSpeakerName && rawSpeakerName !== "Scholar" && rawSpeakerName !== "Learner" && !rawSpeakerName.startsWith("Scholar (")
+        ? rawSpeakerName
+        : "Speaker"
+      : rawSpeakerName && rawSpeakerName !== "Scholar" && rawSpeakerName !== "Learner" && !rawSpeakerName.startsWith("Scholar (")
+      ? rawSpeakerName
+      : "Speaker";
 
   return (
     <div className="max-w-3xl mx-auto space-y-6 text-center py-6 px-3 sm:px-4">
@@ -364,13 +371,13 @@ export default function SpectatorLounge({
         </AnimatePresence>
       </div>
 
-      {/* ── 6. Team Rosters & Scholars Overview ── */}
+      {/* ── 6. Team Rosters & Players Overview ── */}
       <div className="surface rounded-3xl p-5 border border-[var(--border-dim)] shadow-sm space-y-3 text-left">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-[var(--olive)]" />
             <h4 className="font-space font-bold text-xs text-[var(--text)]">
-              Scholars on the Field ({activeTeamsList.reduce((acc, t) => acc + (t.players?.length || 0), 0)} total)
+              Players on the Field ({activeTeamsList.reduce((acc, t) => acc + (t.players?.length || 0), 0)} total)
             </h4>
           </div>
           <button

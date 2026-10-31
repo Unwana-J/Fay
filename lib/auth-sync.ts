@@ -52,7 +52,7 @@ export async function signUpWithEmail(
       password,
       options: {
         data: {
-          username: localState.profile.username || "Scholar",
+          username: localState.profile.username && localState.profile.username !== "Scholar" ? localState.profile.username : "",
           avatar: localState.profile.avatar,
         },
         emailRedirectTo: redirectOrigin,
@@ -82,7 +82,7 @@ export async function signUpWithEmail(
       {
         id: user.id,
         email: trimmedEmail,
-        username: localState.profile.username || "Scholar",
+        username: localState.profile.username && localState.profile.username !== "Scholar" ? localState.profile.username : "",
         avatar: localState.profile.avatar || "/avatars/avatar-scholar.svg",
         bio: localState.profile.bio || "Building knowledge one topic at a time.",
         xp: localState.profile.xp || 0,
@@ -205,7 +205,10 @@ export async function signInWithEmail(email: string, password: string): Promise<
         ? {
             id: user.id,
             email: user.email || trimmedEmail,
-            username: profileRow.username || user.user_metadata?.username || "Scholar",
+            username:
+              (profileRow.username && profileRow.username !== "Scholar" && profileRow.username !== "Learner" ? profileRow.username : "") ||
+              (user.user_metadata?.username && user.user_metadata.username !== "Scholar" && user.user_metadata.username !== "Learner" ? user.user_metadata.username : "") ||
+              "",
             avatar: profileRow.avatar || user.user_metadata?.avatar || "/avatars/avatar-scholar.svg",
             bio: profileRow.bio || "Building knowledge one topic at a time.",
             xp: profileRow.xp || 0,
@@ -215,7 +218,9 @@ export async function signInWithEmail(email: string, password: string): Promise<
         : {
             id: user.id,
             email: user.email || trimmedEmail,
-            username: user.user_metadata?.username || "Scholar",
+            username:
+              (user.user_metadata?.username && user.user_metadata.username !== "Scholar" && user.user_metadata.username !== "Learner" ? user.user_metadata.username : "") ||
+              "",
             avatar: user.user_metadata?.avatar || "/avatars/avatar-scholar.svg",
             hasClaimedAccount: true,
           },

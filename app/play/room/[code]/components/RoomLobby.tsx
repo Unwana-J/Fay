@@ -151,41 +151,42 @@ export default function RoomLobby({
   // Resolve player details from presence map, knownNames cache, or persisted details
   const getPlayerDisplay = (pId: string) => {
     // 1. If it's me and I have a valid name, prefer local name
-    if (pId === myPlayerId && room.player_details?.[pId]?.name) {
+    if (pId === myPlayerId && room.player_details?.[pId]?.name && room.player_details[pId].name !== "Scholar" && room.player_details[pId].name !== "Learner" && !room.player_details[pId].name.startsWith("Scholar (")) {
       const myDetail = room.player_details[pId];
       return { id: pId, name: myDetail.name, avatar: myDetail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: myDetail.joinedAt || Date.now() };
     }
     // 2. Check persisted room.player_details
     const detail = room.player_details?.[pId];
-    if (detail && detail.name && detail.name !== "Scholar" && detail.name !== "Learner") {
+    if (detail && detail.name && detail.name !== "Scholar" && detail.name !== "Learner" && !detail.name.startsWith("Scholar (")) {
       return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail.joinedAt || Date.now() };
     }
     // 3. Check presence map
     const found = presencePlayers.find((p) => p.id === pId);
-    if (found && found.name && found.name !== "Scholar" && found.name !== "Learner") {
+    if (found && found.name && found.name !== "Scholar" && found.name !== "Learner" && !found.name.startsWith("Scholar (")) {
       return { id: pId, name: found.name, avatar: found.avatar || "/avatars/avatar-scholar.svg", isHost: found.isHost || pId === room.host_id, joinedAt: found.joinedAt || Date.now() };
     }
     // 4. Check knownNames persistent cache
     const known = knownNames[pId];
-    if (known && known.name && known.name !== "Scholar" && known.name !== "Learner") {
+    if (known && known.name && known.name !== "Scholar" && known.name !== "Learner" && !known.name.startsWith("Scholar (")) {
       return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail?.joinedAt || Date.now() };
     }
     // 5. Host fallback
     if (pId === room.host_id) {
-      return { id: pId, name: room.host_name || "Host", avatar: "/avatars/avatar-scholar.svg", isHost: true, joinedAt: detail?.joinedAt || Date.now() };
+      const hostDisplay = room.host_name && room.host_name !== "Scholar" && room.host_name !== "Scholar Host" ? room.host_name : "Host";
+      return { id: pId, name: hostDisplay, avatar: "/avatars/avatar-scholar.svg", isHost: true, joinedAt: detail?.joinedAt || Date.now() };
     }
-    // 6. If detail, presence, or known has any name
-    if (detail?.name) {
+    // 6. If detail, presence, or known has any non-scholar name
+    if (detail?.name && detail.name !== "Scholar" && detail.name !== "Learner" && !detail.name.startsWith("Scholar (")) {
       return { id: pId, name: detail.name, avatar: detail.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail.joinedAt || Date.now() };
     }
-    if (found?.name) {
+    if (found?.name && found.name !== "Scholar" && found.name !== "Learner" && !found.name.startsWith("Scholar (")) {
       return { id: pId, name: found.name, avatar: found.avatar || "/avatars/avatar-scholar.svg", isHost: found.isHost || pId === room.host_id, joinedAt: found.joinedAt || Date.now() };
     }
-    if (known?.name) {
+    if (known?.name && known.name !== "Scholar" && known.name !== "Learner" && !known.name.startsWith("Scholar (")) {
       return { id: pId, name: known.name, avatar: known.avatar || "/avatars/avatar-scholar.svg", isHost: pId === room.host_id, joinedAt: detail?.joinedAt || Date.now() };
     }
     const cleanId = pId.replace(/^guest-/, "");
-    return { id: pId, name: `Scholar (${cleanId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false, joinedAt: detail?.joinedAt || Date.now() };
+    return { id: pId, name: `Player (${cleanId.slice(0, 5)})`, avatar: "/avatars/avatar-scholar.svg", isHost: false, joinedAt: detail?.joinedAt || Date.now() };
   };
 
   // Find all unassigned or spectator scholars
@@ -511,10 +512,10 @@ export default function RoomLobby({
             </div>
             <div>
               <span className="font-space font-bold text-amber-700 dark:text-amber-300 block">
-                Playing as a Guest ({profile?.username || "Scholar"}) · Streak Not Tracked
+                Playing as a Guest ({profile?.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player"}) · Streak Not Tracked
               </span>
               <span className="text-[11px] text-[var(--text-dim)]">
-                Link a free scholar account so this match counts toward your daily streak and your match honors persist across all devices.
+                Link a free account so this match counts toward your daily streak and your match honors persist across all devices.
               </span>
             </div>
           </div>
@@ -571,7 +572,7 @@ export default function RoomLobby({
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[var(--gold)] animate-pulse" />
               <h2 className="font-space font-extrabold text-sm text-[var(--text)]">
-                Waiting in Lobby Queue ({sortedWaitingScholars.length} Scholars)
+                Waiting in Lobby Queue ({sortedWaitingScholars.length} Players)
               </h2>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)]">
                 Arrival Order (FIFO)

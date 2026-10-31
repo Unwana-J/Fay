@@ -126,11 +126,11 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
             return {
               id,
               name:
-                detail?.name && detail.name !== "Scholar" && detail.name !== "Learner"
+                detail?.name && detail.name !== "Scholar" && detail.name !== "Learner" && !detail.name.startsWith("Scholar (")
                   ? detail.name
-                  : id === roomData.host_id
+                  : id === roomData.host_id && roomData.host_name && roomData.host_name !== "Scholar" && roomData.host_name !== "Scholar Host"
                   ? roomData.host_name
-                  : `Scholar (${id.replace(/^guest-/, "").slice(0, 5)})`,
+                  : `Player (${id.replace(/^guest-/, "").slice(0, 5)})`,
               avatar: detail?.avatar || "/avatars/avatar-scholar.svg",
               team,
               isHost: id === roomData.host_id,
@@ -335,8 +335,9 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
         profile?.id ||
         (typeof crypto !== "undefined" && crypto.randomUUID
           ? crypto.randomUUID()
-          : `scholar-${Math.random().toString(36).slice(2, 9)}`);
-      const effectiveHostName = profile?.username?.trim() || "Scholar Host";
+          : `player-${Math.random().toString(36).slice(2, 9)}`);
+      const effectiveHostName =
+        (profile?.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username.trim() : "") || "Host";
 
       if (!profile?.id) {
         updateProfile({ id: effectiveHostId, username: effectiveHostName });
@@ -476,30 +477,40 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
 
           {/* Mode Selector: Only rendered if Pass-the-Phone feature flag is enabled */}
           {enablePassThePhone ? (
-            <div className="flex p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-xs">
+            <div className="flex p-1.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-xs relative">
               <button
                 type="button"
                 onClick={() => setPlayMode("online")}
-                className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
-                  playMode === "online"
-                    ? "bg-[var(--terra)] text-white shadow-sm"
-                    : "text-[var(--text-dim)] hover:text-[var(--text)]"
-                }`}
+                className="relative py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition-colors cursor-pointer z-10"
               >
-                <Globe className="w-4 h-4" />
-                Online Room (Friends)
+                {playMode === "online" && (
+                  <motion.div
+                    layoutId="articulateModePill"
+                    transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                    className="absolute inset-0 rounded-xl bg-[var(--terra)] z-[-1] shadow-xs"
+                  />
+                )}
+                <Globe className={`w-4 h-4 ${playMode === "online" ? "text-white" : "text-[var(--text-dim)]"}`} />
+                <span className={playMode === "online" ? "text-white" : "text-[var(--text-dim)] hover:text-[var(--text)]"}>
+                  Online Room (Friends)
+                </span>
               </button>
               <button
                 type="button"
                 onClick={() => setPlayMode("local")}
-                className={`py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition cursor-pointer ${
-                  playMode === "local"
-                    ? "bg-[var(--olive)] text-white shadow-sm"
-                    : "text-[var(--text-dim)] hover:text-[var(--text)]"
-                }`}
+                className="relative py-2 px-4 rounded-xl text-xs font-bold font-space flex items-center gap-2 transition-colors cursor-pointer z-10"
               >
-                <Smartphone className="w-4 h-4" />
-                Pass-the-Phone (Local)
+                {playMode === "local" && (
+                  <motion.div
+                    layoutId="articulateModePill"
+                    transition={{ type: "spring", stiffness: 450, damping: 32 }}
+                    className="absolute inset-0 rounded-xl bg-[var(--olive)] z-[-1] shadow-xs"
+                  />
+                )}
+                <Smartphone className={`w-4 h-4 ${playMode === "local" ? "text-white" : "text-[var(--text-dim)]"}`} />
+                <span className={playMode === "local" ? "text-white" : "text-[var(--text-dim)] hover:text-[var(--text)]"}>
+                  Pass-the-Phone (Local)
+                </span>
               </button>
             </div>
           ) : (
@@ -944,7 +955,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         </div>
 
                         <div className="flex items-center gap-3 text-xs text-[var(--text-dim)] flex-wrap">
-                          <span>Host: <strong className="text-[var(--text)]">{room.hostName || "Scholar"}</strong></span>
+                          <span>Host: <strong className="text-[var(--text)]">{room.hostName && room.hostName !== "Scholar" && room.hostName !== "Scholar Host" ? room.hostName : "Host"}</strong></span>
                           <span>•</span>
                           <span>{room.date}</span>
                           {room.myTeam && (
@@ -1055,7 +1066,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         <div className="flex items-center gap-2 flex-wrap pt-0.5">
                           <span className="inline-flex items-center gap-1 text-[11px] font-space font-medium text-[var(--text-dim)] bg-[var(--bg-card)] px-2 py-0.5 rounded-md border border-[var(--border-dim)]">
                             <Users className="w-3 h-3 text-[var(--olive)]" />
-                            {participantCount} {participantCount === 1 ? "Scholar" : "Scholars"}
+                            {participantCount} {participantCount === 1 ? "Player" : "Players"}
                           </span>
                           <span className="inline-flex items-center gap-1 text-[11px] font-space font-medium text-[var(--text-dim)] bg-[var(--bg-card)] px-2 py-0.5 rounded-md border border-[var(--border-dim)]">
                             <Clock className="w-3 h-3 text-[var(--gold)]" />
@@ -1106,7 +1117,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                     <p className="text-xs text-[var(--text-dim)] mt-0.5">
                       Round {currentRoundIndex + 1}{numberOfRounds !== 999 ? ` of ${numberOfRounds}` : ""} • Next Speaker:{" "}
                       <strong className="text-[var(--text)]">
-                        {activeSpeaker || turnOrder[currentTurnIndex]?.name || "Scholar"}
+                        {activeSpeaker || turnOrder[currentTurnIndex]?.name || "Speaker"}
                       </strong>{" "}
                       ({turnOrder[currentTurnIndex] ? getTeamName(turnOrder[currentTurnIndex].team) : ""})
                     </p>
@@ -1943,7 +1954,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                         {selectedCompletedMatch.teamBName || "Team Omega"} Victory!
                       </>
                     ) : (
-                      "Scholarly Deadlock (Tie)!"
+                      "Deadlock (Tie)!"
                     )}
                   </div>
                 </div>
@@ -1965,7 +1976,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div className="surface rounded-2xl p-3.5 border border-[var(--border-dim)] space-y-1">
                   <div className="flex items-center gap-1.5 text-xs text-[var(--text-mute)] font-medium">
-                    <Users className="w-3.5 h-3.5 text-[var(--olive)]" /> Total Scholars
+                    <Users className="w-3.5 h-3.5 text-[var(--olive)]" /> Total Players
                   </div>
                   <div className="text-base font-space font-extrabold text-[var(--text)] flex items-center gap-1.5">
                     {isLoadingMatchDetails ? (
@@ -2038,14 +2049,14 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                 <div className="surface rounded-2xl p-6 border border-[var(--border-dim)] text-center space-y-2">
                   <Loader2 className="w-5 h-5 animate-spin text-[var(--olive)] mx-auto" />
                   <p className="text-xs font-space font-bold text-[var(--text-dim)]">
-                    Retrieving scholar roster and match duration from server archive...
+                    Retrieving player roster and match duration from server archive...
                   </p>
                 </div>
               ) : selectedCompletedMatch.participants && selectedCompletedMatch.participants.length > 0 ? (
                 <div className="space-y-3">
                   <h3 className="font-space font-bold text-sm text-[var(--text)] flex items-center gap-1.5">
                     <Users className="w-4 h-4 text-[var(--olive)]" />
-                    Participating Scholars ({selectedCompletedMatch.participants.length})
+                    Participating Players ({selectedCompletedMatch.participants.length})
                   </h3>
 
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2057,7 +2068,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                           {selectedCompletedMatch.teamAName || "Team Alpha"}
                         </span>
                         <span className="text-[10px] font-mono text-[var(--terra)] font-bold">
-                          {selectedCompletedMatch.participants.filter((p) => p.team === "A").length} Scholars
+                          {selectedCompletedMatch.participants.filter((p) => p.team === "A").length} Players
                         </span>
                       </div>
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
@@ -2074,7 +2085,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             </div>
                           ))}
                         {selectedCompletedMatch.participants.filter((p) => p.team === "A").length === 0 && (
-                          <p className="text-xs text-[var(--text-mute)] italic">No assigned scholars</p>
+                          <p className="text-xs text-[var(--text-mute)] italic">No assigned players</p>
                         )}
                       </div>
                     </div>
@@ -2087,7 +2098,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                           {selectedCompletedMatch.teamBName || "Team Omega"}
                         </span>
                         <span className="text-[10px] font-mono text-[var(--olive)] font-bold">
-                          {selectedCompletedMatch.participants.filter((p) => p.team === "B").length} Scholars
+                          {selectedCompletedMatch.participants.filter((p) => p.team === "B").length} Players
                         </span>
                       </div>
                       <div className="space-y-1.5 max-h-32 overflow-y-auto">
@@ -2104,7 +2115,7 @@ export default function SetupScreen({ onStart }: { onStart: () => void }) {
                             </div>
                           ))}
                         {selectedCompletedMatch.participants.filter((p) => p.team === "B").length === 0 && (
-                          <p className="text-xs text-[var(--text-mute)] italic">No assigned scholars</p>
+                          <p className="text-xs text-[var(--text-mute)] italic">No assigned players</p>
                         )}
                       </div>
                     </div>

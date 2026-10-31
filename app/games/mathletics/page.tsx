@@ -22,7 +22,7 @@ export async function generateMetadata({
     const challenge = decodeChallengeFromUrl(challengeCode);
     if (challenge) {
       const title = `${challenge.title} · 25s Math Duel · Fey`;
-      const description = `Competed on Fey: ${challenge.questionCount} mental math questions hosted by Scholar ${challenge.creatorName}. Join and beat the clock!`;
+      const description = `Competed on Fey: ${challenge.questionCount} mental math questions hosted by ${challenge.creatorName && challenge.creatorName !== "Scholar" ? challenge.creatorName : "Host"}. Join and beat the clock!`;
       const canonicalUrl = `https://fey.lokinlabs.com.ng/games/mathletics?challenge=${challengeCode}`;
 
       return {
@@ -54,14 +54,14 @@ export async function generateMetadata({
   const score = scoreRaw ? parseInt(scoreRaw, 10) : 0;
   const total = totalRaw ? parseInt(totalRaw, 10) : 10;
   const pct = pctRaw ? parseInt(pctRaw, 10) : Math.round((score / total) * 100) || 0;
-  const author = byRaw || "Scholar";
+  const author = byRaw && byRaw !== "Scholar" ? byRaw : "Challenger";
 
   const title = isChallenge
     ? `${author} scored ${pct}% on Mathletics · Can you calculate faster? · Fey`
     : "Mathletics Mental Arena · Fey";
 
   const description = isChallenge
-    ? `Scholar ${author} scored ${score}/${total} (${pct}% accuracy) in 25-second rounds on Mathletics. Answer the exact same questions and see if you can out-calculate them.`
+    ? `${author} scored ${score}/${total} (${pct}% accuracy) in 25-second rounds on Mathletics. Answer the exact same questions and see if you can out-calculate them.`
     : "25-second mental math, algebra, probability, and geometry challenges. Sharpen your quantitative intuition on Fey.";
 
   return {

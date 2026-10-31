@@ -43,7 +43,7 @@ export async function generateMetadata({
     if (leagueRow) {
       const status = getLeagueStatus(leagueRow.start_date, leagueRow.duration_days);
       const title = `🏆 ${leagueRow.title} · Day ${status.dayNumber} of ${leagueRow.duration_days} · Fey League`;
-      const description = `Multi-day Naija Trivia tournament hosted by Scholar ${leagueRow.creator_name}. Answer 1 daily quiz drop and compete for the top spot!`;
+      const description = `Multi-day Naija Trivia tournament hosted by ${leagueRow.creator_name && leagueRow.creator_name !== "Scholar" ? leagueRow.creator_name : "Host"}. Answer 1 daily quiz drop and compete for the top spot!`;
 
       return {
         title,
@@ -149,7 +149,7 @@ export default async function LeaguePage({
     const durationDays = [3, 5, 7, 14].includes(Number(sp?.d)) ? Number(sp.d) : 5;
     const questionsPerDay = [5, 10].includes(Number(sp?.q)) ? Number(sp.q) : 5;
     const title = sp?.t ? decodeURIComponent(sp.t) : `Friendship League (${cleanCode})`;
-    const creatorName = sp?.c ? decodeURIComponent(sp.c) : "Scholar";
+    const creatorName = sp?.c && sp.c !== "Scholar" ? decodeURIComponent(sp.c) : "Host";
     const category = sp?.cat || "all";
     const difficulty = sp?.diff || "mixed";
     const attemptPolicy = (sp?.pol as any) || "flexible";

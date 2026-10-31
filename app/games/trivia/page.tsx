@@ -22,12 +22,12 @@ export async function generateMetadata({
     const challenge = decodeChallengeFromUrl(challengeCode);
     if (challenge) {
       const title = `${challenge.title} · Timed Trivia Challenge · Fey`;
-      const description = `Competed on Fey: ${challenge.questionCount} questions hosted by Scholar ${challenge.creatorName}. Join and beat the leaderboard!`;
+      const description = `Competed on Fey: ${challenge.questionCount} questions hosted by ${challenge.creatorName && challenge.creatorName !== "Scholar" ? challenge.creatorName : "Host"}. Join and beat the leaderboard!`;
       const canonicalUrl = `https://fey.lokinlabs.com.ng/games/trivia?challenge=${challengeCode}`;
 
       const ogParams = new URLSearchParams();
       ogParams.set("challengeTitle", challenge.title);
-      ogParams.set("by", challenge.creatorName || "Scholar");
+      ogParams.set("by", (challenge.creatorName && challenge.creatorName !== "Scholar") ? challenge.creatorName : "Player");
       ogParams.set("total", String(challenge.questionCount || 10));
       ogParams.set("difficulty", challenge.difficulty || "Mixed");
       const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/trivia?${ogParams.toString()}`;
@@ -74,7 +74,7 @@ export async function generateMetadata({
   const score = scoreRaw ? parseInt(scoreRaw, 10) : 0;
   const total = totalRaw ? parseInt(totalRaw, 10) : 15;
   const pct = pctRaw ? parseInt(pctRaw, 10) : Math.round((score / total) * 100) || 0;
-  const author = byRaw || "Scholar";
+  const author = byRaw && byRaw !== "Scholar" ? byRaw : "Challenger";
   const grade = gradeRaw || (pct >= 80 ? "Naija Expert" : pct >= 60 ? "Sharp Sharp" : pct >= 40 ? "Not bad o" : "Keep studying");
 
   const title = isChallenge
@@ -82,7 +82,7 @@ export async function generateMetadata({
     : "Naija Trivia Arcade · Fey";
 
   const description = isChallenge
-    ? `Scholar ${author} scored ${score}/${total} (${pct}% accuracy) on Naija Trivia. Answer the exact same questions and see if you can top their score.`
+    ? `${author} scored ${score}/${total} (${pct}% accuracy) on Naija Trivia. Answer the exact same questions and see if you can top their score.`
     : "Test your knowledge of Nigerian history, pop culture, and general knowledge with 1,000+ curated questions. Think deeper on Fey.";
 
   const queryParams = new URLSearchParams();
@@ -167,7 +167,7 @@ export default async function TriviaPage({
       score: scoreRaw,
       total: totalRaw,
       pct: pctRaw ?? Math.round((scoreRaw / totalRaw) * 100),
-      by: byRaw || "Scholar",
+      by: byRaw && byRaw !== "Scholar" ? byRaw : "Challenger",
       grade: gradeRaw,
       questionIds: qIds,
     };

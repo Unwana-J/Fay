@@ -518,7 +518,12 @@ export const useAppStore = create<AppState>()(
       registerWithCloud: async (email, password, confirmedUsername) => {
         const state = get();
         const trimmed = email.trim().toLowerCase();
-        const chosenUsername = confirmedUsername?.trim() || state.profile.username || "Scholar";
+        const chosenUsername =
+          confirmedUsername?.trim() ||
+          (state.profile.username && state.profile.username !== "Scholar" && state.profile.username !== "Learner"
+            ? state.profile.username
+            : "") ||
+          "Player";
         const updatedProfile = {
           ...state.profile,
           username: chosenUsername,
@@ -621,7 +626,10 @@ export const useAppStore = create<AppState>()(
               ...local.profile,
               id: res.user.id,
               email: res.user.email,
-              username: cloud.profile.username || local.profile.username || "Scholar",
+              username:
+                (cloud.profile.username && cloud.profile.username !== "Scholar" && cloud.profile.username !== "Learner" ? cloud.profile.username : "") ||
+                (local.profile.username && local.profile.username !== "Scholar" && local.profile.username !== "Learner" ? local.profile.username : "") ||
+                "",
               avatar: cloud.profile.avatar || local.profile.avatar || "/avatars/avatar-scholar.svg",
               bio: cloud.profile.bio || local.profile.bio,
               xp: finalXP,
@@ -1509,6 +1517,11 @@ export const useAppStore = create<AppState>()(
 
         state.hasSeenArticulateGuide = typeof state?.hasSeenArticulateGuide === "boolean" ? state.hasSeenArticulateGuide : false;
         state.hasSeenTriviaGuide = typeof state?.hasSeenTriviaGuide === "boolean" ? state.hasSeenTriviaGuide : false;
+
+        // Purge legacy default "Scholar" / "Learner" username
+        if (state?.profile?.username === "Scholar" || state?.profile?.username === "Learner") {
+          state.profile.username = "";
+        }
 
         // Ensure profile has an id
         if (!state?.profile?.id) {

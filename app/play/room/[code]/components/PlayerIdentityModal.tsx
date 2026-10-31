@@ -47,7 +47,9 @@ export default function PlayerIdentityModal({
   const [name, setName] = useState(
     currentName && currentName !== "Scholar" && currentName !== "Learner"
       ? currentName
-      : profile?.username || ""
+      : profile?.username && profile.username !== "Scholar" && profile.username !== "Learner"
+      ? profile.username
+      : ""
   );
   const [selectedAvatar, setSelectedAvatar] = useState(
     currentAvatar || profile?.avatar || "/avatars/avatar-scholar.svg"
@@ -121,7 +123,7 @@ export default function PlayerIdentityModal({
             <h2 className="font-space font-extrabold text-2xl text-[var(--text)]">
               {mode === "join"
                 ? hasPreviousName
-                  ? `Play as @${name || "Scholar"}?`
+                  ? `Play as @${name || "Player"}?`
                   : "What's Your Name?"
                 : "Edit Player Name"}
             </h2>

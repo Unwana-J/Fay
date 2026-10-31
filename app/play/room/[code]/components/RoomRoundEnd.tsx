@@ -275,7 +275,7 @@ export default function RoomRoundEnd({
     const cleanId = pId.replace(/^guest-/, "");
     return {
       id: pId,
-      name: `Scholar (${cleanId.slice(0, 5)})`,
+      name: `Player (${cleanId.slice(0, 5)})`,
       avatar: "/avatars/avatar-scholar.svg",
       team: null,
       isHost: false,
@@ -996,7 +996,7 @@ export default function RoomRoundEnd({
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[var(--gold)] animate-pulse" />
               <h2 className="font-space font-extrabold text-sm text-[var(--text)]">
-                Waiting in Lobby Queue ({sortedWaitingScholars.length} Scholars)
+                Waiting in Lobby Queue ({sortedWaitingScholars.length} Players)
               </h2>
               <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--gold)]/20 text-[var(--gold)]">
                 Arrival Order (FIFO)

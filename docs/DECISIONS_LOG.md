@@ -286,3 +286,58 @@
     - Synchronized daily drop schedules across devices via Supabase with automatic local hydration fallback.
 - **Content Angle / Lesson for Builders**:
   > *"Why bingeable content kills social retention: How sequential daily drops turned one-off trivia games into a sustained multi-week ritual for groups of friends."*
+
+---
+
+## 17. Unified Mathletics Leagues: Instant Sprint Duels & Multi-Day Marathons
+
+- **Date / Phase**: Phase 2 — Social Play & Mathematical Agility
+- **The Problem / Context**:
+  Mathletics previously only offered 1v1 challenge links that were fire-and-forget: once a friend opened the link, their score stayed locked in their local browser. Neither friend could view a combined scoreboard, see who had answered, or benchmark against other peers who received the same link. Furthermore, users wanted both instant 5-minute party duels and multi-day group tournaments without managing two distinct products.
+- **User Insight & Reason**:
+  When you finish a math sprint, your competitive drive is at its peak. You want to immediately duel your friends on the exact same 10 questions you just solved, and you want a persistent live leaderboard showing everyone who accepted the challenge. For study groups, having a multi-day marathon with daily drops keeps the group active over weeks.
+- **Architectural Landing**:
+  We built a single unified architecture supporting both formats seamlessly:
+  1. **Dual Format Model (`MathleticsLeague`)**: `durationDays: 1` acts as a **Sprint Duel** (one round, single attempt locked per player), while `durationDays >= 3` acts as a **Marathon Tournament** (daily drops with cumulative agility scores).
+  2. **Pre-Seeded Question Inheritance**: Launching "Create Friend Duel" straight from a finished sprint auto-seeds `day_1` with the exact 10 questions the creator just completed, auto-submits their existing score, and generates a shareable league URL.
+  3. **Deterministic Seeded RNG**: Marathon leagues deterministically generate identical question sets per day from the league code seed, ensuring absolute mathematical fairness across all participants without central server coordination during gameplay.
+  4. **Agility Scoring Integration**: Velocity multipliers (+50 pts for <4s answers, +30 for <8s, +15 for <12s) are preserved as canonical `agility_score` in dedicated Supabase tables (`mathletics_leagues`, `mathletics_scores`), with resilient local storage hydration for zero-backend environments.
+- **Content Angle / Lesson for Builders**:
+  > *"Why build two separate games when 1 data model can power both? How combining instant 1v1 duels and multi-day tournaments into one deterministic architecture gave our math game a live viral growth loop."*
+
+---
+
+## 18. Physical Continuity & Design Engineering Standards Across the Fey Parlor
+
+- **Date / Phase**: Phase 2 — UX Polish & Tactile Motion
+- **The Problem / Context**:
+  As games were added to the Fey Parlor (Articulate, Naija Trivia, Mathletics, The Podium), their interactive segmented controls, tab switchers, and game cards suffered from inconsistent feedback. Navigation tabs were swapping with jarring CSS color cuts, while the Games Hub contained raw emojis that broke the classical editorial design system.
+- **User Insight & Reason**:
+  A platform built on rigor and intellectual dignity should feel tactile, grounded, and physically cohesive. High-taste software uses motion to communicate state transitions and spatial continuity, ensuring users never feel disoriented when switching modes.
+- **Architectural Landing**:
+  We adopted modern design engineering specifications (codified into `.agents/skills/ui-motion/SKILL.md`):
+  1. **Sliding Spring Indicators (`layoutId`)**: Navigation tabs across Naija Trivia (`activeTriviaTabPill`), Mathletics (`activeMathleticsTab`), and Articulate (`articulateModePill`) were upgraded with Framer Motion spring physics (`stiffness: 450, damping: 32`), creating a unified, continuous gliding pill.
+  2. **Preserving Rich Parlor Game Visuals**: Retained the high-fidelity 3D Apple-style emoji illustrations and floating momentum graphics on the Games Hub (`/games`), while refining segmented tab controls and mode toggles across game setup screens.
+  3. **Compositor-Only Performance**: Enforced strict GPU-composited animations (`transform` and `opacity` only) with tactile press-down states (`active:scale-[0.98]`).
+- **Content Angle / Lesson for Builders**:
+  > *"From janky tab cuts to physical glass: How codifying a design engineering motion skill transformed 4 disconnected web games into an interconnected, tactile parlor experience."*
+
+---
+
+## 19. Configurable Calculation Velocity: The 25-Second Mental Math Floor
+
+- **Date / Phase**: Phase 2 — Mathematical Agility & Pacing Customization
+- **The Problem / Context**:
+  A uniform 25-second countdown timer for all mental math challenges was exhilarating for speed demons but alienating for participants tackling multi-step algebra, probability, or geometry problems requiring structured scratch-free reasoning. Conversely, removing the clock entirely destroyed the Feynman sprint principle that forces rapid intuitive estimation over brute-force calculation.
+- **User Insight & Reason**:
+  Scholars and study groups have varying calculation cadences. Users requested the flexibility to pick question duration, but with a strict floor (25s shortest) so that the game never loses its core sprint tension or allows tab-switching / calculator abuse.
+- **Architectural Landing**:
+  We introduced **Turn Duration Customization** with a hard minimum floor:
+  1. **Canonical Duration Presets**: `25s` (Blitz), `45s` (Standard), `60s` (Deliberate), `90s` (Extended) with a strict validator (`Math.max(25, Number(timer) || 25)`).
+  2. **End-to-End Pacing Propagation**: Configurable across Solo Sprints, League Creation (`CreateMathleticsLeagueModal`), deterministic League State (`questionTimerSeconds`), API routes (`/api/mathletics/league`), and portable URL share parameters (`tim=45`).
+  3. **Adaptive Velocity Bonuses & Critical Urgency**: Speed bonuses scale proportionally with the selected turn duration (`timeLeft / questionTimerSeconds`), and visual countdown urgency (forest olive shifting to crimson pulse) dynamically activates when `timeLeft <= min(7, round(questionTimerSeconds * 0.25))`.
+- **Content Angle / Lesson for Builders**:
+  > *"Give users agency without sacrificing your product's core constraint: How establishing a 25-second minimum floor let players customize pacing while preserving genuine mental math velocity."*
+
+
+

@@ -98,7 +98,7 @@ export default function LeagueArenaClient({
 
             // If this user is the Host and their local device had unlocked drops, added extra drops,
             // or added bonus questions that haven't synced to the server yet, push them to cloud automatically!
-            const cleanUser = (profile.username || "Scholar").trim().toLowerCase();
+            const cleanUser = (profile.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player").trim().toLowerCase();
             const isHostUser =
               (activeLeague.creatorName || "").trim().toLowerCase() === cleanUser ||
               (profile.id && activeLeague.creatorId === profile.id);
@@ -146,7 +146,8 @@ export default function LeagueArenaClient({
           try {
             const session = JSON.parse(inFlightRaw);
             if (session && session.dayNumber) {
-              const myUserKey = (profile.username || "Scholar").trim().toLowerCase();
+              const cleanPlayerName = (profile.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player").trim();
+              const myUserKey = cleanPlayerName.toLowerCase();
               const alreadyScored = localScores.some(
                 (s) =>
                   s.dayNumber === session.dayNumber &&
@@ -189,7 +190,7 @@ export default function LeagueArenaClient({
                   id: `score_${Date.now()}_abandoned`,
                   leagueCode: activeLeague.code,
                   userId: profile.id || myUserKey,
-                  username: profile.username || "Scholar",
+                  username: cleanPlayerName,
                   avatar: profile.avatar || "/avatars/avatar-scholar.svg",
                   dayNumber: session.dayNumber,
                   date: todayStr(),
@@ -220,7 +221,7 @@ export default function LeagueArenaClient({
                   body: JSON.stringify({
                     leagueCode: activeLeague.code,
                     userId: profile.id,
-                    username: profile.username || "Scholar",
+                    username: cleanPlayerName,
                     avatar: profile.avatar || "/avatars/avatar-scholar.svg",
                     dayNumber: session.dayNumber,
                     score: totalCorrect,
@@ -433,7 +434,7 @@ export default function LeagueArenaClient({
   const [activeDropDay, setActiveDropDay] = useState<number>(currentDay);
 
   // Check if current user has already completed drops
-  const myUsername = (profile.username || "Scholar").trim().toLowerCase();
+  const myUsername = (profile.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player").trim().toLowerCase();
   const myIdentifier = profile.id || myUsername;
 
   // Map of scores per day for this scholar
@@ -477,7 +478,7 @@ export default function LeagueArenaClient({
   // Check if current user is the host/creator of this league
   const isCreator = useMemo(() => {
     if (typeof window === "undefined") return false;
-    const cleanUser = (profile.username || "Scholar").trim().toLowerCase();
+    const cleanUser = (profile.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player").trim().toLowerCase();
     const creatorUser = (league.creatorName || "").trim().toLowerCase();
     if (creatorUser && cleanUser && creatorUser === cleanUser) return true;
     if (league.creatorId && profile.id && league.creatorId === profile.id) return true;
@@ -1117,11 +1118,12 @@ export default function LeagueArenaClient({
       categoryBreakdown: [],
     });
 
+    const cleanPlayerName = (profile.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player").trim();
     const myScoreEntry: LeagueDailyScore = {
       id: `score_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
       leagueCode: league.code,
       userId: myIdentifier,
-      username: profile.username || "Scholar",
+      username: cleanPlayerName,
       avatar: profile.avatar || "/avatars/avatar-scholar.svg",
       dayNumber: activeDropDay,
       date: todayStr(),
@@ -1135,7 +1137,7 @@ export default function LeagueArenaClient({
 
     // Update local state immediately with the locked drop score
     setScores((prevScores) => {
-      const myNameLower = (profile.username || "Scholar").trim().toLowerCase();
+      const myNameLower = cleanPlayerName.toLowerCase();
       const filtered = prevScores.filter(
         (s) =>
           !(
@@ -1174,7 +1176,7 @@ export default function LeagueArenaClient({
         body: JSON.stringify({
           leagueCode: league.code,
           userId: profile.id,
-          username: profile.username || "Scholar",
+          username: cleanPlayerName,
           avatar: profile.avatar || "/avatars/avatar-scholar.svg",
           dayNumber: activeDropDay,
           score: totalCorrect,
@@ -1366,7 +1368,7 @@ export default function LeagueArenaClient({
                 <div className="flex items-center gap-2.5">
                   <Flame size={16} className="text-amber-500 shrink-0 animate-pulse" />
                   <div>
-                    <span className="font-space font-bold text-xs" style={{ color: "var(--text)" }}>Competing as Guest (@{profile?.username || "Scholar"}):</span>{" "}
+                    <span className="font-space font-bold text-xs" style={{ color: "var(--text)" }}>Competing as Guest (@{profile?.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player"}):</span>{" "}
                     <span className="text-[11px] text-[var(--text-dim)]">
                       Link a free account to track your daily streak and ensure your tournament standing syncs across devices.
                     </span>
@@ -1429,7 +1431,7 @@ export default function LeagueArenaClient({
                   </div>
 
                   <div className="p-3 rounded-2xl bg-[var(--bg-input)] border text-center" style={{ borderColor: "var(--border-dim)" }}>
-                    <div className="text-[10px] uppercase font-bold text-[var(--text-mute)]">Scholars Active</div>
+                    <div className="text-[10px] uppercase font-bold text-[var(--text-mute)]">Players Active</div>
                     <div className="font-mono text-xl font-bold text-[var(--text)]">
                       {leaderboard.length} Players
                     </div>

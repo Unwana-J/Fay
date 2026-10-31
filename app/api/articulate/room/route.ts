@@ -15,7 +15,10 @@ export async function POST(req: NextRequest) {
     const { hostId, hostName, settings, roomName, teamAName, teamBName, teamCName, teamDName, teamCount } = body;
 
     const effectiveHostId = (hostId && String(hostId).trim()) || `host-${Math.random().toString(36).slice(2, 9)}`;
-    const effectiveHostName = (hostName && String(hostName).trim()) || "Scholar Host";
+    const effectiveHostName =
+      hostName && String(hostName).trim() && hostName !== "Scholar" && hostName !== "Scholar Host"
+        ? String(hostName).trim()
+        : "Host";
 
     // Generate unique code
     let code = generateRoomCode();

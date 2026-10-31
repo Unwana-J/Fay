@@ -305,7 +305,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                 Track Your Daily Streak &amp; Rank
               </div>
               <p className="text-[11px] text-[var(--text-dim)] leading-relaxed">
-                Your standing as @{profile?.username || "Scholar"} is saved only in this browser. Link a free account to track your daily streak and lock your position on the Titan Leaderboard.
+                Your standing as @{profile?.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "Player"} is saved only in this browser. Link a free account to track your daily streak and lock your position on the Titan Leaderboard.
               </p>
             </div>
           </div>
@@ -481,7 +481,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
             {/* Table Column Headers */}
             <div className="px-4 py-2.5 bg-[var(--bg-input)]/40 flex items-center justify-between text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--text-mute)] border-b border-[var(--border-dim)]">
               <div className="flex items-center gap-2">
-                <span>Scholar &amp; Title</span>
+                <span>Player &amp; Title</span>
                 {entries.length > INITIAL_LIMIT && (
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)] font-mono font-normal">
                     {isExpandedGlobal ? `All ${entries.length}` : `Top 10 of ${entries.length}`}
@@ -741,7 +741,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                     {selectedChallenge.title}
                   </h3>
                   <p className="text-xs text-[var(--text-dim)] mt-0.5">
-                    Convened by <strong>Scholar {selectedChallenge.creatorName}</strong> · {selectedChallenge.questionCount} Questions · {challengeScores.length} Competing
+                    Convened by <strong>{selectedChallenge.creatorName && selectedChallenge.creatorName !== "Scholar" ? selectedChallenge.creatorName : "Host"}</strong> · {selectedChallenge.questionCount} Questions · {challengeScores.length} Competing
                   </p>
                 </div>
               </div>
@@ -835,7 +835,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                                 )}
                               </div>
                               <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
-                                {s.gradeLabel || "Scholar"}
+                                {s.gradeLabel || "Contender"}
                               </div>
                             </div>
                           </div>
@@ -861,7 +861,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                       <div className="px-4 py-2 bg-[var(--bg-input)]/40 text-center text-[10px] font-mono text-[var(--text-dim)] flex items-center justify-center gap-3">
                         <div className="h-px bg-[var(--border-dim)] flex-1" />
                         <span>
-                          ··· {challengeUserIdx - INITIAL_LIMIT > 0 ? `${challengeUserIdx - INITIAL_LIMIT} more scholars · ` : ""}your rank (#{challengeUserIdx + 1}) ···
+                          ··· {challengeUserIdx - INITIAL_LIMIT > 0 ? `${challengeUserIdx - INITIAL_LIMIT} more players · ` : ""}your rank (#{challengeUserIdx + 1}) ···
                         </span>
                         <div className="h-px bg-[var(--border-dim)] flex-1" />
                       </div>
@@ -895,7 +895,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                               </span>
                             </div>
                             <div className="text-xs truncate" style={{ color: "var(--text-mute)" }}>
-                              {userChallengeScore.gradeLabel || "Scholar"}
+                              {userChallengeScore.gradeLabel || "Contender"}
                             </div>
                           </div>
                         </div>
@@ -977,7 +977,7 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
                         {c.title}
                       </h4>
                       <p className="text-xs text-[var(--text-mute)]">
-                        Host: Scholar {c.creatorName} · {cScores.length} {cScores.length === 1 ? "Contender" : "Contenders"}
+                        Host: {c.creatorName && c.creatorName !== "Scholar" ? c.creatorName : "Host"} · {cScores.length} {cScores.length === 1 ? "Contender" : "Contenders"}
                       </p>
                     </div>
 

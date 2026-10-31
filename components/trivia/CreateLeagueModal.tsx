@@ -66,7 +66,7 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: title.trim(),
-          creatorName: profile.username || "Scholar",
+          creatorName: (profile.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "") || "Host",
           creatorId: profile.id,
           durationDays,
           questionsPerDay,
@@ -116,7 +116,7 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
     d: String(durationDays),
     q: String(questionsPerDay),
     t: title.trim(),
-    c: profile.username || "Scholar",
+    c: (profile.username && profile.username !== "Scholar" && profile.username !== "Learner" ? profile.username : "") || "Host",
     cat: category,
     diff: difficulty,
     pol: attemptPolicy,

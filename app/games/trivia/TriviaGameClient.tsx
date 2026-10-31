@@ -255,18 +255,23 @@ function SetupScreen({
 
       {/* Navigation Tab Bar */}
       <div
-        className="grid gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6"
+        className="grid gap-1 sm:gap-1.5 p-1 sm:p-1.5 rounded-2xl bg-[var(--bg-input)] border mb-6 relative"
         style={{ borderColor: "var(--border-dim)", gridTemplateColumns: `repeat(${visibleTabCount}, minmax(0, 1fr))` }}
       >
         <button
           onClick={() => onTabChange("solo")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
-            activeTab === "solo"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            "relative py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98] z-10",
+            activeTab === "solo" ? "text-[var(--text)]" : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
+          {activeTab === "solo" && (
+            <motion.div
+              layoutId="activeTriviaTabPill"
+              transition={{ type: "spring", stiffness: 450, damping: 32 }}
+              className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-xs border border-[var(--border-dim)] z-[-1]"
+            />
+          )}
           <Sparkles size={13} className="text-[var(--terra)] shrink-0" />
           <span className="hidden sm:inline">Play Solo</span>
           <span className="sm:hidden">Solo</span>
@@ -276,12 +281,17 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("league")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
-            activeTab === "league"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            "relative py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98] z-10",
+            activeTab === "league" ? "text-[var(--text)]" : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
+          {activeTab === "league" && (
+            <motion.div
+              layoutId="activeTriviaTabPill"
+              transition={{ type: "spring", stiffness: 450, damping: 32 }}
+              className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-xs border border-[var(--border-dim)] z-[-1]"
+            />
+          )}
           <Trophy size={13} className="text-amber-600 dark:text-amber-400 shrink-0" />
           <span>Leagues</span>
         </button>
@@ -291,12 +301,17 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("challenge")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer relative truncate touch-manipulation select-none active:scale-[0.98]",
-            activeTab === "challenge"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            "relative py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98] z-10",
+            activeTab === "challenge" ? "text-[var(--text)]" : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
+          {activeTab === "challenge" && (
+            <motion.div
+              layoutId="activeTriviaTabPill"
+              transition={{ type: "spring", stiffness: 450, damping: 32 }}
+              className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-xs border border-[var(--border-dim)] z-[-1]"
+            />
+          )}
           <Swords size={13} className="text-[var(--olive)] shrink-0" />
           <span className="hidden sm:inline">Challenges</span>
           <span className="sm:hidden">1v1</span>
@@ -310,12 +325,17 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("leaderboard")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
-            activeTab === "leaderboard"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            "relative py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1.5 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98] z-10",
+            activeTab === "leaderboard" ? "text-[var(--text)]" : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
+          {activeTab === "leaderboard" && (
+            <motion.div
+              layoutId="activeTriviaTabPill"
+              transition={{ type: "spring", stiffness: 450, damping: 32 }}
+              className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-xs border border-[var(--border-dim)] z-[-1]"
+            />
+          )}
           <Crown size={13} className="text-[var(--gold)] shrink-0" />
           <span className="hidden sm:inline">Leaderboard</span>
           <span className="sm:hidden">Ranks</span>
@@ -325,12 +345,17 @@ function SetupScreen({
         <button
           onClick={() => onTabChange("history")}
           className={cn(
-            "py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98]",
-            activeTab === "history"
-              ? "bg-[var(--bg-card)] text-[var(--text)] shadow-xs border border-[var(--border-dim)]"
-              : "text-[var(--text-mute)] hover:text-[var(--text)]"
+            "relative py-2 sm:py-2.5 px-1 sm:px-2 rounded-xl text-xs font-bold transition-colors flex items-center justify-center gap-1 cursor-pointer truncate touch-manipulation select-none active:scale-[0.98] z-10",
+            activeTab === "history" ? "text-[var(--text)]" : "text-[var(--text-mute)] hover:text-[var(--text)]"
           )}
         >
+          {activeTab === "history" && (
+            <motion.div
+              layoutId="activeTriviaTabPill"
+              transition={{ type: "spring", stiffness: 450, damping: 32 }}
+              className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-xs border border-[var(--border-dim)] z-[-1]"
+            />
+          )}
           <History size={12} className="shrink-0" />
           <span className="hidden sm:inline">History{historyCount > 0 ? ` (${historyCount})` : ""}</span>
           <span className="sm:hidden">History</span>
@@ -1071,12 +1096,12 @@ function ResultsScreen({
         >
           <div className="text-xs font-space font-bold uppercase tracking-wider mb-1">
             {userWon ? (
-              <span className="text-[var(--olive)]">Victory over Scholar {challenger?.by}</span>
+              <span className="text-[var(--olive)]">Victory over {challenger?.by && challenger.by !== "Scholar" ? challenger.by : "Challenger"}</span>
             ) : userTied ? (
-              <span className="text-[var(--gold)]">Honorable Stalemate with Scholar {challenger?.by}</span>
+              <span className="text-[var(--gold)]">Honorable Stalemate with {challenger?.by && challenger.by !== "Scholar" ? challenger.by : "Challenger"}</span>
             ) : (
               <span style={{ color: "var(--text-mute)" }}>
-                Scholar {challenger?.by} leads ({challenger?.score}/{challenger?.total})
+                {challenger?.by && challenger.by !== "Scholar" ? challenger.by : "Challenger"} leads ({challenger?.score}/{challenger?.total})
               </span>
             )}
           </div>
@@ -1151,7 +1176,7 @@ function ResultsScreen({
           <div className="space-y-1">
             <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-bold text-amber-600 dark:text-amber-400">
               <Flame size={13} className="text-amber-500 animate-pulse" />
-              <span>Guest Scholar · Streak Not Tracked</span>
+              <span>Playing as Guest · Streak Not Tracked</span>
             </div>
             <div className="text-base font-space font-bold text-[var(--text)]">
               Track your daily streak &amp; lock your rank
@@ -1507,12 +1532,17 @@ export default function TriviaGameClient({
     const remark = getTriviaPerformanceRemark(pct, questions.map((q) => q.id).join(""));
     const gradeLabel = remark.gradeTitle;
 
+    const cleanTriviaPlayerName =
+      profile?.username && profile.username !== "Scholar" && profile.username !== "Learner"
+        ? profile.username.trim()
+        : "Player";
+
     // 1. Record in local challenge scores if playing a group challenge (locks to 1st attempt)
     let challengeRecordResult: RecordScoreResult | null = null;
     if (activeChallenge) {
       challengeRecordResult = recordLocalChallengeScore(activeChallenge.id, {
         id: `score_${Date.now()}`,
-        username: profile?.username?.trim() || "Scholar",
+        username: cleanTriviaPlayerName,
         avatar: profile?.avatar || "/avatars/avatar-scholar.svg",
         score: correct,
         total,
@@ -1553,7 +1583,7 @@ export default function TriviaGameClient({
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
-        username: profile?.username?.trim() || "Scholar",
+        username: cleanTriviaPlayerName,
         avatar: profile?.avatar || "/avatars/avatar-scholar.svg",
         score: correct,
         total,

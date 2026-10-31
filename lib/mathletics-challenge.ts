@@ -13,6 +13,7 @@ export interface MathleticsChallenge {
   questionIds: string[];
   questionCount: number;
   difficulty: MathleticsDifficultyFilter;
+  questionTimerSeconds?: number;
   creatorScore?: {
     score: number;
     total: number;
@@ -34,6 +35,7 @@ export function encodeChallengeToUrl(challenge: MathleticsChallenge): string {
       q: challenge.questionIds,
       n: challenge.questionCount,
       d: challenge.difficulty,
+      tm: Math.max(25, challenge.questionTimerSeconds || 25),
       s: challenge.creatorScore
         ? {
             sc: challenge.creatorScore.score,
@@ -70,6 +72,7 @@ export function decodeChallengeFromUrl(code: string): MathleticsChallenge | null
       questionIds: raw.q,
       questionCount: raw.n || raw.q.length,
       difficulty: raw.d || "random",
+      questionTimerSeconds: Math.max(25, Number(raw.tm) || 25),
       creatorScore: raw.s
         ? {
             score: raw.s.sc ?? 0,
