@@ -9,6 +9,10 @@ import {
   type MathleticsLeague,
   type MathleticsLeagueScore,
 } from "@/lib/mathletics-league";
+import {
+  persistMathleticsLeagueRow,
+  getOrRestoreMathleticsLeague,
+} from "@/lib/mathletics-db";
 import { todayStr, addDaysToDate, formatDateToIso } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -97,51 +101,14 @@ export async function POST(req: NextRequest) {
       createdAt: new Date().toISOString(),
     };
 
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase
-        .from("mathletics_leagues")
-        .insert([
-          {
-            code: leagueData.code,
-            title: leagueData.title,
-            creator_name: leagueData.creatorName,
-            creator_id: leagueData.creatorId,
-            format: leagueData.format,
-            duration_days: leagueData.durationDays,
-            start_date: leagueData.startDate,
-            end_date: leagueData.endDate,
-            questions_per_day: leagueData.questionsPerDay,
-            difficulty: leagueData.difficulty,
-            category: leagueData.category,
-            daily_seed_map: leagueData.dailySeedMap,
-          },
-        ])
-        .select()
-        .single();
-
-      if (error) {
-        console.warn("Supabase insert mathletics_leagues warning (fallback to local):", error.message);
-        return NextResponse.json({
-          success: true,
-          stored: false,
-          league: leagueData,
-        });
-      }
-
-      return NextResponse.json({
-        success: true,
-        stored: true,
-        league: {
-          ...leagueData,
-          id: data?.id,
-        },
-      });
-    }
-
+    const persisted = await persistMathleticsLeagueRow(leagueData);
     return NextResponse.json({
       success: true,
-      stored: false,
-      league: leagueData,
+      stored: persisted.stored,
+      league: {
+        ...leagueData,
+        id: persisted.league?.id,
+      },
     });
   } catch (err: any) {
     console.error("Error creating mathletics league:", err);
@@ -316,44 +283,24 @@ export async function GET(req: NextRequest) {
     }
 
     // ── Mode B: Fetch single league by code ──
-    const { data: leagueRow, error: leagueError } = await supabase
-      .from("mathletics_leagues")
-      .select("*")
-      .eq("code", code!)
-      .maybeSingle();
+    const fallbackMeta: Partial<MathleticsLeague> = {
+      title: searchParams.get("t") ? decodeURIComponent(searchParams.get("t")!) : undefined,
+      creatorName: searchParams.get("c") ? decodeURIComponent(searchParams.get("c")!) : undefined,
+      durationDays: searchParams.get("d") ? Number(searchParams.get("d")) : undefined,
+      questionsPerDay: searchParams.get("q") ? Number(searchParams.get("q")) : 10,
+      category: (searchParams.get("cat") as any) || "all",
+      difficulty: (searchParams.get("diff") as any) || "random",
+      format: (searchParams.get("fmt") as any) || undefined,
+      questionTimerSeconds: searchParams.get("tim") ? Number(searchParams.get("tim")) : 25,
+      unlockedUpToDay: searchParams.get("u") ? Number(searchParams.get("u")) : 1,
+    };
 
-    if (leagueError || !leagueRow) {
+    const fetched = await getOrRestoreMathleticsLeague(code!, fallbackMeta);
+    if (!fetched) {
       return NextResponse.json({ error: "League not found." }, { status: 404 });
     }
 
-    const baseLeague: MathleticsLeague = {
-      id: leagueRow.id,
-      code: leagueRow.code,
-      title: leagueRow.title,
-      creatorName: leagueRow.creator_name,
-      creatorId: leagueRow.creator_id,
-      format: leagueRow.format || leagueRow.daily_seed_map?._format || (leagueRow.duration_days === 1 ? "sprint_duel" : "marathon"),
-      durationDays: leagueRow.duration_days,
-      startDate: leagueRow.start_date,
-      endDate: leagueRow.end_date,
-      questionsPerDay: leagueRow.questions_per_day || 10,
-      difficulty: leagueRow.difficulty || "random",
-      category: leagueRow.category || "all",
-      attemptPolicy: leagueRow.daily_seed_map?._policy || (leagueRow.duration_days === 1 ? "once" : "flexible"),
-      unlockedUpToDay: leagueRow.daily_seed_map?._unlockedUpToDay || 1,
-      questionTimerSeconds: leagueRow.daily_seed_map?._questionTimer || 25,
-      dailySeedMap: leagueRow.daily_seed_map,
-      createdAt: leagueRow.created_at,
-    };
-
-    const { data: scoreRows } = await supabase
-      .from("mathletics_scores")
-      .select("*")
-      .eq("league_code", code)
-      .order("created_at", { ascending: true });
-
-    const { league, scores } = hydrateMathleticsLeagueFromScoreRows(baseLeague, scoreRows || []);
-
+    const { league, scores } = fetched;
     const status = getMathleticsLeagueStatus(league.startDate, league.durationDays);
     const leaderboard = aggregateMathleticsLeaderboard(scores, status.dayNumber);
 

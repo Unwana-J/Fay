@@ -28,6 +28,9 @@
 18. [Physical Continuity & Design Engineering Standards Across the Fey Parlor](#18-physical-continuity--design-engineering-standards-across-the-fey-parlor)
 19. [Configurable Calculation Velocity: The 25-Second Mental Math Floor](#19-configurable-calculation-velocity-the-25-second-mental-math-floor)
 20. [Spatial Partitioning: The Study vs. The Parlor (Resolving Dashboard Cognitive Overload & Progressive Day 0 Disclosure)](#20-spatial-partitioning-the-study-vs-the-parlor-resolving-dashboard-cognitive-overload--progressive-day-0-disclosure)
+21. [Articulate Match Ledger: Counting Hours That "Play Again" Used to Erase](#21-articulate-match-ledger-counting-hours-that-play-again-used-to-erase)
+22. [Admin Console Redesign: Server-Signed Sessions, Cross-Game Hours & Unified Scholar Identity](#22-admin-console-redesign-server-signed-sessions-cross-game-hours--unified-scholar-identity)
+23. [Resilient Cross-Device Real-Time Syncing: Dual-Table Database Fallback & Zero-Loss Local Score Auto-Heal (Fixing Mathletics League Score Isolation)](#23-resilient-cross-device-real-time-syncing-dual-table-database-fallback--zero-loss-local-score-auto-heal-fixing-mathletics-league-score-isolation)
 
 ---
 
@@ -383,7 +386,25 @@
 
 ---
 
-## 22. Admin Console Redesign: Server-Signed Sessions, Cross-Game Hours & Unified Scholar Identity
+## 23. Resilient Cross-Device Real-Time Syncing: Dual-Table Database Fallback & Zero-Loss Local Score Auto-Heal (Fixing Mathletics League Score Isolation)
+
+- **Date / Phase**: Phase 2 — Multiplayer Infrastructure & Distributed State Syncing
+- **The Problem / Context**:
+  When two scholars played a Mathletics League tournament (e.g. Wana_Bee on desktop vs Sage on mobile via share URL `.../games/mathletics/league/RUZSNQ?...`), scores were completely isolated: Wana_Bee only saw their own score (821 pts, "1 Scholars Contending") and Sage only saw their own score (685 pts, "1 Scholars Contending").
+  Root causes identified:
+  1. **Missing Database Table in Production**: The dedicated tables (`mathletics_leagues` / `mathletics_scores`) added in the latest schema had not yet been executed in production Supabase, causing score insertions to silently fail (`stored: false`) and fall back to local device storage.
+  2. **Foreign Key Lockout**: Even if a score was submitted, foreign key references to `mathletics_leagues(code)` failed because decentralized URL-generated leagues weren't pre-persisted in the database.
+  3. **No Client Revalidation / Polling**: `MathleticsLeagueClient` only read from `localStorage` once on mount and never polled `/api/mathletics/league?code=...` for updates.
+- **User Insight & Guiding Philosophy**:
+  Multiplayer competition requires instant, reliable trust. Players must see each other's live standings without ever losing a completed round to database errors, missing schema migrations, or network partitions.
+- **Architectural & Product Landing**:
+  1. **Dual-Table Resilient Storage (`lib/mathletics-db.ts`)**: Designed a zero-dependency database layer that tries dedicated `mathletics_leagues`/`mathletics_scores` first, and if PostgreSQL returns error `42P01` (table does not exist), automatically and transparently falls back to the existing, battle-tested `friendship_leagues` and `league_scores` tables.
+  2. **Auto-Restoration from URL Metadata**: If a league code was shared via URL parameters (`?t=...&c=...&d=...`), the API automatically upserts the league row in the database on first score submission or fetch, satisfying foreign keys and allowing zero-database shareable tournaments to sync instantly.
+  3. **Self-Healing Local Score Backfill**: When `MathleticsLeagueClient` mounts, it inspects local storage for completed rounds not yet confirmed in the cloud and automatically background-syncs them to the API. This guarantees Wana_Bee and Sage's existing completed scores are immediately published to the live leaderboard without requiring a replay.
+  4. **Active Polling & Window Focus Sync**: Added background polling (every 15s when not answering) plus instant re-fetch on window `focus` and tab `visibilitychange`.
+- **"Building in Public" Content Takeaway**:
+  > *"Never let an unapplied database migration break a live multiplayer game. How dual-table database fallback and client-side score auto-healing saved our real-time tournament leaderboard from silent data silos."*
+
 
 - **Date / Phase**: Phase 2 — Admin Security, Engagement Analytics & Brand Polish
 - **The Problem / Context**:

@@ -71,7 +71,59 @@ export default function MathleticsLeagueClient({
   const [scores, setScores] = useState<MathleticsLeagueScore[]>(initialScores);
   const [leaderboard, setLeaderboard] = useState<MathleticsLeaderboardEntry[]>(initialLeaderboard);
 
-  // Sync with local storage on mount
+  // Live league data fetcher
+  const fetchLeagueData = useCallback(async () => {
+    const leagueCode = code || league.code;
+    if (!leagueCode) return;
+    try {
+      const q = new URLSearchParams({
+        code: leagueCode,
+        t: league.title || "",
+        c: league.creatorName || "",
+        d: String(league.durationDays || 1),
+        q: String(league.questionsPerDay || 10),
+        cat: league.category || "all",
+        diff: league.difficulty || "random",
+        fmt: league.format || (league.durationDays === 1 ? "sprint_duel" : "marathon"),
+        tim: String(league.questionTimerSeconds || 25),
+        u: String(league.unlockedUpToDay || 1),
+      });
+      const res = await fetch(`/api/mathletics/league?${q.toString()}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      if (data.success && Array.isArray(data.scores)) {
+        setScores((prevScores) => {
+          const scoreMap = new Map<string, MathleticsLeagueScore>();
+          for (const s of prevScores) {
+            const playerKey = (s.username || s.userId || "").trim().toLowerCase();
+            scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
+          }
+          for (const s of data.scores) {
+            const playerKey = (s.username || s.userId || "").trim().toLowerCase();
+            const existing = scoreMap.get(`${playerKey}_${s.dayNumber}`);
+            if (!existing || s.points >= existing.points) {
+              scoreMap.set(`${playerKey}_${s.dayNumber}`, s);
+            }
+          }
+          const merged = Array.from(scoreMap.values()).map(normalizeMathleticsScore);
+          if (typeof window !== "undefined") {
+            try {
+              localStorage.setItem(`fey_math_league_scores_${leagueCode}`, JSON.stringify(merged));
+            } catch {}
+          }
+          const curStatus = getMathleticsLeagueStatus(league.startDate, league.durationDays);
+          setLeaderboard(aggregateMathleticsLeaderboard(merged, curStatus.dayNumber));
+          return merged;
+        });
+
+        if (data.league) {
+          setLeague((prev) => mergeMathleticsLeagueState(prev, data.league));
+        }
+      }
+    } catch {}
+  }, [code, league]);
+
+  // Sync with local storage on mount & auto-backfill local scores to cloud
   useEffect(() => {
     const leagueCode = code || initialLeague.code;
     if (typeof window !== "undefined" && leagueCode) {
@@ -108,12 +160,67 @@ export default function MathleticsLeagueClient({
           const currentStatus = getMathleticsLeagueStatus(activeLeague.startDate, activeLeague.durationDays);
           setLeaderboard(aggregateMathleticsLeaderboard(merged, currentStatus.dayNumber));
         }
+
+        // Auto-heal: If user has a local attempt not yet recorded on server, push it to cloud!
+        const cleanUser = (profile.username || "Scholar").trim().toLowerCase();
+        for (const ls of localScores) {
+          const isMine =
+            (ls.username || "").trim().toLowerCase() === cleanUser ||
+            (profile.id && ls.userId === profile.id);
+          const inCloud = (initialScores || []).some(
+            (is) =>
+              is.dayNumber === ls.dayNumber &&
+              ((is.username || "").trim().toLowerCase() === cleanUser ||
+                (profile.id && is.userId === profile.id))
+          );
+          if (isMine && !inCloud) {
+            fetch("/api/mathletics/league/score", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                ...ls,
+                leagueTitle: activeLeague.title,
+                creatorName: activeLeague.creatorName,
+                durationDays: activeLeague.durationDays,
+                format: activeLeague.format,
+              }),
+            })
+              .then(() => fetchLeagueData())
+              .catch(() => {});
+          }
+        }
       } catch {}
     }
-  }, [code, initialLeague, initialScores]);
+  }, [code, initialLeague, initialScores, profile.username, profile.id, fetchLeagueData]);
 
   // Phase state: overview | playing | round_summary
   const [phase, setPhase] = useState<"overview" | "playing" | "round_summary">("overview");
+
+  // Live background polling: sync every 15s when not actively answering questions, and on window focus
+  useEffect(() => {
+    if (phase === "playing") return;
+    fetchLeagueData();
+
+    const interval = setInterval(() => {
+      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      fetchLeagueData();
+    }, 15000);
+
+    const handleFocus = () => {
+      if (typeof document !== "undefined" && document.visibilityState === "visible") {
+        fetchLeagueData();
+      }
+    };
+
+    window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleFocus);
+
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleFocus);
+    };
+  }, [phase, fetchLeagueData]);
 
   // Game state
   const [activeDay, setActiveDay] = useState<number>(1);
@@ -340,14 +447,21 @@ export default function MathleticsLeagueClient({
       await fetch("/api/mathletics/league/score", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(scorePayload),
+        body: JSON.stringify({
+          ...scorePayload,
+          leagueTitle: league.title,
+          creatorName: league.creatorName,
+          durationDays: league.durationDays,
+          format: league.format,
+        }),
       });
+      fetchLeagueData();
     } catch (err) {
       console.warn("Failed to submit score to cloud (stored locally):", err);
     } finally {
       setIsSubmittingScore(false);
     }
-  }, [questions, userAnswers, activeDay, league, myUserId, profile, roundAgilityScore, addXP]);
+  }, [questions, userAnswers, activeDay, league, myUserId, profile, roundAgilityScore, addXP, fetchLeagueData]);
 
   async function handleCopyShareLink() {
     const url = getMathleticsLeagueShareUrl(league);
