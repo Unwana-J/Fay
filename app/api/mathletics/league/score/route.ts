@@ -64,7 +64,13 @@ export async function POST(req: NextRequest) {
     const cleanLeagueCode = leagueCode.toUpperCase().trim();
     const today = todayStr();
 
-    const agilityScore = calculateMathleticsPoints(score, totalQuestions, durationSeconds);
+    const rawClientPoints = Number(body.agilityScore || body.points || 0);
+    const minValid = score * 100;
+    const maxValid = score * 150;
+    const agilityScore =
+      score > 0 && rawClientPoints >= minValid && rawClientPoints <= maxValid
+        ? Math.round(rawClientPoints)
+        : calculateMathleticsPoints(score, totalQuestions, durationSeconds);
     const points = agilityScore;
     const playerIdentifier = userId || cleanUsername.toLowerCase();
     const dayNumber = typeof clientDayNumber === "number" && clientDayNumber >= 1 ? clientDayNumber : 1;

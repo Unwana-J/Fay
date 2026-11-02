@@ -11,6 +11,7 @@ import {
   Check,
   Sparkles,
   ChevronRight,
+  ChevronDown,
   ArrowRight,
   ArrowLeft,
   Crown,
@@ -23,6 +24,8 @@ import {
   Plus,
   Trash2,
   Zap,
+  Calendar,
+  ShieldCheck,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import Link from "next/link";
@@ -71,22 +74,33 @@ export default function MathleticsLeagueClient({
   const [scores, setScores] = useState<MathleticsLeagueScore[]>(initialScores);
   const [leaderboard, setLeaderboard] = useState<MathleticsLeaderboardEntry[]>(initialLeaderboard);
 
-  // Live league data fetcher
+  // Keep a ref to latest league so fetchLeagueData remains referentially stable
+  // and never triggers an infinite useEffect re-fetch loop when setLeague updates state.
+  const leagueRef = useRef<MathleticsLeague>(league);
+  useEffect(() => {
+    leagueRef.current = league;
+  }, [league]);
+
+  const isFetchingRef = useRef(false);
+
+  // Live league data fetcher (stable callback — depends only on route code)
   const fetchLeagueData = useCallback(async () => {
-    const leagueCode = code || league.code;
-    if (!leagueCode) return;
+    const currentLeague = leagueRef.current;
+    const leagueCode = code || currentLeague.code;
+    if (!leagueCode || isFetchingRef.current) return;
+    isFetchingRef.current = true;
     try {
       const q = new URLSearchParams({
         code: leagueCode,
-        t: league.title || "",
-        c: league.creatorName || "",
-        d: String(league.durationDays || 1),
-        q: String(league.questionsPerDay || 10),
-        cat: league.category || "all",
-        diff: league.difficulty || "random",
-        fmt: league.format || (league.durationDays === 1 ? "sprint_duel" : "marathon"),
-        tim: String(league.questionTimerSeconds || 25),
-        u: String(league.unlockedUpToDay || 1),
+        t: currentLeague.title || "",
+        c: currentLeague.creatorName || "",
+        d: String(currentLeague.durationDays || 1),
+        q: String(currentLeague.questionsPerDay || 10),
+        cat: currentLeague.category || "all",
+        diff: currentLeague.difficulty || "random",
+        fmt: currentLeague.format || (currentLeague.durationDays === 1 ? "sprint_duel" : "marathon"),
+        tim: String(currentLeague.questionTimerSeconds || 25),
+        u: String(currentLeague.unlockedUpToDay || 1),
       });
       const res = await fetch(`/api/mathletics/league?${q.toString()}`);
       if (!res.ok) return;
@@ -111,17 +125,26 @@ export default function MathleticsLeagueClient({
               localStorage.setItem(`fey_math_league_scores_${leagueCode}`, JSON.stringify(merged));
             } catch {}
           }
-          const curStatus = getMathleticsLeagueStatus(league.startDate, league.durationDays);
+          const latestLeague = leagueRef.current;
+          const curStatus = getMathleticsLeagueStatus(latestLeague.startDate, latestLeague.durationDays);
           setLeaderboard(aggregateMathleticsLeaderboard(merged, curStatus.dayNumber));
           return merged;
         });
 
         if (data.league) {
-          setLeague((prev) => mergeMathleticsLeagueState(prev, data.league));
+          setLeague((prev) => {
+            const mergedLeague = mergeMathleticsLeagueState(prev, data.league);
+            saveLocalMathleticsLeague(mergedLeague);
+            return mergedLeague;
+          });
         }
       }
-    } catch {}
-  }, [code, league]);
+    } catch {
+      // Ignore transient network errors
+    } finally {
+      isFetchingRef.current = false;
+    }
+  }, [code]);
 
   // Sync with local storage on mount & auto-backfill local scores to cloud
   useEffect(() => {
@@ -191,12 +214,13 @@ export default function MathleticsLeagueClient({
         }
       } catch {}
     }
-  }, [code, initialLeague, initialScores, profile.username, profile.id, fetchLeagueData]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [code]);
 
   // Phase state: overview | playing | round_summary
   const [phase, setPhase] = useState<"overview" | "playing" | "round_summary">("overview");
 
-  // Live background polling: sync every 15s when not actively answering questions, and on window focus
+  // Live background polling: sync every 25s when not actively answering questions, and on window focus
   useEffect(() => {
     if (phase === "playing") return;
     fetchLeagueData();
@@ -204,7 +228,7 @@ export default function MathleticsLeagueClient({
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       fetchLeagueData();
-    }, 15000);
+    }, 25000);
 
     const handleFocus = () => {
       if (typeof document !== "undefined" && document.visibilityState === "visible") {
@@ -241,7 +265,9 @@ export default function MathleticsLeagueClient({
   >([]);
   const [roundAgilityScore, setRoundAgilityScore] = useState(0);
   const [isSubmittingScore, setIsSubmittingScore] = useState(false);
+  const [isUpdatingLeague, setIsUpdatingLeague] = useState(false);
   const [attemptFeedback, setAttemptFeedback] = useState("");
+  const [expandedParticipants, setExpandedParticipants] = useState<Record<string, boolean>>({});
 
   // Share and proof card
   const [copiedLink, setCopiedLink] = useState(false);
@@ -272,7 +298,43 @@ export default function MathleticsLeagueClient({
     return map;
   }, [scores, myUsername, profile.id]);
 
-  const hasCompletedCurrentDay = Boolean(myScoresByDay.get(status.dayNumber));
+  const maxScoredDay = useMemo(() => {
+    let max = 1;
+    for (const s of scores) {
+      if (s.dayNumber > max) max = s.dayNumber;
+    }
+    return max;
+  }, [scores]);
+
+  const rawUnlockedUpToDay = Number(
+    league.unlockedUpToDay || (league.dailySeedMap as any)?._unlockedUpToDay || 1
+  );
+
+  const unlockedUpToDay = useMemo(() => {
+    if (isSprintDuel) return 1;
+    if (league.attemptPolicy === "flexible") return league.durationDays;
+    if (league.attemptPolicy === "strict") {
+      return Math.max(rawUnlockedUpToDay, status.dayNumber, maxScoredDay);
+    }
+    return Math.max(rawUnlockedUpToDay, maxScoredDay);
+  }, [isSprintDuel, league.attemptPolicy, league.durationDays, rawUnlockedUpToDay, status.dayNumber, maxScoredDay]);
+
+  const isPacedByHostOrSchedule =
+    !isSprintDuel && (league.attemptPolicy === "host_controlled" || league.attemptPolicy === "strict");
+
+  // Next uncompleted day for sequential Marathon progression
+  const nextUncompletedDay = useMemo(() => {
+    for (let day = 1; day <= league.durationDays; day++) {
+      if (!myScoresByDay.has(day)) return day;
+    }
+    return null;
+  }, [league.durationDays, myScoresByDay]);
+
+  const isNextDayLockedByHost = Boolean(
+    isPacedByHostOrSchedule && nextUncompletedDay && nextUncompletedDay > unlockedUpToDay
+  );
+
+  const displayDayNumber = nextUncompletedDay ?? Math.min(league.durationDays, Math.max(status.dayNumber, maxScoredDay));
 
   // Host verification
   const isCreator = useMemo(() => {
@@ -283,14 +345,126 @@ export default function MathleticsLeagueClient({
     return false;
   }, [league.creatorName, league.creatorId, myUsername, profile.id]);
 
+  const toggleParticipantExpanded = useCallback((key: string) => {
+    setExpandedParticipants((prev) => ({
+      ...prev,
+      [key]: !prev[key],
+    }));
+  }, []);
+
+  async function handleUnlockDay(targetDay: number) {
+    if (isUpdatingLeague) return;
+    setIsUpdatingLeague(true);
+    try {
+      const updatedSeedMap: Record<string, any> = {
+        ...(league.dailySeedMap || {}),
+        _unlockedUpToDay: targetDay,
+      };
+      const updatedLeague: MathleticsLeague = {
+        ...league,
+        unlockedUpToDay: targetDay,
+        dailySeedMap: updatedSeedMap,
+      };
+      setLeague(updatedLeague);
+      saveLocalMathleticsLeague(updatedLeague);
+
+      await fetch("/api/mathletics/league", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: league.code,
+          unlockedUpToDay: targetDay,
+          dailySeedMap: updatedSeedMap,
+        }),
+      });
+      setAttemptFeedback(`Day ${targetDay} unlocked for all scholars in this league.`);
+    } catch {
+      // Stored locally
+    } finally {
+      setIsUpdatingLeague(false);
+    }
+  }
+
+  async function handleAddExtraDays(count: number) {
+    if (isUpdatingLeague) return;
+    setIsUpdatingLeague(true);
+    try {
+      const newDuration = league.durationDays + count;
+      const updatedSeedMap: Record<string, any> = { ...(league.dailySeedMap || {}) };
+      for (let d = league.durationDays + 1; d <= newDuration; d++) {
+        if (!updatedSeedMap[`day_${d}`]) {
+          const extraMap = generateDailyMathleticsQuestions(
+            1,
+            league.questionsPerDay || 10,
+            league.difficulty || "random",
+            league.category || "all",
+            `${league.code}_DAY_${d}`
+          );
+          updatedSeedMap[`day_${d}`] = extraMap["day_1"] || [];
+        }
+      }
+      const updatedLeague: MathleticsLeague = {
+        ...league,
+        format: "marathon",
+        durationDays: newDuration,
+        dailySeedMap: updatedSeedMap,
+      };
+      setLeague(updatedLeague);
+      saveLocalMathleticsLeague(updatedLeague);
+
+      await fetch("/api/mathletics/league", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          code: league.code,
+          extraDrops: count,
+          newDuration,
+          attemptPolicy: league.attemptPolicy,
+          dailySeedMap: updatedSeedMap,
+        }),
+      });
+      setAttemptFeedback(`Added ${count} extra day${count > 1 ? "s" : ""}. Tournament expanded to ${newDuration} days.`);
+    } catch {
+      // Stored locally
+    } finally {
+      setIsUpdatingLeague(false);
+    }
+  }
+
+  async function handleDeleteLeague() {
+    const message = isCreator
+      ? `Permanently delete "${league.title}"? This will remove the tournament and its standings for all scholars.`
+      : `Remove "${league.title}" from your leagues?`;
+    if (!confirm(message)) return;
+
+    removeLocalMathleticsLeague(league.code);
+    try {
+      const q = new URLSearchParams({ code: league.code });
+      if (profile.id) q.set("userId", profile.id);
+      if (profile.username) q.set("username", profile.username);
+      await fetch(`/api/mathletics/league?${q.toString()}`, { method: "DELETE" });
+    } catch {}
+    router.push("/games/mathletics");
+  }
+
   // Start Sprint Round
-  function handleStartSprint(dayNumber: number = status.dayNumber) {
+  function handleStartSprint(dayNumber: number = nextUncompletedDay ?? status.dayNumber) {
+    if (isPacedByHostOrSchedule && dayNumber > unlockedUpToDay) {
+      setAttemptFeedback(`Day ${dayNumber} is locked. Awaiting the Host to unlock this round.`);
+      return;
+    }
+
     if (myScoresByDay.has(dayNumber)) {
       setAttemptFeedback(
         isSprintDuel
           ? "You have already completed this Sprint Duel. Scores are locked to preserve competitive fairness."
           : `You have already completed Day ${dayNumber}. Scores are locked.`
       );
+      return;
+    }
+
+    if (!isSprintDuel && dayNumber > 1 && !myScoresByDay.has(dayNumber - 1)) {
+      setAttemptFeedback(`Day ${dayNumber} unlocks after you complete Day ${dayNumber - 1}.`);
       return;
     }
 
@@ -537,11 +711,21 @@ export default function MathleticsLeagueClient({
               color: isSprintDuel ? "var(--terra)" : "var(--olive)",
             }}
           >
-            {isSprintDuel ? "Sprint Duel" : `Marathon · Day ${status.dayNumber}`}
+            {isSprintDuel ? "Sprint Duel" : `Marathon · Day ${displayDayNumber} of ${league.durationDays}`}
           </span>
           <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-lg border surface text-[var(--text-dim)]" style={{ borderColor: "var(--border-dim)" }}>
             {league.code}
           </span>
+          <button
+            type="button"
+            disabled={isUpdatingLeague || phase === "playing"}
+            onClick={handleDeleteLeague}
+            className="h-7 w-7 flex items-center justify-center rounded-lg border border-[var(--border-dim)] text-[var(--text-dim)] hover:text-rose-600 hover:border-rose-300/60 hover:bg-rose-500/10 cursor-pointer surface transition-all shrink-0 disabled:opacity-40"
+            title={isCreator ? "Delete League" : "Remove League"}
+            aria-label={isCreator ? "Delete League" : "Remove League"}
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+          </button>
         </div>
       </div>
 
@@ -587,25 +771,48 @@ export default function MathleticsLeagueClient({
 
               {/* Action Button */}
               <div className="flex flex-col gap-2 shrink-0">
-                {hasCompletedCurrentDay ? (
+                {nextUncompletedDay === null ? (
                   <div className="p-3 rounded-2xl border text-center text-xs" style={{ borderColor: "var(--olive)", backgroundColor: "rgba(68, 78, 44, 0.06)" }}>
                     <div className="font-bold flex items-center justify-center gap-1.5" style={{ color: "var(--olive)" }}>
                       <CheckCircle2 className="w-4 h-4" />
-                      <span>{isSprintDuel ? "Duel Completed" : `Day ${status.dayNumber} Completed`}</span>
+                      <span>{isSprintDuel ? "Duel Completed" : `All ${league.durationDays} Days Completed`}</span>
                     </div>
                     <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
-                      Your Score: {myScoresByDay.get(status.dayNumber)?.points} pts
+                      {isSprintDuel
+                        ? `Your Score: ${myScoresByDay.get(1)?.points || 0} pts`
+                        : `${myScoresByDay.size} of ${league.durationDays} Sprints Finished`}
                     </div>
                   </div>
+                ) : isNextDayLockedByHost ? (
+                  isCreator ? (
+                    <button
+                      type="button"
+                      disabled={isUpdatingLeague}
+                      onClick={() => handleUnlockDay(nextUncompletedDay)}
+                      className="px-6 py-3.5 rounded-2xl font-bold text-xs sm:text-sm text-white shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
+                      style={{ backgroundColor: "var(--olive)" }}
+                    >
+                      <ShieldCheck className="w-4 h-4" />
+                      <span>Unlock Day {nextUncompletedDay}</span>
+                    </button>
+                  ) : (
+                    <div className="p-3 rounded-2xl border text-center text-xs" style={{ borderColor: "var(--border-dim)", backgroundColor: "var(--surface)" }}>
+                      <div className="font-bold flex items-center justify-center gap-1.5 text-[var(--text-dim)]">
+                        <Lock className="w-3.5 h-3.5" />
+                        <span>Day {nextUncompletedDay} Locked</span>
+                      </div>
+                      <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
+                        Awaiting Host to unlock Day {nextUncompletedDay}
+                      </div>
+                    </div>
+                  )
                 ) : (
                   <button
-                    onClick={() => handleStartSprint(status.dayNumber)}
+                    onClick={() => handleStartSprint(nextUncompletedDay)}
                     className="px-6 py-3.5 rounded-2xl font-bold text-xs sm:text-sm text-white shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                     style={{ backgroundColor: "var(--terra)" }}
                   >
-                    <Zap className="w-4 h-4" />
-                    <span>{isSprintDuel ? "Begin Sprint Duel" : `Begin Day ${status.dayNumber} Sprint`}</span>
-                    <ArrowRight className="w-4 h-4" />
+                    <span>{isSprintDuel ? "Play Sprint Duel" : `Play Day ${nextUncompletedDay}`}</span>
                   </button>
                 )}
 
@@ -637,14 +844,211 @@ export default function MathleticsLeagueClient({
             )}
           </div>
 
+          {/* ── MARATHON SPRINT SCHEDULE & HOST CONTROLS ── */}
+          {!isSprintDuel && (
+            <div className="surface rounded-3xl p-6 sm:p-8 border shadow-xs space-y-5" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b pb-4" style={{ borderColor: "var(--border-dim)" }}>
+                <div className="flex items-center gap-2.5">
+                  <Calendar className="w-5 h-5" style={{ color: "var(--terra)" }} />
+                  <div>
+                    <h2 className="font-space text-lg font-bold" style={{ color: "var(--text)" }}>
+                      Quiz Schedule ({league.durationDays} Days)
+                    </h2>
+                    <p className="text-xs text-[var(--text-dim)]">
+                      Complete each daily 10-question calculation sprint sequentially.
+                    </p>
+                  </div>
+                </div>
+                <span
+                  className="text-xs font-mono font-bold px-3 py-1 rounded-full border w-fit"
+                  style={{
+                    color: "var(--olive)",
+                    borderColor: "rgba(68, 78, 44, 0.25)",
+                    backgroundColor: "rgba(68, 78, 44, 0.08)",
+                  }}
+                >
+                  {myScoresByDay.size} / {league.durationDays} Completed
+                </span>
+              </div>
+
+              {/* Host Controls */}
+              {isCreator && (
+                <div
+                  className="p-3.5 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-3"
+                  style={{
+                    borderColor: "rgba(68, 78, 44, 0.3)",
+                    backgroundColor: "rgba(68, 78, 44, 0.06)",
+                  }}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <div
+                      className="w-8 h-8 rounded-xl flex items-center justify-center shrink-0"
+                      style={{ backgroundColor: "rgba(68, 78, 44, 0.15)", color: "var(--olive)" }}
+                    >
+                      <Crown className="w-4 h-4" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                        <span>Host Controls</span>
+                      </div>
+                      <p className="text-[11px] text-[var(--text-dim)]">
+                        Unlock upcoming days for contenders or extend the tournament duration.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {unlockedUpToDay < league.durationDays && (
+                      <button
+                        type="button"
+                        onClick={() => handleUnlockDay(unlockedUpToDay + 1)}
+                        disabled={isUpdatingLeague}
+                        className="px-3 py-1.5 rounded-xl text-xs font-bold text-white transition-all cursor-pointer shadow-2xs disabled:opacity-50"
+                        style={{ backgroundColor: "var(--olive)" }}
+                      >
+                        Unlock Day {unlockedUpToDay + 1}
+                      </button>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => handleAddExtraDays(1)}
+                      disabled={isUpdatingLeague}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold border surface transition-all cursor-pointer disabled:opacity-50"
+                      style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                    >
+                      +1 Day
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAddExtraDays(3)}
+                      disabled={isUpdatingLeague}
+                      className="px-3 py-1.5 rounded-xl text-xs font-bold border surface transition-all cursor-pointer disabled:opacity-50"
+                      style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                    >
+                      +3 Days
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Day Cards Grid */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {Array.from({ length: league.durationDays }, (_, i) => i + 1).map((dayNum) => {
+                  const score = myScoresByDay.get(dayNum);
+                  const isDone = Boolean(score);
+                  const isHostLocked = isPacedByHostOrSchedule && dayNum > unlockedUpToDay;
+                  const isNext = !isDone && !isHostLocked && (dayNum === 1 || myScoresByDay.has(dayNum - 1));
+
+                  return (
+                    <div
+                      key={dayNum}
+                      className={cn(
+                        "p-4 rounded-2xl border transition-all flex flex-col justify-between min-h-[140px]",
+                        isDone
+                          ? "border-[var(--olive)]/35 bg-[var(--olive)]/5"
+                          : isNext
+                          ? "border-[var(--terra)]/60 bg-[var(--terra)]/5 shadow-2xs"
+                          : "border-[var(--border-dim)] opacity-75"
+                      )}
+                    >
+                      <div className="space-y-1">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
+                            Day {dayNum}
+                          </span>
+                          {isDone ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-300 bg-emerald-500/15 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                              <CheckCircle2 className="w-3 h-3" /> Completed
+                            </span>
+                          ) : isNext ? (
+                            <span
+                              className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full border"
+                              style={{
+                                color: "var(--terra)",
+                                backgroundColor: "rgba(122, 28, 46, 0.12)",
+                                borderColor: "rgba(122, 28, 46, 0.3)",
+                              }}
+                            >
+                              Ready to Play
+                            </span>
+                          ) : isHostLocked ? (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-dim)] px-2 py-0.5 rounded-full border" style={{ borderColor: "var(--border-dim)" }}>
+                              <Lock className="w-2.5 h-2.5" /> Locked by Host
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] font-mono text-[var(--text-dim)] px-2 py-0.5 rounded-full border" style={{ borderColor: "var(--border-dim)" }}>
+                              <Lock className="w-2.5 h-2.5" /> Locked
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[11px] text-[var(--text-dim)]">
+                          10 Questions · {questionTimeLimit}s Sprint
+                        </div>
+                      </div>
+
+                      <div className="pt-3">
+                        {isDone && score ? (
+                          <div className="flex items-center justify-between px-3 py-2 rounded-xl border surface text-xs font-mono" style={{ borderColor: "var(--border-dim)" }}>
+                            <span className="text-[var(--text-dim)]">
+                              Score: <strong style={{ color: "var(--text)" }}>{score.score}/{score.totalQuestions || 10}</strong>
+                            </span>
+                            <span className="font-bold" style={{ color: "var(--olive)" }}>
+                              {score.points} pts
+                            </span>
+                          </div>
+                        ) : isHostLocked ? (
+                          isCreator ? (
+                            <button
+                              type="button"
+                              disabled={isUpdatingLeague}
+                              onClick={() => handleUnlockDay(dayNum)}
+                              className="w-full py-2 rounded-xl border text-xs font-bold transition-all cursor-pointer text-center"
+                              style={{ borderColor: "var(--olive)", color: "var(--olive)" }}
+                            >
+                              Unlock Day {dayNum}
+                            </button>
+                          ) : (
+                            <div className="text-[11px] text-[var(--text-dim)] font-mono py-1">
+                              Awaiting Host to unlock Day {dayNum}
+                            </div>
+                          )
+                        ) : isNext ? (
+                          <button
+                            type="button"
+                            onClick={() => handleStartSprint(dayNum)}
+                            className="w-full py-2.5 rounded-xl text-xs font-bold text-white cursor-pointer transition-all shadow-2xs text-center"
+                            style={{ backgroundColor: "var(--terra)" }}
+                          >
+                            Play Day {dayNum}
+                          </button>
+                        ) : (
+                          <div className="text-[11px] text-[var(--text-dim)] font-mono py-1">
+                            Unlocks after Day {dayNum - 1}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Leaderboard Table Card */}
           <div className="surface rounded-3xl p-6 sm:p-8 border shadow-xs" style={{ borderColor: "var(--border-dim)" }}>
             <div className="flex items-center justify-between mb-6">
-              <div className="flex items-center gap-2.5">
-                <Trophy className="w-5 h-5" style={{ color: "var(--gold)" }} />
-                <h2 className="font-space text-lg font-bold" style={{ color: "var(--text)" }}>
-                  Live Standings
-                </h2>
+              <div>
+                <div className="flex items-center gap-2.5">
+                  <Trophy className="w-5 h-5" style={{ color: "var(--gold)" }} />
+                  <h2 className="font-space text-lg font-bold" style={{ color: "var(--text)" }}>
+                    Live Standings
+                  </h2>
+                </div>
+                {!isSprintDuel && (
+                  <p className="text-xs text-[var(--text-dim)] mt-0.5">
+                    Select any scholar to view their day-by-day sprint breakdown
+                  </p>
+                )}
               </div>
               <span className="text-xs font-mono font-semibold text-[var(--text-dim)]">
                 Ranked by Agility Points
@@ -659,11 +1063,13 @@ export default function MathleticsLeagueClient({
                 </p>
               </div>
             ) : (
-              <div className="divide-y" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="space-y-2.5">
                 {leaderboard.map((entry) => {
                   const isUser =
                     (entry.username || "").trim().toLowerCase() === myUsername ||
                     (profile.id && entry.userId === profile.id);
+                  const participantKey = (entry.username || entry.userId || "scholar").trim().toLowerCase();
+                  const isExpanded = Boolean(expandedParticipants[participantKey]);
 
                   let rankColor = "var(--text-dim)";
                   if (entry.rank === 1) rankColor = "var(--gold)";
@@ -672,45 +1078,100 @@ export default function MathleticsLeagueClient({
 
                   return (
                     <div
-                      key={entry.userId}
+                      key={participantKey}
                       className={cn(
-                        "py-3.5 flex items-center justify-between gap-4 transition-colors",
-                        isUser ? "rounded-xl px-3 my-1 border bg-[var(--surface-hover)]" : ""
+                        "rounded-2xl border transition-all overflow-hidden",
+                        isUser ? "bg-[var(--surface-hover)]" : "surface"
                       )}
-                      style={isUser ? { borderColor: "var(--olive)" } : {}}
+                      style={{ borderColor: isUser ? "var(--olive)" : "var(--border-dim)" }}
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-7 font-mono font-bold text-sm text-center" style={{ color: rankColor }}>
-                          #{entry.rank}
-                        </span>
+                      <button
+                        type="button"
+                        onClick={() => !isSprintDuel && toggleParticipantExpanded(participantKey)}
+                        className={cn(
+                          "w-full p-3.5 flex items-center justify-between gap-4 text-left transition-colors",
+                          !isSprintDuel ? "cursor-pointer hover:bg-[var(--surface-hover)]" : "cursor-default"
+                        )}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="w-7 font-mono font-bold text-sm text-center" style={{ color: rankColor }}>
+                            #{entry.rank}
+                          </span>
 
-                        <div className="min-w-0">
-                          <div className="font-bold text-sm flex items-center gap-2 truncate" style={{ color: "var(--text)" }}>
-                            <span className="truncate">{entry.username}</span>
-                            {isUser && (
-                              <span
-                                className="text-[10px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider text-white shrink-0"
-                                style={{ backgroundColor: "var(--terra)" }}
+                          <div className="min-w-0">
+                            <div className="font-bold text-sm flex items-center gap-2 truncate" style={{ color: "var(--text)" }}>
+                              <span className="truncate">{entry.username}</span>
+                              {isUser && (
+                                <span
+                                  className="text-[10px] px-1.5 py-0.2 rounded font-bold uppercase tracking-wider text-white shrink-0"
+                                  style={{ backgroundColor: "var(--terra)" }}
+                                >
+                                  You
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-xs text-[var(--text-dim)]">
+                              {entry.totalCorrect} / {entry.totalQuestions} Correct
+                              {!isSprintDuel && ` · ${entry.daysCompleted} of ${league.durationDays} Days`}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0">
+                          <div className="text-right">
+                            <div className="text-sm font-bold font-mono" style={{ color: "var(--terra)" }}>
+                              {entry.totalPoints} pts
+                            </div>
+                            <div className="text-[11px] text-[var(--text-dim)]">
+                              {Math.round((entry.totalCorrect / (entry.totalQuestions || 1)) * 100)}% accuracy
+                            </div>
+                          </div>
+
+                          {!isSprintDuel && (
+                            <ChevronDown
+                              className={cn(
+                                "w-4 h-4 text-[var(--text-dim)] transition-transform duration-200",
+                                isExpanded ? "rotate-180" : ""
+                              )}
+                            />
+                          )}
+                        </div>
+                      </button>
+
+                      {!isSprintDuel && isExpanded && (
+                        <div
+                          className="border-t px-4 py-3 grid grid-cols-2 sm:grid-cols-4 gap-2"
+                          style={{ borderColor: "var(--border-dim)" }}
+                        >
+                          {Array.from({ length: league.durationDays }, (_, i) => i + 1).map((dayNum) => {
+                            const dayStats = entry.dailyBreakdown?.[dayNum];
+                            return (
+                              <div
+                                key={dayNum}
+                                className="p-2.5 rounded-xl border text-xs surface"
+                                style={{ borderColor: dayStats ? "rgba(68, 78, 44, 0.35)" : "var(--border-dim)" }}
                               >
-                                You
-                              </span>
-                            )}
-                          </div>
-                          <div className="text-xs text-[var(--text-dim)]">
-                            {entry.totalCorrect} / {entry.totalQuestions} Correct
-                            {!isSprintDuel && ` · ${entry.daysCompleted} of ${league.durationDays} Days`}
-                          </div>
+                                <div className="flex items-center justify-between font-mono text-[11px] text-[var(--text-dim)] mb-1">
+                                  <span>Day {dayNum}</span>
+                                  {dayStats && <CheckCircle2 className="w-3 h-3" style={{ color: "var(--olive)" }} />}
+                                </div>
+                                {dayStats ? (
+                                  <div className="flex items-baseline justify-between gap-1">
+                                    <span className="font-bold" style={{ color: "var(--text)" }}>
+                                      {dayStats.score}/{dayStats.totalQuestions || 10}
+                                    </span>
+                                    <span className="font-mono font-bold text-[11px]" style={{ color: "var(--terra)" }}>
+                                      {dayStats.points} pts
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <div className="text-[11px] text-[var(--text-dim)] opacity-60">Pending</div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
-                      </div>
-
-                      <div className="text-right shrink-0">
-                        <div className="text-sm font-bold font-mono" style={{ color: "var(--terra)" }}>
-                          {entry.totalPoints} pts
-                        </div>
-                        <div className="text-[11px] text-[var(--text-dim)]">
-                          {Math.round((entry.totalCorrect / (entry.totalQuestions || 1)) * 100)}% accuracy
-                        </div>
-                      </div>
+                      )}
                     </div>
                   );
                 })}

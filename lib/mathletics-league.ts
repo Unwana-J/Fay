@@ -380,6 +380,8 @@ export function mergeMathleticsLeagueState(
     title: base.title || incoming.title || "Mathletics League",
     creatorName: base.creatorName || incoming.creatorName || "Scholar",
     creatorId: base.creatorId || incoming.creatorId || "creator",
+    startDate: base.startDate || incoming.startDate || todayStr(),
+    endDate: base.endDate || incoming.endDate || todayStr(),
     format,
     durationDays: maxDuration,
     unlockedUpToDay: maxUnlocked,
@@ -708,17 +710,49 @@ export function computeUserMathleticsLeagueSummary(
       (userId && e.userId === userId)
   );
 
-  const todayScoreRows = scores.filter((s) => s.dayNumber === status.dayNumber && keyMatch(s));
+  const myScores = scores.filter(keyMatch);
+  const myCompletedDays = new Set(myScores.map((s) => s.dayNumber));
+
+  let maxScoredDay = 1;
+  for (const s of scores) {
+    if (s.dayNumber > maxScoredDay) maxScoredDay = s.dayNumber;
+  }
+
+  const rawUnlocked = Number(
+    league.unlockedUpToDay || (league.dailySeedMap as any)?._unlockedUpToDay || 1
+  );
+  const isSprint = league.format === "sprint_duel" || league.durationDays === 1;
+  const effectiveUnlocked = isSprint
+    ? 1
+    : league.attemptPolicy === "flexible"
+    ? league.durationDays
+    : league.attemptPolicy === "strict"
+    ? Math.max(rawUnlocked, status.dayNumber, maxScoredDay)
+    : Math.max(rawUnlocked, maxScoredDay);
+
+  let nextPlayableDay: number | null = null;
+  for (let d = 1; d <= Math.min(league.durationDays, effectiveUnlocked); d++) {
+    if (!myCompletedDays.has(d)) {
+      nextPlayableDay = d;
+      break;
+    }
+  }
+
+  const activeTargetDay = nextPlayableDay ?? Math.min(league.durationDays, Math.max(status.dayNumber, maxScoredDay));
+  const todayScoreRows = myScores.filter((s) => s.dayNumber === activeTargetDay);
   const todayScoreRow = todayScoreRows[0] || undefined;
 
-  const hasCompletedToday = Boolean(todayScoreRow);
+  const hasCompletedToday = nextPlayableDay === null;
   const userRank = userLeaderboardEntry?.rank ?? leaderboard.length + 1;
   const userTotalPoints = userLeaderboardEntry?.totalPoints ?? 0;
   const userTotalCorrect = userLeaderboardEntry?.totalCorrect ?? 0;
   const userDaysCompleted = userLeaderboardEntry?.daysCompleted ?? 0;
 
   return {
-    status,
+    status: {
+      ...status,
+      dayNumber: activeTargetDay,
+    },
     scores,
     leaderboard,
     hasCompletedToday,
