@@ -1255,9 +1255,9 @@ export const DIFFICULTY_BONUS_XP: Record<Difficulty, number> = {
 };
 
 export const DIFFICULTY_LABELS: Record<Difficulty, { icon: string; label: string; description: string }> = {
-  Novice:  { icon: "🌱", label: "Novice",  description: "Foundational topics — great for building a broad base" },
-  Scholar: { icon: "📖", label: "Scholar", description: "Intermediate depth — challenges your existing understanding" },
-  Expert:  { icon: "🔥", label: "Expert",  description: "Advanced concepts — for those who want to go deeper" },
+  Novice:  { icon: "I", label: "Novice",  description: "Foundational tenets — ideal for crystal-clear primer articulation" },
+  Scholar: { icon: "II", label: "Scholar", description: "Intermediate depth — challenges nuance and structural explanations" },
+  Expert:  { icon: "III", label: "Master",  description: "Advanced paradigms — rigorous precision under time pressure" },
 };
 
 export function getTopicsByCategory(category: string): Topic[] {

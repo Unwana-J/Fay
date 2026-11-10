@@ -6,6 +6,7 @@ import { X, Check, Compass, Sparkles, Layers, ArrowRight } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { CATEGORY_COLORS, CATEGORY_ICONS, TOPIC_BANK } from "@/lib/topics";
 import FeyLogo from "@/components/ui/FeyLogo";
+import CategoryIcon from "@/components/ui/CategoryIcon";
 
 interface FocusCategoryModalProps {
   isOpen: boolean;
@@ -196,7 +197,15 @@ export default function FocusCategoryModal({
                       }}
                     >
                       <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xl shrink-0">{icon}</span>
+                        <div
+                          className="w-8 h-8 rounded-lg flex items-center justify-center border shrink-0"
+                          style={{
+                            backgroundColor: `${catColor}14`,
+                            borderColor: `${catColor}35`,
+                          }}
+                        >
+                          <CategoryIcon category={cat} size={15} style={{ color: catColor }} />
+                        </div>
                         <div className="min-w-0">
                           <div className="flex items-center gap-1.5">
                             <span

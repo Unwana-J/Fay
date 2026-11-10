@@ -31,6 +31,7 @@
 21. [Articulate Match Ledger: Counting Hours That "Play Again" Used to Erase](#21-articulate-match-ledger-counting-hours-that-play-again-used-to-erase)
 22. [Admin Console Redesign: Server-Signed Sessions, Cross-Game Hours & Unified Scholar Identity](#22-admin-console-redesign-server-signed-sessions-cross-game-hours--unified-scholar-identity)
 23. [Resilient Cross-Device Real-Time Syncing: Dual-Table Database Fallback & Zero-Loss Local Score Auto-Heal (Fixing Mathletics League Score Isolation)](#23-resilient-cross-device-real-time-syncing-dual-table-database-fallback--zero-loss-local-score-auto-heal-fixing-mathletics-league-score-isolation)
+24. [Hard Border Structural System, Maroon Focal Anchor & Academic Serif Hierarchy (Killing Soft AI Template Tropes)](#24-hard-border-structural-system-maroon-focal-anchor--academic-serif-hierarchy-killing-soft-ai-template-tropes)
 
 ---
 
@@ -419,3 +420,58 @@
   3. **Overview & Brand Cleanup (`components/admin/*`)**: Replaced the static PostHog box with live game engagement, Top Scholars, and the 3 newest feedback comments; added sample-size indicators (`n = X`), CSV export, ISO timestamp sorting, and native `<dialog closedby="any">` light-dismiss modals.
 - **"Building in Public" Content Takeaway**:
   > *"Replace vanity placeholders in your admin dashboard with the two things that actually drive community momentum: cumulative hours played per game toward your next public milestone, and a unified leaderboard of the power users carrying your platform."*
+
+---
+
+## 24. Hard Border Structural System, Maroon Focal Anchor & Academic Serif Hierarchy (Killing Soft AI Template Tropes)
+
+- **Date / Phase**: Phase 2 — Editorial UI Integrity & Anti-AI Template Refresh
+- **The Problem / Context**:
+  1. **Fuzzy Soft AI Shadows**: Default LLM generation templates rely excessively on washed-out, low-contrast drop shadows (`shadow-sm`, `shadow-xl`) and invisible hairline boundaries (`rgba(68,78,44,0.08)`). This created floating, unanchored cards that looked AI-generated rather than deliberately crafted.
+  2. **Timid Accent Usage**: The brand's signature maroon (`--terra`, `#7A1C2E`) was being diluted as faint 6% opacity background tints and subtle badges rather than commanding attention as a high-impact action block.
+  3. **Generic Monospaced LLM Micro-Labels**: Uppercase monospaced gray tracker labels (`DAILY DISPATCH - WEDNESDAY, NOVEMBER 4`) screamed default LLM component output.
+  4. **Rigid Card Monotony**: Every single card shared an identical cream background (`#FDFCFA`), uniform padding, and flat hierarchy, making the study dashboard feel like a static list rather than an active, breathing intellectual workspace.
+- **User Insight & Guiding Philosophy**:
+  Fey is a scholarly editorial publication, not a generic SaaS utility. A bespoke study app should feel tactile and printed: sharp, deliberate solid borders, bold focal action points that immediately direct human intent, distinct visual weight for active tasks, and academic serif headers paired with clean sans-serif body text.
+- **Architectural & Product Landing**:
+  1. **Hard Border Structure (`app/globals.css`)**: Replaced fuzzy card shadows with sharp, deliberate 1px and 2px solid structural borders (`rgba(44, 49, 28, 0.26)` and `--border-strong: #2E341E`). Cards now look built with architectural integrity rather than softly rendered.
+  2. **Signature Maroon Anchor Block (`.btn-terra`)**: Hardened `.btn-terra` into a confident, solid wine-red block (`#7A1C2E`) with a tactile 3D bevel bottom border (`#58101E`) and high-contrast white text. Purged faint maroon gradient washes that diluted brand contrast.
+  3. **Elevated Academic Serif Typography**:
+     - Connected Google Font `Lora` directly into Tailwind CSS v4 via `@theme { --font-serif: var(--font-serif), 'Lora', Georgia, serif; }`.
+     - Elevated the main feature heading (`"You started. Don't stop."`) into a commanding editorial serif headline.
+     - Ditched uppercase monospaced gray tracker micro-labels in favor of a clean, high-contrast publication masthead (`Daily Dispatch / Wednesday, November 4`) and dignified section headers across ledgers and quests.
+  4. **Asymmetric Workspace Elevation (`.surface-hero`)**:
+     - Elevated the active primary inquiry card with a bold 4px solid maroon top accent line (`border-top: 4px solid var(--terra)`), crisp `#FFFFFF` workspace surface, and an "Active Articulation Workspace" structural eyebrow bar.
+     - Subordinated secondary cards (Daily Vows, Feynman Ritual, Consistency Ledger) with distinct warm tints (`bg-[var(--bg-panel)]/35`) and varied internal padding (`p-5` vs `p-7`), breaking rigid symmetry and giving the page a natural, dynamic visual rhythm.
+  5. **Purging the "Claude Beige" Canvas & Universal Emoji Eradication**:
+     - **Canvas Tone Shift**: Replaced Claude's ubiquitous `#F4EFE6` peach-beige with an authentic archival chalk canvas (`--bg-base: #F7F5F0`, `--text: #16190D`), layered with an ultra-faint physical paper micro-stipple overlay (`body::before`) that feels like heavy letterpress book stock rather than flat digital hex.
+     - **Total Emoji Purge**: Eradicated all system emojis (`🤖`, `🔥`, `🛡️`, `📜`, `🎮`, `🎤`, `🎭`, `🇳🇬`, `📐`, `🎙️`, `🌌`, `🎯`, `🌱`) from the interface in favor of bespoke 1.5px vector line icons (`CategoryIcon.tsx`, Lucide) and Roman numeral study tiers (`I · Novice`, `II · Scholar`, `III · Master`).
+- **"Building in Public" Content Takeaway**:
+  > *"Every AI-generated app defaults to the same flat Claude beige and sprinkles emojis across every button. Shifting to an archival chalk canvas with tactile micro-grain and replacing emojis with razor-sharp vector line art is the single fastest way to take your product from 'LLM prototype' to bespoke editorial software."*
+
+---
+
+## 25. Desktop Companion as a Technical PM Scribe: Mid-Meeting Side-Notes, Active Document Insertion & Task Tracker Templates
+
+- **Date / Phase**: Phase 2 — Desktop Companion (Ollie Native Architecture)
+- **The Problem / Context**:
+  1. **Binary Meeting Mode**: Previously, clicking or talking to Ollie during a live meeting abruptly aborted the meeting, stopped audio capture, and generated early notes. A Product Manager in an ongoing sprint planning or architectural review could not capture technical debt or assign action items in real time without destroying the active recording.
+  2. **Unsolicited Screen Vision & Drafting**: Automatic screenshotting on every ambient audio trigger caused false ticket drafting into random windows when the PM was merely typing or conversing.
+  3. **Rigid Single-Artifact Assumption**: AI desktop assistants typically assume all PM work is Jira ticket creation. In reality, PMs maintain custom task trackers (in Superhuman, Obsidian, Notion, Google Docs) and need formatted tech-debt bullets (`Component`, `Impact`, `Remediation`) inserted directly at their active cursor position.
+- **User Insight & Guiding Philosophy**:
+  A true executive assistant doesn't force you to choose between continuous meeting transcription and capturing mid-meeting epiphanies. When a technical debt item or critical bug is spotted mid-call, a PM should be able to tap their desktop companion, dictate the note, see it formatted and pasted directly into their open Superhuman draft or Obsidian ledger, and have the companion seamlessly resume meeting transcription in the background.
+- **Architectural & Product Landing**:
+  1. **Dual-Recorder Architecture & Mid-Meeting State Machine (`macos-overlay.m`)**:
+     - Separated continuous background meeting capture (`meetingRecorder`) from conversational interaction capture (`recorder`).
+     - Tapping Ollie mid-meeting triggers `isMidMeetingSideNote`, cleanly pausing `meetingRecorder` without terminating the session or resetting the audio buffer.
+     - Once the user's side-note is transcribed, synthesized, pasted via native Quartz HID events into the frontmost document, and verbally confirmed, `onFinishedSpeakingTurn` automatically calls `[meetingRecorder record]` and restores the visual meeting state (`🫒📝`).
+  2. **PM Technical Scribe Intelligence (`sysPrompt`)**:
+     - Added specialized structured synthesis for **Technical Debt** (`[Tech Debt] **Title**: Flaw | **Impact**: Risk | **Remediation**: Fix`), **Action Items** (`[Action Item] **Owner**: Task (Due: Date)`), and **Decisions**.
+     - Injected a customizable `~/Documents/Ollie Templates/task-tracker-format.md` template into the LLM context alongside the Jira ticket template.
+     - Added explicit negative constraints prohibiting unsolicited ticket drafting unless explicitly commanded.
+  3. **Strict Tap-to-Talk Default & Privacy Boundary**:
+     - Microphone is completely halted and closed by default in idle mode (`handsFreeWakeEnabled = NO`), eliminating phantom audio triggers and orange mic indicators.
+     - Hands-free wake is strictly opt-in with a recalibrated close-proximity vocal threshold (`-28 dB`).
+- **"Building in Public" Content Takeaway**:
+  > *"Desktop AI assistants fail when they treat meetings as a monolith. Real product managers need mid-meeting side-channel logging: pause continuous recording, synthesize a structured technical debt bullet into your active Superhuman draft, and resume listening to the call without dropping a single beat."*
+

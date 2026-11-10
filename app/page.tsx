@@ -1,13 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
   Zap, BookOpen, Mic, ArrowRight,
   Star, Shuffle, Sparkles, Compass,
-  Gamepad2, ChevronRight,
+  Gamepad2, ChevronRight, Flame, ShieldCheck,
+  Target, Presentation, MessageSquareQuote, Trophy,
+  Calculator, ScrollText, CheckCircle2, Radio,
 } from "lucide-react";
+import CategoryIcon from "@/components/ui/CategoryIcon";
 import { useAppStore } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress, getNextLevel, ACHIEVEMENTS } from "@/lib/achievements";
 import { CATEGORY_COLORS, CATEGORY_ICONS, TOPIC_BANK, DIFFICULTY_LABELS, DIFFICULTY_XP, DIFFICULTY_BONUS_XP, type Difficulty } from "@/lib/topics";
@@ -16,6 +19,7 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import FeyLogo from "@/components/ui/FeyLogo";
 import FocusCategoryModal from "@/components/dashboard/FocusCategoryModal";
+import StreakCalendarModal from "@/components/ui/StreakCalendarModal";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { getDailyQuests } from "@/lib/quests";
 import { analytics } from "@/lib/analytics";
@@ -221,6 +225,7 @@ export default function Dashboard() {
     isOnboarded,
     pendingTopic,
     setPendingTopic,
+    buyStreakShield,
   } = useAppStore();
   const difficultyMode: Difficulty = (settings.difficultyMode as Difficulty) ?? "Scholar";
   const level     = getLevelForXP(profile.xp);
@@ -228,12 +233,18 @@ export default function Dashboard() {
   const progress  = getLevelProgress(profile.xp);
   const [mounted, setMounted] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [showStreakModal, setShowStreakModal] = useState(false);
   const [skippedToday, setSkippedToday] = useState<string[]>([]);
   const [spinning, setSpinning] = useState(false);
   const [focusCategory, setFocusCategory] = useState<string | null>(null);
   const [showFocusModal, setShowFocusModal] = useState(false);
   const [spinOffset, setSpinOffset] = useState(0);
   const [activeTab, setActiveTab] = useState<"practice" | "parlor">("practice");
+
+  const activityDates = useMemo(
+    () => new Set(sessions.map((s) => s.date.slice(0, 10))),
+    [sessions]
+  );
 
   const { features, fetchFeatures } = useFeatureStore();
 
@@ -412,38 +423,37 @@ export default function Dashboard() {
         {enablePodium && (
           <Link href="/podium" className="group">
             <motion.div
-              whileHover={{ y: -4, scale: 1.015 }}
+              whileHover={{ y: -3 }}
               whileTap={{ scale: 0.985 }}
               transition={{ type: "spring", stiffness: 420, damping: 26 }}
-              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              className="p-4 rounded-2xl border-[1.5px] h-full flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden bg-[var(--bg-card)] hover:border-[var(--gold)]"
               style={{
-                background: "linear-gradient(135deg, rgba(166, 124, 30, 0.14) 0%, rgba(166, 124, 30, 0.04) 50%, var(--bg-card) 100%)",
-                borderColor: "rgba(166, 124, 30, 0.3)",
+                borderColor: "var(--border)",
               }}
             >
-              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                🎤
+              <div className="absolute -right-3 -bottom-3 text-[var(--gold)] opacity-5 select-none group-hover:scale-110 transition-transform pointer-events-none">
+                <Presentation size={72} strokeWidth={1} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
-                    style={{ background: "rgba(166, 124, 30, 0.2)", borderColor: "rgba(166, 124, 30, 0.4)" }}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border-[1.5px]"
+                    style={{ background: "rgba(166, 124, 30, 0.12)", borderColor: "var(--gold)" }}
                   >
-                    🎤
+                    <Presentation size={18} className="text-[var(--gold)]" />
                   </div>
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--gold)] shadow-xs">
-                    ★ Party Slides
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white bg-[var(--gold)]">
+                    Party Slides
                   </span>
                 </div>
-                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--gold)] transition-colors" style={{ color: "var(--text)" }}>
+                <h4 className="font-serif font-bold text-sm mb-1 group-hover:text-[var(--gold)] transition-colors" style={{ color: "var(--text)" }}>
                   The Podium
                 </h4>
                 <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
                   Spin a spicy topic, jot your angle & let Fay-re build your slide deck.
                 </p>
               </div>
-              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--gold)]" style={{ borderColor: "rgba(166, 124, 30, 0.2)" }}>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-semibold text-[var(--gold)]" style={{ borderColor: "var(--border-dim)" }}>
                 <span>Present Deck</span>
                 <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
                   Start <ChevronRight size={12} />
@@ -457,38 +467,37 @@ export default function Dashboard() {
         {enableArticulate && (
           <Link href="/play" className="group">
             <motion.div
-              whileHover={{ y: -4, scale: 1.015 }}
+              whileHover={{ y: -3 }}
               whileTap={{ scale: 0.985 }}
               transition={{ type: "spring", stiffness: 420, damping: 26 }}
-              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              className="p-4 rounded-2xl border-[1.5px] h-full flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden bg-[var(--bg-card)] hover:border-[var(--terra)]"
               style={{
-                background: "linear-gradient(135deg, rgba(122, 28, 46, 0.14) 0%, rgba(122, 28, 46, 0.04) 50%, var(--bg-card) 100%)",
-                borderColor: "rgba(122, 28, 46, 0.3)",
+                borderColor: "var(--border)",
               }}
             >
-              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                🎭
+              <div className="absolute -right-3 -bottom-3 text-[var(--terra)] opacity-5 select-none group-hover:scale-110 transition-transform pointer-events-none">
+                <MessageSquareQuote size={72} strokeWidth={1} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
-                    style={{ background: "rgba(122, 28, 46, 0.2)", borderColor: "rgba(122, 28, 46, 0.4)" }}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border-[1.5px]"
+                    style={{ background: "rgba(122, 28, 46, 0.12)", borderColor: "var(--terra)" }}
                   >
-                    🎭
+                    <MessageSquareQuote size={18} className="text-[var(--terra)]" />
                   </div>
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--terra)] shadow-xs">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white bg-[var(--terra)]">
                     Multiplayer
                   </span>
                 </div>
-                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--terra)] transition-colors" style={{ color: "var(--text)" }}>
+                <h4 className="font-serif font-bold text-sm mb-1 group-hover:text-[var(--terra)] transition-colors" style={{ color: "var(--text)" }}>
                   Online Articulate
                 </h4>
                 <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
                   Fast-paced word describing game with speech recognition & AI referee.
                 </p>
               </div>
-              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--terra)]" style={{ borderColor: "rgba(122, 28, 46, 0.2)" }}>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-semibold text-[var(--terra)]" style={{ borderColor: "var(--border-dim)" }}>
                 <span>House Party</span>
                 <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
                   Play Room <ChevronRight size={12} />
@@ -502,38 +511,37 @@ export default function Dashboard() {
         {enableTrivia && (
           <Link href="/games/trivia" className="group">
             <motion.div
-              whileHover={{ y: -4, scale: 1.015 }}
+              whileHover={{ y: -3 }}
               whileTap={{ scale: 0.985 }}
               transition={{ type: "spring", stiffness: 420, damping: 26 }}
-              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              className="p-4 rounded-2xl border-[1.5px] h-full flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden bg-[var(--bg-card)] hover:border-[var(--olive)]"
               style={{
-                background: "linear-gradient(135deg, rgba(68, 78, 44, 0.14) 0%, rgba(68, 78, 44, 0.04) 50%, var(--bg-card) 100%)",
-                borderColor: "rgba(68, 78, 44, 0.3)",
+                borderColor: "var(--border)",
               }}
             >
-              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                🇳🇬
+              <div className="absolute -right-3 -bottom-3 text-[var(--olive)] opacity-5 select-none group-hover:scale-110 transition-transform pointer-events-none">
+                <Trophy size={72} strokeWidth={1} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
-                    style={{ background: "rgba(68, 78, 44, 0.2)", borderColor: "rgba(68, 78, 44, 0.4)" }}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border-[1.5px]"
+                    style={{ background: "rgba(68, 78, 44, 0.12)", borderColor: "var(--olive)" }}
                   >
-                    🇳🇬
+                    <Trophy size={18} className="text-[var(--olive)]" />
                   </div>
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-[var(--olive)] shadow-xs">
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white bg-[var(--olive)]">
                     Trivia Arcade
                   </span>
                 </div>
-                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-[var(--olive)] transition-colors" style={{ color: "var(--text)" }}>
+                <h4 className="font-serif font-bold text-sm mb-1 group-hover:text-[var(--olive)] transition-colors" style={{ color: "var(--text)" }}>
                   Naija Trivia
                 </h4>
                 <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
                   Test your mastery of Nigerian history, culture & general knowledge.
                 </p>
               </div>
-              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-[var(--olive)]" style={{ borderColor: "rgba(68, 78, 44, 0.2)" }}>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-semibold text-[var(--olive)]" style={{ borderColor: "var(--border-dim)" }}>
                 <span>Speed Quiz</span>
                 <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
                   Challenge <ChevronRight size={12} />
@@ -547,38 +555,37 @@ export default function Dashboard() {
         {enableMathletics && (
           <Link href="/games/mathletics" className="group">
             <motion.div
-              whileHover={{ y: -4, scale: 1.015 }}
+              whileHover={{ y: -3 }}
               whileTap={{ scale: 0.985 }}
               transition={{ type: "spring", stiffness: 420, damping: 26 }}
-              className="p-4 rounded-2xl border h-full flex flex-col justify-between transition-all hover:shadow-xl cursor-pointer relative overflow-hidden"
+              className="p-4 rounded-2xl border-[1.5px] h-full flex flex-col justify-between transition-all cursor-pointer relative overflow-hidden bg-[var(--bg-card)] hover:border-emerald-700"
               style={{
-                background: "linear-gradient(135deg, rgba(45, 106, 79, 0.14) 0%, rgba(45, 106, 79, 0.04) 50%, var(--bg-card) 100%)",
-                borderColor: "rgba(45, 106, 79, 0.3)",
+                borderColor: "var(--border)",
               }}
             >
-              <div className="absolute -right-4 -bottom-4 text-5xl opacity-10 select-none group-hover:scale-125 transition-transform">
-                📐
+              <div className="absolute -right-3 -bottom-3 text-emerald-700 opacity-5 select-none group-hover:scale-110 transition-transform pointer-events-none">
+                <Calculator size={72} strokeWidth={1} />
               </div>
               <div>
                 <div className="flex items-center justify-between mb-2.5">
                   <div
-                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border shadow-xs"
-                    style={{ background: "rgba(45, 106, 79, 0.2)", borderColor: "rgba(45, 106, 79, 0.4)" }}
+                    className="w-9 h-9 rounded-xl flex items-center justify-center text-lg border-[1.5px]"
+                    style={{ background: "rgba(45, 106, 79, 0.12)", borderColor: "rgb(45, 106, 79)" }}
                   >
-                    📐
+                    <Calculator size={18} className="text-emerald-700" />
                   </div>
-                  <span className="text-[9px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-full text-white bg-emerald-700 shadow-xs">
-                    ★ Speed Run
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-md text-white bg-emerald-700">
+                    Speed Run
                   </span>
                 </div>
-                <h4 className="font-space font-bold text-sm mb-1 group-hover:text-emerald-700 transition-colors" style={{ color: "var(--text)" }}>
+                <h4 className="font-serif font-bold text-sm mb-1 group-hover:text-emerald-700 transition-colors" style={{ color: "var(--text)" }}>
                   Mathletics
                 </h4>
                 <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
                   25s rapid mental calculation, algebra, and geometry speed duels.
                 </p>
               </div>
-              <div className="pt-2 border-t flex items-center justify-between text-xs font-mono font-bold text-emerald-700" style={{ borderColor: "rgba(45, 106, 79, 0.2)" }}>
+              <div className="pt-2 border-t flex items-center justify-between text-xs font-semibold text-emerald-700" style={{ borderColor: "var(--border-dim)" }}>
                 <span>Speed Arena</span>
                 <span className="flex items-center gap-0.5 group-hover:translate-x-1 transition-transform">
                   Duel <ChevronRight size={12} />
@@ -598,117 +605,121 @@ export default function Dashboard() {
       animate="visible"
       className="min-h-screen p-4 sm:p-8 max-w-5xl mx-auto"
     >
-      {/* ── Editorial Folio Header ── */}
-      <motion.div variants={cardVariants} className="mb-6">
-        {/* Folio top dateline */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b pb-2.5 mb-4 gap-2" style={{ borderColor: "var(--border-dim)" }}>
-          <div className="flex items-center gap-2 font-mono text-[10px] uppercase tracking-[0.16em]" style={{ color: "var(--text-mute)" }}>
-            <span>Daily Dispatch</span>
-            <span>·</span>
-            <span>{new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}</span>
+      {/* ── Editorial Folio Header (Unified Typographic Lockup — Responsive Mobile First) ── */}
+      <motion.div variants={cardVariants} className="mb-6 sm:mb-7">
+        <div className="flex flex-col gap-3 sm:gap-4">
+          {/* Top metadata line: Date on left, Scholar status on right */}
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <p className="text-xs font-medium text-[var(--text-dim)] tracking-tight">
+              {new Date().toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+            </p>
+
+            {/* Compact Scholar Status Pill Lockup (Clickable -> Opens Streak Calendar Modal) */}
+            <button
+              type="button"
+              onClick={() => setShowStreakModal(true)}
+              title="View Streak Calendar & Scholar's Seals"
+              aria-label="View streak details and calendar"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:border-[var(--olive)] hover:bg-[var(--bg-panel)] transition-all cursor-pointer active:scale-[0.98] group select-none text-left"
+            >
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--olive)] group-hover:scale-125 transition-transform" />
+              <div className="text-xs font-medium">
+                <span className="font-semibold text-[var(--text)]">{profile.username}</span>
+                <span className="text-[var(--text-mute)] mx-1">·</span>
+                <span className="text-[var(--olive)] font-semibold">{level.title}</span>
+              </div>
+              <span className="text-[var(--border)] font-bold">·</span>
+              <span className="inline-flex items-center gap-1 font-bold text-xs text-[var(--terra)]">
+                <Flame size={12} className="text-[var(--terra)] fill-[var(--terra)] shrink-0 transition-transform group-hover:scale-110" />
+                <span>{streak.current}d</span>
+                {(streak.shields ?? 0) > 0 && (
+                  <span className="inline-flex items-center gap-0.5 text-[var(--olive)]" title={`${streak.shields} Scholar's Seal active`}>
+                    <ShieldCheck size={12} className="text-[var(--olive)]" />
+                    <span className="text-[10px] font-mono">{streak.shields}</span>
+                  </span>
+                )}
+              </span>
+            </button>
           </div>
 
-          <div className="hidden sm:flex items-center gap-2 font-mono text-[11px]" style={{ color: "var(--text-mute)" }}>
-            <span>Scholar {profile.username}</span>
-            <span>·</span>
-            <span style={{ color: "var(--olive)" }}>{level.title}</span>
-            <span>·</span>
-            <span className="flex items-center gap-1 font-semibold" style={{ color: "var(--terra)" }}>
-              <span>🔥 {streak.current}d</span>
-              {(streak.shields ?? 0) > 0 && (
-                <span className="select-none" title={`${streak.shields} Scholar's Seal active`}>🛡️</span>
-              )}
-            </span>
-          </div>
-        </div>
-
-        {/* Lead title & Integrated Epigraph */}
-        <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+          {/* Lead Headline & Literary Epigraph */}
           <div>
             <h1
-              className="font-serif font-bold leading-tight tracking-tight"
-              style={{ fontSize: "clamp(1.9rem, 3.2vw, 2.5rem)", color: "var(--text)" }}
+              className="font-serif font-bold leading-tight tracking-tight text-[var(--text)]"
+              style={{
+                fontSize: "clamp(1.85rem, 4vw, 2.75rem)",
+                fontFamily: "var(--font-serif), 'Lora', Georgia, serif",
+              }}
             >
               {streakMessage(streak.current, todayIndex)}
             </h1>
             
-            {/* Literary Epigraph (no awkward floating quote box!) */}
-            <div
-              className="mt-2.5 pl-3.5 border-l-2 text-sm font-serif italic max-w-2xl leading-relaxed"
-              style={{
-                borderColor: "rgba(122, 28, 46, 0.4)",
-                color: "var(--text-dim)",
-              }}
+            {/* Literary Epigraph */}
+            <p
+              className="mt-2 text-sm sm:text-base italic max-w-2xl leading-relaxed text-[var(--text-dim)]"
+              style={{ fontFamily: "var(--font-serif), 'Lora', Georgia, serif" }}
             >
-              &ldquo;{dailyQuote.quote}&rdquo;
-              <span className="ml-2 not-italic font-sans text-[10px] uppercase font-bold tracking-wider" style={{ color: "var(--text-mute)" }}>
+              &ldquo;{dailyQuote.quote}&rdquo;{" "}
+              <span className="not-italic font-sans text-xs font-bold text-[var(--text-mute)]">
                 — {dailyQuote.author}
               </span>
-            </div>
+            </p>
           </div>
         </div>
       </motion.div>
 
-      {/* ── Day 0 Welcome Orientation Banner (Crisp, Warm & Animated) ── */}
+      {/* ── Day 0 Welcome Orientation Banner (Bespoke Scholar Induction) ── */}
       {sessions.length === 0 && (
         <motion.div
           variants={cardVariants}
-          className="surface rounded-2xl p-5 sm:p-6 mb-6 border relative overflow-hidden group"
+          className="rounded-2xl p-5 sm:p-6 mb-6 border-[1.5px] bg-[var(--bg-card)] relative overflow-hidden"
           style={{
-            borderColor: "rgba(68, 78, 44, 0.35)",
-            background: "linear-gradient(135deg, rgba(68, 78, 44, 0.1) 0%, rgba(166, 124, 30, 0.05) 50%, var(--bg-card) 100%)",
-            boxShadow: "0 8px 24px -4px rgba(68, 78, 44, 0.08)",
+            borderColor: "var(--border)",
           }}
         >
-          {/* Subtle atmospheric ambient glow */}
-          <div
-            className="absolute -top-16 -right-16 w-44 h-44 rounded-full blur-3xl pointer-events-none opacity-20"
-            style={{ background: "var(--gold)" }}
-          />
           <div className="flex items-start gap-4 relative z-10">
-            <motion.div
-              animate={{ rotate: [0, 6, -6, 0] }}
-              transition={{ repeat: Infinity, duration: 6, ease: "easeInOut" }}
-              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border mt-0.5 shadow-xs"
+            <div
+              className="w-11 h-11 rounded-xl flex items-center justify-center shrink-0 border-[1.5px] mt-0.5"
               style={{
-                background: "linear-gradient(135deg, rgba(68, 78, 44, 0.2) 0%, rgba(166, 124, 30, 0.18) 100%)",
-                borderColor: "rgba(68, 78, 44, 0.35)",
+                background: "var(--bg-panel)",
+                borderColor: "var(--border)",
+                color: "var(--terra)",
               }}
             >
-              <Sparkles size={20} className="text-[var(--gold)]" />
-            </motion.div>
+              <FeyLogo size={22} />
+            </div>
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1.5 flex-wrap">
-                <span className="font-mono text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-md bg-[var(--olive)]/12 text-[var(--olive)] border border-[var(--olive)]/20">
-                  First Sprint Orientation
-                </span>
-                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--bg-input)] font-medium" style={{ color: "var(--text-mute)" }}>
-                  Day 0 Scholar
-                </span>
+              <div className="flex items-center gap-2 mb-1 text-xs font-semibold text-[var(--olive)]">
+                <span>Scholar Induction</span>
+                <span className="text-[var(--border)] font-bold">·</span>
+                <span className="font-medium text-[var(--text-dim)]">First Vocal Sprint</span>
               </div>
-              <h2 className="font-serif font-bold text-xl sm:text-2xl mb-1.5 tracking-tight" style={{ color: "var(--text)" }}>
+              <h2
+                className="font-serif font-bold text-xl sm:text-2xl mb-1.5 tracking-tight text-[var(--text)]"
+                style={{ fontFamily: "var(--font-serif), 'Lora', Georgia, serif" }}
+              >
                 Welcome, {profile.username || "Scholar"}!
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed max-w-2xl text-[var(--text-dim)]">
-                Ready to find your voice? Pick today&apos;s topic and explain it in your own words.
+                Fey is designed to prove true understanding through voice. Select today&apos;s inquiry below, sketch your tenets in 15 minutes, and articulate them simply under 90 seconds.
               </p>
             </div>
           </div>
         </motion.div>
       )}
 
-      {/* ── Dashboard Tab Bar (High-Taste Animated Segmented Control) ── */}
+      {/* ── Dashboard Tab Bar (Crisp Solid Border Segmented Control) ── */}
       <motion.div variants={cardVariants} className="mb-6">
         <div
-          className="relative flex p-1.5 rounded-2xl border bg-[var(--bg-input)]/70 gap-2 shadow-inner backdrop-blur-xs"
-          style={{ borderColor: "var(--border-dim)" }}
+          className="relative flex p-1.5 rounded-2xl border-[1.5px] bg-[var(--bg-input)]/60 gap-2"
+          style={{ borderColor: "var(--border)" }}
         >
           {/* Tab 1: Daily Practice & Study */}
           <button
             type="button"
             onClick={() => setActiveTab("practice")}
             className={cn(
-              "relative flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer select-none z-10",
+              "relative flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer select-none z-10",
               activeTab === "practice"
                 ? "text-[var(--text)] font-bold"
                 : "text-[var(--text-mute)] hover:text-[var(--text)]"
@@ -717,24 +728,23 @@ export default function Dashboard() {
             {activeTab === "practice" && (
               <motion.div
                 layoutId="active-dashboard-tab"
-                className="absolute inset-0 rounded-xl shadow-md border"
+                className="absolute inset-0 rounded-xl border-[1.5px]"
                 style={{
-                  background: "linear-gradient(135deg, rgba(122, 28, 46, 0.08) 0%, var(--bg-card) 100%)",
-                  borderColor: "rgba(122, 28, 46, 0.35)",
-                  boxShadow: "0 4px 16px -2px rgba(122, 28, 46, 0.12), 0 2px 6px -1px rgba(0, 0, 0, 0.05)",
+                  background: "var(--bg-card)",
+                  borderColor: "var(--border)",
                 }}
                 transition={{ type: "spring", stiffness: 480, damping: 36 }}
               />
             )}
-            <span className="relative z-10 flex items-center gap-2">
+            <span className="relative z-10 flex items-center gap-1.5 sm:gap-2">
               <BookOpen
                 size={16}
                 className={cn(
-                  "transition-transform duration-200",
+                  "transition-transform duration-200 shrink-0",
                   activeTab === "practice" ? "text-[var(--terra)] scale-110" : "opacity-60"
                 )}
               />
-              <span>Daily Practice & Study</span>
+              <span>Daily Practice<span className="hidden sm:inline"> & Study</span></span>
             </span>
           </button>
 
@@ -743,7 +753,7 @@ export default function Dashboard() {
             type="button"
             onClick={() => setActiveTab("parlor")}
             className={cn(
-              "relative flex-1 py-3 px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-2 cursor-pointer select-none z-10",
+              "relative flex-1 py-2.5 sm:py-3 px-3 sm:px-4 rounded-xl text-xs sm:text-sm font-semibold transition-colors flex items-center justify-center gap-1.5 sm:gap-2 cursor-pointer select-none z-10",
               activeTab === "parlor"
                 ? "text-[var(--text)] font-bold"
                 : "text-[var(--text-mute)] hover:text-[var(--text)]"
@@ -752,24 +762,23 @@ export default function Dashboard() {
             {activeTab === "parlor" && (
               <motion.div
                 layoutId="active-dashboard-tab"
-                className="absolute inset-0 rounded-xl shadow-md border"
+                className="absolute inset-0 rounded-xl border-[1.5px]"
                 style={{
-                  background: "linear-gradient(135deg, rgba(166, 124, 30, 0.09) 0%, var(--bg-card) 100%)",
-                  borderColor: "rgba(166, 124, 30, 0.4)",
-                  boxShadow: "0 4px 16px -2px rgba(166, 124, 30, 0.15), 0 2px 6px -1px rgba(0, 0, 0, 0.05)",
+                  background: "var(--bg-card)",
+                  borderColor: "var(--border)",
                 }}
                 transition={{ type: "spring", stiffness: 480, damping: 36 }}
               />
             )}
-            <span className="relative z-10 flex items-center gap-2">
+            <span className="relative z-10 flex items-center gap-1.5 sm:gap-2">
               <Gamepad2
                 size={16}
                 className={cn(
-                  "transition-transform duration-200",
+                  "transition-transform duration-200 shrink-0",
                   activeTab === "parlor" ? "text-[var(--gold)] scale-110" : "opacity-60"
                 )}
               />
-              <span>The Parlor & Games</span>
+              <span>The Parlor<span className="hidden sm:inline"> & Games</span></span>
             </span>
           </button>
         </div>
@@ -792,7 +801,9 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between mb-5 flex-wrap gap-2">
               <div className="flex items-center gap-3">
-                <span className="text-2xl select-none">🎮</span>
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center border border-[var(--border)] bg-[var(--bg-input)]/50 shrink-0">
+                  <Gamepad2 size={18} className="text-[var(--gold)]" />
+                </div>
                 <div>
                   <h3 className="font-serif font-bold text-lg sm:text-xl" style={{ color: "var(--text)" }}>
                     The Scholar&apos;s Parlor
@@ -823,64 +834,90 @@ export default function Dashboard() {
           animate="visible"
           exit="exit"
         >
-          {/* ── The Centerpiece: Today's Feynman Inquiry ── */}
+          {/* ── The Centerpiece: Today's Feynman Inquiry (High-Impact Active Workspace) ── */}
           <motion.div
             variants={cardVariants}
-            className="surface rounded-2xl p-7 md:p-8 mb-6 border relative overflow-hidden"
-            style={{ borderColor: "var(--border)" }}
+            className="surface-hero rounded-2xl p-5 sm:p-8 md:p-9 mb-6 relative overflow-hidden"
           >
         {activeSession ? (
           /* Resume in-progress session */
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div>
-              <div className="text-olive mb-2 text-label">Session in progress</div>
-              <p
-                className="font-serif font-bold text-2xl"
-                style={{ color: "var(--text)", lineHeight: 1.3, maxWidth: "52ch" }}
-              >
-                {activeSession.topic.text}
-              </p>
-              <div className="flex items-center gap-2 mt-3">
-                <span className="tag tag-terra capitalize">{activeSession.stage}</span>
-                <span
-                  className="tag font-bold"
-                  style={{
-                    backgroundColor: `${catColor}15`,
-                    color: catColor,
-                    border: `1px solid ${catColor}30`,
-                  }}
-                >
-                  {CATEGORY_ICONS[heroCat]} {heroCat}
+          <div>
+            <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[var(--terra)] animate-pulse" />
+                <span className="text-xs font-bold tracking-wider uppercase text-[var(--terra)] font-mono">
+                  Active Session in Progress
                 </span>
               </div>
+              <span className="text-xs font-medium text-[var(--text-mute)]">
+                Pick up where you left off
+              </span>
             </div>
-            <Link href={`/session/${activeSession.id}`}>
-              <button className="btn-terra whitespace-nowrap">
-                Resume Session <ArrowRight size={15} />
-              </button>
-            </Link>
+            <div className="flex items-center justify-between flex-wrap gap-4">
+              <div>
+                <p
+                  className="font-serif font-bold text-2xl sm:text-3xl"
+                  style={{ color: "var(--text)", lineHeight: 1.25, maxWidth: "52ch", fontFamily: "var(--font-serif), 'Lora', Georgia, serif" }}
+                >
+                  {activeSession.topic.text}
+                </p>
+                <div className="flex items-center gap-2 mt-3.5">
+                  <span className="tag tag-terra capitalize font-bold">{activeSession.stage}</span>
+                  <span
+                    className="tag font-bold inline-flex items-center gap-1.5"
+                    style={{
+                      backgroundColor: `${catColor}15`,
+                      color: catColor,
+                      border: `1px solid ${catColor}35`,
+                    }}
+                  >
+                    <CategoryIcon category={heroCat} size={13} />
+                    <span>{heroCat}</span>
+                  </span>
+                </div>
+              </div>
+              <Link href={`/session/${activeSession.id}`}>
+                <button className="btn-terra whitespace-nowrap text-sm sm:text-base px-6 py-3.5 shadow-none">
+                  Resume Session <ArrowRight size={16} />
+                </button>
+              </Link>
+            </div>
           </div>
         ) : (
           /* Suggested topic */
           <div>
+            {/* Active Workspace Structural Header */}
+            <div className="flex items-center justify-between gap-3 mb-4 pb-3 border-b" style={{ borderColor: "var(--border-dim)" }}>
+              <div className="flex items-center gap-2">
+                <span className="w-2.5 h-2.5 rounded-full bg-[var(--terra)]" />
+                <span className="text-xs font-bold tracking-wider uppercase text-[var(--terra)] font-mono">
+                  Active Articulation Workspace
+                </span>
+              </div>
+              <div className="text-xs font-medium text-[var(--text-mute)] hidden sm:block">
+                15m Research · 90s Vocal Articulation
+              </div>
+            </div>
+
             {/* Metadata and Unified Focus Trigger */}
-            <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+            <div className="flex items-center justify-between gap-3 mb-4 flex-wrap">
               <div className="flex items-center gap-2 flex-wrap">
                 <span
-                  className="tag font-bold font-mono text-[11px]"
+                  className="tag font-bold font-mono text-xs px-2.5 py-1 inline-flex items-center gap-1.5"
                   style={{
                     backgroundColor: `${catColor}15`,
                     color: catColor,
-                    border: `1px solid ${catColor}30`,
+                    border: `1px solid ${catColor}35`,
                   }}
                 >
-                  {CATEGORY_ICONS[heroCat]} {heroCat}
+                  <CategoryIcon category={heroCat} size={13} />
+                  <span>{heroCat}</span>
                 </span>
-                <span className="tag tag-olive font-mono text-[11px]">
-                  {DIFFICULTY_LABELS[suggestedTopic.difficulty as Difficulty]?.icon ?? "📖"}{" "}
+                <span className="tag tag-olive font-mono text-xs px-2.5 py-1">
+                  {DIFFICULTY_LABELS[suggestedTopic.difficulty as Difficulty]?.icon ?? "I"}{" "}
                   {suggestedTopic.difficulty}
                 </span>
-                <span className="tag tag-gold font-mono text-[11px]">
+                <span className="tag tag-gold font-mono text-xs px-2.5 py-1">
                   +{DIFFICULTY_XP[suggestedTopic.difficulty as Difficulty] ?? 150} XP
                   {DIFFICULTY_BONUS_XP[suggestedTopic.difficulty as Difficulty] > 0 && (
                     <span className="ml-1 opacity-70">
@@ -895,9 +932,9 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setShowFocusModal(true)}
-                  className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-mono transition-all surface hover:border-[var(--olive-br)] hover:bg-[var(--bg-input)]/50 cursor-pointer"
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono transition-all surface hover:border-[var(--olive-br)] hover:bg-[var(--bg-input)]/50 cursor-pointer border"
                   style={{
-                    borderColor: focusCategory ? catColor : "var(--border-dim)",
+                    borderColor: focusCategory ? catColor : "var(--border)",
                     backgroundColor: focusCategory ? `${catColor}12` : undefined,
                   }}
                   title="Select or focus specific categories"
@@ -913,7 +950,7 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => handleSelectFocus(null)}
-                    className="text-[11px] font-mono text-[var(--text-mute)] hover:text-[var(--terra)] transition-colors px-1"
+                    className="text-xs font-mono text-[var(--text-mute)] hover:text-[var(--terra)] transition-colors px-1"
                     title="Reset focus to all categories"
                   >
                     ✕
@@ -925,19 +962,21 @@ export default function Dashboard() {
             {/* Accepted Challenge Banner from Landing Page */}
             {pendingTopic && suggestedTopic.id === pendingTopic.id && (
               <div
-                className="mb-4 p-3.5 rounded-2xl border flex items-center justify-between gap-3 flex-wrap"
+                className="mb-4 p-3.5 rounded-2xl border-[1.5px] flex items-center justify-between gap-3 flex-wrap"
                 style={{
-                  background: "rgba(122, 28, 46, 0.06)",
+                  background: "rgba(122, 28, 46, 0.05)",
                   borderColor: "var(--terra)",
                 }}
               >
                 <div className="flex items-center gap-2.5">
-                  <span className="text-base">🎯</span>
+                  <div className="w-8 h-8 rounded-lg flex items-center justify-center bg-[var(--terra)]/15 border border-[var(--terra)]/30 shrink-0">
+                    <Target size={16} className="text-[var(--terra)]" />
+                  </div>
                   <div>
-                    <div className="text-xs font-bold font-mono uppercase tracking-wider" style={{ color: "var(--terra)" }}>
+                    <div className="text-xs font-bold uppercase tracking-wider text-[var(--terra)]">
                       Your Accepted Challenge
                     </div>
-                    <div className="text-xs" style={{ color: "var(--text-dim)" }}>
+                    <div className="text-xs text-[var(--text-dim)]">
                       You accepted this topic from the parlor roulette. Ready to articulate?
                     </div>
                   </div>
@@ -945,8 +984,7 @@ export default function Dashboard() {
                 <button
                   type="button"
                   onClick={() => setPendingTopic(null)}
-                  className="text-xs font-semibold underline underline-offset-4 cursor-pointer"
-                  style={{ color: "var(--text-mute)" }}
+                  className="text-xs font-semibold underline underline-offset-4 cursor-pointer text-[var(--text-mute)]"
                 >
                   Clear & use today&apos;s daily topic
                 </button>
@@ -964,11 +1002,11 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => updateSettings({ difficultyMode: mode })}
                     title={meta.description}
-                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-mono font-medium transition-all border"
+                    className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium transition-all border"
                     style={{
-                      borderColor: isActive ? "var(--terra)" : "var(--border-dim)",
-                      backgroundColor: isActive ? "rgba(122,28,46,0.08)" : "transparent",
-                      color: isActive ? "var(--terra)" : "var(--text-mute)",
+                      borderColor: isActive ? "var(--terra)" : "var(--border)",
+                      backgroundColor: isActive ? "var(--terra)" : "var(--bg-card)",
+                      color: isActive ? "#FFFFFF" : "var(--text-dim)",
                     }}
                   >
                     <span>{meta.icon}</span>
@@ -980,7 +1018,7 @@ export default function Dashboard() {
 
             {/* The Question in classic editorial typography with subtle Fey spin state */}
             {spinning ? (
-              <div className="py-4 my-1 flex items-center gap-3">
+              <div className="py-6 my-2 flex items-center gap-3">
                 <div className="relative w-8 h-8 flex items-center justify-center shrink-0">
                   <FeyLogo size={24} spinning={true} />
                 </div>
@@ -995,12 +1033,12 @@ export default function Dashboard() {
               </div>
             ) : (
               <p
-                className="font-serif font-bold mb-3 tracking-tight transition-all duration-300"
+                className="font-serif font-bold mb-3 tracking-tight text-[var(--text)] transition-all duration-300"
                 style={{
-                  fontSize: "clamp(1.35rem, 2.7vw, 1.85rem)",
-                  color: "var(--text)",
-                  lineHeight: 1.3,
-                  maxWidth: "54ch",
+                  fontSize: "clamp(1.5rem, 3.2vw, 2.25rem)",
+                  lineHeight: 1.25,
+                  maxWidth: "52ch",
+                  fontFamily: "var(--font-serif), 'Lora', Georgia, serif",
                 }}
               >
                 {suggestedTopic.text}
@@ -1009,35 +1047,40 @@ export default function Dashboard() {
 
             {/* Feynman challenge prompt */}
             <p
-              className="text-sm font-serif italic mb-6 max-w-2xl leading-relaxed"
-              style={{ color: "var(--text-dim)" }}
+              className="text-sm sm:text-base font-serif italic mb-6 max-w-2xl leading-relaxed text-[var(--text-dim)]"
+              style={{ fontFamily: "var(--font-serif), 'Lora', Georgia, serif" }}
             >
               Can you break down the essential concepts of this topic and articulate them simply in your own voice under 90 seconds?
             </p>
 
-            {/* Action Bar */}
-            <div className="flex items-center gap-3 pt-3 border-t flex-wrap" style={{ borderColor: "var(--border-dim)" }}>
-              <button onClick={handleStartSuggested} className="btn-terra">
-                Begin Research (15m) <ArrowRight size={15} />
-              </button>
-
+            {/* Action Bar — Signature Solid Maroon Anchor Block */}
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 pt-4 border-t" style={{ borderColor: "var(--border-dim)" }}>
               <button
-                onClick={handleStartImpromptu}
-                className="btn-ghost text-xs flex items-center gap-1.5 cursor-pointer font-mono"
-                title="Already know the concept? Skip research and articulate immediately"
+                onClick={handleStartSuggested}
+                className="btn-terra w-full sm:w-auto text-sm sm:text-base font-bold px-6 py-3.5 shadow-none"
               >
-                <Zap size={13} style={{ color: "var(--gold)" }} /> Impromptu Speech (90s)
+                Begin Research (15m) <ArrowRight size={16} />
               </button>
 
-              <button
-                onClick={handleSkipTopic}
-                className="btn-ghost text-xs cursor-pointer font-mono"
-                title="Pick another question from your preferences"
-              >
-                <Shuffle size={13} /> Next Topic
-              </button>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <button
+                  onClick={handleStartImpromptu}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
+                  title="Already know the concept? Skip research and articulate immediately"
+                >
+                  <Zap size={14} className="text-[var(--gold)]" /> Impromptu (90s)
+                </button>
 
-              <div className="ml-auto text-[11px] font-mono hidden md:flex items-center gap-2" style={{ color: "var(--text-mute)" }}>
+                <button
+                  onClick={handleSkipTopic}
+                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                  title="Pick another question from your preferences"
+                >
+                  <Shuffle size={14} /> Next Topic
+                </button>
+              </div>
+
+              <div className="ml-auto text-xs font-medium hidden md:flex items-center gap-2 text-[var(--text-mute)]">
                 <span>15m Notes</span>
                 <span>·</span>
                 <span>90s Vocal Articulation</span>
@@ -1047,54 +1090,54 @@ export default function Dashboard() {
         )}
       </motion.div>
 
-      {/* ── Day 0 Orientation Guide: Elevated to sit with Today's Inquiry ── */}
+      {/* ── Day 0 Orientation Guide: Distinct Background Rhythm ── */}
       {sessions.length === 0 && (
         <motion.div
           variants={cardVariants}
-          className="surface rounded-2xl p-6 mb-6 border"
-          style={{ borderColor: "var(--border-dim)" }}
+          className="rounded-2xl p-6 mb-6 border-[1.5px] bg-[var(--bg-panel)]/35"
+          style={{ borderColor: "var(--border)" }}
         >
           <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
             <div>
-              <span className="text-[10px] font-mono uppercase tracking-wider font-semibold block mb-0.5" style={{ color: "var(--olive)" }}>
+              <span className="text-xs font-bold text-[var(--olive)] block mb-1">
                 The Feynman Ritual
               </span>
-              <h3 className="font-serif text-lg font-semibold" style={{ color: "var(--text)" }}>
+              <h3 className="font-serif text-lg sm:text-xl font-bold" style={{ color: "var(--text)" }}>
                 How your articulation practice works
               </h3>
             </div>
-            <span className="text-xs font-mono px-2.5 py-0.5 rounded-full bg-[var(--bg-input)] font-medium" style={{ color: "var(--text-mute)" }}>
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-md bg-[var(--bg-card)] border border-[var(--border)] text-[var(--text-dim)]">
               First Sprint
             </span>
           </div>
 
           <div className="grid md:grid-cols-3 gap-3.5 pt-1">
-            <div className="p-4 rounded-xl border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
-              <div className="font-mono text-xs font-bold mb-1.5 flex items-center gap-2" style={{ color: "var(--terra)" }}>
+            <div className="p-4 rounded-xl border-[1.5px] bg-[var(--bg-card)]" style={{ borderColor: "var(--border)" }}>
+              <div className="text-xs font-bold mb-1.5 flex items-center gap-2 text-[var(--terra)]">
                 <span>01</span>
                 <span>Deep Research (15m)</span>
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+              <p className="text-xs leading-relaxed text-[var(--text-dim)]">
                 Read the prompt, outline core tenets in the distraction-free editor, and organize key analogies without rote memorization.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
-              <div className="font-mono text-xs font-bold mb-1.5 flex items-center gap-2" style={{ color: "var(--olive)" }}>
+            <div className="p-4 rounded-xl border-[1.5px] bg-[var(--bg-card)]" style={{ borderColor: "var(--border)" }}>
+              <div className="text-xs font-bold mb-1.5 flex items-center gap-2 text-[var(--olive)]">
                 <span>02</span>
                 <span>Vocal Synthesis (90s)</span>
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+              <p className="text-xs leading-relaxed text-[var(--text-dim)]">
                 Explain the concept aloud under pressure using real microphone capture. Listen back, re-record if needed, and refine your delivery.
               </p>
             </div>
 
-            <div className="p-4 rounded-xl border" style={{ background: "var(--bg-input)/20", borderColor: "var(--border-dim)" }}>
-              <div className="font-mono text-xs font-bold mb-1.5 flex items-center gap-2" style={{ color: "var(--gold)" }}>
+            <div className="p-4 rounded-xl border-[1.5px] bg-[var(--bg-card)]" style={{ borderColor: "var(--border)" }}>
+              <div className="text-xs font-bold mb-1.5 flex items-center gap-2 text-[var(--gold)]">
                 <span>03</span>
                 <span>Reflect & Expand</span>
               </div>
-              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+              <p className="text-xs leading-relaxed text-[var(--text-dim)]">
                 Rate your understanding. Each completed sprint unlocks new nodes on your interactive Constellation Graph and lights up your activity ledger.
               </p>
             </div>
@@ -1102,24 +1145,24 @@ export default function Dashboard() {
         </motion.div>
       )}
 
-      {/* ── Daily Vows (Duolingo Habit Engine: 3 Daily Quests) ── */}
+      {/* ── Daily Vows (3 Daily Quests) ── */}
       <motion.div
         variants={cardVariants}
-        className="surface rounded-xl p-5 mb-6 border"
-        style={{ borderColor: "var(--border-dim)" }}
+        className="surface rounded-2xl p-5 mb-6 border-[1.5px]"
+        style={{ borderColor: "var(--border)" }}
       >
         <div className="flex items-center justify-between mb-3.5 flex-wrap gap-2">
           <div className="flex items-center gap-2">
-            <span className="text-base select-none">📜</span>
-            <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
+            <ScrollText size={16} className="text-[var(--olive)]" />
+            <span className="font-serif font-bold text-sm sm:text-base text-[var(--text)]">
               Daily Vows & Quests
             </span>
-            <span className="text-[10px] font-mono uppercase tracking-wider px-2 py-0.5 rounded-full bg-[var(--bg-input)]/50" style={{ color: "var(--text-mute)" }}>
+            <span className="text-xs font-medium px-2 py-0.5 rounded-md bg-[var(--bg-input)] text-[var(--text-dim)] border border-[var(--border-dim)]">
               Resets at midnight
             </span>
           </div>
 
-          <div className="text-xs font-mono" style={{ color: "var(--text-mute)" }}>
+          <div className="text-xs font-semibold text-[var(--text-dim)]">
             {dailyQuests.filter((q) => q.completed).length}/{dailyQuests.length} Fulfilled
           </div>
         </div>
@@ -1132,19 +1175,24 @@ export default function Dashboard() {
             return (
               <div
                 key={quest.id}
-                className="p-3.5 rounded-xl border flex flex-col justify-between transition-all"
+                className="p-3.5 rounded-xl border-[1.5px] flex flex-col justify-between transition-all"
                 style={{
                   background: isClaimed
-                    ? "var(--bg-input)/20"
+                    ? "var(--bg-input)/30"
                     : isDone
                     ? "rgba(166, 124, 30, 0.08)"
                     : "var(--bg-card)",
-                  borderColor: isDone ? "var(--gold)" : "var(--border-dim)",
+                  borderColor: isDone ? "var(--gold)" : "var(--border)",
                 }}
               >
                 <div>
                   <div className="flex items-center justify-between gap-2 mb-1.5">
-                    <span className="text-lg select-none">{quest.icon}</span>
+                    <div className="w-7 h-7 rounded-lg flex items-center justify-center border border-[var(--border)] bg-[var(--bg-input)]/40">
+                      {quest.key === "daily-speech" && <Mic size={14} className="text-[var(--terra)]" />}
+                      {quest.key === "vocal-conviction" && <Zap size={14} className="text-[var(--gold)]" />}
+                      {quest.key === "clarity-mastery" && <CheckCircle2 size={14} className="text-[var(--olive)]" />}
+                      {!["daily-speech", "vocal-conviction", "clarity-mastery"].includes(quest.key) && <Sparkles size={14} className="text-[var(--olive)]" />}
+                    </div>
                     <span className="tag tag-gold font-mono text-[10px] px-1.5 py-0.5">
                       +{quest.rewardXP} XP
                     </span>
@@ -1152,19 +1200,19 @@ export default function Dashboard() {
                   <div className="text-xs font-serif font-bold mb-1" style={{ color: "var(--text)" }}>
                     {quest.title}
                   </div>
-                  <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
+                  <p className="text-[11px] leading-relaxed mb-3 text-[var(--text-dim)]">
                     {quest.description}
                   </p>
                 </div>
 
                 {/* Status & Claim Button */}
                 <div className="pt-2 border-t flex items-center justify-between" style={{ borderColor: "var(--border-dim)" }}>
-                  <span className="font-mono text-[10px]" style={{ color: "var(--text-mute)" }}>
+                  <span className="text-xs font-mono text-[var(--text-mute)]">
                     {quest.current}/{quest.target} {quest.key === "vocal-conviction" ? "sec" : "done"}
                   </span>
 
                   {isClaimed ? (
-                    <span className="text-[11px] font-mono text-[var(--olive-br)] font-bold flex items-center gap-1">
+                    <span className="text-xs font-bold text-[var(--olive-br)] flex items-center gap-1">
                       ✓ Claimed
                     </span>
                   ) : isDone ? (
@@ -1173,13 +1221,13 @@ export default function Dashboard() {
                       onClick={() => {
                         claimQuestXP(quest.id, quest.rewardXP);
                       }}
-                      className="px-2.5 py-1 rounded-md text-[11px] font-mono font-bold text-white transition-all shadow-sm hover:scale-105 cursor-pointer"
+                      className="px-2.5 py-1 rounded-md text-xs font-bold text-white transition-all shadow-none hover:opacity-90 cursor-pointer"
                       style={{ background: "var(--gold)" }}
                     >
                       Claim +{quest.rewardXP} XP
                     </button>
                   ) : (
-                    <span className="text-[10px] font-mono text-[var(--text-mute)]">In Progress</span>
+                    <span className="text-xs font-medium text-[var(--text-mute)]">In Progress</span>
                   )}
                 </div>
               </div>
@@ -1188,27 +1236,27 @@ export default function Dashboard() {
         </div>
       </motion.div>
 
-      {/* ── Consolidated Scholar Ledger (Replaces 4 isolated SaaS cards) ── */}
+      {/* ── Consolidated Scholar Ledger ── */}
       <motion.div
         variants={cardVariants}
-        className="surface rounded-xl p-4 md:p-5 mb-6 border"
-        style={{ borderColor: "var(--border-dim)" }}
+        className="surface rounded-2xl p-4 md:p-5 mb-6 border-[1.5px]"
+        style={{ borderColor: "var(--border)" }}
       >
-        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--border-dim)]">
+        <div className="grid grid-cols-2 md:grid-cols-4 divide-y md:divide-y-0 md:divide-x divide-[var(--border)]">
           <div className="px-4 py-2 text-left">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+            <span className="text-xs font-semibold text-[var(--text-dim)] block mb-1.5">
               Completed Sprints
             </span>
             <span className="font-mono text-2xl font-bold" style={{ color: "var(--text)" }}>
               {sessions.length}
             </span>
-            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+            <span className="text-xs text-[var(--text-mute)] block mt-0.5">
               sessions recorded
             </span>
           </div>
 
           <div className="px-4 py-2 text-left">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+            <span className="text-xs font-semibold text-[var(--text-dim)] block mb-1.5">
               Deep Research
             </span>
             <span className="font-mono text-2xl font-bold" style={{ color: "var(--text)" }}>
@@ -1216,31 +1264,31 @@ export default function Dashboard() {
                 ? `${Math.floor(totalResearchMin / 60)}h ${totalResearchMin % 60}m`
                 : `${totalResearchMin}m`}
             </span>
-            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+            <span className="text-xs text-[var(--text-mute)] block mt-0.5">
               reading & notes
             </span>
           </div>
 
           <div className="px-4 py-2 text-left">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+            <span className="text-xs font-semibold text-[var(--text-dim)] block mb-1.5">
               Vocal Synthesis
             </span>
             <span className="font-mono text-2xl font-bold" style={{ color: "var(--text)" }}>
               {Math.round(totalSpeakSec / 60)}m
             </span>
-            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+            <span className="text-xs text-[var(--text-mute)] block mt-0.5">
               spoken articulation
             </span>
           </div>
 
           <div className="px-4 py-2 text-left">
-            <span className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] block mb-1">
+            <span className="text-xs font-semibold text-[var(--text-dim)] block mb-1.5">
               Scholarly XP
             </span>
             <span className="font-mono text-2xl font-bold" style={{ color: "var(--gold)" }}>
               {profile.xp.toLocaleString()}
             </span>
-            <span className="text-[11px] font-mono text-[var(--text-mute)] block mt-0.5">
+            <span className="text-xs text-[var(--text-mute)] block mt-0.5">
               {level.title}
             </span>
           </div>
@@ -1251,10 +1299,12 @@ export default function Dashboard() {
       {sessions.length === 0 ? (
         <motion.div
           variants={cardVariants}
-          className="surface rounded-2xl p-6 mb-6 border text-center py-8"
-          style={{ borderColor: "var(--border-dim)" }}
+          className="surface rounded-2xl p-6 mb-6 border-[1.5px] text-center py-8"
+          style={{ borderColor: "var(--border)" }}
         >
-          <div className="text-3xl mb-2 opacity-40 select-none">🌌</div>
+          <div className="w-12 h-12 rounded-2xl mx-auto mb-3 flex items-center justify-center border border-[var(--border)] bg-[var(--bg-input)]/40">
+            <Compass size={24} className="text-[var(--olive)] opacity-70" />
+          </div>
           <h4 className="font-serif font-bold text-base mb-1" style={{ color: "var(--text)" }}>
             Your Consistency Ledger & Heatmap
           </h4>
@@ -1267,49 +1317,49 @@ export default function Dashboard() {
         <div className="grid lg:grid-cols-3 gap-3 mb-6">
           <motion.div
             variants={cardVariants}
-            className="lg:col-span-2 surface rounded-xl p-5 border"
-            style={{ borderColor: "var(--border-dim)" }}
+            className="lg:col-span-2 surface rounded-2xl p-5 border-[1.5px]"
+            style={{ borderColor: "var(--border)" }}
           >
             <div className="flex items-center justify-between mb-4">
               <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
                 Scholarly Consistency
               </span>
-              <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>
+              <span className="text-xs font-mono font-medium" style={{ color: "var(--text-mute)" }}>
                 {sessions.length} sessions this year
               </span>
             </div>
             <ActivityHeatmap history={history} />
             <div className="flex items-center justify-end gap-1.5 mt-3">
-              <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>Less</span>
-              {[0.4, 0.55, 0.75, 1].map((op, i) => (
+              <span className="text-[10px] font-mono font-semibold" style={{ color: "var(--text-mute)" }}>Less</span>
+              {[0.35, 0.55, 0.75, 1].map((op, i) => (
                 <div
                   key={i}
-                  className="w-2.5 h-2.5 rounded-[2px]"
+                  className="w-2.5 h-2.5 rounded-[2px] border border-[var(--border)]"
                   style={{ background: `var(--olive)`, opacity: op }}
                 />
               ))}
-              <span className="text-[10px] font-mono" style={{ color: "var(--text-mute)" }}>More</span>
+              <span className="text-[10px] font-mono font-semibold" style={{ color: "var(--text-mute)" }}>More</span>
             </div>
           </motion.div>
 
           <motion.div
             variants={cardVariants}
-            className="surface rounded-xl p-5 border"
-            style={{ borderColor: "var(--border-dim)" }}
+            className="surface rounded-2xl p-5 border-[1.5px]"
+            style={{ borderColor: "var(--border)" }}
           >
             <div className="font-serif font-semibold text-sm mb-4" style={{ color: "var(--text)" }}>
               This Week
             </div>
             <WeeklyBars sessions={sessions} />
 
-            <div className="mt-5 pt-4" style={{ borderTop: "1px solid var(--border-dim)" }}>
+            <div className="mt-5 pt-4" style={{ borderTop: "1.5px solid var(--border-dim)" }}>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>Level {level.level}</span>
+                <span className="text-xs font-mono font-medium" style={{ color: "var(--text-mute)" }}>Level {level.level}</span>
                 {nextLevel && (
-                  <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>→ Lv {level.level + 1}</span>
+                  <span className="text-xs font-mono font-medium" style={{ color: "var(--text-mute)" }}>→ Lv {level.level + 1}</span>
                 )}
               </div>
-              <div className="h-1.5 rounded-full overflow-hidden" style={{ background: "var(--bg-input)" }}>
+              <div className="h-1.5 rounded-full overflow-hidden border border-[var(--border-dim)]" style={{ background: "var(--bg-input)" }}>
                 <motion.div
                   className="h-full rounded-full"
                   style={{ background: "var(--gold)" }}
@@ -1318,7 +1368,7 @@ export default function Dashboard() {
                   transition={{ type: "spring", stiffness: 100, damping: 15 }}
                 />
               </div>
-              <div className="text-[11px] font-mono mt-1.5" style={{ color: "var(--text-mute)" }}>{level.title}</div>
+              <div className="text-xs font-mono font-semibold mt-1.5" style={{ color: "var(--text-dim)" }}>{level.title}</div>
             </div>
           </motion.div>
         </div>
@@ -1329,15 +1379,15 @@ export default function Dashboard() {
         {/* Recent sessions */}
         <motion.div
           variants={cardVariants}
-          className="surface rounded-xl p-5 border"
-          style={{ borderColor: "var(--border-dim)" }}
+          className="surface rounded-2xl p-5 border-[1.5px]"
+          style={{ borderColor: "var(--border)" }}
         >
           <div className="flex items-center justify-between mb-4">
             <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
               Recent Sprints
             </span>
             <Link href="/library">
-              <span className="text-xs font-mono hover:underline cursor-pointer" style={{ color: "var(--terra)" }}>
+              <span className="text-xs font-semibold hover:underline cursor-pointer" style={{ color: "var(--terra)" }}>
                 View in Library →
               </span>
             </Link>
@@ -1345,11 +1395,13 @@ export default function Dashboard() {
 
           {recentSessions.length === 0 ? (
             <div className="py-8 text-center">
-              <div className="text-3xl mb-2 opacity-35">🎙️</div>
+              <div className="w-11 h-11 rounded-xl mx-auto mb-2.5 flex items-center justify-center border border-[var(--border)] bg-[var(--bg-input)]/30">
+                <Mic size={20} className="text-[var(--olive)] opacity-60" />
+              </div>
               <p className="font-serif text-sm italic" style={{ color: "var(--text-dim)" }}>
                 No speeches recorded yet.
               </p>
-              <p className="text-xs font-mono mt-1" style={{ color: "var(--text-mute)" }}>
+              <p className="text-xs font-medium mt-1" style={{ color: "var(--text-mute)" }}>
                 Complete today&apos;s inquiry above to record your first synthesis.
               </p>
             </div>
@@ -1367,10 +1419,10 @@ export default function Dashboard() {
                     className="w-7 h-7 rounded-md flex items-center justify-center text-sm flex-shrink-0 mt-0.5"
                     style={{
                       background: `${CATEGORY_COLORS[s.category] || "var(--bg-input)"}15`,
-                      border: `1px solid ${CATEGORY_COLORS[s.category] || "var(--border-dim)"}30`
+                      border: `1px solid ${CATEGORY_COLORS[s.category] || "var(--border)"}35`
                     }}
                   >
-                    {CATEGORY_ICONS[s.category]}
+                    <CategoryIcon category={s.category} size={14} style={{ color: CATEGORY_COLORS[s.category] || "var(--olive)" }} />
                   </div>
                   <div className="flex-1 min-w-0">
                     <p
@@ -1380,8 +1432,8 @@ export default function Dashboard() {
                       {s.topicText}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
-                      <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>{relativeDate(s.date)}</span>
-                      <span style={{ color: "var(--text-mute)", fontSize: "10px" }}>·</span>
+                      <span className="text-[11px] font-mono text-[var(--text-mute)]">{relativeDate(s.date)}</span>
+                      <span className="text-[var(--text-mute)] text-[10px]">·</span>
                       <span className="tag tag-gold font-mono" style={{ fontSize: "10px", padding: "1px 5px" }}>
                         +{s.xpEarned} XP
                       </span>
@@ -1407,14 +1459,14 @@ export default function Dashboard() {
         {/* Achievements */}
         <motion.div
           variants={cardVariants}
-          className="surface rounded-xl p-5 border"
-          style={{ borderColor: "var(--border-dim)" }}
+          className="surface rounded-2xl p-5 border-[1.5px]"
+          style={{ borderColor: "var(--border)" }}
         >
           <div className="flex items-center justify-between mb-4">
             <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
               Scholarly Milestones
             </span>
-            <span className="text-xs font-mono" style={{ color: "var(--text-mute)" }}>
+            <span className="text-xs font-mono font-medium" style={{ color: "var(--text-mute)" }}>
               {profile.unlockedAchievements.length}/{ACHIEVEMENTS.length}
             </span>
           </div>
@@ -1425,17 +1477,17 @@ export default function Dashboard() {
                 <div
                   key={ach.id}
                   title={`${ach.title}: ${ach.description}`}
-                  className="rounded-lg p-2.5 text-center transition-all"
+                  className="rounded-xl p-2.5 text-center transition-all"
                   style={{
                     background: unlocked ? "rgba(92,106,54,0.06)" : "var(--bg-input)/35",
-                    border: `1px solid ${unlocked ? "rgba(68,78,44,0.2)" : "transparent"}`,
-                    opacity: unlocked ? 1 : 0.4,
+                    border: `1.5px solid ${unlocked ? "rgba(68,78,44,0.28)" : "var(--border-dim)"}`,
+                    opacity: unlocked ? 1 : 0.45,
                     filter: unlocked ? "none" : "grayscale(1)",
                   }}
                 >
                   <div className="text-xl mb-1">{ach.icon}</div>
                   <div
-                    className="text-[10px] font-medium leading-tight truncate"
+                    className="text-[10px] font-semibold leading-tight truncate"
                     style={{ color: unlocked ? "var(--text)" : "var(--text-mute)" }}
                   >
                     {ach.title}
@@ -1445,7 +1497,7 @@ export default function Dashboard() {
             })}
           </div>
           {profile.unlockedAchievements.length === 0 && (
-            <p className="mt-3 text-xs font-mono text-center" style={{ color: "var(--text-mute)" }}>
+            <p className="mt-3 text-xs text-center" style={{ color: "var(--text-mute)" }}>
               Complete sessions to unlock your first achievement.
             </p>
           )}
@@ -1460,7 +1512,9 @@ export default function Dashboard() {
               style={{ borderColor: "var(--border-dim)" }}
             >
               <div className="flex items-center gap-3">
-                <span className="text-2xl select-none">🎮</span>
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center border border-[var(--border)] bg-[var(--bg-input)]/50 shrink-0">
+                  <Gamepad2 size={20} className="text-[var(--gold)]" />
+                </div>
                 <div>
                   <div className="font-serif font-bold text-sm" style={{ color: "var(--text)" }}>
                     Want to practice with peers?
@@ -1491,6 +1545,22 @@ export default function Dashboard() {
         activeFocus={focusCategory}
         onSelectFocus={handleSelectFocus}
       />
+
+      {/* Streak Calendar & Loss Aversion Modal */}
+      <AnimatePresence>
+        {showStreakModal && (
+          <StreakCalendarModal
+            onClose={() => setShowStreakModal(false)}
+            streakCurrent={streak.current}
+            streakLongest={streak.longest}
+            streakLastDate={streak.lastDate}
+            streakShields={streak.shields ?? 1}
+            profileXp={profile.xp}
+            onBuyShield={buyStreakShield}
+            activityDates={activityDates}
+          />
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 }
