@@ -39,6 +39,7 @@ import {
   getPublicChallenges,
   deleteLocalChallenge,
   getLocalChallengeScores,
+  getUserChallengeAttempt,
   DURATION_CHOICES,
 } from "@/lib/trivia-challenge";
 import { copyTextToClipboard } from "@/lib/clipboard";
@@ -467,7 +468,7 @@ export default function TriviaChallengeLounge({
           <div className="space-y-4">
             {/* Category filter pills */}
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1 text-xs">
-              {["all", "History", "Pop Culture", "General Knowledge"].map((cat) => (
+              {["all", "History", "Pop Culture", "General Knowledge", "Sports"].map((cat) => (
                 <button
                   key={cat}
                   type="button"
@@ -488,6 +489,7 @@ export default function TriviaChallengeLounge({
             <div className="grid grid-cols-1 gap-4">
               {filteredPublicChallenges.map((c) => {
                 const cScores = getLocalChallengeScores(c.id);
+                const attempt = getUserChallengeAttempt(c.id, profile.username || "");
 
                 return (
                   <div
@@ -508,6 +510,11 @@ export default function TriviaChallengeLounge({
                           <span className="text-[10px] font-mono capitalize px-2 py-0.5 rounded-full bg-[var(--bg-input)] text-[var(--text-dim)] border border-[var(--border-dim)]">
                             {c.difficulty}
                           </span>
+                          {attempt && (
+                            <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                              Score: {attempt.pct}% ({attempt.score}/{attempt.total})
+                            </span>
+                          )}
                         </div>
 
                         <h3
@@ -558,9 +565,7 @@ export default function TriviaChallengeLounge({
                           }}
                           className="px-4 py-2.5 rounded-xl btn-terra font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer shadow-sm hover:scale-[1.01] active:scale-[0.99] transition-all text-center whitespace-nowrap"
                         >
-                          <Zap size={13} />
-                          <span>Accept Challenge</span>
-                          <ArrowRight size={13} />
+                          <span>{attempt ? "Replay Challenge" : "Play Challenge"}</span>
                         </button>
                       </div>
                     </div>

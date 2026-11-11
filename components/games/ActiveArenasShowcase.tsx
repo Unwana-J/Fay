@@ -19,6 +19,7 @@ import {
   Crown,
   Gamepad2,
   Presentation,
+  X,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import {
@@ -33,6 +34,9 @@ import {
   getPublicChallenges,
   getDetailedChallengeCountdown,
   getUserChallengeAttempt,
+  getDismissedChallengeIds,
+  dismissChallengeFromArena,
+  dismissChallengesFromArena,
   type TriviaChallenge,
 } from "@/lib/trivia-challenge";
 import { cn } from "@/lib/utils";
@@ -61,6 +65,7 @@ export default function ActiveArenasShowcase({
 
   const [leagues, setLeagues] = useState<FriendshipLeague[]>([]);
   const [challenges, setChallenges] = useState<TriviaChallenge[]>([]);
+  const [dismissedIds, setDismissedIds] = useState<string[]>([]);
   const [showActionModal, setShowActionModal] = useState(false);
   const [showCreateLeagueModal, setShowCreateLeagueModal] = useState(false);
 
@@ -91,8 +96,9 @@ export default function ActiveArenasShowcase({
     }
   }, [profile.id, profile.username]);
 
-  // 2. Load challenges (local + public)
+  // 2. Load challenges (local + public) & dismissed challenge IDs
   useEffect(() => {
+    setDismissedIds(getDismissedChallengeIds());
     const local = getAllLocalChallenges();
     const pub = getPublicChallenges();
     const map = new Map<string, TriviaChallenge>();
@@ -122,18 +128,37 @@ export default function ActiveArenasShowcase({
     );
   }, [activeLeagues]);
 
-  // Active challenges that have not expired
+  // Active challenges that have not expired and have not been dismissed by the user
   const activeChallenges = useMemo(() => {
+    const dismissedSet = new Set(dismissedIds);
     return challenges
+      .filter((c) => !dismissedSet.has(c.id))
       .map((c) => {
         const countdown = getDetailedChallengeCountdown(c);
         const attempt = getUserChallengeAttempt(c.id, profile.username || "");
         return { challenge: c, countdown, attempt };
       })
       .filter(({ countdown }) => !countdown.isExpired);
-  }, [challenges, profile.username]);
+  }, [challenges, dismissedIds, profile.username]);
+
+  const completedActiveChallengeIds = useMemo(() => {
+    return activeChallenges.filter(({ attempt }) => Boolean(attempt)).map(({ challenge }) => challenge.id);
+  }, [activeChallenges]);
 
   const totalActiveCompetitions = activeLeagues.length + activeChallenges.length;
+
+  function handleDismissChallenge(challengeId: string, e: React.MouseEvent) {
+    e.stopPropagation();
+    const updated = dismissChallengeFromArena(challengeId);
+    setDismissedIds(updated);
+  }
+
+  function handleDismissAllCompleted(e: React.MouseEvent) {
+    e.stopPropagation();
+    if (completedActiveChallengeIds.length === 0) return;
+    const updated = dismissChallengesFromArena(completedActiveChallengeIds);
+    setDismissedIds(updated);
+  }
 
   function handleLeagueClick(code: string) {
     router.push(`/games/trivia/league/${code}`);
@@ -173,7 +198,19 @@ export default function ActiveArenasShowcase({
               </span>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              {completedActiveChallengeIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleDismissAllCompleted}
+                  className="px-2.5 py-1 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-input)] hover:bg-[var(--bg-base)] text-[var(--text-dim)] hover:text-[var(--text)] font-space font-bold text-[11px] flex items-center gap-1 transition-colors cursor-pointer whitespace-nowrap"
+                  title="Close completed challenges to declutter Live Arenas"
+                >
+                  <X size={12} />
+                  <span>Close Completed ({completedActiveChallengeIds.length})</span>
+                </button>
+              )}
+
               <button
                 type="button"
                 onClick={() => setShowActionModal(true)}
@@ -293,7 +330,7 @@ export default function ActiveArenasShowcase({
               ))}
 
             {/* 3. Active 1v1 / Group Challenges */}
-            {activeChallenges.slice(0, 2).map(({ challenge, countdown, attempt }) => (
+            {activeChallenges.slice(0, 3).map(({ challenge, countdown, attempt }) => (
               <div
                 key={challenge.id}
                 onClick={() => handleChallengePlay(challenge)}
@@ -305,10 +342,21 @@ export default function ActiveArenasShowcase({
                     <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono font-bold bg-[var(--olive)]/15 text-[var(--olive)] border border-[var(--olive)]/30">
                       <Swords size={11} /> 1v1 Challenge
                     </span>
-                    <span className="text-[10px] font-mono text-[var(--text-dim)] flex items-center gap-1">
-                      <Clock size={10} />
-                      {countdown.isIndefinite ? "Open" : countdown.remainingText}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-mono text-[var(--text-dim)] flex items-center gap-1">
+                        <Clock size={10} />
+                        {countdown.isIndefinite ? "Open" : countdown.remainingText}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={(e) => handleDismissChallenge(challenge.id, e)}
+                        className="w-6 h-6 -mr-1 rounded-lg flex items-center justify-center text-[var(--text-mute)] hover:text-[var(--text)] hover:bg-[var(--bg-input)] border border-transparent hover:border-[var(--border-dim)] transition-colors cursor-pointer"
+                        title="Close challenge and remove from Live Arenas"
+                        aria-label={`Close ${challenge.title}`}
+                      >
+                        <X size={13} />
+                      </button>
+                    </div>
                   </div>
 
                   <h4 className="font-space font-bold text-base text-[var(--text)] group-hover:text-[var(--olive)] transition-colors line-clamp-1">
@@ -319,8 +367,8 @@ export default function ActiveArenasShowcase({
                   </p>
                 </div>
 
-                <div className="flex items-center justify-between pt-2 border-t border-[var(--border-dim)]">
-                  <span className="text-[10px] font-mono font-bold text-[var(--text-dim)]">
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-[var(--border-dim)]">
+                  <span className="text-[10px] font-mono font-bold text-[var(--text-dim)] truncate">
                     {attempt ? (
                       <span className="text-emerald-600 dark:text-emerald-400">
                         Score: {attempt.pct}% ({attempt.score}/{attempt.total})
@@ -329,8 +377,20 @@ export default function ActiveArenasShowcase({
                       "Ready to play"
                     )}
                   </span>
-                  <div className="btn-primary px-3.5 py-1.5 rounded-xl font-space font-bold text-xs">
-                    <span>{attempt ? "Replay Challenge" : "Play Challenge"}</span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    {attempt && (
+                      <button
+                        type="button"
+                        onClick={(e) => handleDismissChallenge(challenge.id, e)}
+                        className="px-2.5 py-1.5 rounded-xl border border-[var(--border-dim)] hover:bg-[var(--bg-input)] text-[var(--text-dim)] hover:text-[var(--text)] font-space font-bold text-xs transition-colors cursor-pointer"
+                        title="Close completed challenge"
+                      >
+                        Close
+                      </button>
+                    )}
+                    <div className="btn-primary px-3.5 py-1.5 rounded-xl font-space font-bold text-xs">
+                      <span>{attempt ? "Replay" : "Play Challenge"}</span>
+                    </div>
                   </div>
                 </div>
               </div>

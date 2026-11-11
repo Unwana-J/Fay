@@ -79,7 +79,7 @@ export const DURATION_CHOICES = [
 ];
 
 /**
- * 3 Official Permanent Indefinite Challenges open to all Fey scholars.
+ * 5 Official Permanent Indefinite Challenges open to all Fey scholars.
  */
 export const CURATED_PUBLIC_CHALLENGES: TriviaChallenge[] = [
   {
@@ -120,6 +120,32 @@ export const CURATED_PUBLIC_CHALLENGES: TriviaChallenge[] = [
     category: "General Knowledge",
     description: "The ultimate trial across 36 states, landmarks, confluences, indigenous inventions, languages, and natural wonders.",
     questionIds: ["g001", "g002", "g003", "g004", "g005", "g006", "g007", "g008", "g009", "g010"],
+  },
+  {
+    id: "pub_super_eagles_olympic_glory",
+    title: "🦅 Super Eagles, Falcons & Olympic Glory",
+    creatorName: "Fey Sports Desk",
+    createdAt: 1727740800000,
+    durationHours: 0, // 0 = Indefinite / No expiry
+    difficulty: "medium",
+    questionCount: 10,
+    isPublic: true,
+    category: "Sports",
+    description: "Relive Nigeria's greatest sporting triumphs—from the Atlanta '96 Dream Team and USA '94 to Super Falcons dominance and world record breakers.",
+    questionIds: ["s001", "s002", "s003", "s004", "s005", "s006", "s007", "s008", "s010", "s012"],
+  },
+  {
+    id: "pub_kingdoms_activists_icons",
+    title: "👑 Ancient Kingdoms, Rebels & Democratic Icons",
+    creatorName: "Fey Archives",
+    createdAt: 1727740800000,
+    durationHours: 0, // 0 = Indefinite / No expiry
+    difficulty: "medium",
+    questionCount: 10,
+    isPublic: true,
+    category: "History",
+    description: "Journey from the Benin Bronzes, Nok terracotta, and Oyo cavalry to the Aba Women's War, June 12, and the return to democracy.",
+    questionIds: ["h011", "h012", "h013", "h014", "h015", "h016", "h017", "h018", "h023", "h024"],
   },
 ];
 
@@ -422,6 +448,56 @@ export function deleteLocalChallenge(id: string): void {
     localStorage.setItem(CHALLENGE_STORE_KEY, JSON.stringify(map));
   } catch (e) {
     console.warn("Could not delete local challenge:", e);
+  }
+}
+
+const DISMISSED_CHALLENGES_KEY = "fey_dismissed_challenges_v1";
+
+export function getDismissedChallengeIds(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(DISMISSED_CHALLENGES_KEY);
+    if (!raw) return [];
+    const list = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
+  } catch {
+    return [];
+  }
+}
+
+export function dismissChallengeFromArena(id: string): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const current = new Set(getDismissedChallengeIds());
+    current.add(id);
+    const updated = Array.from(current);
+    localStorage.setItem(DISMISSED_CHALLENGES_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return getDismissedChallengeIds();
+  }
+}
+
+export function dismissChallengesFromArena(ids: string[]): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const current = new Set(getDismissedChallengeIds());
+    ids.forEach((id) => current.add(id));
+    const updated = Array.from(current);
+    localStorage.setItem(DISMISSED_CHALLENGES_KEY, JSON.stringify(updated));
+    return updated;
+  } catch {
+    return getDismissedChallengeIds();
+  }
+}
+
+export function restoreDismissedChallenges(): string[] {
+  if (typeof window === "undefined") return [];
+  try {
+    localStorage.removeItem(DISMISSED_CHALLENGES_KEY);
+    return [];
+  } catch {
+    return [];
   }
 }
 

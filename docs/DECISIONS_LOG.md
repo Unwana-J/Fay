@@ -540,3 +540,21 @@
      - **Diagonal Split Gradient (`linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)`)**: Both a Research Challenge and Games completed on the same day.
 - **"Building in Public" Content Takeaway**:
   > *"GitHub-style activity heatmaps break when your product has both high-effort deep work and low-friction daily games. By splitting cells into Wine Red for Research, Forest Olive for Games, and a diagonal split when a user does both, you reward every daily touchpoint without diluting the prestige of deep work."*
+
+---
+
+## 29. Dismissible Live Arena Challenges & Curated Custom Challenge Rotation
+
+- **Date / Phase**: Phase 2 — Trivia Arcade UX & Decluttering
+- **The Problem / Context**:
+  Permanent curated 1v1/group challenges (`The Founding Fathers & First Republic`, `Nollywood, Afrobeats & Golden Age Culture`) were pinned indefinitely in `ActiveArenasShowcase` via `.slice(0, 2)` without a close/dismiss action. Once a player completed them, those finished cards permanently occupied the Live Arenas slots, cluttering the Trivia setup page and preventing unplayed or newly added custom challenges from surfacing.
+- **User Insight & Guiding Philosophy**:
+  Once a player completes a custom challenge, they should be able to close it to declutter their Live Arenas view—and whenever Fey releases new custom challenges, those unplayed challenges should automatically surface into the slots so the player can choose to play them.
+- **Architectural & Product Landing**:
+  1. **Per-Challenge Dismissal Persistence (`lib/trivia-challenge.ts`, `components/games/ActiveArenasShowcase.tsx`)**:
+     - Added `fey_dismissed_challenges_v1` localStorage persistence (`getDismissedChallengeIds`, `dismissChallengeFromArena`, `dismissChallengesFromArena`, `restoreDismissedChallenges`).
+     - Added per-card `X` and `Close` actions on Live Arena challenge cards plus a header `Close Completed (N)` action to clear completed challenges in one tap, immediately rotating remaining unplayed custom challenges into view while keeping all challenges accessible in the `Challenges` tab (`TriviaChallengeLounge`).
+  2. **Expanded Curated Custom Challenge Roster (`lib/trivia-challenge.ts`, `components/games/TriviaChallengeLounge.tsx`)**:
+     - Added two new curated 10-question custom challenges: **`🦅 Super Eagles, Falcons & Olympic Glory`** (`pub_super_eagles_olympic_glory`, Sports) and **`👑 Ancient Kingdoms, Rebels & Democratic Icons`** (`pub_kingdoms_activists_icons`, History), plus a `Sports` discipline filter pill in the Public Community Arena.
+- **"Building in Public" Content Takeaway**:
+  > *"Featured challenges shouldn't become permanent dashboard wallpaper after a player beats them. Letting players close completed challenges turns a static showcase into a zero-inbox discovery feed where fresh custom challenges automatically rotate into view."*
