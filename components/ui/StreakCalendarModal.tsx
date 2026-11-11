@@ -57,6 +57,8 @@ export default function StreakCalendarModal({
   profileXp,
   onBuyShield,
   activityDates,
+  researchDates,
+  gameDates,
 }: {
   onClose: () => void;
   streakCurrent: number;
@@ -66,9 +68,13 @@ export default function StreakCalendarModal({
   profileXp: number;
   onBuyShield: () => boolean;
   activityDates: Set<string>;
+  researchDates?: Set<string>;
+  gameDates?: Set<string>;
 }) {
   const streakDates = getStreakDates(streakCurrent, streakLastDate);
   const hasActivity = (dateStr: string) => activityDates.has(dateStr);
+  const hasResearch = (dateStr: string) => Boolean(researchDates?.has(dateStr));
+  const hasGame = (dateStr: string) => Boolean(gameDates?.has(dateStr));
   const isStreak = (dateStr: string) => streakDates.includes(dateStr);
   const [shieldMsg, setShieldMsg] = useState<string | null>(null);
   const [mounted, setMounted] = useState(false);
@@ -157,29 +163,50 @@ export default function StreakCalendarModal({
                   if (day.isPadding) return <div key={dIdx} className="w-8 h-8" />;
                   
                   const played = hasActivity(day.dateStr);
+                  const isRes = hasResearch(day.dateStr);
+                  const isGm = hasGame(day.dateStr) || (played && !isRes);
                   const active = isStreak(day.dateStr);
 
                   let cellClass = "w-8 h-8 flex items-center justify-center text-xs font-mono transition-all relative rounded-full ";
                   const cellStyle: React.CSSProperties = {};
 
-                  if (active) {
+                  if (isRes && isGm) {
+                    cellClass += "text-white font-bold shadow-sm ";
+                    cellStyle.background = "linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)";
+                  } else if (isRes) {
                     cellClass += "text-white font-bold bg-[var(--terra)] shadow-sm ";
-                  } else if (played) {
-                    cellClass += "bg-[var(--bg-input)] border border-[var(--olive)] text-[var(--olive-text)] font-semibold";
+                  } else if (isGm) {
+                    cellClass += "text-white font-bold bg-[var(--olive)] shadow-sm ";
+                  } else if (active) {
+                    cellClass += "bg-[var(--bg-input)] border border-[var(--terra)] text-[var(--terra)] font-bold ";
                   } else {
                     cellClass += "text-[var(--text)] hover:bg-[var(--bg-input)]/50";
                   }
 
+                  if (active && (isRes || isGm)) {
+                    cellStyle.boxShadow = "0 0 0 2px var(--bg-card), 0 0 0 3.5px var(--gold)";
+                  }
+
+                  const activityTypeLabel = isRes && isGm
+                    ? "Research & Games"
+                    : isRes
+                    ? "Research Challenge"
+                    : isGm
+                    ? "Parlor Games"
+                    : active
+                    ? "Streak Protected"
+                    : "";
+
                   return (
                     <div
                       key={dIdx}
-                      title={day.dateStr}
+                      title={activityTypeLabel ? `${day.dateStr} · ${activityTypeLabel}` : day.dateStr}
                       className={cellClass}
                       style={cellStyle}
                     >
                       {day.dayNum}
-                      {active && played && (
-                        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white/70" />
+                      {active && (
+                        <span className="absolute bottom-1 w-1 h-1 rounded-full bg-white/80" />
                       )}
                     </div>
                   );
@@ -233,14 +260,23 @@ export default function StreakCalendarModal({
         </div>
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center justify-center gap-6 pt-3 border-t" style={{ borderColor: "var(--border-dim)" }}>
+        <div className="flex flex-wrap items-center justify-center gap-5 pt-3 border-t" style={{ borderColor: "var(--border-dim)" }}>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-5 h-5 rounded-full bg-[var(--bg-input)] border border-[var(--olive)] flex items-center justify-center text-[10px] text-[var(--olive-text)] font-bold">12</div>
-            <span style={{ color: "var(--text-dim)" }}>Completed Session</span>
+            <div className="w-5 h-5 rounded-full bg-[var(--terra)] text-white flex items-center justify-center text-[10px] font-bold">12</div>
+            <span style={{ color: "var(--text-dim)" }}>Research Challenge</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
-            <div className="w-8 h-5 rounded-full bg-[var(--terra)] text-white flex items-center justify-center text-[10px] font-bold">12</div>
-            <span style={{ color: "var(--text-dim)" }}>Active Streak Day</span>
+            <div className="w-5 h-5 rounded-full bg-[var(--olive)] text-white flex items-center justify-center text-[10px] font-bold">12</div>
+            <span style={{ color: "var(--text-dim)" }}>Games</span>
+          </div>
+          <div className="flex items-center gap-2 text-xs">
+            <div
+              className="w-5 h-5 rounded-full text-white flex items-center justify-center text-[10px] font-bold"
+              style={{ background: "linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)" }}
+            >
+              12
+            </div>
+            <span style={{ color: "var(--text-dim)" }}>Both</span>
           </div>
         </div>
       </motion.div>

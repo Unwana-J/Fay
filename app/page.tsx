@@ -86,10 +86,14 @@ function streakMessage(days: number, todayIndex: number) {
 }
 
 /* ─── Activity heatmap ───────────────────────────────────────────── */
-function ActivityHeatmap({ history }: { history: Array<{ date: string; count: number }> }) {
+function ActivityHeatmap({
+  researchDates,
+  gameDates,
+}: {
+  researchDates: Set<string>;
+  gameDates: Set<string>;
+}) {
   const allDays = getLast52Weeks();
-  const histMap: Record<string, number> = {};
-  history.forEach((h) => { histMap[h.date] = h.count; });
 
   const weeks: string[][] = [];
   let week: string[] = [];
@@ -105,27 +109,38 @@ function ActivityHeatmap({ history }: { history: Array<{ date: string; count: nu
       <div className="flex gap-0.5 min-w-max">
         {weeks.map((wk, wi) => (
           <div key={wi} className="flex flex-col gap-0.5">
-            {wk.map((day, di) =>
-              day === "" ? (
-                <div key={di} className="w-[11px] h-[11px]" />
-              ) : (
+            {wk.map((day, di) => {
+              if (day === "") return <div key={di} className="w-[11px] h-[11px]" />;
+              const isRes = researchDates.has(day);
+              const isGm = gameDates.has(day);
+              let bg = "rgba(68,78,44,0.06)";
+              if (isRes && isGm) {
+                bg = "linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)";
+              } else if (isRes) {
+                bg = "var(--terra)";
+              } else if (isGm) {
+                bg = "var(--olive)";
+              }
+              const titleText =
+                isRes && isGm
+                  ? `${day} · Research & Games`
+                  : isRes
+                  ? `${day} · Research Challenge`
+                  : isGm
+                  ? `${day} · Games`
+                  : day;
+              return (
                 <div
                   key={di}
-                  title={day}
+                  title={titleText}
                   className="w-[11px] h-[11px] rounded-[2px] transition-colors"
                   style={{
-                    background: !histMap[day]
-                      ? "rgba(68,78,44,0.06)"
-                      : histMap[day] === 1
-                      ? "rgba(68,78,44,0.22)"
-                      : histMap[day] === 2
-                      ? "rgba(68,78,44,0.55)"
-                      : "var(--olive)",
+                    background: bg,
                     opacity: 1,
                   }}
                 />
-              )
-            )}
+              );
+            })}
           </div>
         ))}
       </div>
@@ -215,6 +230,9 @@ export default function Dashboard() {
     profile,
     streak,
     sessions,
+    triviaHistory = [],
+    mathleticsHistory = [],
+    articulateHistory = [],
     activeSession,
     settings,
     customTopics,
@@ -247,10 +265,61 @@ export default function Dashboard() {
   const [activeTab, setActiveTab] = useState<"practice" | "parlor">("practice");
   const [dismissedTomorrowModal, setDismissedTomorrowModal] = useState(false);
 
-  const activityDates = useMemo(
-    () => new Set(sessions.map((s) => s.date.slice(0, 10))),
-    [sessions]
-  );
+  const { activityDates, researchDates, gameDates } = useMemo(() => {
+    const all = new Set<string>();
+    const res = new Set<string>();
+    const gm = new Set<string>();
+
+    const toIso = (ts: number) => {
+      const d = new Date(ts);
+      const yr = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, "0");
+      const dy = String(d.getDate()).padStart(2, "0");
+      return `${yr}-${mo}-${dy}`;
+    };
+
+    (sessions || []).forEach((s) => {
+      if (s.date) {
+        const dt = s.date.slice(0, 10);
+        all.add(dt);
+        res.add(dt);
+      }
+    });
+
+    (triviaHistory || []).forEach((t) => {
+      const dt = t.date ? t.date.slice(0, 10) : t.timestamp ? toIso(t.timestamp) : null;
+      if (dt) {
+        all.add(dt);
+        gm.add(dt);
+      }
+    });
+
+    (mathleticsHistory || []).forEach((m) => {
+      const dt = m.date ? m.date.slice(0, 10) : m.timestamp ? toIso(m.timestamp) : null;
+      if (dt) {
+        all.add(dt);
+        gm.add(dt);
+      }
+    });
+
+    (articulateHistory || []).forEach((a) => {
+      const dt = a.date ? a.date.slice(0, 10) : a.timestamp ? toIso(a.timestamp) : null;
+      if (dt) {
+        all.add(dt);
+        gm.add(dt);
+      }
+    });
+
+    (streak.history || []).forEach((h) => {
+      if (h.date) {
+        const dt = h.date.slice(0, 10);
+        all.add(dt);
+        if (!res.has(dt)) gm.add(dt);
+      }
+    });
+
+    return { activityDates: all, researchDates: res, gameDates: gm };
+  }, [sessions, triviaHistory, mathleticsHistory, articulateHistory, streak.history]);
 
   const { features, fetchFeatures } = useFeatureStore();
 
@@ -1566,7 +1635,7 @@ export default function Dashboard() {
       </motion.div>
 
       {/* ── Day 0 Milestone Tracker vs. Active Activity Heatmap ── */}
-      {sessions.length === 0 ? (
+      {activityDates.size === 0 ? (
         <motion.div
           variants={cardVariants}
           className="surface rounded-2xl p-6 mb-6 border-[1.5px] text-center py-8"
@@ -1595,20 +1664,26 @@ export default function Dashboard() {
                 Scholarly Consistency
               </span>
               <span className="text-xs font-mono font-medium" style={{ color: "var(--text-mute)" }}>
-                {sessions.length} sessions this year
+                {activityDates.size} active {activityDates.size === 1 ? "day" : "days"}
               </span>
             </div>
-            <ActivityHeatmap history={history} />
-            <div className="flex items-center justify-end gap-1.5 mt-3">
-              <span className="text-[10px] font-mono font-semibold" style={{ color: "var(--text-mute)" }}>Less</span>
-              {[0.35, 0.55, 0.75, 1].map((op, i) => (
+            <ActivityHeatmap researchDates={researchDates} gameDates={gameDates} />
+            <div className="flex flex-wrap items-center justify-end gap-3 mt-3 text-[10px] font-mono font-semibold" style={{ color: "var(--text-mute)" }}>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--terra)" }} />
+                <span>Research Challenge</span>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <div className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--olive)" }} />
+                <span>Games</span>
+              </div>
+              <div className="flex items-center gap-1.5">
                 <div
-                  key={i}
-                  className="w-2.5 h-2.5 rounded-[2px] border border-[var(--border)]"
-                  style={{ background: `var(--olive)`, opacity: op }}
+                  className="w-2.5 h-2.5 rounded-[2px]"
+                  style={{ background: "linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)" }}
                 />
-              ))}
-              <span className="text-[10px] font-mono font-semibold" style={{ color: "var(--text-mute)" }}>More</span>
+                <span>Both</span>
+              </div>
             </div>
           </motion.div>
 
@@ -1828,6 +1903,8 @@ export default function Dashboard() {
             profileXp={profile.xp}
             onBuyShield={buyStreakShield}
             activityDates={activityDates}
+            researchDates={researchDates}
+            gameDates={gameDates}
           />
         )}
       </AnimatePresence>

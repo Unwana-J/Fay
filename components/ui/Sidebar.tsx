@@ -59,6 +59,7 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
     streak,
     sessions,
     triviaHistory = [],
+    mathleticsHistory = [],
     articulateHistory = [],
     buyStreakShield,
     syncActivityDates,
@@ -83,32 +84,62 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
       .catch(() => {});
   }, [profile?.username, syncActivityDates]);
 
-  // Aggregate all unique active scholar dates across solo sessions, trivia, and articulate rooms
-  const activityDates = useMemo(() => {
-    const dates = new Set<string>();
-    (sessions || []).forEach((s) => s.date && dates.add(s.date));
+  // Separate research dates vs game dates for visual calendar distinction
+  const { activityDates, researchDates, gameDates } = useMemo(() => {
+    const all = new Set<string>();
+    const res = new Set<string>();
+    const gm = new Set<string>();
+
+    const toIso = (ts: number) => {
+      const d = new Date(ts);
+      const yr = d.getFullYear();
+      const mo = String(d.getMonth() + 1).padStart(2, "0");
+      const dy = String(d.getDate()).padStart(2, "0");
+      return `${yr}-${mo}-${dy}`;
+    };
+
+    (sessions || []).forEach((s) => {
+      if (s.date) {
+        const dt = s.date.slice(0, 10);
+        all.add(dt);
+        res.add(dt);
+      }
+    });
+
     (triviaHistory || []).forEach((t) => {
-      if (t.date) dates.add(t.date);
-      else if (t.timestamp) {
-        const d = new Date(t.timestamp);
-        const yr = d.getFullYear();
-        const mo = String(d.getMonth() + 1).padStart(2, "0");
-        const dy = String(d.getDate()).padStart(2, "0");
-        dates.add(`${yr}-${mo}-${dy}`);
+      const dt = t.date ? t.date.slice(0, 10) : t.timestamp ? toIso(t.timestamp) : null;
+      if (dt) {
+        all.add(dt);
+        gm.add(dt);
       }
     });
+
+    (mathleticsHistory || []).forEach((m) => {
+      const dt = m.date ? m.date.slice(0, 10) : m.timestamp ? toIso(m.timestamp) : null;
+      if (dt) {
+        all.add(dt);
+        gm.add(dt);
+      }
+    });
+
     (articulateHistory || []).forEach((a) => {
-      if (a.timestamp) {
-        const d = new Date(a.timestamp);
-        const yr = d.getFullYear();
-        const mo = String(d.getMonth() + 1).padStart(2, "0");
-        const dy = String(d.getDate()).padStart(2, "0");
-        dates.add(`${yr}-${mo}-${dy}`);
+      const dt = a.date ? a.date.slice(0, 10) : a.timestamp ? toIso(a.timestamp) : null;
+      if (dt) {
+        all.add(dt);
+        gm.add(dt);
       }
     });
-    (streak.history || []).forEach((h) => h.date && dates.add(h.date));
-    return dates;
-  }, [sessions, triviaHistory, articulateHistory, streak.history]);
+
+    (streak.history || []).forEach((h) => {
+      if (h.date) {
+        const dt = h.date.slice(0, 10);
+        all.add(dt);
+        if (!res.has(dt)) gm.add(dt);
+      }
+    });
+
+    return { activityDates: all, researchDates: res, gameDates: gm };
+  }, [sessions, triviaHistory, mathleticsHistory, articulateHistory, streak.history]);
 
   const isActive = (href: string) =>
     href === "/" ? pathname === "/" : pathname.startsWith(href);
@@ -307,6 +338,8 @@ export default function Sidebar({ onClose }: { onClose?: () => void }) {
             profileXp={profile.xp}
             onBuyShield={buyStreakShield}
             activityDates={activityDates}
+            researchDates={researchDates}
+            gameDates={gameDates}
           />
         )}
       </AnimatePresence>

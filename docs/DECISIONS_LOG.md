@@ -520,3 +520,23 @@
   6. **Post-Session 3-Question Recall Check (`components/research/ResearchQuizCard.tsx`)**: Generated inside the same `/api/ai/research` call (with a deterministic source-sentence fallback when Gemini times out). Shown on `Session Complete` as a non-blocking bonus card awarding `+15 XP` per correct answer plus `+15 XP` Perfect Recall bonus (`+60 XP` max), locked to one claim per session (`fey-research-quiz-claimed:<sessionId>`).
 - **"Building in Public" Content Takeaway**:
   > *"Don't let an LLM write your citations. Retrieve first, summarize second, and only show sources the summary actually used."*
+
+---
+
+## 28. Dual-Hue Activity Heatmaps & Streak Calendars: Distinguishing Deep Research from Parlor Games
+
+- **Date / Phase**: Phase 2 — Habit Visibility & Analytics Integrity
+- **The Problem / Context**:
+  Users earning multi-week streaks across both solo Feynman sprints and Parlor games (Trivia, Mathletics, Articulate) noticed that the Analytics Year Activity heatmap and Dashboard consistency grid only shaded days with solo `sessions`. A 20-day historical streak looked nearly empty on the Year Activity chart if most days were sustained via Trivia or Mathletics. Conversely, lumping all activities into a single uniform color blurs the distinction between deep vocal synthesis and quick daily games.
+- **User Insight & Guiding Philosophy**:
+  Every daily intellectual touchpoint counts toward the habit streak and deserves visual credit on the calendar and year heatmap, but the interface should visually distinguish **Research Challenges** from **Parlor Games** at a glance.
+- **Architectural & Product Landing**:
+  1. **Unified Activity Aggregation (`app/analytics/page.tsx`, `app/page.tsx`, `components/ui/Sidebar.tsx`)**:
+     - Partitioned daily activity into `researchDates` (`sessions`) and `gameDates` (`triviaHistory`, `mathleticsHistory`, `articulateHistory`, and synced `streak.history` dates).
+     - Upgraded `reconcileStreakState` in `store/useAppStore.ts` to compute the true maximum consecutive historical run across all merged activity dates so `streak.longest` is always accurately preserved.
+  2. **Semantic Color Coding (`components/ui/StreakCalendarModal.tsx`, `app/analytics/page.tsx`, `app/page.tsx`)**:
+     - **Wine Red (`var(--terra)`)**: Research Challenge completed on that day.
+     - **Forest Olive (`var(--olive)`)**: Parlor Games completed on that day.
+     - **Diagonal Split Gradient (`linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)`)**: Both a Research Challenge and Games completed on the same day.
+- **"Building in Public" Content Takeaway**:
+  > *"GitHub-style activity heatmaps break when your product has both high-effort deep work and low-friction daily games. By splitting cells into Wine Red for Research, Forest Olive for Games, and a diagonal split when a user does both, you reward every daily touchpoint without diluting the prestige of deep work."*

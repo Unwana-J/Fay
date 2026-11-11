@@ -226,9 +226,29 @@ export function reconcileStreakState(state: any): StreakData {
     currentStreak = 0;
   }
 
+  // Compute longest consecutive streak across all historical activityDates
+  let maxHistoricalStreak = 0;
+  let runningStreak = 0;
+  for (let i = 0; i < sortedDates.length; i++) {
+    if (i === 0) {
+      runningStreak = 1;
+    } else {
+      const gap = daysBetween(sortedDates[i - 1], sortedDates[i]);
+      if (gap === 1) {
+        runningStreak++;
+      } else if (gap > 1) {
+        runningStreak = 1;
+      }
+    }
+    if (runningStreak > maxHistoricalStreak) {
+      maxHistoricalStreak = runningStreak;
+    }
+  }
+
   const longest = Math.max(
     existingStreak.longest ?? 0,
     currentStreak,
+    maxHistoricalStreak,
     sortedDates.length > 0 ? 1 : 0
   );
 

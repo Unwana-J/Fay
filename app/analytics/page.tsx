@@ -8,8 +8,8 @@ import {
 } from "recharts";
 import { TrendingUp, Clock, Mic, BookOpen, Flame, Star } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
-import { getLast7Days, getLast52Weeks, getDayOfWeek } from "@/lib/utils";
-import { cn } from "@/lib/utils";
+import { getLast7Days, getLast52Weeks, getDayOfWeek, formatDateToIso } from "@/lib/utils";
+import { getStreakDates } from "@/components/ui/StreakCalendarModal";
 
 // ─── Custom Premium Palette for Charts ──────────────────────────────────────
 const EDITORIAL_PALETTE = [
@@ -64,10 +64,65 @@ function StatCard({ icon, label, value, sub }: { icon: React.ReactNode; label: s
 }
 
 export default function AnalyticsPage() {
-  const { sessions, streak } = useAppStore();
+  const {
+    sessions,
+    streak,
+    triviaHistory = [],
+    mathleticsHistory = [],
+    articulateHistory = [],
+  } = useAppStore();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
   if (!mounted) return null;
+
+  // ── Unified daily activity map (solo sessions, trivia, mathletics, articulate, streak history) ──
+  const histMap: Record<string, number> = {};
+  const researchMap: Record<string, number> = {};
+  const gamesMap: Record<string, number> = {};
+
+  const addResearchActivity = (dateStr: string | undefined, count = 1) => {
+    if (!dateStr) return;
+    const key = dateStr.slice(0, 10);
+    histMap[key] = (histMap[key] ?? 0) + count;
+    researchMap[key] = (researchMap[key] ?? 0) + count;
+  };
+
+  const addGameActivity = (dateStr: string | undefined, count = 1) => {
+    if (!dateStr) return;
+    const key = dateStr.slice(0, 10);
+    histMap[key] = (histMap[key] ?? 0) + count;
+    gamesMap[key] = (gamesMap[key] ?? 0) + count;
+  };
+
+  sessions.forEach((s) => addResearchActivity(s.date, 1));
+  triviaHistory.forEach((t) => {
+    const d = t.date || (t.timestamp ? formatDateToIso(new Date(t.timestamp)) : undefined);
+    addGameActivity(d, 1);
+  });
+  mathleticsHistory.forEach((m) => {
+    const d = m.date || (m.timestamp ? formatDateToIso(new Date(m.timestamp)) : undefined);
+    addGameActivity(d, 1);
+  });
+  articulateHistory.forEach((a) => {
+    const d = a.date || (a.timestamp ? formatDateToIso(new Date(a.timestamp)) : undefined);
+    addGameActivity(d, 1);
+  });
+  (streak.history || []).forEach((h) => {
+    if (h.date) {
+      const key = h.date.slice(0, 10);
+      if (!histMap[key]) {
+        const cnt = h.count || 1;
+        histMap[key] = cnt;
+        gamesMap[key] = cnt;
+      }
+    }
+  });
+  getStreakDates(streak.current, streak.lastDate).forEach((d) => {
+    if (!histMap[d]) {
+      histMap[d] = 1;
+      gamesMap[d] = 1;
+    }
+  });
 
   // ── Trend data (last 14 sessions) ──
   const trendData = sessions.slice(0, 14).reverse().map((s, i) => ({
@@ -81,13 +136,18 @@ export default function AnalyticsPage() {
   const last7 = getLast7Days();
   const weeklyData = last7.map((day) => ({
     name: new Date(day + "T00:00:00").toLocaleDateString("en-US", { weekday: "short" }),
-    sessions: sessions.filter((s) => s.date === day).length,
+    games: gamesMap[day] ?? 0,
     research: sessions.filter((s) => s.date === day).reduce((a, s) => a + s.researchMinutes, 0),
   }));
 
   // ── Category distribution ──
   const catCounts: Record<string, number> = {};
   sessions.forEach((s) => { catCounts[s.category] = (catCounts[s.category] ?? 0) + 1; });
+  triviaHistory.forEach((t) => {
+    (t.categoryBreakdown || []).forEach((cb) => {
+      if (cb.category) catCounts[cb.category] = (catCounts[cb.category] ?? 0) + 1;
+    });
+  });
   const pieData = Object.entries(catCounts).map(([cat, count], idx) => ({
     name: cat,
     value: count,
@@ -100,8 +160,6 @@ export default function AnalyticsPage() {
   const avgConf = sessions.length ? (sessions.reduce((a, s) => a + s.ratings.confidence, 0) / sessions.length).toFixed(1) : "0";
 
   // ── Heatmap ──
-  const histMap: Record<string, number> = {};
-  sessions.forEach((s) => { histMap[s.date] = (histMap[s.date] ?? 0) + 1; });
   const allDays = getLast52Weeks();
   const weeks: string[][] = [];
   let week: string[] = [];
@@ -206,12 +264,12 @@ export default function AnalyticsPage() {
               <XAxis dataKey="name" tick={{ fill: "var(--text-mute)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "var(--text-mute)", fontSize: 10 }} axisLine={false} tickLine={false} />
               <Tooltip content={<CustomTooltip />} />
-              <Bar dataKey="sessions" fill="var(--olive-br)" radius={[3,3,0,0]} name="Sessions" />
+              <Bar dataKey="games" fill="var(--olive-br)" radius={[3,3,0,0]} name="Games Played" />
               <Bar dataKey="research" fill="var(--terra)" radius={[3,3,0,0]} name="Research Min" />
             </BarChart>
           </ResponsiveContainer>
           <div className="flex items-center gap-4 mt-2">
-            {[{ color: "var(--olive-br)", label: "Sessions" }, { color: "var(--terra)", label: "Research min" }].map((l) => (
+            {[{ color: "var(--olive-br)", label: "Games played" }, { color: "var(--terra)", label: "Research min" }].map((l) => (
               <div key={l.label} className="flex items-center gap-1.5 text-xs" style={{ color: "var(--text-dim)" }}>
                 <div className="w-2.5 h-2.5 rounded-full" style={{ background: l.color }} />{l.label}
               </div>
@@ -250,28 +308,66 @@ export default function AnalyticsPage() {
 
       {/* Activity heatmap */}
       <motion.div variants={cardVariants} className="rounded-xl p-5 surface">
-        <h3 className="text-heading mb-4" style={{ fontSize: "0.9rem" }}>Year Activity</h3>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-4">
+          <h3 className="text-heading" style={{ fontSize: "0.9rem" }}>Year Activity</h3>
+          <div className="flex flex-wrap items-center gap-4 text-xs" style={{ color: "var(--text-dim)" }}>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--terra)" }} />
+              <span>Research Challenge</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div className="w-2.5 h-2.5 rounded-[2px]" style={{ background: "var(--olive)" }} />
+              <span>Games</span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              <div
+                className="w-2.5 h-2.5 rounded-[2px]"
+                style={{ background: "linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)" }}
+              />
+              <span>Both</span>
+            </div>
+          </div>
+        </div>
         <div className="overflow-x-auto">
           <div className="flex gap-0.5 min-w-max">
             {weeks.map((wk, wi) => (
               <div key={wi} className="flex flex-col gap-0.5">
-                {wk.map((day, di) =>
-                  day === "" ? <div key={di} className="w-[11px] h-[11px]" /> : (
-                    <div key={di} title={day}
+                {wk.map((day, di) => {
+                  if (day === "") return <div key={di} className="w-[11px] h-[11px]" />;
+                  const resCount = researchMap[day] ?? 0;
+                  const gmCount = gamesMap[day] ?? 0;
+                  const totalCount = histMap[day] ?? 0;
+
+                  let bg = "var(--olive-dim)";
+                  if (resCount > 0 && gmCount > 0) {
+                    bg = "linear-gradient(135deg, var(--terra) 50%, var(--olive) 50%)";
+                  } else if (resCount > 0) {
+                    bg = resCount === 1 ? "rgba(122,28,46,0.55)" : resCount === 2 ? "rgba(122,28,46,0.8)" : "var(--terra)";
+                  } else if (gmCount > 0) {
+                    bg = gmCount === 1 ? "rgba(68,78,44,0.45)" : gmCount === 2 ? "rgba(68,78,44,0.75)" : "var(--olive)";
+                  }
+
+                  const tooltipLabel =
+                    resCount > 0 && gmCount > 0
+                      ? `${day} · Research (${resCount}) & Games (${gmCount})`
+                      : resCount > 0
+                      ? `${day} · Research Challenge (${resCount})`
+                      : gmCount > 0
+                      ? `${day} · Games (${gmCount})`
+                      : day;
+
+                  return (
+                    <div
+                      key={di}
+                      title={tooltipLabel}
                       className="w-[11px] h-[11px] rounded-[2px] transition-colors cursor-default"
                       style={{
-                        background: !histMap[day]
-                          ? "var(--olive-dim)"
-                          : histMap[day] === 1
-                          ? "rgba(68,78,44,0.4)"
-                          : histMap[day] === 2
-                          ? "rgba(68,78,44,0.7)"
-                          : "var(--olive)",
-                        opacity: !histMap[day] ? 0.4 : 1,
+                        background: bg,
+                        opacity: totalCount === 0 ? 0.4 : 1,
                       }}
                     />
-                  )
-                )}
+                  );
+                })}
               </div>
             ))}
           </div>
