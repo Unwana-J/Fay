@@ -46,9 +46,25 @@ export interface ActiveSession {
   stage: "research" | "notes" | "speaking" | "reflection";
   startedAt: number;
   researchDurationMin: number;
+  speakingDurationSec?: number;
   notes: string;
   researchCompletedAt?: number;
   speakingCompletedAt?: number;
+}
+
+export interface ScheduledTopicItem {
+  date: string; // YYYY-MM-DD (scheduled date)
+  topic: Topic;
+  addedAt: number;
+}
+
+export function getNext7ScheduleDays(baseDateStr: string = todayStr()): string[] {
+  const base = new Date(baseDateStr + "T00:00:00");
+  return Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(base);
+    d.setDate(d.getDate() + i + 1);
+    return formatDateToIso(d);
+  });
 }
 
 export interface StreakData {
@@ -345,6 +361,12 @@ export interface AppState {
   activeSession: ActiveSession | null;
   pendingTopic: Topic | null;
   setPendingTopic: (topic: Topic | null) => void;
+  queuedTomorrowTopic: { topic: Topic; queuedDate: string } | null;
+  setQueuedTomorrowTopic: (topic: Topic | null) => void;
+  scheduledTopics: ScheduledTopicItem[];
+  scheduleTopicForDate: (topic: Topic, date: string) => void;
+  queueTopicNextAvailableDay: (topic: Topic) => { scheduledDate: string | null; isFull: boolean };
+  removeScheduledTopic: (date: string) => void;
 
   // Streak
   streak: StreakData;
@@ -378,8 +400,15 @@ export interface AppState {
   mathleticsHistory: MathleticsHistoryItem[];
 
   // Actions
-  startSession: (topic: Topic, researchMin: number, initialStage?: "research" | "speaking") => string;
+  startSession: (
+    topic: Topic,
+    researchMin: number,
+    initialStage?: "research" | "speaking",
+    speakingDurationSec?: number,
+    initialNotes?: string
+  ) => string;
   updateActiveSessionStage: (stage: ActiveSession["stage"]) => void;
+  updateActiveSessionSpeakingSec: (speakingDurationSec: number) => void;
   updateNotes: (notes: string) => void;
   completeSession: (data: {
     notes: string;
@@ -472,6 +501,98 @@ export const useAppStore = create<AppState>()(
       activeSession: null,
       pendingTopic: null,
       setPendingTopic: (topic) => set({ pendingTopic: topic }),
+      queuedTomorrowTopic: null,
+      scheduledTopics: [],
+      setQueuedTomorrowTopic: (topic) => {
+        const next7 = getNext7ScheduleDays();
+        const tomorrowIso = next7[0];
+        set((s) => {
+          const existing = (s.scheduledTopics || []).filter((item) => item.date >= todayStr());
+          if (!topic) {
+            return {
+              queuedTomorrowTopic: null,
+              scheduledTopics: existing.filter((item) => item.date !== tomorrowIso),
+            };
+          }
+          const withoutTomorrowOrSameTopic = existing.filter(
+            (item) => item.date !== tomorrowIso && item.topic.id !== topic.id
+          );
+          const updated = [
+            ...withoutTomorrowOrSameTopic,
+            { date: tomorrowIso, topic, addedAt: Date.now() },
+          ]
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .slice(0, 7);
+          return {
+            queuedTomorrowTopic: { topic, queuedDate: todayStr() },
+            scheduledTopics: updated,
+          };
+        });
+      },
+      scheduleTopicForDate: (topic, date) => {
+        const today = todayStr();
+        const next7 = getNext7ScheduleDays(today);
+        const tomorrowIso = next7[0];
+        set((s) => {
+          const active = (s.scheduledTopics || []).filter(
+            (item) => item.date >= today && item.date !== date && item.topic.id !== topic.id
+          );
+          const updated = [...active, { date, topic, addedAt: Date.now() }]
+            .sort((a, b) => a.date.localeCompare(b.date))
+            .slice(0, 7);
+          const tomorrowEntry = updated.find((item) => item.date === tomorrowIso);
+          return {
+            scheduledTopics: updated,
+            queuedTomorrowTopic: tomorrowEntry
+              ? { topic: tomorrowEntry.topic, queuedDate: today }
+              : null,
+          };
+        });
+      },
+      queueTopicNextAvailableDay: (topic) => {
+        const today = todayStr();
+        const next7 = getNext7ScheduleDays(today);
+        const tomorrowIso = next7[0];
+        const state = get();
+        const active = (state.scheduledTopics || []).filter((item) => item.date >= today);
+
+        // If this topic is already scheduled, return its date
+        const already = active.find((item) => item.topic.id === topic.id);
+        if (already) {
+          return { scheduledDate: already.date, isFull: false };
+        }
+
+        const takenDates = new Set(active.map((item) => item.date));
+        const openDate = next7.find((d) => !takenDates.has(d));
+        if (!openDate || active.filter((item) => next7.includes(item.date)).length >= 7) {
+          return { scheduledDate: null, isFull: true };
+        }
+
+        const updated = [...active, { date: openDate, topic, addedAt: Date.now() }]
+          .sort((a, b) => a.date.localeCompare(b.date))
+          .slice(0, 7);
+        const tomorrowEntry = updated.find((item) => item.date === tomorrowIso);
+
+        set({
+          scheduledTopics: updated,
+          queuedTomorrowTopic: tomorrowEntry
+            ? { topic: tomorrowEntry.topic, queuedDate: today }
+            : state.queuedTomorrowTopic,
+        });
+        return { scheduledDate: openDate, isFull: false };
+      },
+      removeScheduledTopic: (date) => {
+        const today = todayStr();
+        const tomorrowIso = getNext7ScheduleDays(today)[0];
+        set((s) => {
+          const updated = (s.scheduledTopics || []).filter((item) => item.date !== date);
+          return {
+            scheduledTopics: updated,
+            queuedTomorrowTopic:
+              date === tomorrowIso ? null : s.queuedTomorrowTopic,
+          };
+        });
+      },
       streak: {
         current: 0,
         longest: 0,
@@ -784,20 +905,31 @@ export const useAppStore = create<AppState>()(
       },
 
 
-      startSession: (topic, researchMin, initialStage = "research") => {
+      startSession: (topic, researchMin, initialStage = "research", speakingDurationSec, initialNotes) => {
         const id = uid();
-        set({
+        set((s) => ({
           pendingTopic: null,
+          queuedTomorrowTopic:
+            s.queuedTomorrowTopic?.topic.id === topic.id ? null : s.queuedTomorrowTopic,
+          scheduledTopics: (s.scheduledTopics || []).filter(
+            (item) => item.topic.id !== topic.id
+          ),
           activeSession: {
             id,
             topic,
             stage: initialStage,
             startedAt: Date.now(),
             researchDurationMin: researchMin,
-            notes: initialStage === "speaking" ? "Impromptu Articulation (Direct-to-speech sprint)" : "",
+            ...(speakingDurationSec ? { speakingDurationSec } : {}),
+            notes:
+              initialNotes !== undefined
+                ? initialNotes
+                : initialStage === "speaking"
+                ? "Impromptu Articulation (Direct-to-speech sprint)"
+                : "",
             ...(initialStage === "speaking" ? { researchCompletedAt: Date.now() } : {}),
           },
-        });
+        }));
         analytics.trackSprintStarted({
           topicId: topic.id,
           topicText: topic.text,
@@ -828,6 +960,17 @@ export const useAppStore = create<AppState>()(
         }));
       },
 
+      updateActiveSessionSpeakingSec: (speakingDurationSec) => {
+        set((s) => ({
+          activeSession: s.activeSession
+            ? {
+                ...s.activeSession,
+                speakingDurationSec,
+              }
+            : null,
+        }));
+      },
+
       updateNotes: (notes) => {
         set((s) => ({
           activeSession: s.activeSession ? { ...s.activeSession, notes } : null,
@@ -841,8 +984,12 @@ export const useAppStore = create<AppState>()(
         const today = todayStr();
 
         // Advance streak using unified helper
+        const isFirstCompletionToday = state.streak?.lastDate !== today;
         const updatedStreak = advanceStreakState(state.streak, today);
         const currentStreak = updatedStreak.current;
+        if (isFirstCompletionToday && currentStreak === 3) {
+          updatedStreak.shields = (updatedStreak.shields ?? 0) + 1;
+        }
         const remainingShields = updatedStreak.shields;
         const longest = updatedStreak.longest;
 
@@ -850,6 +997,10 @@ export const useAppStore = create<AppState>()(
         let xpEarned = DIFFICULTY_XP[topic.difficulty] ?? 100;
         // streak bonus
         xpEarned += currentStreak * 10;
+        // Day 2 habit cliff momentum bonus (+50 XP)
+        if (isFirstCompletionToday && currentStreak === 2) {
+          xpEarned += 50;
+        }
         // research bonus
         if (researchDurationMin >= 20) xpEarned += 25;
         // speaking bonus

@@ -475,3 +475,34 @@
 - **"Building in Public" Content Takeaway**:
   > *"Desktop AI assistants fail when they treat meetings as a monolith. Real product managers need mid-meeting side-channel logging: pause continuous recording, synthesize a structured technical debt bullet into your active Superhuman draft, and resume listening to the call without dropping a single beat."*
 
+---
+
+## 26. Behavioral Nudges, In-Sprint Speaking Scaffolding & Next-Day Return Loops
+
+- **Date / Phase**: Phase 2 — Behavioral Growth, Retention Mechanics & Cross-Pollination
+- **The Problem / Context**:
+  1. **Blank-Mic Anxiety & Mid-Sprint Bailouts**: Speaking aloud into a live microphone has the highest activation energy in the app. Users often hesitated during the 3-2-1 countdown, froze mid-recording around the 30-second mark, or clicked `Leave session` before completing their Daily Voice quest.
+  2. **Games as Isolated Silos**: Casual game players on Naija Trivia completed rounds and either left or replayed in isolation without ever crossing over into Fey's core vocal articulation loop.
+  3. **Post-Completion Dead End**: The `StageComplete` screen rewarded users with XP and share cards, but ended with a dead-end `Back to Dashboard` button—missing the peak dopamine moment to lock in a commitment for Day 2 and Day 3.
+- **User Insight & Guiding Philosophy**:
+  Completion screens should never be a full stop; they should be a bridge to the next habit loop. By reducing microphone cold-start friction during the sprint, offering a low-friction 45-second downsell on exit intent, cross-pollinating missed trivia concepts into 60-second voice challenges, and letting users lock in tomorrow's topic before leaving, we turn isolated sessions into a compounding multi-day habit.
+- **Architectural & Product Landing**:
+  1. **In-Sprint Speaking Scaffolding (`app/session/[id]/page.tsx`)**:
+     - Added a dynamic **Opening Sentence Starter** (`getFirstSentenceStarter`) displayed during the 3-2-1 countdown and first 15 seconds of recording to eliminate blank-mic hesitation.
+     - Added a 3-stage **Timed Speaking Scaffold** (`getSpeakingScaffoldStep`) below the live waveform that smoothly transitions across elapsed time: *Step 1: Plain Definition (0–40%)* → *Step 2: Real-World Analogy (40–75%)* → *Step 3: Why It Matters (75–100%)*.
+  2. **Exit-Intent Downsell Nudge (`app/session/[id]/page.tsx` & `store/useAppStore.ts`)**:
+     - Intercepted `Leave session` / `Abandon` during active research or speaking with a dignified modal that highlights endowed progress (*"1 Step Away from Daily Voice"*) and offers a 1-click downsell (`Switch to 45s Quick Summary` via `speakingDurationSec: 45`), preserving the user's daily streak instead of letting them churn.
+  3. **Game-to-Voice Cross-Pollination & 1-Shot Capped Redemption (`app/games/trivia/TriviaGameClient.tsx`)**:
+     - Added a dual-action **Next-Tier Nudge** on Trivia Results:
+       - **1-Shot Redemption (`Retry X Missed · Capped 85%`)**: Allows a single redemption pass on missed questions only (`hasUsedRedemption`), with recovery weighted at `0.5x` and hard-capped at `85%` (preventing 100% perfection via retries and preserving first-attempt leaderboard integrity while awarding `+2 Recovery XP` per redeemed answer).
+       - **Play Fresh Deck**: Launches a brand-new unseen question deck immediately.
+     - Added a **Turn a Missed Question into Mastery (+50 Bonus XP)** card that converts a missed trivia question (and its explanation) directly into a 60-second Impromptu Voice Challenge (`/session/[id]`).
+  4. **3-Day Habit Momentum Track & 7-Day Study Schedule (`store/useAppStore.ts`, `app/library/page.tsx`, `app/session/[id]/page.tsx`, `app/page.tsx`)**:
+     - Built a functional **3-Day Habit Momentum Track** rewarding the critical Day 1 → Day 2 → Day 3 retention cliff: Day 1 (`First Voice`), Day 2 (`+50 Bonus XP` automatically awarded in `completeSession`), and Day 3 (`+1 Streak Shield` automatically awarded in `completeSession`).
+     - Upgraded the single-topic queue into a **7-Day Study Schedule** (`scheduledTopics` capped at 7 days, 1 topic per day across the next 7 calendar days via `getNext7ScheduleDays()`).
+     - Added a dedicated **7-Day Schedule (`X/7`)** tab in `/library` (`app/library/page.tsx`) where users can view all 7 upcoming day slots, filter uncompleted topics by difficulty level (`Novice` / `Scholar` / `Expert`) and discipline in the Topic Finder Modal, and assign, swap, or launch scheduled topics.
+     - On each calendar day (`date <= todayStr()`), the Dashboard (`app/page.tsx`) automatically promotes that day's scheduled topic into the Hero Workspace and triggers a **Welcome-Back Login Reminder Modal** (`Scheduled for Today · Ready`) with 1-click `Start Scheduled Topic (15m)` and `Impromptu (90s)` CTAs.
+- **"Building in Public" Content Takeaway**:
+  > *"Don't treat your completion screen or library as passive archives. Turn your Library into a 7-day study planner where learners lock in level-matched inquiries for the week ahead—and greet them each morning with the exact promise they made to themselves."*
+
+

@@ -14,9 +14,10 @@ import {
   Bold, Italic, List, ListOrdered, CheckSquare,
   ChevronRight, Star, ArrowLeft, Zap, Volume2, RefreshCcw, Globe,
   Share2, Check, ExternalLink, Sparkles, Image as ImageIcon,
+  Calendar, ShieldCheck, Flame, Target, MessageSquareQuote,
 } from "lucide-react";
 import { useAppStore, type ActiveSession } from "@/store/useAppStore";
-import { CATEGORY_ICONS, CATEGORY_COLORS } from "@/lib/topics";
+import { CATEGORY_ICONS, CATEGORY_COLORS, TOPIC_BANK, DIFFICULTY_LABELS, type Topic, type Difficulty } from "@/lib/topics";
 import { formatTime, cn } from "@/lib/utils";
 import ShareNoteModal from "@/components/notes/ShareNoteModal";
 import { FeyLogo } from "@/components/ui/FeyLogo";
@@ -428,13 +429,48 @@ function StageResearch({ session, onAdvance, onAbandon }: {
   );
 }
 
+// ─── Speaking Starter & Timed Scaffolding Helpers ────────────────────────────
+function getFirstSentenceStarter(topicText: string): string {
+  const clean = topicText
+    .replace(/^(How|Why|What|When|Where)\s+(does|do|is|are|can|did|will|should)\s+/i, "")
+    .replace(/\?$/, "")
+    .trim();
+  if (clean.length > 0 && clean.length < 55) {
+    return `"At its core, ${clean.charAt(0).toLowerCase() + clean.slice(1)} comes down to one simple idea..."`;
+  }
+  return `"Imagine explaining this to a curious friend: the main mechanism works by..."`;
+}
+
+function getSpeakingScaffoldStep(liveElapsed: number, totalSeconds: number) {
+  const pct = totalSeconds > 0 ? liveElapsed / totalSeconds : 0;
+  if (pct < 0.4) {
+    return {
+      step: 1,
+      label: "Step 1 of 3 · Plain Definition",
+      prompt: "State the core idea in plain, everyday words. Avoid technical jargon.",
+    };
+  }
+  if (pct < 0.75) {
+    return {
+      step: 2,
+      label: "Step 2 of 3 · Real-World Analogy",
+      prompt: "Give one concrete example or 'imagine if...' comparison.",
+    };
+  }
+  return {
+    step: 3,
+    label: "Step 3 of 3 · Why It Matters",
+    prompt: "Wrap up your synthesis: why does this concept matter in practice?",
+  };
+}
+
 // ─── Stage Speaking ───────────────────────────────────────────────────────────
 function StageSpeaking({ session, onComplete, onAbandon }: {
   session: ActiveSession;
   onComplete: (speakingSeconds: number, blob: Blob | null) => void;
   onAbandon: () => void;
 }) {
-  const TOTAL = 60;
+  const TOTAL = session.speakingDurationSec || 60;
   const [phase, setPhase] = useState<"countdown" | "recording" | "done">("countdown");
   const [countdown, setCountdown] = useState(3);
   const [secondsLeft, setSecondsLeft] = useState(TOTAL);
@@ -448,6 +484,11 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const startTsRef = useRef(0);
   const { topic } = session;
+  const starterSentence = useMemo(() => getFirstSentenceStarter(topic.text), [topic.text]);
+
+  useEffect(() => {
+    setSecondsLeft(TOTAL);
+  }, [TOTAL]);
 
   // Countdown
   useEffect(() => {
@@ -511,6 +552,7 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
   }
 
   const liveElapsed = TOTAL - secondsLeft;
+  const scaffold = getSpeakingScaffoldStep(liveElapsed, TOTAL);
 
   return (
     <div className="flex flex-col items-center justify-center min-h-[500px] gap-8">
@@ -527,7 +569,19 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
             <div className="text-9xl font-bold font-space leading-none" style={{ color: "var(--terra)" }}>
               {countdown === 0 ? "Go!" : countdown}
             </div>
-            <div className="text-sm max-w-md text-center" style={{ color: "var(--text-dim)" }}>{topic.text}</div>
+            <div className="text-sm max-w-md text-center font-semibold" style={{ color: "var(--text)" }}>{topic.text}</div>
+            <div
+              className="mt-2 rounded-xl px-4 py-3 border max-w-md text-center surface"
+              style={{ borderColor: "var(--border-dim)" }}
+            >
+              <div className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)] mb-1 flex items-center justify-center gap-1.5">
+                <MessageSquareQuote size={12} />
+                <span>Opening Sentence Starter</span>
+              </div>
+              <p className="text-xs font-serif italic" style={{ color: "var(--text-dim)" }}>
+                {starterSentence}
+              </p>
+            </div>
           </motion.div>
         )}
 
@@ -536,14 +590,14 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
             key="recording"
             initial={{ opacity: 0, y: 16 }}
             animate={{ opacity: 1, y: 0 }}
-            className="flex flex-col items-center gap-6 w-full max-w-md"
+            className="flex flex-col items-center gap-5 w-full max-w-md"
           >
             <div className="flex items-center gap-2 px-4 py-1.5 rounded-full border" style={{ backgroundColor: "var(--red-bg)", borderColor: "var(--red)" }}>
               <div className="w-2 h-2 rounded-full bg-[#D94F4F] animate-pulse" />
               <span className="text-red-400 text-xs font-semibold uppercase tracking-wider">Active mic</span>
             </div>
 
-            <div className="relative flex items-center justify-center my-4">
+            <div className="relative flex items-center justify-center my-2">
               <motion.div
                 className="absolute rounded-full border-2 border-[var(--terra)]/20"
                 style={{ width: 220, height: 220 }}
@@ -560,6 +614,41 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
             </div>
 
             <Waveform active={true} analyser={analyser} />
+
+            {/* Timed Speaking Scaffolding Cue */}
+            <div
+              className="w-full rounded-xl p-3.5 border transition-all"
+              style={{
+                background: "var(--bg-panel)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1.5">
+                <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)]">
+                  {scaffold.label}
+                </span>
+                <div className="flex items-center gap-1">
+                  {[1, 2, 3].map((s) => (
+                    <span
+                      key={s}
+                      className="h-1.5 rounded-full transition-all duration-300"
+                      style={{
+                        width: s === scaffold.step ? 18 : 6,
+                        backgroundColor: s <= scaffold.step ? "var(--olive)" : "var(--border)",
+                      }}
+                    />
+                  ))}
+                </div>
+              </div>
+              <p className="text-xs font-medium leading-relaxed" style={{ color: "var(--text)" }}>
+                {scaffold.prompt}
+              </p>
+              {liveElapsed < 15 && (
+                <p className="text-[11px] font-serif italic mt-1.5 pt-1.5 border-t" style={{ color: "var(--text-dim)", borderColor: "var(--border-dim)" }}>
+                  Try starting with: {starterSentence}
+                </p>
+              )}
+            </div>
 
             <div className="rounded-2xl p-5 text-center w-full surface">
               <div className="text-label mb-2">Your topic</div>
@@ -891,11 +980,74 @@ function StageComplete({
 }) {
   const { ACHIEVEMENTS } = require("@/lib/achievements");
   const unlockedAchs = ACHIEVEMENTS.filter((a: any) => newAchievements.includes(a.id));
-  const { toggleFavoriteTopic, settings, profile } = useAppStore();
+  const {
+    toggleFavoriteTopic,
+    settings,
+    updateSettings,
+    profile,
+    sessions,
+    queuedTomorrowTopic,
+    setQueuedTomorrowTopic,
+    scheduledTopics,
+    queueTopicNextAvailableDay,
+    removeScheduledTopic,
+  } = useAppStore();
   const isFav = settings.favoriteTopics?.includes(topicId);
   const [copiedDispatch, setCopiedDispatch] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  const activeDifficulty: Difficulty =
+    (settings.difficultyMode as Difficulty) ||
+    (topicDifficulty as Difficulty) ||
+    "Novice";
+
+  // Curate 2 uncompleted next-day topics matching user's difficulty level & favorite categories
+  const tomorrowCandidates = useMemo(() => {
+    const completedIds = new Set([...sessions.map((s) => s.topicId), topicId]);
+    const favCats = settings.favoriteCategories?.length
+      ? settings.favoriteCategories
+      : settings.enabledCategories?.length
+      ? settings.enabledCategories
+      : [topicCategory];
+
+    // 1. Strict match: user's favorite categories + user's difficulty level (e.g., Novice)
+    const levelAndCatPool = TOPIC_BANK.filter(
+      (t) =>
+        !completedIds.has(t.id) &&
+        t.difficulty === activeDifficulty &&
+        (t.category === topicCategory || favCats.includes(t.category))
+    );
+
+    // 2. Fallback: any uncompleted topic at user's difficulty level
+    const levelOnlyPool = TOPIC_BANK.filter(
+      (t) => !completedIds.has(t.id) && t.difficulty === activeDifficulty
+    );
+
+    // 3. Final fallback: category match if all topics at that difficulty are completed
+    const fallbackPool = TOPIC_BANK.filter(
+      (t) => !completedIds.has(t.id) && (t.category === topicCategory || favCats.includes(t.category))
+    );
+
+    const pool =
+      levelAndCatPool.length >= 2
+        ? levelAndCatPool
+        : levelOnlyPool.length >= 2
+        ? levelOnlyPool
+        : fallbackPool.length >= 2
+        ? fallbackPool
+        : TOPIC_BANK.filter((t) => !completedIds.has(t.id));
+
+    if (pool.length <= 2) return pool;
+    const seed = topicId.split("").reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+    const first = pool[seed % pool.length];
+    const secondPool = pool.filter((t) => t.id !== first.id && t.category !== first.category);
+    const second =
+      secondPool.length > 0
+        ? secondPool[(seed + 7) % secondPool.length]
+        : pool[(seed + 1) % pool.length];
+    return [first, second];
+  }, [sessions, topicId, topicCategory, settings.favoriteCategories, settings.enabledCategories, activeDifficulty]);
 
   useEffect(() => { fireConfetti(); }, []);
 
@@ -1251,9 +1403,9 @@ function StageComplete({
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.4 }}
-          className="rounded-2xl p-5 surface"
+          className="rounded-2xl p-5 surface w-full"
         >
-          <div className="text-label mb-3">🎉 Achievements unlocked!</div>
+          <div className="text-label mb-3">Achievements unlocked</div>
           <div className="flex flex-wrap gap-2 justify-center">
             {unlockedAchs.map((a: any) => (
               <div key={a.id} className="flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold tag tag-gold">
@@ -1261,6 +1413,201 @@ function StageComplete({
                 <span>{a.title}</span>
               </div>
             ))}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── 3-Day Habit Momentum Track (Day 1 → Day 2 → Day 3 Retention Nudge) ── */}
+      <motion.div
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.42 }}
+        className="w-full rounded-2xl p-5 border surface text-left"
+        style={{ borderColor: "var(--border)" }}
+      >
+        <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+          <div className="flex items-center gap-2">
+            <Flame size={15} className="text-[var(--terra)]" />
+            <span className="font-serif font-bold text-sm" style={{ color: "var(--text)" }}>
+              3-Day Habit Momentum
+            </span>
+          </div>
+          <span className="text-[11px] font-mono font-semibold text-[var(--gold)]">
+            {streak === 1
+              ? "Come back tomorrow for +50 Bonus XP"
+              : streak === 2
+              ? "Day 2 Bonus Unlocked · 1 day to Bonus Shield"
+              : `${streak}-Day Streak Active`}
+          </span>
+        </div>
+
+        <div className="grid grid-cols-3 gap-2.5">
+          {[
+            { day: 1, title: "Day 1", reward: "First Voice", done: streak >= 1 },
+            { day: 2, title: "Day 2", reward: "+50 Bonus XP", done: streak >= 2 },
+            { day: 3, title: "Day 3", reward: "+1 Streak Shield", done: streak >= 3 },
+          ].map((step) => (
+            <div
+              key={step.day}
+              className="rounded-xl p-3 border transition-all"
+              style={{
+                borderColor: step.done ? "var(--gold)" : "var(--border-dim)",
+                background: step.done ? "rgba(166, 124, 30, 0.08)" : "var(--bg-card)",
+              }}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--text-mute)]">
+                  {step.title}
+                </span>
+                {step.done ? (
+                  <CheckCircle2 size={13} className="text-[var(--gold)]" />
+                ) : (
+                  <ShieldCheck size={13} className="text-[var(--text-mute)] opacity-50" />
+                )}
+              </div>
+              <div
+                className="text-xs font-bold"
+                style={{ color: step.done ? "var(--gold)" : "var(--text)" }}
+              >
+                {step.reward}
+              </div>
+            </div>
+          ))}
+        </div>
+      </motion.div>
+
+      {/* ── Queue Tomorrow's Topic (Next-Day Return Commitment Hook) ── */}
+      {tomorrowCandidates.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 14 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.48 }}
+          className="w-full rounded-2xl p-5 border surface-raised text-left"
+          style={{
+            borderColor: queuedTomorrowTopic ? "var(--olive)" : "var(--border)",
+            background: "var(--bg-card)",
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <Calendar size={15} className="text-[var(--olive)]" />
+              <span className="font-serif font-bold text-sm sm:text-base" style={{ color: "var(--text)" }}>
+                Queue Tomorrow&apos;s Topic
+              </span>
+              <span className="tag tag-olive text-[10px] font-mono">
+                {DIFFICULTY_LABELS[activeDifficulty]?.icon ?? "I"} {activeDifficulty} Level
+              </span>
+            </div>
+            <div className="flex items-center gap-1.5">
+              {(["Novice", "Scholar", "Expert"] as Difficulty[]).map((lvl) => {
+                const isCurrent = activeDifficulty === lvl;
+                return (
+                  <button
+                    key={lvl}
+                    type="button"
+                    onClick={() => updateSettings({ difficultyMode: lvl })}
+                    className="px-2 py-0.5 rounded-md text-[10px] font-mono font-semibold border transition-colors cursor-pointer"
+                    style={{
+                      borderColor: isCurrent ? "var(--terra)" : "var(--border-dim)",
+                      backgroundColor: isCurrent ? "var(--terra)" : "var(--bg-panel)",
+                      color: isCurrent ? "#FFFFFF" : "var(--text-mute)",
+                    }}
+                    title={`Show ${lvl} level topics for tomorrow`}
+                  >
+                    {lvl}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          <p className="text-xs mb-4 leading-relaxed" style={{ color: "var(--text-dim)" }}>
+            Matched to your <strong>{activeDifficulty}</strong> level and selected categories. Choose one to have waiting on your dashboard tomorrow:
+          </p>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            {tomorrowCandidates.map((cand: Topic) => {
+              const scheduledEntry = (scheduledTopics ?? []).find(
+                (s) => s.topic.id === cand.id
+              );
+              const isSelected =
+                Boolean(scheduledEntry) ||
+                queuedTomorrowTopic?.topic.id === cand.id;
+              const candColor = CATEGORY_COLORS[cand.category] || "var(--olive)";
+              return (
+                <div
+                  key={cand.id}
+                  className="rounded-xl p-3.5 border flex flex-col justify-between gap-3 transition-all"
+                  style={{
+                    borderColor: isSelected ? "var(--olive)" : "var(--border-dim)",
+                    background: isSelected ? "rgba(68, 78, 44, 0.08)" : "var(--bg-panel)",
+                  }}
+                >
+                  <div>
+                    <div className="flex items-center justify-between gap-2 mb-1.5">
+                      <span
+                        className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md"
+                        style={{
+                          backgroundColor: `${candColor}15`,
+                          color: candColor,
+                          border: `1px solid ${candColor}30`,
+                        }}
+                      >
+                        {cand.category}
+                      </span>
+                      <span className="text-[10px] font-mono text-[var(--text-mute)]">
+                        {cand.difficulty}
+                      </span>
+                    </div>
+                    <p className="font-serif font-bold text-xs sm:text-sm leading-snug" style={{ color: "var(--text)" }}>
+                      {cand.text}
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (scheduledEntry) {
+                        removeScheduledTopic(scheduledEntry.date);
+                      } else if (isSelected) {
+                        setQueuedTomorrowTopic(null);
+                      } else {
+                        queueTopicNextAvailableDay(cand);
+                      }
+                    }}
+                    className={cn(
+                      "w-full py-2 px-3 rounded-lg text-xs font-mono font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer",
+                      isSelected
+                        ? "bg-[var(--olive)] text-white"
+                        : "border border-[var(--border)] bg-[var(--bg-card)] hover:border-[var(--olive)] text-[var(--text)]"
+                    )}
+                  >
+                    {isSelected ? (
+                      <>
+                        <Check size={13} />
+                        <span>Scheduled ({(scheduledTopics ?? []).length}/7)</span>
+                      </>
+                    ) : (
+                      <>
+                        <Target size={13} className="text-[var(--terra)]" />
+                        <span>Lock in for Tomorrow</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+
+          <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs flex-wrap gap-2" style={{ borderColor: "var(--border-dim)" }}>
+            <span className="text-[11px] font-mono text-[var(--text-mute)]">
+              Up to 7 days of topics can be planned ahead ({(scheduledTopics ?? []).length}/7 scheduled)
+            </span>
+            <a
+              href="/library?tab=schedule"
+              className="text-xs font-mono font-semibold text-[var(--olive)] hover:underline"
+            >
+              Manage 7-Day Schedule in Library →
+            </a>
           </div>
         </motion.div>
       )}
@@ -1302,11 +1649,21 @@ const stageSlideVariants = {
 export default function SessionPage({ params }: { params: Promise<{ id: string }> }) {
   const unwrappedParams = use(params);
   const router = useRouter();
-  const { activeSession, updateActiveSessionStage, updateNotes, completeSession, abandonSession, streak, triggerActivityFeedbackIfEligible } = useAppStore();
+  const {
+    activeSession,
+    updateActiveSessionStage,
+    updateActiveSessionSpeakingSec,
+    updateNotes,
+    completeSession,
+    abandonSession,
+    streak,
+    triggerActivityFeedbackIfEligible,
+  } = useAppStore();
   const [speakingSeconds, setSpeakingSeconds] = useState(0);
   const [recordedBlob, setRecordedBlob] = useState<Blob | null>(null);
   const [completionData, setCompletionData] = useState<{ xpEarned: number; newAchievements: string[] } | null>(null);
   const [completedSession, setCompletedSession] = useState<ActiveSession | null>(null);
+  const [showExitNudge, setShowExitNudge] = useState(false);
 
   const currentSession = activeSession || completedSession;
 
@@ -1373,8 +1730,29 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }
 
   function handleAbandon() {
+    if (!completionData && currentSession && (currentSession.stage === "research" || currentSession.stage === "speaking")) {
+      setShowExitNudge(true);
+      return;
+    }
     abandonSession();
     router.push("/");
+  }
+
+  function handleConfirmAbandon() {
+    setShowExitNudge(false);
+    abandonSession();
+    router.push("/");
+  }
+
+  function handleQuick45sDownsell() {
+    setShowExitNudge(false);
+    updateActiveSessionSpeakingSec(45);
+    if (currentSession?.stage !== "speaking") {
+      if (!currentSession?.notes || currentSession.notes.trim().length === 0) {
+        updateNotes("Quick 45-second voice synthesis.");
+      }
+      updateActiveSessionStage("speaking");
+    }
   }
 
   const stageLabels = ["Research", "Speak", "Reflect", "Done"];
@@ -1457,6 +1835,66 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               onComplete={handleReflectionDone}
               onAbandon={handleAbandon}
             />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Soft Exit-Intent Downsell Nudge Modal */}
+      <AnimatePresence>
+        {showExitNudge && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs"
+          >
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0, y: 12 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 12 }}
+              className="w-full max-w-md rounded-2xl p-6 border surface-raised shadow-xl"
+              style={{
+                background: "var(--bg-card)",
+                borderColor: "var(--border)",
+              }}
+            >
+              <div className="flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider text-[var(--olive)] mb-2">
+                <Flame size={14} className="text-[var(--terra)]" />
+                <span>1 Step Away from Daily Voice</span>
+              </div>
+              <h3 className="font-serif font-bold text-xl mb-2" style={{ color: "var(--text)" }}>
+                Short on time? Do a quick 45-second summary instead.
+              </h3>
+              <p className="text-xs sm:text-sm leading-relaxed mb-5" style={{ color: "var(--text-dim)" }}>
+                You&apos;ve already started this topic. Instead of losing your progress, switch to a fast 45-second voice summary right now to lock in your streak and earn today&apos;s XP.
+              </p>
+
+              <div className="flex flex-col gap-2.5">
+                <button
+                  type="button"
+                  onClick={handleQuick45sDownsell}
+                  className="btn-terra w-full py-3 rounded-xl font-mono text-xs sm:text-sm font-bold flex items-center justify-center gap-2 cursor-pointer"
+                >
+                  <Mic size={15} />
+                  <span>Switch to 45s Quick Summary</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setShowExitNudge(false)}
+                  className="btn-ghost w-full py-2.5 rounded-xl border text-xs font-mono font-semibold cursor-pointer"
+                  style={{ borderColor: "var(--border)", color: "var(--text)" }}
+                >
+                  Keep Going with Current Session
+                </button>
+                <button
+                  type="button"
+                  onClick={handleConfirmAbandon}
+                  className="w-full py-2 text-xs font-mono text-[var(--text-mute)] hover:text-[var(--red)] transition-colors cursor-pointer"
+                >
+                  Leave session anyway
+                </button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>

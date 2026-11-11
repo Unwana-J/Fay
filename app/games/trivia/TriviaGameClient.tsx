@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useRef, useCallback } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
@@ -28,6 +29,7 @@ import {
   Plus,
   Moon,
   Sun,
+  Mic,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -918,6 +920,16 @@ function GameScreen({
 
 // ─── Results Screen ───────────────────────────────────────────────────────────
 
+interface RedemptionSummary {
+  originalCorrect: number;
+  originalTotal: number;
+  redeemedCount: number;
+  missedTotal: number;
+  adjustedScore: number;
+  cappedPct: number;
+  bonusXp: number;
+}
+
 function ResultsScreen({
   questions,
   answers,
@@ -925,6 +937,10 @@ function ResultsScreen({
   xpEarned,
   difficultyMode,
   onRetry,
+  onStartFreshDeck,
+  onStartRedemption,
+  hasUsedRedemption,
+  redemptionSummary,
   onViewHistory,
   onViewLeaderboard,
   challenger,
@@ -938,6 +954,10 @@ function ResultsScreen({
   xpEarned: number;
   difficultyMode?: TriviaDifficultyFilter;
   onRetry: () => void;
+  onStartFreshDeck: () => void;
+  onStartRedemption: (missedQuestions: TriviaQuestion[]) => void;
+  hasUsedRedemption: boolean;
+  redemptionSummary: RedemptionSummary | null;
   onViewHistory: () => void;
   onViewLeaderboard: () => void;
   challenger?: ChallengerInfo | null;
@@ -946,14 +966,64 @@ function ResultsScreen({
   challengeRecordResult?: RecordScoreResult | null;
 }) {
   const [showShareModal, setShowShareModal] = useState(false);
+  const router = useRouter();
   const profile = useAppStore((s) => s.profile);
   const openClaimAccountPrompt = useAppStore((s) => s.openClaimAccountPrompt);
+  const startSession = useAppStore((s) => s.startSession);
+  const addXP = useAppStore((s) => s.addXP);
   // Re-render when an answer contest is upheld so the score and review update live
   const [, setOverrideVersion] = useState(0);
   useEffect(() => subscribeAnswerOverrides(() => setOverrideVersion((v) => v + 1)), []);
-  const correct = answers.filter((a, i) => a !== null && isAnswerAccepted(questions[i], a)).length;
-  const total = questions.length;
-  const pct = Math.round((correct / total) * 100);
+  const rawCorrect = answers.filter((a, i) => a !== null && isAnswerAccepted(questions[i], a)).length;
+  const rawTotal = questions.length;
+
+  const correct = redemptionSummary ? redemptionSummary.adjustedScore : rawCorrect;
+  const total = redemptionSummary ? redemptionSummary.originalTotal : rawTotal;
+  const pct = redemptionSummary ? redemptionSummary.cappedPct : Math.round((rawCorrect / rawTotal) * 100);
+
+  const missedQuestions = questions.filter(
+    (q, i) => answers[i] === null || !isAnswerAccepted(q, answers[i] as number)
+  );
+
+  // Pick a missed question (or first question with explanation if 100%) for Game-to-Voice Cross-Pollination
+  const crossPollinationQuestion = (() => {
+    if (missedQuestions.length > 0) return { question: missedQuestions[0], wasMissed: true };
+    const withExp = questions.find((q) => Boolean(q.explanation));
+    return withExp ? { question: withExp, wasMissed: false } : questions[0] ? { question: questions[0], wasMissed: false } : null;
+  })();
+
+  // Near-miss & next-round target calculation
+  const nearMissInfo = (() => {
+    if (pct >= 100 || total <= 0) return null;
+    const nextTargetPct = pct < 60 ? 60 : pct < 80 ? 80 : 100;
+    const nextTierLabel = pct < 60 ? "Sharp Sharp Tier" : pct < 80 ? "Naija Expert Tier" : "Perfect Score";
+    const neededCorrect = Math.ceil((nextTargetPct / 100) * total);
+    const diff = Math.max(1, neededCorrect - correct);
+    const isTrueNearMiss = diff <= 2;
+    return { diff, neededCorrect, nextTargetPct, nextTierLabel, isTrueNearMiss };
+  })();
+
+  function handleLaunchVoiceFromTrivia(q: TriviaQuestion) {
+    const correctOption = q.options[q.answer];
+    const initialNotes = `Trivia Concept: ${q.question}\nKey Fact: ${correctOption}${
+      q.explanation ? `\nContext: ${q.explanation}` : ""
+    }`;
+    addXP(50);
+    const sessionId = startSession(
+      {
+        id: `trivia_voice_${q.id}`,
+        text: `${q.question} — Explain why "${correctOption}" is the answer in your own words.`,
+        category: "History",
+        difficulty: "Scholar",
+        tags: [q.category, "Trivia Synthesis"],
+      },
+      0,
+      "speaking",
+      60,
+      initialNotes
+    );
+    router.push(`/session/${sessionId}`);
+  }
 
   const byCategory = Object.entries(
     questions.reduce<Record<string, { correct: number; total: number }>>((acc, q, i) => {
@@ -1150,16 +1220,150 @@ function ResultsScreen({
           </div>
         )}
 
-        {/* Share Proof Card Action */}
+        {/* Share Score Card Action */}
         <div className="mt-6 pt-5 border-t" style={{ borderColor: "var(--border-dim)" }}>
+          {redemptionSummary && (
+            <div
+              className="mb-4 p-3.5 rounded-2xl border text-left"
+              style={{
+                borderColor: "var(--olive)",
+                background: "rgba(68, 78, 44, 0.08)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
+                <span className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)]">
+                  Redemption Complete · 1/1 Attempt Used
+                </span>
+                <span className="text-[10px] font-mono font-bold text-[var(--gold)]">
+                  +{redemptionSummary.bonusXp} Recovery XP
+                </span>
+              </div>
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text)" }}>
+                You redeemed <strong>{redemptionSummary.redeemedCount}/{redemptionSummary.missedTotal}</strong> missed questions (0.5x recovery credit, capped below full score). Your adjusted round score moved from{" "}
+                <strong>{redemptionSummary.originalCorrect}/{redemptionSummary.originalTotal}</strong> to{" "}
+                <strong>{redemptionSummary.adjustedScore}/{redemptionSummary.originalTotal} ({redemptionSummary.cappedPct}%)</strong>.
+              </p>
+            </div>
+          )}
           <button
             onClick={() => setShowShareModal(true)}
             className="w-full py-3.5 px-4 rounded-xl btn-terra font-space font-bold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md"
           >
-            <Share2 size={16} /> Share Broadside Proof Card
+            <Share2 size={16} /> Share Score Card
           </button>
         </div>
       </div>
+
+      {/* Redemption Drill (1 Attempt Capped) & Fresh Deck Target Nudge */}
+      <div
+        className="rounded-3xl p-5 border mb-6 flex flex-col gap-4 shadow-xs"
+        style={{
+          borderColor: "var(--border)",
+          background: "var(--bg-card)",
+        }}
+      >
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)]">
+              <Target size={13} className="text-[var(--terra)]" />
+              <span>
+                {nearMissInfo
+                  ? nearMissInfo.isTrueNearMiss
+                    ? `Near Miss · Just ${nearMissInfo.diff} Correct Answer${nearMissInfo.diff > 1 ? "s" : ""} Short`
+                    : `Next Round Target · Aim for ${nearMissInfo.neededCorrect}/${total} (${nearMissInfo.nextTargetPct}%)`
+                  : "Top Tier Mastery"}
+              </span>
+            </div>
+            {!hasUsedRedemption && missedQuestions.length > 0 && (
+              <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md border border-[var(--terra)]/30 bg-[var(--terra)]/10 text-[var(--terra)]">
+                1 Redemption Attempt Available
+              </span>
+            )}
+          </div>
+
+          <div className="text-sm sm:text-base font-space font-bold text-[var(--text)]">
+            {nearMissInfo
+              ? !hasUsedRedemption && missedQuestions.length > 0
+                ? `Redeem your ${missedQuestions.length} missed question${missedQuestions.length > 1 ? "s" : ""} or play a fresh ${total}-question deck for ${nearMissInfo.nextTargetPct}% (${nearMissInfo.nextTierLabel})`
+                : `Play a fresh ${total}-question deck and aim for ${nearMissInfo.neededCorrect}/${total} (${nearMissInfo.nextTargetPct}% ${nearMissInfo.nextTierLabel})`
+              : "Flawless round! See where you stand on the Leaderboard."}
+          </div>
+
+          <p className="text-xs text-[var(--text-dim)] leading-relaxed">
+            {nearMissInfo
+              ? !hasUsedRedemption && missedQuestions.length > 0
+                ? `Redemption gives you 1 shot at only the ${missedQuestions.length} question${missedQuestions.length > 1 ? "s" : ""} you missed for half-credit recovery (+2 XP each, max score capped at 85%). Want a clean shot at 100%? Start a fresh deck instead.`
+                : "Your 1 redemption attempt has been used for this round. Start a brand-new deck of questions for a clean full-score run."
+              : "Your accuracy puts you among the top contenders today."}
+          </p>
+        </div>
+
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          {!hasUsedRedemption && missedQuestions.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onStartRedemption(missedQuestions)}
+              className="btn-terra flex-1 py-2.5 px-4 rounded-xl font-space font-bold text-xs flex items-center justify-center gap-1.5 cursor-pointer"
+            >
+              <RefreshCcw size={13} />
+              <span>Redeem {missedQuestions.length} Missed (1 Shot · Capped)</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={nearMissInfo ? onStartFreshDeck : onViewLeaderboard}
+            className="flex-1 py-2.5 px-4 rounded-xl border border-[var(--olive)] bg-[var(--bg-panel)] hover:bg-[var(--olive)] hover:text-white text-[var(--olive)] font-space font-bold text-xs cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+          >
+            <span>{nearMissInfo ? `Play Fresh Deck (${total} New Qs)` : "View Leaderboard"}</span>
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      {/* Game-to-Voice Cross-Pollination Nudge (Explain a Missed Question in 60s) */}
+      {crossPollinationQuestion && (
+        <div
+          className="rounded-3xl p-5 border mb-6 shadow-xs"
+          style={{
+            borderColor: "var(--gold)",
+            background: "rgba(166, 124, 30, 0.06)",
+          }}
+        >
+          <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+            <div className="flex items-center gap-1.5 text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--gold)]">
+              <Mic size={13} className="text-[var(--terra)]" />
+              <span>
+                {crossPollinationQuestion.wasMissed
+                  ? "Turn a Missed Question into Mastery"
+                  : "Deepen Your Mastery"}
+              </span>
+            </div>
+            <span className="tag tag-gold text-[10px] font-mono font-bold px-2 py-0.5">
+              +50 Bonus XP
+            </span>
+          </div>
+
+          <p className="font-serif font-bold text-sm sm:text-base mb-1.5" style={{ color: "var(--text)" }}>
+            {crossPollinationQuestion.question.question}
+          </p>
+          <p className="text-xs mb-3 leading-relaxed" style={{ color: "var(--text-dim)" }}>
+            <strong style={{ color: "var(--text)" }}>
+              Answer: {crossPollinationQuestion.question.options[crossPollinationQuestion.question.answer]}.
+            </strong>{" "}
+            {crossPollinationQuestion.question.explanation ||
+              "Articulate why this answer is correct in your own voice under 60 seconds to cement it in memory."}
+          </p>
+
+          <button
+            type="button"
+            onClick={() => handleLaunchVoiceFromTrivia(crossPollinationQuestion.question)}
+            className="btn-terra w-full sm:w-auto px-4 py-2.5 rounded-xl font-mono font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+          >
+            <Mic size={14} />
+            <span>Explain in 60s Voice Challenge</span>
+          </button>
+        </div>
+      )}
 
       {/* Save Score & Create Account Callout for Guest Players */}
       {!profile.hasClaimedAccount && (
@@ -1360,9 +1564,18 @@ export default function TriviaGameClient({
   const [answers, setAnswers] = useState<(number | null)[]>([]);
   const [reviewMode, setReviewMode] = useState<ReviewMode>("instant");
   const [totalSeconds, setTotalSeconds] = useState(600);
+  const [lastSoloMinutes, setLastSoloMinutes] = useState(10);
   const [xpEarned, setXpEarned] = useState(0);
   const [currentDifficulty, setCurrentDifficulty] = useState<TriviaDifficultyFilter>("random");
   const [lastChallengeResult, setLastChallengeResult] = useState<RecordScoreResult | null>(null);
+  const [isRedemptionRound, setIsRedemptionRound] = useState(false);
+  const [hasUsedRedemption, setHasUsedRedemption] = useState(false);
+  const [redemptionSummary, setRedemptionSummary] = useState<RedemptionSummary | null>(null);
+  const [preRedemptionSnapshot, setPreRedemptionSnapshot] = useState<{
+    correct: number;
+    total: number;
+    xpEarned: number;
+  } | null>(null);
 
   const [showGuideModal, setShowGuideModal] = useState(false);
 
@@ -1439,16 +1652,63 @@ export default function TriviaGameClient({
 
     markTriviaQuestionsSeen(selectedQuestions.map((q) => q.id));
 
+    setLastSoloMinutes(minutes);
     setCurrentDifficulty(difficulty);
     setQuestions(selectedQuestions);
     setTotalSeconds(minutes * 60);
     setReviewMode(mode);
     setLastChallengeResult(null);
+    setIsRedemptionRound(false);
+    setHasUsedRedemption(false);
+    setRedemptionSummary(null);
+    setPreRedemptionSnapshot(null);
+    setPhase("playing");
+  }
+
+  function handleStartFreshDeck() {
+    const count = QUESTION_COUNTS[lastSoloMinutes] || 15;
+    const { questions: freshQuestions, wasReset } = getFreshQuestions(
+      count,
+      seenTriviaQuestionIds,
+      currentDifficulty
+    );
+    if (wasReset) {
+      resetSeenTriviaQuestions();
+    }
+    markTriviaQuestionsSeen(freshQuestions.map((q) => q.id));
+    setQuestions(freshQuestions);
+    setTotalSeconds(lastSoloMinutes * 60);
+    setLastChallengeResult(null);
+    setIsRedemptionRound(false);
+    setHasUsedRedemption(false);
+    setRedemptionSummary(null);
+    setPreRedemptionSnapshot(null);
+    setPhase("playing");
+  }
+
+  function handleStartRedemption(missedQuestions: TriviaQuestion[]) {
+    if (hasUsedRedemption || missedQuestions.length === 0) return;
+    const currentCorrect = answers.filter(
+      (a, i) => a !== null && isAnswerAccepted(questions[i], a)
+    ).length;
+    setPreRedemptionSnapshot({
+      correct: currentCorrect,
+      total: questions.length,
+      xpEarned,
+    });
+    setIsRedemptionRound(true);
+    setHasUsedRedemption(true);
+    setQuestions(missedQuestions);
+    setTotalSeconds(Math.max(30, missedQuestions.length * 30));
     setPhase("playing");
   }
 
   function handleStartChallenge(challenge: TriviaChallenge) {
     setActiveChallenge(challenge);
+    setIsRedemptionRound(false);
+    setHasUsedRedemption(false);
+    setRedemptionSummary(null);
+    setPreRedemptionSnapshot(null);
     const existingAttempt = getUserChallengeAttempt(challenge.id, profile?.username || "");
     if (existingAttempt) {
       setLastChallengeResult({
@@ -1474,6 +1734,10 @@ export default function TriviaGameClient({
   function handlePlayDeck(questionIds: string[], minutes: number) {
     setActiveChallenge(null);
     setLastChallengeResult(null);
+    setIsRedemptionRound(false);
+    setHasUsedRedemption(false);
+    setRedemptionSummary(null);
+    setPreRedemptionSnapshot(null);
     const matched = getQuestionsByIds(questionIds);
     if (matched.length > 0) {
       setQuestions(matched);
@@ -1488,6 +1752,40 @@ export default function TriviaGameClient({
     const correct = finalAnswers.filter((a, i) => a !== null && isAnswerAccepted(questions[i], a)).length;
     const total = questions.length;
     const pct = Math.round((correct / total) * 100);
+
+    // Handle 1-Shot Redemption Round completion (capped score recovery, no leaderboard overwrite)
+    if (isRedemptionRound && preRedemptionSnapshot) {
+      const redeemedCount = correct;
+      const missedTotal = total;
+      // Half-credit recovery per redeemed question, strictly capped at max 85% of original total (and at least 1 below full score)
+      const maxAllowedScore = Math.min(
+        Math.max(1, preRedemptionSnapshot.total - 1),
+        Math.floor(preRedemptionSnapshot.total * 0.85)
+      );
+      const rawAdjusted = Math.floor(preRedemptionSnapshot.correct + redeemedCount * 0.5);
+      const adjustedScore = Math.max(
+        preRedemptionSnapshot.correct,
+        Math.min(maxAllowedScore, rawAdjusted)
+      );
+      const cappedPct = Math.round((adjustedScore / preRedemptionSnapshot.total) * 100);
+      const bonusXp = redeemedCount * 2;
+
+      setRedemptionSummary({
+        originalCorrect: preRedemptionSnapshot.correct,
+        originalTotal: preRedemptionSnapshot.total,
+        redeemedCount,
+        missedTotal,
+        adjustedScore,
+        cappedPct,
+        bonusXp,
+      });
+      setIsRedemptionRound(false);
+      setAnswers(finalAnswers);
+      setXpEarned(preRedemptionSnapshot.xpEarned + bonusXp);
+      if (bonusXp > 0) addXP(bonusXp);
+      setPhase("results");
+      return;
+    }
 
     // High-Stakes XP Model:
     // Challenges are locked to a single attempt and carry real reputation stakes,
@@ -1639,6 +1937,10 @@ export default function TriviaGameClient({
           xpEarned={xpEarned}
           difficultyMode={currentDifficulty}
           onRetry={() => setPhase("setup")}
+          onStartFreshDeck={handleStartFreshDeck}
+          onStartRedemption={handleStartRedemption}
+          hasUsedRedemption={hasUsedRedemption}
+          redemptionSummary={redemptionSummary}
           onViewHistory={() => {
             setSetupTab("history");
             setPhase("setup");

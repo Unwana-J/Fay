@@ -8,13 +8,13 @@ import {
   Star, Shuffle, Sparkles, Compass,
   Gamepad2, ChevronRight, Flame, ShieldCheck,
   Target, Presentation, MessageSquareQuote, Trophy,
-  Calculator, ScrollText, CheckCircle2, Radio,
+  Calculator, ScrollText, CheckCircle2, Radio, Calendar,
 } from "lucide-react";
 import CategoryIcon from "@/components/ui/CategoryIcon";
-import { useAppStore } from "@/store/useAppStore";
+import { useAppStore, getNext7ScheduleDays } from "@/store/useAppStore";
 import { getLevelForXP, getLevelProgress, getNextLevel, ACHIEVEMENTS } from "@/lib/achievements";
 import { CATEGORY_COLORS, CATEGORY_ICONS, TOPIC_BANK, DIFFICULTY_LABELS, DIFFICULTY_XP, DIFFICULTY_BONUS_XP, type Difficulty } from "@/lib/topics";
-import { relativeDate, getLast52Weeks, getDayOfWeek } from "@/lib/utils";
+import { relativeDate, getLast52Weeks, getDayOfWeek, todayStr } from "@/lib/utils";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import FeyLogo from "@/components/ui/FeyLogo";
@@ -225,6 +225,11 @@ export default function Dashboard() {
     isOnboarded,
     pendingTopic,
     setPendingTopic,
+    queuedTomorrowTopic,
+    setQueuedTomorrowTopic,
+    scheduledTopics = [],
+    queueTopicNextAvailableDay,
+    removeScheduledTopic,
     buyStreakShield,
   } = useAppStore();
   const difficultyMode: Difficulty = (settings.difficultyMode as Difficulty) ?? "Scholar";
@@ -240,6 +245,8 @@ export default function Dashboard() {
   const [showFocusModal, setShowFocusModal] = useState(false);
   const [spinOffset, setSpinOffset] = useState(0);
   const [activeTab, setActiveTab] = useState<"practice" | "parlor">("practice");
+  const [previewTomorrowMode, setPreviewTomorrowMode] = useState(false);
+  const [dismissedTomorrowModal, setDismissedTomorrowModal] = useState(false);
 
   const activityDates = useMemo(
     () => new Set(sessions.map((s) => s.date.slice(0, 10))),
@@ -296,10 +303,40 @@ export default function Dashboard() {
 
   const allTopics = [...TOPIC_BANK, ...(customTopics || [])];
 
+  const todayIso = todayStr();
+  const next7Days = getNext7ScheduleDays(todayIso);
+  const upcomingScheduled = (scheduledTopics || [])
+    .filter((item) => next7Days.includes(item.date))
+    .sort((a, b) => a.date.localeCompare(b.date));
+  const todayScheduledItem = (scheduledTopics || []).find((item) => item.date === todayIso);
+  const nextQueuedItem =
+    todayScheduledItem ||
+    (queuedTomorrowTopic && queuedTomorrowTopic.queuedDate !== todayIso
+      ? { date: todayIso, topic: queuedTomorrowTopic.topic }
+      : upcomingScheduled[0] ||
+        (queuedTomorrowTopic ? { date: next7Days[0], topic: queuedTomorrowTopic.topic } : null));
+
+  const isScheduledForTodayOrPreview = Boolean(
+    nextQueuedItem &&
+      (todayScheduledItem ||
+        (queuedTomorrowTopic && queuedTomorrowTopic.queuedDate !== todayIso) ||
+        previewTomorrowMode)
+  );
+
   const suggestedTopic = (() => {
     // 0. If user accepted a topic from the landing spinner
     if (pendingTopic) {
       return pendingTopic;
+    }
+
+    // 0b. If user has a topic scheduled for today (or is previewing tomorrow's login), promote it today!
+    if (
+      isScheduledForTodayOrPreview &&
+      nextQueuedItem &&
+      !completedTopicIds.has(nextQueuedItem.topic.id) &&
+      !skippedToday.includes(nextQueuedItem.topic.id)
+    ) {
+      return nextQueuedItem.topic;
     }
 
     const excluded = new Set([...completedTopicIds, ...skippedToday]);
@@ -701,7 +738,7 @@ export default function Dashboard() {
                 Welcome, {profile.username || "Scholar"}!
               </h2>
               <p className="text-xs sm:text-sm leading-relaxed max-w-2xl text-[var(--text-dim)]">
-                Fey is designed to prove true understanding through voice. Select today&apos;s inquiry below, sketch your tenets in 15 minutes, and articulate them simply under 90 seconds.
+                Fey is designed to prove true understanding through voice. Select today&apos;s topic below, sketch your key points in 15 minutes, and articulate them simply under 90 seconds.
               </p>
             </div>
           </div>
@@ -834,6 +871,63 @@ export default function Dashboard() {
           animate="visible"
           exit="exit"
         >
+          {/* ── Top-of-Dashboard 7-Day Schedule Strip (Above the Hero Card!) ── */}
+          {!activeSession && nextQueuedItem && !isScheduledForTodayOrPreview && (
+            <motion.div
+              variants={cardVariants}
+              className="rounded-2xl p-4 sm:p-5 mb-5 border-[1.5px] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-xs"
+              style={{
+                background: "rgba(68, 78, 44, 0.08)",
+                borderColor: "var(--olive)",
+              }}
+            >
+              <div className="flex items-start gap-3 min-w-0 flex-1">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--olive)]/15 border border-[var(--olive)]/30 shrink-0 mt-0.5 sm:mt-0">
+                  <Calendar size={16} className="text-[var(--olive)]" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                    <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--olive)]">
+                      7-Day Schedule ({Math.max(1, upcomingScheduled.length)}/7 Planned)
+                    </span>
+                    <span className="text-[10px] font-mono text-[var(--text-mute)]">
+                      · Next:{" "}
+                      {new Date(nextQueuedItem.date + "T00:00:00").toLocaleDateString("en-US", {
+                        weekday: "short",
+                        month: "short",
+                        day: "numeric",
+                      })}{" "}
+                      · {nextQueuedItem.topic.difficulty}
+                    </span>
+                  </div>
+                  <p className="font-serif font-bold text-sm sm:text-base leading-snug" style={{ color: "var(--text)" }}>
+                    {nextQueuedItem.topic.text}
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setDismissedTomorrowModal(false);
+                    setPreviewTomorrowMode(true);
+                  }}
+                  className="btn-terra px-3 py-1.5 rounded-lg text-xs font-mono font-bold whitespace-nowrap cursor-pointer"
+                  title="Simulate logging in on that day to see the Welcome Back modal & CTA"
+                >
+                  Preview Next-Day Login CTA
+                </button>
+                <Link
+                  href="/library?tab=schedule"
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[var(--olive)] bg-[var(--bg-card)] hover:bg-[var(--olive)] hover:text-white text-[var(--olive)] whitespace-nowrap transition-colors"
+                >
+                  Manage 7-Day Schedule
+                </Link>
+              </div>
+            </motion.div>
+          )}
+
           {/* ── The Centerpiece: Today's Feynman Inquiry (High-Impact Active Workspace) ── */}
           <motion.div
             variants={cardVariants}
@@ -991,6 +1085,54 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* Queued Yesterday Banner (Next-Day Return Commitment Fulfilled) */}
+            {nextQueuedItem &&
+              isScheduledForTodayOrPreview &&
+              suggestedTopic.id === nextQueuedItem.topic.id && (
+                <div
+                  className="mb-4 p-4 rounded-2xl border-[1.5px] flex items-center justify-between gap-3 flex-wrap"
+                  style={{
+                    background: "rgba(122, 28, 46, 0.06)",
+                    borderColor: "var(--terra)",
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-[var(--terra)]/15 border border-[var(--terra)]/30 shrink-0">
+                      <Calendar size={17} className="text-[var(--terra)]" />
+                    </div>
+                    <div>
+                      <div className="text-xs font-bold uppercase tracking-wider text-[var(--terra)]">
+                        Welcome Back, {profile.username || "Scholar"} · Your Scheduled Topic is Ready
+                      </div>
+                      <div className="text-xs text-[var(--text-dim)]">
+                        You planned this <strong>{nextQueuedItem.topic.difficulty}</strong> topic for today in your 7-Day Schedule. Keep your commitment and start now.
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={handleStartSuggested}
+                      className="btn-terra px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer"
+                    >
+                      <span>Start Scheduled Topic</span>
+                      <ArrowRight size={13} />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewTomorrowMode(false);
+                        removeScheduledTopic(nextQueuedItem.date);
+                        setQueuedTomorrowTopic(null);
+                      }}
+                      className="text-xs font-semibold underline underline-offset-4 cursor-pointer text-[var(--text-mute)] px-2"
+                    >
+                      Dismiss
+                    </button>
+                  </div>
+                </div>
+              )}
+
             {/* ── Difficulty Mode Toggle ── */}
             <div className="flex items-center gap-1.5 mb-4">
               {(["Novice", "Scholar", "Expert"] as Difficulty[]).map((mode) => {
@@ -1054,41 +1196,187 @@ export default function Dashboard() {
             </p>
 
             {/* Action Bar — Signature Solid Maroon Anchor Block */}
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2.5 sm:gap-3 pt-4 border-t" style={{ borderColor: "var(--border-dim)" }}>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:flex-wrap gap-2.5 sm:gap-3 pt-4 border-t" style={{ borderColor: "var(--border-dim)" }}>
               <button
                 onClick={handleStartSuggested}
-                className="btn-terra w-full sm:w-auto text-sm sm:text-base font-bold px-6 py-3.5 shadow-none"
+                className="btn-terra w-full sm:w-auto whitespace-nowrap shrink-0 text-sm sm:text-base font-bold px-6 py-3.5 shadow-none"
               >
-                Begin Research (15m) <ArrowRight size={16} />
+                <span>
+                  {nextQueuedItem &&
+                  (nextQueuedItem.date <= todayIso || previewTomorrowMode) &&
+                  suggestedTopic.id === nextQueuedItem.topic.id
+                    ? "Start Scheduled Topic (15m)"
+                    : "Begin Research (15m)"}
+                </span>
+                <ArrowRight size={16} className="shrink-0" />
               </button>
 
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="grid grid-cols-2 sm:flex sm:items-center gap-2 w-full sm:w-auto">
                 <button
                   onClick={handleStartImpromptu}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-xs font-semibold text-[var(--text)] transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-xs font-semibold text-[var(--text)] whitespace-nowrap transition-colors cursor-pointer"
                   title="Already know the concept? Skip research and articulate immediately"
                 >
-                  <Zap size={14} className="text-[var(--gold)]" /> Impromptu (90s)
+                  <Zap size={14} className="text-[var(--gold)] shrink-0" />
+                  <span>Impromptu (90s)</span>
                 </button>
 
                 <button
                   onClick={handleSkipTopic}
-                  className="flex-1 sm:flex-none inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-card)] hover:bg-[var(--bg-base)] text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer"
+                  className="inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--border)] bg-[var(--bg-base)] hover:bg-[var(--bg-card)] text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] whitespace-nowrap transition-colors cursor-pointer"
                   title="Pick another question from your preferences"
                 >
-                  <Shuffle size={14} /> Next Topic
+                  <Shuffle size={14} className="shrink-0" />
+                  <span>Next Topic</span>
                 </button>
               </div>
 
-              <div className="ml-auto text-xs font-medium hidden md:flex items-center gap-2 text-[var(--text-mute)]">
-                <span>15m Notes</span>
-                <span>·</span>
-                <span>90s Vocal Articulation</span>
-              </div>
+              {!upcomingScheduled.some((s) => s.topic.id === suggestedTopic.id) &&
+                upcomingScheduled.length < 7 && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPreviewTomorrowMode(false);
+                      queueTopicNextAvailableDay(suggestedTopic);
+                    }}
+                    className="w-full sm:w-auto sm:ml-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--olive)]/40 bg-[var(--bg-card)] hover:border-[var(--olive)] text-xs font-semibold text-[var(--olive)] whitespace-nowrap transition-colors cursor-pointer"
+                    title="Add this question to your next open day in your 7-Day Study Schedule"
+                  >
+                    <Calendar size={14} className="shrink-0" />
+                    <span>
+                      {upcomingScheduled.length === 0
+                        ? "Queue for Tomorrow"
+                        : `Schedule Next Day (${upcomingScheduled.length}/7)`}
+                    </span>
+                  </button>
+                )}
             </div>
           </div>
         )}
       </motion.div>
+
+      {/* ── Next-Day Scheduled Topic Login Reminder Modal ── */}
+      <AnimatePresence>
+        {!activeSession &&
+          nextQueuedItem &&
+          (nextQueuedItem.date <= todayIso || previewTomorrowMode) &&
+          !dismissedTomorrowModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setDismissedTomorrowModal(true)}
+              className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/55 backdrop-blur-xs"
+            >
+              <motion.div
+                initial={{ scale: 0.94, opacity: 0, y: 14 }}
+                animate={{ scale: 1, opacity: 1, y: 0 }}
+                exit={{ scale: 0.94, opacity: 0, y: 14 }}
+                onClick={(e) => e.stopPropagation()}
+                className="w-full max-w-lg rounded-3xl p-6 sm:p-7 border-[1.5px] surface-raised shadow-2xl"
+                style={{
+                  background: "var(--bg-card)",
+                  borderColor: "var(--terra)",
+                }}
+              >
+                <div className="flex items-center justify-between gap-2 mb-3">
+                  <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--terra)]/10 border border-[var(--terra)]/30 text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--terra)]">
+                    <Calendar size={13} />
+                    <span>Scheduled for Today · Ready</span>
+                  </div>
+                  <span className="tag tag-olive text-[11px] font-mono">
+                    {nextQueuedItem.topic.difficulty} Level
+                  </span>
+                </div>
+
+                <h3 className="font-serif font-bold text-xl sm:text-2xl mb-1.5" style={{ color: "var(--text)" }}>
+                  Welcome back, {profile.username || "Scholar"}!
+                </h3>
+                <p className="text-xs sm:text-sm mb-4 leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                  You picked this <strong>{nextQueuedItem.topic.category}</strong> topic in your 7-Day Study Schedule for today. Ready to follow through?
+                </p>
+
+                <div
+                  className="rounded-2xl p-4 sm:p-5 border mb-5"
+                  style={{
+                    background: "var(--bg-panel)",
+                    borderColor: "var(--border)",
+                  }}
+                >
+                  <div className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)] mb-1">
+                    {nextQueuedItem.topic.category} · +{DIFFICULTY_XP[nextQueuedItem.topic.difficulty as Difficulty] ?? 150} XP
+                  </div>
+                  <p className="font-serif font-bold text-base sm:text-lg leading-snug" style={{ color: "var(--text)" }}>
+                    {nextQueuedItem.topic.text}
+                  </p>
+                </div>
+
+                <div className="flex flex-col sm:flex-row gap-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = nextQueuedItem.topic;
+                      setPreviewTomorrowMode(false);
+                      setDismissedTomorrowModal(true);
+                      removeScheduledTopic(nextQueuedItem.date);
+                      const id = startSession(t, settings.researchMin);
+                      router.push(`/session/${id}`);
+                    }}
+                    className="btn-terra flex-1 py-3.5 px-5 rounded-xl font-bold text-xs sm:text-sm flex items-center justify-center gap-2 cursor-pointer"
+                  >
+                    <span>Start Scheduled Topic (15m)</span>
+                    <ArrowRight size={15} />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const t = nextQueuedItem.topic;
+                      setPreviewTomorrowMode(false);
+                      setDismissedTomorrowModal(true);
+                      removeScheduledTopic(nextQueuedItem.date);
+                      const id = startSession(t, 0, "speaking");
+                      router.push(`/session/${id}`);
+                    }}
+                    className="py-3.5 px-4 rounded-xl border border-[var(--border)] bg-[var(--bg-panel)] hover:border-[var(--olive)] text-xs sm:text-sm font-semibold text-[var(--text)] flex items-center justify-center gap-1.5 cursor-pointer transition-colors"
+                  >
+                    <Zap size={14} className="text-[var(--gold)]" />
+                    <span>Impromptu (90s)</span>
+                  </button>
+                </div>
+
+                <div className="mt-3 pt-3 border-t flex items-center justify-between text-xs flex-wrap gap-2" style={{ borderColor: "var(--border-dim)" }}>
+                  <button
+                    type="button"
+                    onClick={() => setDismissedTomorrowModal(true)}
+                    className="font-medium text-[var(--text-dim)] hover:text-[var(--text)] cursor-pointer"
+                  >
+                    Keep on dashboard for later today
+                  </button>
+                  <div className="flex items-center gap-3">
+                    <Link
+                      href="/library?tab=schedule"
+                      onClick={() => setDismissedTomorrowModal(true)}
+                      className="font-medium text-[var(--olive)] hover:underline"
+                    >
+                      View 7-Day Schedule
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setPreviewTomorrowMode(false);
+                        setDismissedTomorrowModal(true);
+                        removeScheduledTopic(nextQueuedItem.date);
+                      }}
+                      className="font-medium text-[var(--text-mute)] hover:text-[var(--red)] cursor-pointer"
+                    >
+                      Clear slot
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+      </AnimatePresence>
 
       {/* ── Day 0 Orientation Guide: Distinct Background Rhythm ── */}
       {sessions.length === 0 && (
@@ -1402,7 +1690,7 @@ export default function Dashboard() {
                 No speeches recorded yet.
               </p>
               <p className="text-xs font-medium mt-1" style={{ color: "var(--text-mute)" }}>
-                Complete today&apos;s inquiry above to record your first synthesis.
+                Complete today&apos;s topic above to record your first synthesis.
               </p>
             </div>
           ) : (
