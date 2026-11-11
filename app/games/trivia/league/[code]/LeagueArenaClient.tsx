@@ -315,6 +315,7 @@ export default function LeagueArenaClient({
 
   // Bonus Extension Round State
   const [isBonusRound, setIsBonusRound] = useState(false);
+  const [bonusCountdown, setBonusCountdown] = useState<{ day: number; seconds: number } | null>(null);
   const [bonusBaseScore, setBonusBaseScore] = useState(0);
   const [bonusBaseTotal, setBonusBaseTotal] = useState(0);
   const [bonusBaseDuration, setBonusBaseDuration] = useState(0);
@@ -702,6 +703,11 @@ export default function LeagueArenaClient({
         [currentDayKey]: [...(league.dailySeedMap?.[currentDayKey] || []), ...chosen],
       };
 
+      if (phase === "round_summary") {
+        // Host gets the inline countdown instead of the player prompt
+        seenBonusKeys.current.add(`${targetDay}:${(updatedSeedMap[currentDayKey] || []).length}`);
+      }
+
       const updatedLeague: FriendshipLeague = {
         ...league,
         dailySeedMap: updatedSeedMap,
@@ -723,6 +729,10 @@ export default function LeagueArenaClient({
       setAttemptFeedback(
         `Added +${count} bonus questions to Drop ${targetDay}! Drop ${targetDay} is now reopened for all scholars.`
       );
+      // Start a countdown into the bonus round when the host is on the summary screen
+      if (phase === "round_summary") {
+        setBonusCountdown({ day: targetDay, seconds: 5 });
+      }
     } catch (err) {
       console.error("Failed to add bonus questions to drop:", err);
     } finally {
@@ -733,6 +743,53 @@ export default function LeagueArenaClient({
   async function handleAddQuestionsToDrop(count: number) {
     return handleAddQuestionsToDay(activeDropDay, count);
   }
+
+  // Player bonus prompt: detect finished drops that gained new bonus questions
+  const [bonusPrompt, setBonusPrompt] = useState<{ day: number; count: number; seconds: number } | null>(null);
+  const seenBonusKeys = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (phase === "playing" || bonusPrompt || bonusCountdown) return;
+    for (const [day, sc] of myScoresByDay.entries()) {
+      const total = getQuestionsForLeagueDay(league, day).length;
+      const answered = (sc.questionResults || []).length || sc.totalQuestions || 0;
+      const pending = total - answered;
+      const key = `${day}:${total}`;
+      if (pending > 0 && !seenBonusKeys.current.has(key)) {
+        seenBonusKeys.current.add(key);
+        setBonusPrompt({ day, count: pending, seconds: 5 });
+        playAudioTone(880, "sine", 0.2);
+        break;
+      }
+    }
+  }, [league, myScoresByDay, phase, bonusPrompt, bonusCountdown]);
+
+  useEffect(() => {
+    if (!bonusPrompt || bonusPrompt.seconds <= 0) return;
+    const t = setTimeout(
+      () => setBonusPrompt((p) => (p ? { ...p, seconds: p.seconds - 1 } : p)),
+      1000
+    );
+    return () => clearTimeout(t);
+  }, [bonusPrompt]);
+
+  // Countdown tick, then auto-start the bonus round once the score is synced
+  useEffect(() => {
+    if (!bonusCountdown) return;
+    if (bonusCountdown.seconds <= 0) {
+      if (submittingScore) return;
+      const day = bonusCountdown.day;
+      setBonusCountdown(null);
+      startBonusRound(day);
+      return;
+    }
+    const t = setTimeout(
+      () => setBonusCountdown((c) => (c ? { ...c, seconds: c.seconds - 1 } : c)),
+      1000
+    );
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [bonusCountdown, submittingScore]);
 
   // Start bonus round for a reopened drop
   function startBonusRound(targetDay: number) {
@@ -2383,8 +2440,29 @@ export default function LeagueArenaClient({
               <p className="text-xs text-rose-600 font-semibold">{submitError}</p>
             )}
 
+            {bonusCountdown && (
+              <div
+                className="p-4 rounded-2xl border max-w-md mx-auto space-y-2"
+                style={{ borderColor: "var(--terra)", backgroundColor: "var(--bg-input)" }}
+              >
+                <div className="text-[10px] uppercase font-bold text-[var(--text-mute)]">
+                  Bonus questions start in
+                </div>
+                <div className="font-mono text-4xl font-bold text-[var(--terra)]">
+                  {bonusCountdown.seconds > 0 ? bonusCountdown.seconds : "Go"}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setBonusCountdown(null)}
+                  className="text-xs font-semibold text-[var(--text-dim)] underline cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            )}
+
             {/* Host End-of-Round Power: Add dynamic bonus questions */}
-            {isCreator && (
+            {isCreator && !bonusCountdown && (
               <div
                 className="p-4 rounded-2xl surface border text-left space-y-3 max-w-md mx-auto"
                 style={{ borderColor: "var(--border-dim)" }}
@@ -2449,6 +2527,47 @@ export default function LeagueArenaClient({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {bonusPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div
+            className="w-full max-w-sm rounded-3xl p-6 surface border shadow-lg text-center space-y-4"
+            style={{ borderColor: "var(--border)" }}
+          >
+            <h3 className="font-space text-xl font-extrabold" style={{ color: "var(--text)" }}>
+              Bonus questions added
+            </h3>
+            <p className="text-xs text-[var(--text-dim)]">
+              The host added {bonusPrompt.count} bonus question{bonusPrompt.count === 1 ? "" : "s"} to Drop {bonusPrompt.day}. Your score will update when you finish them.
+            </p>
+            <div className="font-mono text-4xl font-bold text-[var(--terra)]">
+              {bonusPrompt.seconds > 0 ? bonusPrompt.seconds : "Ready"}
+            </div>
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setBonusPrompt(null)}
+                className="flex-1 py-2.5 rounded-xl text-xs font-semibold border border-[var(--border-dim)] cursor-pointer"
+                style={{ color: "var(--text)" }}
+              >
+                Later
+              </button>
+              <button
+                type="button"
+                disabled={bonusPrompt.seconds > 0}
+                onClick={() => {
+                  const day = bonusPrompt.day;
+                  setBonusPrompt(null);
+                  startBonusRound(day);
+                }}
+                className="flex-1 btn-terra py-2.5 rounded-xl text-xs font-bold cursor-pointer disabled:opacity-50"
+              >
+                Start Bonus Round
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Detailed Scholar Scorecard Modal */}
       <AnimatePresence>
