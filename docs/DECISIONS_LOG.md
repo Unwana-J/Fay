@@ -506,3 +506,16 @@
   > *"Don't treat your completion screen or library as passive archives. Turn your Library into a 7-day study planner where learners lock in level-matched inquiries for the week ahead—and greet them each morning with the exact promise they made to themselves."*
 
 
+## 27. In-App Sourced Research Pack & Speaking Cues
+
+- **Date / Phase**: Phase 2 — Closing the Feynman Loop
+- **The Problem / Context**: Research meant leaving Fey for Google, which broke flow and lost users before they returned to speak. Naive fix (ask Gemini to "summarize published works") risks hallucinated facts and fake citations, which would destroy trust in an app about real understanding.
+- **User Insight & Guiding Philosophy**: Do the research for the learner, but keep it grounded and keep the learner active. Users choose their own highlights as retrieval cues; cues kickstart speech but must never become a script.
+- **Architectural & Product Landing**:
+  1. `POST /api/ai/research` retrieves real passages (Wikipedia, Europe PMC, OpenAlex), then Gemini summarizes ONLY that material with inline `[S#]` citations. Only cited sources are returned, each linking to a real URL/DOI. No sources found → graceful fallback to self-research.
+  2. Three reading layers (Gist ~100w, Summary ~300w, Deep Dive ≤800w) plus sources. Cached per topic in localStorage (`fey-research-v1:<topicId>`).
+  3. Text selection → "Add as cue". Cap: 500 words total across cues (no per-cue cap; over-limit selections are flagged, not truncated) (no total cap; over-limit selections are flagged, not truncated). Cues show during speaking, fade at 20s, with a Hide/Show toggle.
+  4. Per-cue "Save to notes" checkbox (no interrupting prompt); saved cues append as "Key passages" to the library notes.
+  5. The 30-word own-notes gate remains, so reading never replaces writing. Rules copy changed from "No AI summaries" to sourced reading pack.
+- **"Building in Public" Content Takeaway**:
+  > *"Don't let an LLM write your citations. Retrieve first, summarize second, and only show sources the summary actually used."*

@@ -1,3 +1,4 @@
+import type { Cue } from "@/lib/research-types";
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import { type Topic, type Difficulty, DIFFICULTY_XP } from "@/lib/topics";
@@ -48,6 +49,7 @@ export interface ActiveSession {
   researchDurationMin: number;
   speakingDurationSec?: number;
   notes: string;
+  cues?: Cue[];
   researchCompletedAt?: number;
   speakingCompletedAt?: number;
 }
@@ -410,6 +412,7 @@ export interface AppState {
   updateActiveSessionStage: (stage: ActiveSession["stage"]) => void;
   updateActiveSessionSpeakingSec: (speakingDurationSec: number) => void;
   updateNotes: (notes: string) => void;
+  updateCues: (cues: Cue[]) => void;
   completeSession: (data: {
     notes: string;
     speakingSeconds: number;
@@ -968,6 +971,12 @@ export const useAppStore = create<AppState>()(
                 speakingDurationSec,
               }
             : null,
+        }));
+      },
+
+      updateCues: (cues) => {
+        set((s) => ({
+          activeSession: s.activeSession ? { ...s.activeSession, cues } : null,
         }));
       },
 

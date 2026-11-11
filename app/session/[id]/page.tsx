@@ -26,6 +26,8 @@ import { getShortenedUrl } from "@/lib/url-shortener";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 import { analytics } from "@/lib/analytics";
+import ResearchReader from "@/components/research/ResearchReader";
+import type { Cue } from "@/lib/research-types";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -202,6 +204,10 @@ function StageResearch({ session, onAdvance, onAbandon }: {
 }) {
   const { topic } = session;
   const updateNotes = useAppStore((s) => s.updateNotes);
+  const updateCues = useAppStore((s) => s.updateCues);
+  const cues = session.cues ?? [];
+  const insertedCueIds = useRef<Set<string>>(new Set());
+  const advanceRef = useRef<() => void>(() => {});
 
   const [pasteWarning, setPasteWarning] = useState<string | null>(null);
   const triggerWarningRef = useRef<(msg?: string) => void>(() => {});
@@ -250,8 +256,28 @@ function StageResearch({ session, onAdvance, onAbandon }: {
     },
   });
 
+  function handleCuesChange(next: Cue[]) {
+    // Cues ticked "Save to notes" land in the editor immediately, once
+    const esc = (t: string) => t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    next.forEach((c) => {
+      if (c.addToNotes && !insertedCueIds.current.has(c.id) && editor) {
+        insertedCueIds.current.add(c.id);
+        editor.commands.insertContentAt(editor.state.doc.content.size, `<ul><li><p>${esc(c.text)}</p></li></ul>`);
+      }
+    });
+    updateCues(next);
+  }
+
+  function advance() {
+    onAdvance(editor?.getHTML() ?? "");
+  }
+  advanceRef.current = advance;
+
+  const cueWords = cues
+    .filter((c) => insertedCueIds.current.has(c.id))
+    .reduce((n, c) => n + c.text.split(/\s+/).filter(Boolean).length, 0);
   const wordCount = editor
-    ? editor.state.doc.textContent.split(/\s+/).filter(Boolean).length
+    ? Math.max(0, editor.state.doc.textContent.split(/\s+/).filter(Boolean).length - cueWords)
     : 0;
   const canAdvance = wordCount >= 30;
 
@@ -267,7 +293,7 @@ function StageResearch({ session, onAdvance, onAbandon }: {
     if (secondsLeft <= 0) {
       if (!timeUpUnlocked) {
         if (canAdvance) {
-          onAdvance(editor?.getHTML() ?? "");
+          advanceRef.current();
         } else {
           setTimeUpUnlocked(true);
           triggerWarningRef.current("Time's up — you can still add notes before advancing.");
@@ -287,7 +313,7 @@ function StageResearch({ session, onAdvance, onAbandon }: {
 
   function handleStop() {
     if (effectiveCanAdvance) {
-      onAdvance(editor?.getHTML() ?? "");
+      advance();
     } else {
       triggerPasteWarning("You need to write at least 30 words before stopping the research stage.");
     }
@@ -350,12 +376,12 @@ function StageResearch({ session, onAdvance, onAbandon }: {
         {/* Rules */}
         <div className="rounded-2xl p-4 text-xs space-y-2.5 surface">
           <div className="text-label mb-1">Challenge rules</div>
-          {["Read articles & books", "Watch educational videos", "Take notes in your words"].map((r, i) => (
+          {["Read the sourced reading pack", "Highlight short cues to prompt you", "Take notes in your words"].map((r, i) => (
             <div key={i} className="flex items-start gap-2" style={{ color: "var(--olive-text)" }}>
               <CheckCircle2 size={12} className="mt-0.5 flex-shrink-0" />{r}
             </div>
           ))}
-          {["AI-generated summaries", "Copy-pasting content"].map((r, i) => (
+          {["Copy-pasting content", "Reading your notes aloud"].map((r, i) => (
             <div key={i} className="flex items-start gap-2" style={{ color: "var(--text-mute)" }}>
               <X size={12} className="mt-0.5 flex-shrink-0" />{r}
             </div>
@@ -366,7 +392,7 @@ function StageResearch({ session, onAdvance, onAbandon }: {
       {/* Right — editor */}
       <div className="flex-1 flex flex-col gap-3 min-h-0 lg:col-span-2">
         <div className="flex items-center justify-between">
-          <h2 className="font-space text-xl font-bold" style={{ color: "var(--text)" }}>Research Notes</h2>
+          <h2 className="font-space text-xl font-bold" style={{ color: "var(--text)" }}>Read, then write in your own words</h2>
           <div className="flex items-center gap-2 text-xs text-[var(--text-mute)]">
             <span className={cn("transition-colors font-mono", canAdvance ? "text-[var(--olive-text)] font-semibold" : "text-[var(--text-mute)]")}>
               {wordCount} words
@@ -375,8 +401,17 @@ function StageResearch({ session, onAdvance, onAbandon }: {
           </div>
         </div>
 
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        <ResearchReader
+          topicId={topic.id}
+          topicText={topic.text}
+          category={topic.category}
+          cues={cues}
+          onCuesChange={handleCuesChange}
+        />
+
         {/* Editor Container with clipboard interception */}
-        <div className="flex-1 rounded-xl overflow-hidden flex flex-col surface relative">
+        <div className="rounded-xl overflow-hidden flex flex-col surface relative xl:sticky xl:top-4">
           <EditorToolbar editor={editor} />
           
           <div
@@ -405,6 +440,8 @@ function StageResearch({ session, onAdvance, onAbandon }: {
           </AnimatePresence>
         </div>
 
+        </div>
+
         {!effectiveCanAdvance && (
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-mute)" }}>
             <AlertCircle size={12} />
@@ -418,7 +455,7 @@ function StageResearch({ session, onAdvance, onAbandon }: {
           </button>
           <button
             disabled={!effectiveCanAdvance}
-            onClick={() => onAdvance(editor?.getHTML() ?? "")}
+            onClick={advance}
             className="flex-1 btn-terra"
           >
             <Mic size={14} /> I'm Ready to Speak <ChevronRight size={14} className="ml-1" />
@@ -427,6 +464,22 @@ function StageResearch({ session, onAdvance, onAbandon }: {
       </div>
     </div>
   );
+}
+
+// Editor notes are stored as HTML; turn them into readable plain text for previews
+function notesToPlainText(html: string): string {
+  return html
+    .replace(/<\/(p|h[1-6]|blockquote)>/gi, "\n")
+    .replace(/<li[^>]*>/gi, "• ")
+    .replace(/<\/li>/gi, "\n")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<[^>]*>/g, "")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&amp;/g, "&")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
 }
 
 // ─── Speaking Starter & Timed Scaffolding Helpers ────────────────────────────
@@ -552,6 +605,12 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
   }
 
   const liveElapsed = TOTAL - secondsLeft;
+  const sessionCues: Cue[] = session.cues ?? [];
+  const [cuesOpen, setCuesOpen] = useState(true);
+  useEffect(() => {
+    // Cues fade after 20s so they work as a kickstart, not a script
+    if (phase === "recording" && liveElapsed === 20) setCuesOpen(false);
+  }, [phase, liveElapsed]);
   const scaffold = getSpeakingScaffoldStep(liveElapsed, TOTAL);
 
   return (
@@ -649,6 +708,37 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
                 </p>
               )}
             </div>
+
+            {sessionCues.length > 0 && (
+              <div className="w-full">
+                <button
+                  onClick={() => setCuesOpen((o) => !o)}
+                  className="text-[10px] font-mono uppercase tracking-wider font-bold text-[var(--olive)] mb-1.5"
+                >
+                  {cuesOpen ? "Hide cues" : "Show cues"}
+                </button>
+                <AnimatePresence>
+                  {cuesOpen && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: "auto" }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="flex flex-wrap gap-2 overflow-hidden"
+                    >
+                      {sessionCues.map((c) => (
+                        <span
+                          key={c.id}
+                          className="px-3 py-1.5 rounded-full text-xs font-semibold border"
+                          style={{ background: "var(--bg-panel)", borderColor: "var(--olive)", color: "var(--olive-text)" }}
+                        >
+                          {c.text}
+                        </span>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+            )}
 
             <div className="rounded-2xl p-5 text-center w-full surface">
               <div className="text-label mb-2">Your topic</div>
@@ -1279,7 +1369,7 @@ function StageComplete({
 
         <div className="rounded-xl p-4 surface border mb-4" style={{ borderColor: "var(--border-dim)", background: "var(--bg-panel)" }}>
           <p className="font-serif italic text-xs sm:text-sm leading-relaxed text-[var(--text-dim)] whitespace-pre-wrap max-h-40 overflow-y-auto">
-            &ldquo;{displayNotes}&rdquo;
+            &ldquo;{notesToPlainText(displayNotes)}&rdquo;
           </p>
           <div className="mt-3 pt-2 border-t text-[10px] font-mono text-[var(--text-mute)] flex items-center justify-between" style={{ borderColor: "var(--border-dim)" }}>
             <span>Scholar {profile.username || "Scholar"}</span>
