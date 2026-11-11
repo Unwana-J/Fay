@@ -1595,9 +1595,14 @@ export const useAppStore = create<AppState>()(
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       migrate: (persistedState: any, fromVersion: number) => {
         const state = { ...persistedState };
-        // Always clear activeSession on cold start from persisted state 
-        // to prevent being trapped in a stale session
-        state.activeSession = null;
+        // Preserve recent activeSession across refreshes; only clear if older than 12 hours
+        if (
+          state.activeSession &&
+          typeof state.activeSession.startedAt === "number" &&
+          Date.now() - state.activeSession.startedAt > 12 * 60 * 60 * 1000
+        ) {
+          state.activeSession = null;
+        }
 
         // Ensure triviaHistory & articulateHistory arrays exist
         state.triviaHistory = Array.isArray(state?.triviaHistory) ? state.triviaHistory : [];

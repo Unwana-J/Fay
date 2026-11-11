@@ -27,6 +27,7 @@ import { copyTextToClipboard } from "@/lib/clipboard";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 import { analytics } from "@/lib/analytics";
 import ResearchReader from "@/components/research/ResearchReader";
+import ResearchQuizCard from "@/components/research/ResearchQuizCard";
 import type { Cue } from "@/lib/research-types";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
@@ -281,18 +282,76 @@ function StageResearch({ session, onAdvance, onAbandon }: {
     : 0;
   const canAdvance = wordCount >= 30;
 
-  // Timer states
-  const [secondsLeft, setSecondsLeft] = useState(session.researchDurationMin * 60);
-  const [isPaused, setIsPaused] = useState(false);
+  // Timer states — persisted per session so refreshing keeps exact remaining time and pauses
+  const timerStorageKey = `fey-research-timer:${session.id}`;
+  const MIN_STUDY_SECONDS = 120; // 2 minutes of active study unlocks speaking
+  const [secondsLeft, setSecondsLeft] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(timerStorageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { secondsLeft?: number };
+          if (typeof parsed.secondsLeft === "number" && parsed.secondsLeft >= 0) {
+            return parsed.secondsLeft;
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return session.researchDurationMin * 60;
+  });
+  const [studiedSeconds, setStudiedSeconds] = useState<number>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const raw = window.localStorage.getItem(timerStorageKey);
+        if (raw) {
+          const parsed = JSON.parse(raw) as { studiedSeconds?: number; secondsLeft?: number };
+          if (typeof parsed.studiedSeconds === "number" && parsed.studiedSeconds >= 0) {
+            return parsed.studiedSeconds;
+          }
+          if (typeof parsed.secondsLeft === "number") {
+            return Math.max(0, session.researchDurationMin * 60 - parsed.secondsLeft);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
+    return 0;
+  });
+  const [isPaused, setIsPaused] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        return Boolean(window.localStorage.getItem(timerStorageKey));
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  });
   const [timeUpUnlocked, setTimeUpUnlocked] = useState(false);
-  
-  const effectiveCanAdvance = canAdvance || timeUpUnlocked;
+
+  const studyTimeUnlocked = studiedSeconds >= MIN_STUDY_SECONDS;
+  const studySecondsRemaining = Math.max(0, MIN_STUDY_SECONDS - studiedSeconds);
+  const effectiveCanAdvance = canAdvance || studyTimeUnlocked || timeUpUnlocked;
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(
+        timerStorageKey,
+        JSON.stringify({ secondsLeft, studiedSeconds, isPaused })
+      );
+    } catch {
+      /* ignore */
+    }
+  }, [timerStorageKey, secondsLeft, studiedSeconds, isPaused]);
 
   useEffect(() => {
     if (isPaused) return;
     if (secondsLeft <= 0) {
       if (!timeUpUnlocked) {
-        if (canAdvance) {
+        if (canAdvance || studyTimeUnlocked) {
           advanceRef.current();
         } else {
           setTimeUpUnlocked(true);
@@ -303,9 +362,10 @@ function StageResearch({ session, onAdvance, onAbandon }: {
     }
     const interval = setInterval(() => {
       setSecondsLeft((s) => Math.max(0, s - 1));
+      setStudiedSeconds((s) => s + 1);
     }, 1000);
     return () => clearInterval(interval);
-  }, [isPaused, secondsLeft, canAdvance, timeUpUnlocked, editor, onAdvance]);
+  }, [isPaused, secondsLeft, canAdvance, studyTimeUnlocked, timeUpUnlocked, editor, onAdvance]);
 
   function handleExtend() {
     setSecondsLeft((s) => s + 300); // Add 5 minutes (300 seconds)
@@ -315,7 +375,9 @@ function StageResearch({ session, onAdvance, onAbandon }: {
     if (effectiveCanAdvance) {
       advance();
     } else {
-      triggerPasteWarning("You need to write at least 30 words before stopping the research stage.");
+      triggerPasteWarning(
+        `Study for ${formatTime(studySecondsRemaining)} more or write at least 30 words in your own words before advancing.`
+      );
     }
   }
 
@@ -406,6 +468,7 @@ function StageResearch({ session, onAdvance, onAbandon }: {
           topicId={topic.id}
           topicText={topic.text}
           category={topic.category}
+          tags={topic.tags}
           cues={cues}
           onCuesChange={handleCuesChange}
         />
@@ -445,7 +508,9 @@ function StageResearch({ session, onAdvance, onAbandon }: {
         {!effectiveCanAdvance && (
           <div className="flex items-center gap-2 text-xs" style={{ color: "var(--text-mute)" }}>
             <AlertCircle size={12} />
-            Write at least 30 words of notes to unlock the speaking stage.
+            <span>
+              Study the reading pack for <span className="font-mono font-semibold">{formatTime(studySecondsRemaining)}</span> more (or write 30 words in your own words) to unlock speaking.
+            </span>
           </div>
         )}
 
@@ -1044,6 +1109,7 @@ function StarRating({ label, value, onChange }: { label: string; value: number; 
 
 // ─── Completion screen ────────────────────────────────────────────────────────
 function StageComplete({
+  sessionId,
   xpEarned,
   newAchievements,
   streak,
@@ -1056,6 +1122,7 @@ function StageComplete({
   tags,
   speakingSeconds,
 }: {
+  sessionId: string;
   xpEarned: number;
   newAchievements: string[];
   streak: number;
@@ -1068,6 +1135,7 @@ function StageComplete({
   tags?: string[];
   speakingSeconds: number;
 }) {
+  const [bonusQuizXP, setBonusQuizXP] = useState(0);
   const { ACHIEVEMENTS } = require("@/lib/achievements");
   const unlockedAchs = ACHIEVEMENTS.filter((a: any) => newAchievements.includes(a.id));
   const {
@@ -1298,9 +1366,11 @@ function StageComplete({
           style={{ borderColor: "var(--border-dim)" }}
         >
           <div className="text-4xl font-bold font-mono" style={{ color: "var(--gold)" }}>
-            +<CountUp end={xpEarned} />
+            +<CountUp end={xpEarned + bonusQuizXP} />
           </div>
-          <div className="text-xs font-mono mt-1" style={{ color: "var(--text-dim)" }}>XP Earned</div>
+          <div className="text-xs font-mono mt-1" style={{ color: "var(--text-dim)" }}>
+            XP Earned{bonusQuizXP > 0 ? ` (+${bonusQuizXP} Recall)` : ""}
+          </div>
         </motion.div>
         <motion.div
           initial={{ y: 12, opacity: 0 }}
@@ -1396,18 +1466,6 @@ function StageComplete({
               {copiedCardImage ? <Check size={13} className="text-[var(--olive)]" /> : <ImageIcon size={13} className="text-[var(--gold)]" />}
               <span>{copiedCardImage ? "Card Copied!" : "Copy Card Image"}</span>
             </button>
-
-            {activeShareUrl && (
-              <a
-                href={activeShareUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="btn-ghost px-3 py-2 text-xs font-mono rounded-lg border border-[var(--border-dim)] hover:border-[var(--text)] transition-colors flex items-center gap-1.5"
-              >
-                <span>View Full Page</span>
-                <ExternalLink size={12} />
-              </a>
-            )}
           </div>
 
           <div className="flex items-center gap-2">
@@ -1460,6 +1518,16 @@ function StageComplete({
           View Map →
         </a>
       </div>
+
+      {/* ── Post-Session 3-Question Recall Check (+60 Bonus XP max) ── */}
+      <ResearchQuizCard
+        sessionId={sessionId}
+        topicId={topicId}
+        topicText={topicText}
+        category={topicCategory}
+        tags={tags}
+        onBonusXPClaimed={(xp) => setBonusQuizXP((prev) => prev + xp)}
+      />
 
       <div className="flex gap-3 flex-wrap justify-center">
         <button
@@ -1755,6 +1823,16 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [completedSession, setCompletedSession] = useState<ActiveSession | null>(null);
   const [showExitNudge, setShowExitNudge] = useState(false);
 
+  const [hasHydrated, setHasHydrated] = useState(false);
+
+  useEffect(() => {
+    const unsub = useAppStore.persist.onFinishHydration(() => setHasHydrated(true));
+    if (useAppStore.persist.hasHydrated()) {
+      setHasHydrated(true);
+    }
+    return () => unsub();
+  }, []);
+
   const currentSession = activeSession || completedSession;
 
   const STAGES = ["research", "speaking", "reflection", "complete"] as const;
@@ -1765,12 +1843,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     : 2;
 
   useEffect(() => {
-    if (completionData) return;
+    if (!hasHydrated || completionData) return;
     if (!activeSession || activeSession.id !== unwrappedParams.id) {
       router.replace("/discover");
     }
-  }, [activeSession, unwrappedParams.id, router, completionData]);
+  }, [hasHydrated, activeSession, unwrappedParams.id, router, completionData]);
 
+  if (!hasHydrated) return null;
   if (!currentSession && !completionData) return null;
   if (!currentSession) return null;
 
@@ -1896,6 +1975,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         {completionData ? (
           <motion.div key="complete" variants={stageSlideVariants} initial="enter" animate="center" exit="exit">
             <StageComplete
+              sessionId={currentSession.id}
               xpEarned={completionData.xpEarned}
               newAchievements={completionData.newAchievements}
               streak={streak.current}

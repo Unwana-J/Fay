@@ -514,8 +514,9 @@
 - **Architectural & Product Landing**:
   1. `POST /api/ai/research` retrieves real passages (Wikipedia, Europe PMC, OpenAlex), then Gemini summarizes ONLY that material with inline `[S#]` citations. Only cited sources are returned, each linking to a real URL/DOI. No sources found → graceful fallback to self-research.
   2. Three reading layers (Gist ~100w, Summary ~300w, Deep Dive ≤800w) plus sources. Cached per topic in localStorage (`fey-research-v1:<topicId>`).
-  3. Text selection → "Add as cue". Cap: 500 words total across cues (no per-cue cap; over-limit selections are flagged, not truncated) (no total cap; over-limit selections are flagged, not truncated). Cues show during speaking, fade at 20s, with a Hide/Show toggle.
-  4. Per-cue "Save to notes" checkbox (no interrupting prompt); saved cues append as "Key passages" to the library notes.
+  3. Text selection → "Add as cue". Cap: 500 words total across cues (no per-cue cap; over-limit selections are flagged, not truncated). Cues show during speaking, fade at 20s, with a Hide/Show toggle.
+  4. Per-cue "Save to notes" checkbox (no interrupting prompt); saved cues insert live into the editor.
   5. The 30-word own-notes gate remains, so reading never replaces writing. Rules copy changed from "No AI summaries" to sourced reading pack.
+  6. **Post-Session 3-Question Recall Check (`components/research/ResearchQuizCard.tsx`)**: Generated inside the same `/api/ai/research` call (with a deterministic source-sentence fallback when Gemini times out). Shown on `Session Complete` as a non-blocking bonus card awarding `+15 XP` per correct answer plus `+15 XP` Perfect Recall bonus (`+60 XP` max), locked to one claim per session (`fey-research-quiz-claimed:<sessionId>`).
 - **"Building in Public" Content Takeaway**:
   > *"Don't let an LLM write your citations. Retrieve first, summarize second, and only show sources the summary actually used."*

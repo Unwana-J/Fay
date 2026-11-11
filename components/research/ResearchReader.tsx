@@ -11,12 +11,11 @@ import {
   countWords,
   cacheResearch,
   getCachedResearch,
+  setMemoryResearch,
+  clearMemoryResearch,
 } from "@/lib/research-types";
 
 type Tab = "gist" | "summary" | "deep";
-
-// Keeps fallback packs alive across remounts so the reader never reloads needlessly
-const memo = new Map<string, ResearchPack>();
 
 function Cited({ text, pack }: { text: string; pack: ResearchPack }) {
   const parts = text.split(/(\[S\d+\])/g);
@@ -64,12 +63,14 @@ export default function ResearchReader({
   topicId,
   topicText,
   category,
+  tags,
   cues,
   onCuesChange,
 }: {
   topicId: string;
   topicText: string;
   category: string;
+  tags?: string[];
   cues: Cue[];
   onCuesChange: (cues: Cue[]) => void;
 }) {
@@ -83,7 +84,7 @@ export default function ResearchReader({
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
-    const cached = attempt === 0 ? memo.get(topicId) ?? getCachedResearch(topicId) : null;
+    const cached = attempt === 0 ? getCachedResearch(topicId) : null;
     if (cached) {
       setPack(cached);
       setStatus("ready");
@@ -94,7 +95,7 @@ export default function ResearchReader({
     fetch("/api/ai/research", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ topicId, topic: topicText, category }),
+      body: JSON.stringify({ topicId, topic: topicText, category, tags }),
       signal: AbortSignal.timeout(30000),
     })
       .then(async (r) => {
@@ -103,7 +104,7 @@ export default function ResearchReader({
       })
       .then((p) => {
         if (cancelled) return;
-        memo.set(topicId, p);
+        setMemoryResearch(p);
         if (!p.degraded) cacheResearch(p);
         setPack(p);
         setStatus("ready");
@@ -213,7 +214,14 @@ export default function ResearchReader({
       {pack.degraded && (
         <div className="flex items-center justify-between gap-2 rounded-lg px-3 py-2 text-xs surface" style={{ color: "var(--text-dim)" }}>
           <span>Showing source excerpts. The plain-language summary is unavailable right now.</span>
-          <button onClick={() => setAttempt((n) => n + 1)} className="font-bold underline" style={{ color: "var(--olive)" }}>
+          <button
+            onClick={() => {
+              clearMemoryResearch(topicId);
+              setAttempt((n) => n + 1);
+            }}
+            className="font-bold underline cursor-pointer"
+            style={{ color: "var(--olive)" }}
+          >
             Retry
           </button>
         </div>
