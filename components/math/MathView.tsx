@@ -66,7 +66,7 @@ export function MathView({ children, className = "", block = false }: MathViewPr
 }
 
 function hasMathCommands(text: string): boolean {
-  return /\\(frac|sqrt|pi|theta|times|div|pm|approx|le|ge|ne|degree|infty|cdot|\^|_)/.test(text);
+  return /\\(frac|binom|sqrt|text|pi|theta|times|div|pm|approx|le|ge|ne|equiv|implies|Rightarrow|star|oplus|otimes|diamond|triangle|dots|lfloor|rfloor|degree|infty|cdot|\^|_)/.test(text);
 }
 
 /**
@@ -93,15 +93,43 @@ function parseMathToNodes(expr: string): React.ReactNode[] {
     .replace(/\\div/g, " ÷ ")
     .replace(/\\pm/g, " ± ")
     .replace(/\\approx/g, " ≈ ")
+    .replace(/\\equiv/g, " ≡ ")
+    .replace(/\\implies/g, " ⇒ ")
+    .replace(/\\Rightarrow/g, " ⇒ ")
+    .replace(/\\rightarrow/g, " → ")
+    .replace(/\\to/g, " → ")
+    .replace(/\\star/g, " ★ ")
+    .replace(/\\oplus/g, " ⊕ ")
+    .replace(/\\otimes/g, " ⊗ ")
+    .replace(/\\diamond/g, " ◇ ")
+    .replace(/\\triangle/g, " △ ")
     .replace(/\\le/g, " ≤ ")
     .replace(/\\ge/g, " ≥ ")
     .replace(/\\ne/g, " ≠ ")
     .replace(/\\infty/g, " ∞ ")
+    .replace(/\\dots/g, "…")
+    .replace(/\\cdots/g, "⋯")
     .replace(/\\cdot/g, " · ")
+    .replace(/\\lfloor/g, "⌊")
+    .replace(/\\rfloor/g, "⌋")
+    .replace(/\\lceil/g, "⌈")
+    .replace(/\\rceil/g, "⌉")
+    .replace(/\\%/g, "%")
+    .replace(/\\pmod\s*\{([^}]+)\}/g, " (mod $1)")
+    .replace(/\\pmod\s+(\S+)/g, " (mod $1)")
+    .replace(/\\bmod/g, " mod ")
+    .replace(/\\gcd/g, "gcd")
+    .replace(/\\lcm/g, "lcm")
+    .replace(/\\log/g, "log")
+    .replace(/\\ln/g, "ln")
+    .replace(/\\sin/g, "sin")
+    .replace(/\\cos/g, "cos")
+    .replace(/\\tan/g, "tan")
     .replace(/\\pi/g, "π")
     .replace(/\\theta/g, "θ")
     .replace(/\\alpha/g, "α")
     .replace(/\\beta/g, "β")
+    .replace(/\\gamma/g, "γ")
     .replace(/\\Delta/g, "Δ")
     .replace(/\\Sigma/g, "Σ")
     .replace(/\\degree/g, "°");
@@ -111,6 +139,56 @@ function parseMathToNodes(expr: string): React.ReactNode[] {
   let keyCount = 0;
 
   while (i < str.length) {
+    // 0. \text{...} -> upright plain text
+    if (str.startsWith("\\text", i)) {
+      const txtStart = str.indexOf("{", i);
+      if (txtStart !== -1) {
+        const txtEnd = findMatchingBrace(str, txtStart);
+        if (txtEnd !== -1) {
+          const innerText = str.slice(txtStart + 1, txtEnd);
+          nodes.push(
+            <span key={`txt-${keyCount++}`} className="font-sans not-italic">
+              {innerText}
+            </span>
+          );
+          i = txtEnd + 1;
+          continue;
+        }
+      }
+    }
+
+    // 0b. Binomial coefficient: \binom{n}{k}
+    if (str.startsWith("\\binom", i)) {
+      const topStart = str.indexOf("{", i);
+      if (topStart !== -1) {
+        const topEnd = findMatchingBrace(str, topStart);
+        if (topEnd !== -1) {
+          const botStart = str.indexOf("{", topEnd + 1);
+          if (botStart !== -1) {
+            const botEnd = findMatchingBrace(str, botStart);
+            if (botEnd !== -1) {
+              const topText = str.slice(topStart + 1, topEnd);
+              const botText = str.slice(botStart + 1, botEnd);
+              nodes.push(
+                <span
+                  key={`binom-${keyCount++}`}
+                  className="inline-flex items-center align-middle mx-0.5"
+                >
+                  <span className="text-[1.2em] font-light leading-none">(</span>
+                  <span className="inline-flex flex-col items-center justify-center text-[0.78em] leading-tight px-0.5">
+                    <span>{parseMathToNodes(topText)}</span>
+                    <span>{parseMathToNodes(botText)}</span>
+                  </span>
+                  <span className="text-[1.2em] font-light leading-none">)</span>
+                </span>
+              );
+              i = botEnd + 1;
+              continue;
+            }
+          }
+        }
+      }
+    }
     // 1. Fractions: \frac{num}{den}
     if (str.startsWith("\\frac", i)) {
       const numStart = str.indexOf("{", i);

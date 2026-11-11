@@ -107,7 +107,7 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     Icon: Calculator,
     image: "/showcase/mathletics-preview.png",
     urlPath: "fey.lokinlabs.com.ng/games/mathletics",
-    stat: "25s Rapid Duels · 5 Pillars · Titans Rankings",
+    stat: "25s Rapid Duels · 6 Categories · Titans Rankings",
   },
   {
     id: "articulate",

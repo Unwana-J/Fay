@@ -493,7 +493,7 @@ export default function CreateMathleticsLeagueModal({
                         : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] surface"
                     }`}
                   >
-                    All 5 Pillars
+                    All Categories
                   </button>
                   {MATHLETICS_CATEGORIES.map((cat) => (
                     <button
