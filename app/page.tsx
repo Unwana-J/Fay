@@ -245,7 +245,6 @@ export default function Dashboard() {
   const [showFocusModal, setShowFocusModal] = useState(false);
   const [spinOffset, setSpinOffset] = useState(0);
   const [activeTab, setActiveTab] = useState<"practice" | "parlor">("practice");
-  const [previewTomorrowMode, setPreviewTomorrowMode] = useState(false);
   const [dismissedTomorrowModal, setDismissedTomorrowModal] = useState(false);
 
   const activityDates = useMemo(
@@ -316,11 +315,10 @@ export default function Dashboard() {
       : upcomingScheduled[0] ||
         (queuedTomorrowTopic ? { date: next7Days[0], topic: queuedTomorrowTopic.topic } : null));
 
-  const isScheduledForTodayOrPreview = Boolean(
+  const isScheduledForToday = Boolean(
     nextQueuedItem &&
       (todayScheduledItem ||
-        (queuedTomorrowTopic && queuedTomorrowTopic.queuedDate !== todayIso) ||
-        previewTomorrowMode)
+        (queuedTomorrowTopic && queuedTomorrowTopic.queuedDate !== todayIso))
   );
 
   const suggestedTopic = (() => {
@@ -329,9 +327,9 @@ export default function Dashboard() {
       return pendingTopic;
     }
 
-    // 0b. If user has a topic scheduled for today (or is previewing tomorrow's login), promote it today!
+    // 0b. If user has a topic scheduled for today, promote it today!
     if (
-      isScheduledForTodayOrPreview &&
+      isScheduledForToday &&
       nextQueuedItem &&
       !completedTopicIds.has(nextQueuedItem.topic.id) &&
       !skippedToday.includes(nextQueuedItem.topic.id)
@@ -872,7 +870,7 @@ export default function Dashboard() {
           exit="exit"
         >
           {/* ── Top-of-Dashboard 7-Day Schedule Strip (Above the Hero Card!) ── */}
-          {!activeSession && nextQueuedItem && !isScheduledForTodayOrPreview && (
+          {!activeSession && nextQueuedItem && !isScheduledForToday && (
             <motion.div
               variants={cardVariants}
               className="rounded-2xl p-4 sm:p-5 mb-5 border-[1.5px] flex flex-col sm:flex-row sm:items-center justify-between gap-3.5 shadow-xs"
@@ -907,22 +905,11 @@ export default function Dashboard() {
               </div>
 
               <div className="flex items-center gap-2 shrink-0 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDismissedTomorrowModal(false);
-                    setPreviewTomorrowMode(true);
-                  }}
-                  className="btn-terra px-3 py-1.5 rounded-lg text-xs font-mono font-bold whitespace-nowrap cursor-pointer"
-                  title="Simulate logging in on that day to see the Welcome Back modal & CTA"
-                >
-                  Preview Next-Day Login CTA
-                </button>
                 <Link
                   href="/library?tab=schedule"
-                  className="px-3 py-1.5 rounded-lg text-xs font-mono font-semibold border border-[var(--olive)] bg-[var(--bg-card)] hover:bg-[var(--olive)] hover:text-white text-[var(--olive)] whitespace-nowrap transition-colors"
+                  className="px-3.5 py-2 rounded-xl text-xs font-mono font-semibold border border-[var(--olive)] bg-[var(--bg-card)] hover:bg-[var(--olive)] hover:text-white text-[var(--olive)] whitespace-nowrap transition-colors"
                 >
-                  Manage 7-Day Schedule
+                  Manage Schedule
                 </Link>
               </div>
             </motion.div>
@@ -1087,7 +1074,7 @@ export default function Dashboard() {
 
             {/* Queued Yesterday Banner (Next-Day Return Commitment Fulfilled) */}
             {nextQueuedItem &&
-              isScheduledForTodayOrPreview &&
+              isScheduledForToday &&
               suggestedTopic.id === nextQueuedItem.topic.id && (
                 <div
                   className="mb-4 p-4 rounded-2xl border-[1.5px] flex items-center justify-between gap-3 flex-wrap"
@@ -1121,7 +1108,6 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        setPreviewTomorrowMode(false);
                         removeScheduledTopic(nextQueuedItem.date);
                         setQueuedTomorrowTopic(null);
                       }}
@@ -1203,7 +1189,7 @@ export default function Dashboard() {
               >
                 <span>
                   {nextQueuedItem &&
-                  (nextQueuedItem.date <= todayIso || previewTomorrowMode) &&
+                  nextQueuedItem.date <= todayIso &&
                   suggestedTopic.id === nextQueuedItem.topic.id
                     ? "Start Scheduled Topic (15m)"
                     : "Begin Research (15m)"}
@@ -1236,7 +1222,6 @@ export default function Dashboard() {
                   <button
                     type="button"
                     onClick={() => {
-                      setPreviewTomorrowMode(false);
                       queueTopicNextAvailableDay(suggestedTopic);
                     }}
                     className="w-full sm:w-auto sm:ml-auto inline-flex items-center justify-center gap-1.5 px-3.5 py-2.5 rounded-xl border border-[var(--olive)]/40 bg-[var(--bg-card)] hover:border-[var(--olive)] text-xs font-semibold text-[var(--olive)] whitespace-nowrap transition-colors cursor-pointer"
@@ -1259,7 +1244,7 @@ export default function Dashboard() {
       <AnimatePresence>
         {!activeSession &&
           nextQueuedItem &&
-          (nextQueuedItem.date <= todayIso || previewTomorrowMode) &&
+          nextQueuedItem.date <= todayIso &&
           !dismissedTomorrowModal && (
             <motion.div
               initial={{ opacity: 0 }}
@@ -1316,7 +1301,6 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => {
                       const t = nextQueuedItem.topic;
-                      setPreviewTomorrowMode(false);
                       setDismissedTomorrowModal(true);
                       removeScheduledTopic(nextQueuedItem.date);
                       const id = startSession(t, settings.researchMin);
@@ -1331,7 +1315,6 @@ export default function Dashboard() {
                     type="button"
                     onClick={() => {
                       const t = nextQueuedItem.topic;
-                      setPreviewTomorrowMode(false);
                       setDismissedTomorrowModal(true);
                       removeScheduledTopic(nextQueuedItem.date);
                       const id = startSession(t, 0, "speaking");
@@ -1363,7 +1346,6 @@ export default function Dashboard() {
                     <button
                       type="button"
                       onClick={() => {
-                        setPreviewTomorrowMode(false);
                         setDismissedTomorrowModal(true);
                         removeScheduledTopic(nextQueuedItem.date);
                       }}
