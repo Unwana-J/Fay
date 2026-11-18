@@ -32,6 +32,11 @@
 22. [Admin Console Redesign: Server-Signed Sessions, Cross-Game Hours & Unified Scholar Identity](#22-admin-console-redesign-server-signed-sessions-cross-game-hours--unified-scholar-identity)
 23. [Resilient Cross-Device Real-Time Syncing: Dual-Table Database Fallback & Zero-Loss Local Score Auto-Heal (Fixing Mathletics League Score Isolation)](#23-resilient-cross-device-real-time-syncing-dual-table-database-fallback--zero-loss-local-score-auto-heal-fixing-mathletics-league-score-isolation)
 24. [Hard Border Structural System, Maroon Focal Anchor & Academic Serif Hierarchy (Killing Soft AI Template Tropes)](#24-hard-border-structural-system-maroon-focal-anchor--academic-serif-hierarchy-killing-soft-ai-template-tropes)
+25. [Desktop Companion as a Technical PM Scribe: Mid-Meeting Side-Notes, Active Document Insertion & Task Tracker Templates](#25-desktop-companion-as-a-technical-pm-scribe-mid-meeting-side-notes-active-document-insertion--task-tracker-templates)
+26. [Behavioral Nudges, In-Sprint Speaking Scaffolding & Next-Day Return Loops](#26-behavioral-nudges-in-sprint-speaking-scaffolding--next-day-return-loops)
+27. [In-App Sourced Research Pack & Speaking Cues](#27-in-app-sourced-research-pack--speaking-cues)
+28. [Dual-Hue Activity Heatmaps & Streak Calendars: Distinguishing Deep Research from Parlor Games](#28-dual-hue-activity-heatmaps--streak-calendars-distinguishing-deep-research-from-parlor-games)
+29. [Dismissible Live Arena Challenges & Curated Custom Challenge Rotation](#29-dismissible-live-arena-challenges--curated-custom-challenge-rotation)
 
 ---
 
@@ -387,6 +392,24 @@
 
 ---
 
+## 22. Admin Console Redesign: Server-Signed Sessions, Cross-Game Hours & Unified Scholar Identity
+
+- **Date / Phase**: Phase 2 — Admin Security, Engagement Analytics & Brand Polish
+- **The Problem / Context**:
+  1. **Security**: Admin API routes (`/api/admin/users`, `/api/admin/features`, `/api/admin/overview`, `/api/feedback`, `/api/safety/report`) had no server-side authentication checks, and the passcodes (`fey2026`, `admin`) were checked in client-side JS.
+  2. **Fragmented Game Hours & Identity**: Sprints, Trivia Leagues, Solo Trivia, Mathletics, and Articulate lived in separate tables keyed by a mix of `user_id`, `device_id`, and `username`. There was no single view of hours played per game or who the top scholars were across games.
+  3. **Overview Clutter & Jargon**: Half of the Overview tab was a static PostHog placeholder with hardcoded event rows, user counts disagreed between cards and tabs, and copy/colors violated the anti-jargon and color-semantics rules.
+- **User Insight & Guiding Philosophy**:
+  An admin console should answer the founder's real daily questions at a glance: *How many hours are people spending in each game? How close is Articulate to 500 hours? Who are our most dedicated scholars across the whole platform, and are they happy?*
+- **Architectural & Product Landing**:
+  1. **HMAC-Signed `httpOnly` Session Cookie (`lib/admin-auth.ts`, `/api/admin/session`)**: Replaced client-side passcode checks with timing-safe server verification and an `httpOnly` cookie enforced by `isAdminAuthorized()` across all admin endpoints.
+  2. **Cross-Game Engagement & Scholar Deduplication (`lib/admin-engagement.ts`, `lib/play-sessions.ts`)**: Aggregates hours, sessions, 14-day activity trends, and period-over-period deltas (`7d` / `30d` / `all`) across Articulate, Trivia, Mathletics, and Feynman Sprints, resolving player identities by `user_id`/`device_id` and normalized `username` into a unified **Top Scholars** ranking.
+  3. **Overview & Brand Cleanup (`components/admin/*`)**: Replaced the static PostHog box with live game engagement, Top Scholars, and the 3 newest feedback comments; added sample-size indicators (`n = X`), CSV export, ISO timestamp sorting, and native `<dialog closedby="any">` light-dismiss modals.
+- **"Building in Public" Content Takeaway**:
+  > *"Replace vanity placeholders in your admin dashboard with the two things that actually drive community momentum: cumulative hours played per game toward your next public milestone, and a unified leaderboard of the power users carrying your platform."*
+
+---
+
 ## 23. Resilient Cross-Device Real-Time Syncing: Dual-Table Database Fallback & Zero-Loss Local Score Auto-Heal (Fixing Mathletics League Score Isolation)
 
 - **Date / Phase**: Phase 2 — Multiplayer Infrastructure & Distributed State Syncing
@@ -405,21 +428,6 @@
   4. **Active Polling & Window Focus Sync**: Added background polling (every 15s when not answering) plus instant re-fetch on window `focus` and tab `visibilitychange`.
 - **"Building in Public" Content Takeaway**:
   > *"Never let an unapplied database migration break a live multiplayer game. How dual-table database fallback and client-side score auto-healing saved our real-time tournament leaderboard from silent data silos."*
-
-
-- **Date / Phase**: Phase 2 — Admin Security, Engagement Analytics & Brand Polish
-- **The Problem / Context**:
-  1. **Security**: Admin API routes (`/api/admin/users`, `/api/admin/features`, `/api/admin/overview`, `/api/feedback`, `/api/safety/report`) had no server-side authentication checks, and the passcodes (`fey2026`, `admin`) were checked in client-side JS.
-  2. **Fragmented Game Hours & Identity**: Sprints, Trivia Leagues, Solo Trivia, Mathletics, and Articulate lived in separate tables keyed by a mix of `user_id`, `device_id`, and `username`. There was no single view of hours played per game or who the top scholars were across games.
-  3. **Overview Clutter & Jargon**: Half of the Overview tab was a static PostHog placeholder with hardcoded event rows, user counts disagreed between cards and tabs, and copy/colors violated the anti-jargon and color-semantics rules.
-- **User Insight & Guiding Philosophy**:
-  An admin console should answer the founder's real daily questions at a glance: *How many hours are people spending in each game? How close is Articulate to 500 hours? Who are our most dedicated scholars across the whole platform, and are they happy?*
-- **Architectural & Product Landing**:
-  1. **HMAC-Signed `httpOnly` Session Cookie (`lib/admin-auth.ts`, `/api/admin/session`)**: Replaced client-side passcode checks with timing-safe server verification and an `httpOnly` cookie enforced by `isAdminAuthorized()` across all admin endpoints.
-  2. **Cross-Game Engagement & Scholar Deduplication (`lib/admin-engagement.ts`, `lib/play-sessions.ts`)**: Aggregates hours, sessions, 14-day activity trends, and period-over-period deltas (`7d` / `30d` / `all`) across Articulate, Trivia, Mathletics, and Feynman Sprints, resolving player identities by `user_id`/`device_id` and normalized `username` into a unified **Top Scholars** ranking.
-  3. **Overview & Brand Cleanup (`components/admin/*`)**: Replaced the static PostHog box with live game engagement, Top Scholars, and the 3 newest feedback comments; added sample-size indicators (`n = X`), CSV export, ISO timestamp sorting, and native `<dialog closedby="any">` light-dismiss modals.
-- **"Building in Public" Content Takeaway**:
-  > *"Replace vanity placeholders in your admin dashboard with the two things that actually drive community momentum: cumulative hours played per game toward your next public milestone, and a unified leaderboard of the power users carrying your platform."*
 
 ---
 
