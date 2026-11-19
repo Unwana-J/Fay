@@ -1,0 +1,24 @@
+{
+  "name": "fey-beta-video",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Fey Beta motion video (Remotion) + app screenshot capture",
+  "scripts": {
+    "capture": "node capture/capture.mjs",
+    "studio": "remotion studio src/index.ts",
+    "card": "node scripts/make-card.mjs",
+    "render:all": "node scripts/render-videos.mjs",
+    "render": "remotion render src/index.ts FeyBeta out/fey-beta-16x9.mp4 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
+    "render:vertical": "remotion render src/index.ts FeyBetaVertical out/fey-beta-9x16.mp4 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
+    "still": "remotion still src/index.ts FeyBeta out/still.png --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\""
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.545",
+    "@types/react": "19.3.0",
+    "puppeteer-core": "25.18.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "remotion": "4.0.545",
+    "typescript": "5.9.3"
+  }
+}

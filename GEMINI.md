@@ -84,6 +84,12 @@ For the complete brand voice, design tokens, and UI standards, refer to [`docs/B
   - **Architectural & Product Landing** (How we solved it technically, trade-offs, schemas, protocols)
   - **"Building in Public" Content Takeaway** (Tweetable headline, lesson for tech builders, thought leadership angle)
 
+### 2.9. Brand Calendar, Motion Studio & Social Card Generator (`video/`)
+*Full calendar: [`docs/BRAND_CALENDAR.md`](./docs/BRAND_CALENDAR.md) · Workspace skill: [`.agents/skills/fey-social-cards/SKILL.md`](./.agents/skills/fey-social-cards/SKILL.md)*
+- **Go-to-Market Cadence**: Pre-launch awareness on **WhatsApp + LinkedIn** (Nov–Dec 2026, leveraging **The Parlor** for holiday/Christmas hangouts), expanding to **Instagram + TikTok** for the **Public Beta launch in early January 2027**.
+- **Reusable Social Card Generator**: Run `node video/scripts/make-card.mjs` to export crisp Fey-branded PNGs (`broadside`, `chalkboard`, `puzzle`, `receipt`, `lesson` templates) in `linkedin` (`1200×1500`), `status` (`1080×1920`), `landscape` (`1600×900`), and `square` (`1080×1080`) formats into `video/out/cards/`.
+- **Motion Video Compositions**: 65s launch film (`FeyBeta` / `FeyBetaVertical`) and 15s teaser (`FeyTeaser` / `FeyTeaserVertical`) built in Remotion inside `video/`, rendered via `node video/scripts/render-videos.mjs`.
+
 ---
 
 ## 3. Tech Stack & State Management

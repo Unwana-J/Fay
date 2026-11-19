@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-strat" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#254133"/>
+      <stop offset="100%" stop-color="#13231B"/>
+    </linearGradient>
+    <linearGradient id="skin-strat" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#FCD9C0"/>
+      <stop offset="100%" stop-color="#E5B496"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="50" fill="url(#bg-strat)"/>
+  <circle cx="50" cy="50" r="48" fill="none" stroke="#8CE0A8" stroke-width="1.5" stroke-opacity="0.3"/>
+  <!-- Chess Knight watermark -->
+  <path d="M72 18 C68 22 66 28 66 34 L76 34 C76 26 78 22 72 18 Z" fill="#8CE0A8" opacity="0.25"/>
+  <!-- Dark Smart Vest & Shirt -->
+  <path d="M22 100 C22 75 34 69 50 69 C66 69 78 75 78 100 Z" fill="#182A21"/>
+  <path d="M38 71 L50 86 L62 71 Z" fill="#FAF6EE"/>
+  <path d="M48 76 L50 96 L52 76 Z" fill="#3D6650"/>
+  <rect x="44" y="56" width="12" height="16" rx="3" fill="url(#skin-strat)"/>
+  <!-- Head & Sharp Haircut -->
+  <ellipse cx="50" cy="44" rx="17" ry="20" fill="url(#skin-strat)"/>
+  <path d="M32 38 C32 23 42 19 50 19 C58 19 68 23 68 38 C68 32 60 25 50 25 C40 25 32 32 32 38 Z" fill="#1E2320"/>
+  <path d="M32 32 C38 21 54 20 68 30 C64 24 54 22 47 22 C38 22 33 27 32 32 Z" fill="#333B36"/>
+  <!-- Focused Sharp Eyes -->
+  <circle cx="43" cy="44" r="2" fill="#13231B"/>
+  <circle cx="57" cy="44" r="2" fill="#13231B"/>
+  <path d="M38 38 L48 40" stroke="#13231B" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M62 38 L52 40" stroke="#13231B" stroke-width="1.8" stroke-linecap="round"/>
+  <!-- Precise line smile -->
+  <path d="M46 54 C48 56 52 56 54 54" stroke="#7A4C39" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+</svg>

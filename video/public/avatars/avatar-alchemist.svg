@@ -1,0 +1,40 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
+  <defs>
+    <linearGradient id="bg-alch" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2E5E58"/>
+      <stop offset="100%" stop-color="#163430"/>
+    </linearGradient>
+    <linearGradient id="skin-alch" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#EED2BE"/>
+      <stop offset="100%" stop-color="#D9B49A"/>
+    </linearGradient>
+  </defs>
+  <rect width="100" height="100" rx="50" fill="url(#bg-alch)"/>
+  <circle cx="50" cy="50" r="48" fill="none" stroke="#73D4C8" stroke-width="1.5" stroke-opacity="0.3"/>
+  <!-- Atom Orbital rings -->
+  <ellipse cx="50" cy="30" rx="28" ry="8" fill="none" stroke="#73D4C8" stroke-width="1" stroke-opacity="0.4" transform="rotate(-20 50 30)"/>
+  <circle cx="73" cy="22" r="2.5" fill="#73D4C8"/>
+  <!-- Lab Coat & Teal Tie -->
+  <path d="M22 100 C22 75 34 69 50 69 C66 69 78 75 78 100 Z" fill="#F4F7F6"/>
+  <path d="M40 70 L50 88 L60 70 Z" fill="#243331"/>
+  <path d="M48 76 L50 98 L52 76 Z" fill="#2E5E58"/>
+  <rect x="44" y="56" width="12" height="16" rx="3" fill="url(#skin-alch)"/>
+  <!-- Head & Hair -->
+  <ellipse cx="50" cy="44" rx="17" ry="20" fill="url(#skin-alch)"/>
+  <!-- Curly voluminous hair -->
+  <circle cx="34" cy="34" r="9" fill="#1C1824"/>
+  <circle cx="44" cy="24" r="10" fill="#1C1824"/>
+  <circle cx="56" cy="24" r="10" fill="#1C1824"/>
+  <circle cx="66" cy="34" r="9" fill="#1C1824"/>
+  <circle cx="32" cy="44" r="7" fill="#1C1824"/>
+  <circle cx="68" cy="44" r="7" fill="#1C1824"/>
+  <!-- Eyes with curious twinkle -->
+  <circle cx="43" cy="45" r="2" fill="#1C1824"/>
+  <circle cx="57" cy="45" r="2" fill="#1C1824"/>
+  <circle cx="44" cy="44" r="0.7" fill="#FFF"/>
+  <circle cx="58" cy="44" r="0.7" fill="#FFF"/>
+  <path d="M39 39 C41 38 46 39 47 41" stroke="#1C1824" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <path d="M53 41 C54 39 59 38 61 39" stroke="#1C1824" stroke-width="1.6" stroke-linecap="round" fill="none"/>
+  <!-- Warm smile -->
+  <path d="M46 55 C48 58 52 58 54 55" stroke="#7A3F2C" stroke-width="1.8" stroke-linecap="round" fill="none"/>
+</svg>
