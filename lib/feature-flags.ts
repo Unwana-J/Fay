@@ -79,11 +79,11 @@ export const FEATURE_DEFINITIONS: FeatureDefinition[] = [
   },
   {
     key: "enableMathletics",
-    name: "Mathletics Arena",
+    name: "Quant Arena",
     category: "Party Games",
     description: "Rapid mental arithmetic, algebra, probability, and geometry challenges with 25-second rounds.",
     route: "/games/mathletics",
-    userImpact: "Controls access to the Mathletics Arena across the dashboard and games hub.",
+    userImpact: "Controls access to the Quant Arena across the dashboard and games hub.",
     iconName: "trophy",
     isPrimary: true,
   },

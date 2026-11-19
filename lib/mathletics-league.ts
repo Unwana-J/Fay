@@ -668,7 +668,7 @@ export function getMathleticsLeagueShareUrl(league: MathleticsLeague): string {
   const origin =
     typeof window !== "undefined" ? window.location.origin : "https://fey.lokinlabs.com.ng";
   const params = new URLSearchParams({
-    t: league.title || "Mathletics League",
+    t: league.title || "Quant League",
     c: league.creatorName || "Scholar",
     d: String(league.durationDays || 1),
     q: String(league.questionsPerDay || 10),

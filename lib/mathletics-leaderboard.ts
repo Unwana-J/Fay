@@ -187,7 +187,7 @@ export function getMathleticsLeaderboard(
     avatar: profile.avatar || "/avatars/avatar-scholar.svg",
     title:
       totalXP >= 600
-        ? "Mathletics Grandmaster"
+        ? "Quant Grandmaster"
         : totalXP >= 350
         ? "Analytical Titan"
         : totalXP >= 150

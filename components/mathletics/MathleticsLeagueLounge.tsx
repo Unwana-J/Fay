@@ -281,7 +281,7 @@ export default function MathleticsLeagueLounge() {
           </div>
 
           <h2 className="font-space text-2xl sm:text-3xl font-extrabold" style={{ color: "var(--text)" }}>
-            Mathletics Leagues
+            Quant Leagues
           </h2>
 
           <p className="text-xs sm:text-sm leading-relaxed text-[var(--text-dim)] max-w-lg">

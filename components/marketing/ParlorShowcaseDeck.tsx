@@ -93,13 +93,13 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
   },
   {
     id: "mathletics",
-    tabLabel: "Mathletics",
+    tabLabel: "Quant",
     badge: "Speed Arena",
-    title: "Mathletics Mental Arena",
+    title: "Quant Mental Arena",
     description:
       "25-second rapid mental math and quantitative reasoning duels. Spot the Socratic shortcut across algebra, probability, and geometry before time expires.",
     href: "/games/mathletics",
-    cta: "Play Mathletics",
+    cta: "Play Quant",
     accent: "var(--olive)",
     accentBg: "rgba(68, 78, 44, 0.09)",
     accentBorder: "rgba(68, 78, 44, 0.28)",

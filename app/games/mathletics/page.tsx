@@ -57,11 +57,11 @@ export async function generateMetadata({
   const author = byRaw && byRaw !== "Scholar" ? byRaw : "Challenger";
 
   const title = isChallenge
-    ? `${author} scored ${pct}% on Mathletics · Can you calculate faster? · Fey`
-    : "Mathletics Mental Arena · Fey";
+    ? `${author} scored ${pct}% on Quant · Can you calculate faster? · Fey`
+    : "Quant Mental Arena · Fey";
 
   const description = isChallenge
-    ? `${author} scored ${score}/${total} (${pct}% accuracy) in 25-second rounds on Mathletics. Answer the exact same questions and see if you can out-calculate them.`
+    ? `${author} scored ${score}/${total} (${pct}% accuracy) in 25-second rounds on Quant. Answer the exact same questions and see if you can out-calculate them.`
     : "25-second mental math, algebra, probability, and geometry challenges. Sharpen your quantitative intuition on Fey.";
 
   return {
@@ -118,8 +118,8 @@ export default async function MathleticsPage({
   return (
     <FeatureGate
       flag="enableMathletics"
-      title="Mathletics is under revamp"
-      message="We're tuning the question banks and calculation arena. Mathletics will be back shortly."
+      title="Quant is under revamp"
+      message="We're tuning the question banks and calculation arena. Quant will be back shortly."
     >
       <MathleticsGameClient
         initialChallenge={initialChallenge}

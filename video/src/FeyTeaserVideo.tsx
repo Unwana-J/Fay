@@ -384,7 +384,7 @@ export const FeyTeaserVideo: React.FC = () => {
     },
     {
       id: "mathletics",
-      title: "Mathletics",
+      title: "Quant",
       subtitle: "25s Quantitative Reasoning.",
       accent: COLORS.olive,
       surface: "#F5F6F0",

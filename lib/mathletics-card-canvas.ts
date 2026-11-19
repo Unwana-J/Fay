@@ -112,7 +112,7 @@ export async function generateMathleticsCardCanvas(
   ctx.font = "bold 20px 'Cinzel', serif, Georgia";
   ctx.fillStyle = c.headerBrand;
   ctx.letterSpacing = "4px";
-  ctx.fillText("FEY · MATHLETICS ARENA", 70, 85);
+  ctx.fillText("FEY · QUANT ARENA", 70, 85);
   ctx.letterSpacing = "0px";
 
   ctx.font = "14px 'Inter', sans-serif";
@@ -203,7 +203,7 @@ export async function generateMathleticsCardCanvas(
 
     ctx.font = "bold 18px 'Inter', sans-serif";
     ctx.fillStyle = c.xpText;
-    ctx.fillText(`+${data.xpEarned} Mathletics XP`, rightX + 60, rightY + 107);
+    ctx.fillText(`+${data.xpEarned} Quant XP`, rightX + 60, rightY + 107);
   }
 
   // Agility score

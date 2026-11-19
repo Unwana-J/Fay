@@ -698,7 +698,7 @@ export async function getAdminEngagement(range: AdminRange = "all"): Promise<Adm
       "Naija Trivia & Leagues",
       "Combines multi-day leagues and solo/challenge quizzes."
     ),
-    buildSummary("mathletics", "Mathletics", "Timed mental math duels and marathons."),
+    buildSummary("mathletics", "Quant", "Timed mental math duels and marathons."),
     buildSummary(
       "sprint",
       "Feynman Vocal Sprints",

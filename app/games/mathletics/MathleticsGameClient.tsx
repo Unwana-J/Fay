@@ -350,7 +350,7 @@ export default function MathleticsGameClient({
 
     const challengePayload: MathleticsChallenge = {
       id: "math-" + Date.now(),
-      title: `Mathletics ${questionTimerSeconds}s Challenge`,
+      title: `Quant ${questionTimerSeconds}s Challenge`,
       creatorName: profile.username || "Scholar",
       createdAt: Date.now(),
       questionIds: questions.map((q) => q.id),
@@ -406,7 +406,7 @@ export default function MathleticsGameClient({
           const dataUrl = canvas.toDataURL("image/png");
           const a = document.createElement("a");
           a.href = dataUrl;
-          a.download = `fey-mathletics-${Date.now()}.png`;
+          a.download = `fey-quant-${Date.now()}.png`;
           a.click();
         } finally {
           setIsExportingCard(false);
@@ -446,7 +446,7 @@ export default function MathleticsGameClient({
             className="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors py-1.5 cursor-pointer group active:scale-95"
           >
             <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-0.5 shrink-0" />
-            <span>Back to Mathletics Dashboard</span>
+            <span>Back to Quant Dashboard</span>
           </button>
         ) : (
           <Link
@@ -481,10 +481,10 @@ export default function MathleticsGameClient({
             type="button"
             onClick={handleReturnToSetup}
             className="text-left cursor-pointer hover:opacity-80 transition-opacity"
-            title="Return to Mathletics Dashboard"
+            title="Return to Quant Dashboard"
           >
             <h1 className="font-space text-3xl sm:text-4xl font-bold" style={{ color: "var(--text)" }}>
-              Mathletics
+              Quant
             </h1>
           </button>
         </div>
@@ -599,7 +599,7 @@ export default function MathleticsGameClient({
                   <span className="font-bold" style={{ color: "var(--text)" }}>{leaderboard.userEntry.bestPct}%</span>
                 </div>
                 <div>
-                  <span className="text-xs block" style={{ color: "var(--text-dim)" }}>Mathletics XP</span>
+                  <span className="text-xs block" style={{ color: "var(--text-dim)" }}>Quant XP</span>
                   <span className="font-bold" style={{ color: "var(--gold)" }}>{leaderboard.userEntry.mathleticsXP} XP</span>
                 </div>
               </div>
@@ -1040,7 +1040,7 @@ export default function MathleticsGameClient({
                     style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
                   >
                     <ArrowLeft className="w-4 h-4 text-[var(--olive)]" />
-                    <span>Mathletics Dashboard</span>
+                    <span>Quant Dashboard</span>
                   </button>
 
                   <button

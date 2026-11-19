@@ -113,8 +113,8 @@ export default function CreateMathleticsLeagueModal({
     const finalTitle =
       title.trim() ||
       (selectedFormat === "sprint_duel"
-        ? `Mathletics Sprint Duel`
-        : `Mathletics Marathon (${durationDays} Days)`);
+        ? `Quant Sprint Duel`
+        : `Quant Marathon (${durationDays} Days)`);
 
     setIsSubmitting(true);
     setErrorMsg("");

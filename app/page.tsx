@@ -655,7 +655,7 @@ export default function Dashboard() {
           </Link>
         )}
 
-        {/* Card 4: Mathletics */}
+        {/* Card 4: Quant */}
         {enableMathletics && (
           <Link href="/games/mathletics" className="group">
             <motion.div
@@ -683,7 +683,7 @@ export default function Dashboard() {
                   </span>
                 </div>
                 <h4 className="font-serif font-bold text-sm mb-1 group-hover:text-emerald-700 transition-colors" style={{ color: "var(--text)" }}>
-                  Mathletics
+                  Quant
                 </h4>
                 <p className="text-[11px] leading-relaxed mb-3" style={{ color: "var(--text-dim)" }}>
                   25s rapid mental calculation, algebra, and geometry speed duels.

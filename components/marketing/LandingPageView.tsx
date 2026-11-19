@@ -24,7 +24,7 @@ const QUICK_STRIP = [
   {
     step: "01",
     title: "Pick a topic or game",
-    detail: "Daily 90s speaking topic, trivia, mathletics, or party game",
+    detail: "Daily 90s speaking topic, trivia, quant, or party game",
     Icon: Compass,
   },
   {
@@ -347,7 +347,7 @@ export default function LandingPageView({
             <Link href="/community" className="hover:underline">Community</Link>
             <Link href="/games" className="hover:underline">Games</Link>
             <Link href="/games/trivia" className="hover:underline">Naija Trivia</Link>
-            <Link href="/games/mathletics" className="hover:underline">Mathletics</Link>
+            <Link href="/games/mathletics" className="hover:underline">Quant</Link>
             <Link href="/podium" className="hover:underline">The Podium</Link>
             <Link href="/about" className="hover:underline">About</Link>
           </span>

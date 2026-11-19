@@ -1399,9 +1399,9 @@ export const useAppStore = create<AppState>()(
         if (isChallenge) {
           triggerCelestialAscension({
             kind: "moon",
-            orbitLabel: "Mathletics Duel · +1 Moon",
+            orbitLabel: "Quant Duel · +1 Moon",
             headline: "New Moon Added to Your Constellation",
-            activityTitle: `Mathletics vs ${round.challengerName} (${round.score}/${round.total})`,
+            activityTitle: `Quant vs ${round.challengerName} (${round.score}/${round.total})`,
             badgeText: `${round.pct}% Accuracy`,
             rewardText: `+${round.xpEarned} XP`,
             category: topCat,
@@ -1409,7 +1409,7 @@ export const useAppStore = create<AppState>()(
         } else {
           triggerCelestialAscension({
             kind: "star",
-            orbitLabel: "Mathletics Sprint · +1 Star",
+            orbitLabel: "Quant Sprint · +1 Star",
             headline: "New Star Added to Your Constellation",
             activityTitle: `${topCat} Sprint (${round.score}/${round.total})`,
             badgeText: `${round.pct}% · ${round.gradeLabel}`,

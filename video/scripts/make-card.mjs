@@ -51,7 +51,7 @@ const PRESETS = {
       formats: ["linkedin", "status"],
       props: {
         template: "puzzle",
-        tag: "MATHLETICS · QUANTITATIVE REASONING",
+        tag: "QUANT · QUANTITATIVE REASONING",
         headline: "Think your *Primary 5* brain is still sharp?",
         timerLabel: "25s · No calculator",
         samples: ["[5, 3 → 16]", "[7, 4 → 33]"],

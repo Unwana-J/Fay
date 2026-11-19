@@ -66,7 +66,7 @@ export function decodeChallengeFromUrl(code: string): MathleticsChallenge | null
 
     return {
       id: raw.i || "challenge-" + Date.now(),
-      title: raw.t || "Mathletics Challenge",
+      title: raw.t || "Quant Challenge",
       creatorName: raw.c || "Scholar",
       createdAt: raw.a || Date.now(),
       questionIds: raw.q,

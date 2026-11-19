@@ -131,7 +131,7 @@ export const StudyToParlorBridge: React.FC = () => {
             })}px)`,
           }}
         >
-          {["Articulate", "The Podium", "Naija Trivia", "Mathletics"].map((g) => (
+          {["Articulate", "The Podium", "Naija Trivia", "Quant"].map((g) => (
             <div
               key={g}
               style={{

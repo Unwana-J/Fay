@@ -42,7 +42,7 @@ export const SITE_KEYWORDS = [
   "microlearning",
   "intellectual games",
   "Naija trivia",
-  "Mathletics",
+  "Quant",
   "mental math game",
   "learning app Nigeria",
 ];
@@ -164,7 +164,7 @@ export const GAMES: Feature[] = [
   },
   {
     slug: "mathletics",
-    name: "Mathletics",
+    name: "Quant",
     path: "/games/mathletics",
     description:
       "25-second rapid mental math, algebra, probability, and geometry challenges. Spot the Socratic shortcut and compete on the Titans leaderboard.",

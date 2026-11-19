@@ -32,12 +32,12 @@ export async function generateMetadata({
   const { code } = await params;
   const sp = searchParams ? await searchParams : {};
   const cleanCode = code?.toUpperCase().trim() || "LEAGUE";
-  const titleFallback = sp?.t ? `${sp.t} · Mathletics League` : `Mathletics League (${cleanCode}) · Fey`;
+  const titleFallback = sp?.t ? `${sp.t} · Quant League` : `Quant League (${cleanCode}) · Fey`;
 
   if (!isSupabaseConfigured || !supabase) {
     return {
       title: titleFallback,
-      description: "Join the Mathletics sprint challenge on Fey.",
+      description: "Join the Quant sprint challenge on Fey.",
     };
   }
 
@@ -53,7 +53,7 @@ export async function generateMetadata({
       const title = isSprint
         ? `⚔️ ${leagueRow.title} · Sprint Duel · Fey`
         : `🏆 ${leagueRow.title} · Day ${getMathleticsLeagueStatus(leagueRow.start_date, leagueRow.duration_days).dayNumber} of ${leagueRow.duration_days} · Fey`;
-      const description = `Mathletics challenge hosted by ${
+      const description = `Quant challenge hosted by ${
         leagueRow.creator_name && leagueRow.creator_name !== "Scholar"
           ? leagueRow.creator_name
           : "Host"
@@ -80,7 +80,7 @@ export async function generateMetadata({
 
   return {
     title: titleFallback,
-    description: "Join the Mathletics sprint challenge on Fey.",
+    description: "Join the Quant sprint challenge on Fey.",
   };
 }
 
@@ -132,7 +132,7 @@ export default async function MathleticsLeaguePage({
     const today = todayStr();
     league = {
       code: cleanCode,
-      title: fallbackMeta.title || `Mathletics League (${cleanCode})`,
+      title: fallbackMeta.title || `Quant League (${cleanCode})`,
       creatorName: fallbackMeta.creatorName || "Host",
       creatorId: "creator",
       format: isSprint ? "sprint_duel" : "marathon",

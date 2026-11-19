@@ -784,7 +784,7 @@ const MathleticsScene: React.FC = () => {
   return (
     <GameStage
       badge="04 / 04 · Live Mental Arena"
-      title="Mathletics"
+      title="Quant"
       headline="25 seconds. No calculator."
       tieIn="Still got that Primary 5 quantitative sharpness?"
       browser={
@@ -797,7 +797,7 @@ const MathleticsScene: React.FC = () => {
           zoomFrom={1.0}
           zoomTo={1.035}
         >
-          {/* Pixel-faithful live Mathletics Quantitative Reasoning view (m_quant_024) */}
+          {/* Pixel-faithful live Quant Quantitative Reasoning view (m_quant_024) */}
           <AbsoluteFill
             style={{
               background: COLORS.bgBase,
@@ -809,7 +809,7 @@ const MathleticsScene: React.FC = () => {
               justifyContent: "flex-start",
             }}
           >
-            {/* Header row matching Fey Mathletics UI */}
+            {/* Header row matching Fey Quant UI */}
             <div
               style={{
                 display: "flex",
@@ -847,7 +847,7 @@ const MathleticsScene: React.FC = () => {
                     letterSpacing: "-0.02em",
                   }}
                 >
-                  Mathletics
+                  Quant
                 </div>
               </div>
 

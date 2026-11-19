@@ -10,7 +10,7 @@
 
 ## 1. Core Strategy: "Parlor in December → Study in January"
 
-1. **December = Parlor Season (The Trojan Horse):** People want fun at Christmas dinners, office end-of-year hangouts, Detty December link-ups, and family group chats. Introducing Fey through **The Podium**, **Articulate**, **Naija Trivia**, and **Mathletics** builds real usage with zero friction.
+1. **December = Parlor Season (The Trojan Horse):** People want fun at Christmas dinners, office end-of-year hangouts, Detty December link-ups, and family group chats. Introducing Fey through **The Podium**, **Articulate**, **Naija Trivia**, and **Quant** builds real usage with zero friction.
 2. **Early January = Study Season (Public Beta Launch):** On **Tuesday, Jan 5, 2027** (right as people return to desks setting *"read more, think deeper, sound sharper"* habits), launch with the 65-second film and refreshed post-holiday user count: *"You played Fey with friends over Christmas. Now make it your 15-minute daily thinking habit."*
 
 ---

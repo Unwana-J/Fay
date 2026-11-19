@@ -30,7 +30,7 @@ Fey solves this through a closed-loop active learning and social sparring ecosys
    * **The Podium (`/podium`)**: Split-panel manual slide studio and AI co-pilot for 5-slide hot-take presentations.
    * **Online Articulate (`/play`)**: Real-time and local multiplayer word description with Cristian's clock sync, Maker-Checker consensus disputes, and an append-only match hours ledger.
    * **Naija Trivia (`/games/trivia`)**: 1,000+ cultural and historical questions, Episodic Daily Drop Friendship Leagues, dismissible Live Arena custom challenges, sub-second AI answer contest refereeing, 1-shot capped redemption (85%), and game-to-voice cross-pollination.
-   * **Mathletics (`/games/mathletics`)**: 300-question mental math & Quantitative Reasoning bank with configurable turn timers (25s floor to 90s), instant 1v1 Sprint Duels, and Multi-Day Marathon Leagues with resilient cross-device score syncing.
+   * **Quant (`/games/mathletics`)**: 300-question mental math & Quantitative Reasoning bank with configurable turn timers (25s floor to 90s), instant 1v1 Sprint Duels, and Multi-Day Marathon Leagues with resilient cross-device score syncing.
 5. **A Viral Distribution Engine**: Zero-database URL-portable dispatches, Substack-style highlight-to-tweet tools, contextual 90s Rebuttal Challenges, dynamic SSR OpenGraph unfurls, and 1-click HTML5 Canvas shareable score and proof cards.
 
 ---
@@ -60,7 +60,7 @@ Fey solves this through a closed-loop active learning and social sparring ecosys
      │ • Sourced Research Pack    │                  │ • The Podium (/podium)     │
      │ • Speaking Cues & Scaffold │                  │ • Articulate (/play)       │
      │ • Vocal Synthesis (45-180s)│                  │ • Naija Trivia (/trivia)   │
-     │ • 3-Q Recall Check (+60XP) │                  │ • Mathletics (/mathletics) │
+     │ • 3-Q Recall Check (+60XP) │                  │ • Quant (/mathletics)      │
      │ • 7-Day Study Schedule     │                  │ • Friendship Leagues       │
      │ • Dual-Hue Streak Calendar │                  │ • Dismissible Live Arenas  │
      └─────────────┬──────────────┘                  └─────────────┬──────────────┘
@@ -84,7 +84,7 @@ Fey solves this through a closed-loop active learning and social sparring ecosys
 * **Spatial Partitioning (The Study vs. The Parlor)**:
   * High-taste segmented spring switcher (`layoutId="active-dashboard-tab"`) separating the dashboard into two focused workspaces:
     1. **`Daily Practice & Study`**: Dedicated to solo Feynman sprints, daily vows, the 3-step ritual guide, and consistency tracking.
-    2. **`The Parlor & Games`**: Dedicated 4-card game launcher (*The Podium*, *Online Articulate*, *Naija Trivia*, *Mathletics*) and active tournaments.
+    2. **`The Parlor & Games`**: Dedicated 4-card game launcher (*The Podium*, *Online Articulate*, *Naija Trivia*, *Quant*) and active tournaments.
 * **Day 0 Progressive Disclosure & Scheduled Topic Auto-Promotion**:
   * Newcomers with 0 completed sessions see a welcoming Day 0 banner and elevated 3-step Feynman Ritual walkthrough (*01 Deep Research → 02 Vocal Synthesis → 03 Reflect & Expand*).
   * If a user scheduled a topic for today in their **7-Day Study Schedule**, the Dashboard automatically promotes it into the Active Articulation Workspace and greets them with a 1-click reminder modal (`Scheduled for Today · Ready`).
@@ -188,7 +188,7 @@ Fey solves this through a closed-loop active learning and social sparring ecosys
   * On the results screen, players can run a single **1-Shot Redemption** pass on missed questions (`0.5x` recovery weight, hard-capped at `85%` to protect first-attempt leaderboard integrity, `+2 Recovery XP` per redeemed answer).
   * **Turn a Missed Question into Mastery (+50 Bonus XP)**: Converts any missed trivia concept and its historical explanation directly into a 60-second Impromptu Voice Challenge (`/session/[id]`).
 
-#### D. Mathletics: Mental Math & Quantitative Reasoning (`/games/mathletics`)
+#### D. Quant: Mental Math & Quantitative Reasoning (`/games/mathletics`)
 * **300-Question Bank with Quantitative Reasoning**:
   * Spans arithmetic velocity, percentages, algebra, probability, pattern sequences, and Nigerian Quantitative Reasoning puzzles across Easy, Medium, and Hard tiers.
 * **Configurable Turn Duration (25-Second Minimum Floor)**:

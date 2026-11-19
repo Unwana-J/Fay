@@ -675,7 +675,7 @@ export default function MathleticsLeagueClient({
           const dataUrl = canvas.toDataURL("image/png");
           const a = document.createElement("a");
           a.href = dataUrl;
-          a.download = `fey-mathletics-league-${Date.now()}.png`;
+          a.download = `fey-quant-league-${Date.now()}.png`;
           a.click();
         } finally {
           setIsExportingCard(false);
@@ -699,7 +699,7 @@ export default function MathleticsLeagueClient({
           className="flex items-center gap-1.5 text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] transition-colors cursor-pointer"
         >
           <ArrowLeft className="w-4 h-4" />
-          <span>{phase === "overview" ? "Mathletics Arena" : "League Standings"}</span>
+          <span>{phase === "overview" ? "Quant Arena" : "League Standings"}</span>
         </button>
 
         <div className="flex items-center gap-2">

@@ -98,7 +98,7 @@ export default function GamesEngagementPanel({
           <div>
             <h3 className="font-serif text-base font-bold">Hours Played by Game</h3>
             <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-              Breakdown across Articulate, Trivia, Mathletics, and Feynman Sprints for the selected period.
+              Breakdown across Articulate, Trivia, Quant, and Feynman Sprints for the selected period.
             </p>
           </div>
           <span className="text-[11px] font-mono" style={{ color: "var(--text-mute)" }}>
@@ -319,7 +319,7 @@ export default function GamesEngagementPanel({
               <h3 className="font-serif text-base font-bold">Top Scholars</h3>
             </div>
             <p className="text-xs mt-0.5" style={{ color: "var(--text-dim)" }}>
-              Cross-game scholar rankings combining Sprints, Trivia, Mathletics, and Articulate.
+              Cross-game scholar rankings combining Sprints, Trivia, Quant, and Articulate.
             </p>
           </div>
 
@@ -329,7 +329,7 @@ export default function GamesEngagementPanel({
                 { key: "hours", label: "Most Hours" },
                 { key: "xp", label: "Highest XP" },
                 { key: "trivia", label: "Trivia" },
-                { key: "mathletics", label: "Mathletics" },
+                { key: "mathletics", label: "Quant" },
                 { key: "streak", label: "Longest Streak" },
               ] as const
             ).map((t) => (
@@ -499,7 +499,7 @@ export default function GamesEngagementPanel({
                         )}
                         {s.mathleticsPoints > 0 && (
                           <div className="text-[10px]" style={{ color: "var(--olive)" }}>
-                            Mathletics: {s.mathleticsPoints.toLocaleString()} pts
+                            Quant: {s.mathleticsPoints.toLocaleString()} pts
                           </div>
                         )}
                       </div>

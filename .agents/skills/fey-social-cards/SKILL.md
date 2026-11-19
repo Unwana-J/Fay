@@ -26,7 +26,7 @@ Wrap any phrase inside `--headline` with `*asterisks*` to accent it in italicize
    - Props: `--tag`, `--headline`, `--body`, `--attribution`, `--footer`, `--beta` (`true`/`false`)
 2. **`chalkboard`** — Deep forest-olive Richard Feynman chalkboard with subtle Feynman-diagram chalk accents and antique gold highlights.
    - Props: `--tag`, `--headline`, `--attribution`, `--body`, `--beta`
-3. **`puzzle`** — Interactive Quantitative Reasoning / Mathletics / Naija Trivia hook card.
+3. **`puzzle`** — Interactive Quantitative Reasoning / Quant / Naija Trivia hook card.
    - Props: `--tag`, `--headline`, `--timer` (e.g. `"25s · No calculator"`), `--samples` (`|`-separated, e.g. `"[2, 3, 4 → 20]|[3, 4, 5 → 35]"`), `--prompt` (e.g. `"[4, 5, 6 → ?]"`), `--options` (`|`-separated, e.g. `"46|50|52|54"`), `--body`, `--footer`
 4. **`receipt`** — Numbered 3-row editorial list card (e.g., `"1,000 posts read"`, 3 holiday games, or 3 key lessons).
    - Props: `--tag`, `--headline`, `--items` (`|`-separated `num:label` pairs, e.g. `"01:Articulate|02:The Podium|03:Naija Trivia"`), `--body`
@@ -61,17 +61,24 @@ node video/scripts/make-card.mjs --preset starter-pack
 
 ---
 
-## 2. Motion Videos (`video/scripts/render-videos.mjs`)
+## 2. Motion Videos (`video/scripts/render-videos.mjs` & `render-spotlights.mjs`)
 
-All 4 compositions live in `video/src/Root.tsx` and render to `video/out/`:
-- `FeyBeta` (`1920×1080`, 65s) → `video/out/fey-beta-16x9.mp4`
-- `FeyBetaVertical` (`1080×1920`, 65s) → `video/out/fey-beta-9x16.mp4`
-- `FeyTeaser` (`1920×1080`, 15s) → `video/out/fey-teaser-15s-16x9.mp4`
-- `FeyTeaserVertical` (`1080×1920`, 15s) → `video/out/fey-teaser-15s-9x16.mp4`
+All compositions live in `video/src/Root.tsx` and render to `video/out/`:
+- **Flagship 65s Launch Film:** `FeyBeta` (`16:9`) · `FeyBetaVertical` (`9:16`) → `video/out/fey-beta-*.mp4`
+- **15s Brand Soft-Launch Film:** `FeyTeaser` (`16:9`) · `FeyTeaserVertical` (`9:16`) → `video/out/fey-teaser-15s-*.mp4`
+- **5-Film Feature Spotlight Series (20s each, `16:9` + `9:16`)** → `video/out/spotlights/`:
+  - `FeySpotStudy` / `FeySpotStudyVertical` (Daily Study loop — Music & Memory)
+  - `FeySpotArticulate` / `FeySpotArticulateVertical` (3 fun word cards + live moving snake-order race board)
+  - `FeySpotPodium` / `FeySpotPodiumVertical` (Spinner + 5-slide presenter deck: *Owambe Is the Peak of Human Social Engineering*)
+  - `FeySpotTrivia` / `FeySpotTriviaVertical` (Live Drop 3 + mocked Friendship League with animated #3 → #1 climb)
+  - `FeySpotMathletics` / `FeySpotMathleticsVertical` (25s Quantitative Reasoning `(3, 4 → 15)` + 1v1 Sprint Duel card)
 
-Before the January Public Beta launch, update the `80` scholar counter in `video/src/scenes/Act5ProofBeta.tsx` (and `video/src/FeyTeaserVideo.tsx`) to the current user count and re-run:
 ```bash
+# Re-render 65s launch films & 15s soft-launch teasers (pass --teasers for 15s only)
 node video/scripts/render-videos.mjs
+
+# Re-render all 5 Feature Spotlights (or pass --only study,articulate,podium,trivia,mathletics)
+node video/scripts/render-spotlights.mjs
 ```
 
 ---

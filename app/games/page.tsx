@@ -55,7 +55,7 @@ export default function GamesHub() {
     },
     {
       id: "mathletics",
-      title: "Mathletics",
+      title: "Quant",
       description: "25-second mental math, algebra, probability, and geometry challenges. Sharpen your quantitative intuition.",
       mainEmoji: "📐",
       bgEmoji1: "⚡",
