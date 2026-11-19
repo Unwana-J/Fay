@@ -5,8 +5,10 @@
   "description": "Fey Beta motion video (Remotion) + app screenshot capture",
   "scripts": {
     "capture": "node capture/capture.mjs",
+    "record:clips": "node capture/record-clips.mjs",
     "studio": "remotion studio src/index.ts",
     "card": "node scripts/make-card.mjs",
+    "render:spotlights": "node scripts/render-spotlights.mjs",
     "render:all": "node scripts/render-videos.mjs",
     "render": "remotion render src/index.ts FeyBeta out/fey-beta-16x9.mp4 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",
     "render:vertical": "remotion render src/index.ts FeyBetaVertical out/fey-beta-9x16.mp4 --browser-executable=\"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome\"",

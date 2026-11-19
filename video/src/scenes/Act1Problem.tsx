@@ -1,23 +1,13 @@
 import React from "react";
 import { AbsoluteFill, Easing, interpolate, spring, useCurrentFrame, useVideoConfig } from "remotion";
 import { FeyBackdrop } from "../components/FeyBackdrop";
+import { OPENING_FEED_POSTS, OpeningSequence } from "../components/OpeningSequence";
 import { COLORS, FONTS, SPRINGS } from "../theme";
 
-const MOCK_POSTS = [
-  { tag: "THREAD · 18 POSTS", title: "How Central Banks Actually Move Interest Rates", meta: "Bookmarked · 4 days ago" },
-  { tag: "SAVED REEL · 01:42", title: "Quantum Computing Explained Without Math", meta: "Saved to Read Later" },
-  { tag: "OPEN TAB · #34", title: "The Economics of African Trade Corridors", meta: "Opened 2 weeks ago" },
-  { tag: "NEWSLETTER · UNREAD", title: "Why End-to-End Encryption Works (Mostly)", meta: "Inbox · 12 min read" },
-  { tag: "BOOKMARK · 214", title: "Game Theory & Why Markets Panic Together", meta: "Liked · Never revisited" },
-  { tag: "PODCAST · 1.5X", title: "The Hidden Architecture of Modern Supply Chains", meta: "Played while commuting" },
-  { tag: "SAVED POST", title: "Cognitive Biases Every Builder Should Know", meta: "Highlighted 6 lines" },
-  { tag: "OPEN TAB · #40", title: "How Compilers Turn Code Into Silicon", meta: "Still open since Tuesday" },
-];
-
 const RECEIPT_LINES = [
-  { num: "1,000", rest: "posts read.", color: COLORS.terra, enterAt: 0 },
-  { num: "240", rest: "bookmarks saved.", color: COLORS.olive, enterAt: 24 },
-  { num: "40", rest: "tabs still open.", color: COLORS.gold, enterAt: 48 },
+  { num: "1,000", rest: "posts read.", color: COLORS.terra, enterAt: 150 },
+  { num: "240", rest: "bookmarks saved.", color: COLORS.olive, enterAt: 166 },
+  { num: "40", rest: "tabs still open.", color: COLORS.gold, enterAt: 182 },
 ];
 
 export const Act1Problem: React.FC = () => {
@@ -25,51 +15,48 @@ export const Act1Problem: React.FC = () => {
   const { fps, width, height } = useVideoConfig();
   const isVertical = height > width;
 
-  // Beat timings inside Act 1 (270 frames = 9s)
-  // Beat 1: 0..96   ("1,000 posts read. / 240 bookmarks saved. / 40 tabs still open.")
-  // Beat 2: 96..184 ("How much of it do you actually know? / Try explaining one. Out loud.")
-  // Beat 3: 184..270 ("Feeling informed / isn't the same as knowing.")
+  // Act 1 (270 frames = 9.0s, keeps Act 2..5 100% locked to the Pixabay track):
+  //   0..90    Dark green type-on: "What if learning felt less like scrolling..." + accelerating feed
+  //   90       HARD CUT to cream (pattern interrupt, feed gone)
+  //   90..150  "...and more like a great conversation?" fades & rises in calmly
+  //   150..214 The Receipt ("1,000 posts read. / 240 bookmarks saved. / 40 tabs still open.")
+  //   214..270 "Feeling informed / isn't the same as knowing." + chalk wipe into Act 2
+  if (frame < 150) {
+    return <OpeningSequence durationInFrames={150} fadeOutFrames={10} />;
+  }
 
-  // Background feed is softly visible from frame 0 so the thumbnail looks rich, freezes dead at frame 94
-  const scrollFrame = Math.min(frame, 94);
-  const scrollY = interpolate(scrollFrame, [0, 94], [-40, -560], {
+  // Receipt phase (150..214f)
+  const receiptLocal = frame - 150;
+  const scrollY = interpolate(Math.min(receiptLocal, 60), [0, 60], [-30, -340], {
     easing: Easing.out(Easing.quad),
   });
-  const feedOpacity = interpolate(frame, [0, 88, 98], [0.34, 0.34, 0], {
+  const feedOpacity = interpolate(frame, [150, 158, 204, 214], [0, 0.26, 0.26, 0], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const receiptIn = interpolate(frame, [150, 158], [0, 1], {
+    extrapolateLeft: "clamp",
+    extrapolateRight: "clamp",
+  });
+  const receiptOut = interpolate(frame, [204, 214], [1, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
   });
 
-  // Beat 1 exit
-  const b1Out = interpolate(frame, [84, 96], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-
-  // Beat 2 entrance & exit
-  const b2Frame = Math.max(0, frame - 98);
-  const b2In = spring({ frame: b2Frame, fps, config: SPRINGS.editorial });
-  const b2SubIn = spring({ frame: Math.max(0, frame - 130), fps, config: SPRINGS.editorial });
-  const b2Out = interpolate(frame, [172, 184], [1, 0], {
-    extrapolateLeft: "clamp",
-    extrapolateRight: "clamp",
-  });
-  const cursorBlink = Math.floor(frame / 10) % 2 === 0 ? 1 : 0.15;
-
-  // Beat 3 entrance, hairline split & chalk wipe transition
-  const b3Frame = Math.max(0, frame - 186);
+  // Beat 3 (214..270f): "Feeling informed / isn't the same as knowing." + chalk wipe
+  const b3Frame = Math.max(0, frame - 214);
   const b3In = spring({ frame: b3Frame, fps, config: SPRINGS.editorial });
-  const crackProgress = interpolate(frame, [198, 226], [0, 1], {
+  const crackProgress = interpolate(frame, [220, 244], [0, 1], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
-  const underlineWidth = interpolate(frame, [214, 240], [0, 100], {
+  const underlineWidth = interpolate(frame, [232, 252], [0, 100], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.out(Easing.cubic),
   });
-  const wipeUp = interpolate(frame, [252, 270], [100, 0], {
+  const wipeUp = interpolate(frame, [254, 270], [100, 0], {
     extrapolateLeft: "clamp",
     extrapolateRight: "clamp",
     easing: Easing.inOut(Easing.cubic),
@@ -79,7 +66,7 @@ export const Act1Problem: React.FC = () => {
 
   return (
     <FeyBackdrop variant="cream">
-      {/* Blurred scrolling social/bookmark feed in Beat 1 */}
+      {/* Soft blurred social/bookmark feed behind The Receipt */}
       {feedOpacity > 0.005 && (
         <AbsoluteFill
           style={{
@@ -102,7 +89,7 @@ export const Act1Problem: React.FC = () => {
               transform: `translateY(${scrollY}px)`,
             }}
           >
-            {[...MOCK_POSTS, ...MOCK_POSTS].map((item, idx) => (
+            {[...OPENING_FEED_POSTS, ...OPENING_FEED_POSTS].map((item, idx) => (
               <div
                 key={idx}
                 style={{
@@ -127,7 +114,6 @@ export const Act1Problem: React.FC = () => {
                   >
                     {item.tag}
                   </span>
-                  {/* Bookmark outline glyph */}
                   <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={COLORS.muted} strokeWidth="2">
                     <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                   </svg>
@@ -152,14 +138,14 @@ export const Act1Problem: React.FC = () => {
         </AbsoluteFill>
       )}
 
-      {/* BEAT 1: THE RECEIPT (1,000 posts read / 240 bookmarks saved / 40 tabs still open) */}
-      {frame < 98 && (
+      {/* THE RECEIPT (150..214f) */}
+      {frame < 216 && (
         <AbsoluteFill
           style={{
             justifyContent: "center",
             alignItems: "center",
             padding: `0 ${sidePad}px`,
-            opacity: b1Out,
+            opacity: receiptIn * receiptOut,
           }}
         >
           <div
@@ -176,7 +162,6 @@ export const Act1Problem: React.FC = () => {
               flexDirection: "column",
             }}
           >
-            {/* Receipt header */}
             <div
               style={{
                 display: "flex",
@@ -212,25 +197,17 @@ export const Act1Problem: React.FC = () => {
               </span>
             </div>
 
-            {/* 3 crisp receipt rows slapping in */}
             <div style={{ display: "flex", flexDirection: "column", gap: isVertical ? 24 : 22 }}>
               {RECEIPT_LINES.map((row, idx) => {
-                // Row 0 is already crisp on frame 0 so the paused thumbnail looks sharp & iconic!
-                const isFirst = idx === 0;
-                const s = isFirst
-                  ? 1
-                  : spring({
-                      frame: Math.max(0, frame - row.enterAt),
-                      fps,
-                      config: SPRINGS.snappy,
-                    });
-                const rowVisible = isFirst || frame >= row.enterAt;
-                const rowOpacity = isFirst
-                  ? 1
-                  : interpolate(frame, [row.enterAt, row.enterAt + 6], [0, 1], {
-                      extrapolateLeft: "clamp",
-                      extrapolateRight: "clamp",
-                    });
+                const s = spring({
+                  frame: Math.max(0, frame - row.enterAt),
+                  fps,
+                  config: SPRINGS.snappy,
+                });
+                const rowOpacity = interpolate(frame, [row.enterAt, row.enterAt + 6], [0, 1], {
+                  extrapolateLeft: "clamp",
+                  extrapolateRight: "clamp",
+                });
 
                 return (
                   <div
@@ -240,11 +217,9 @@ export const Act1Problem: React.FC = () => {
                       alignItems: "baseline",
                       gap: isVertical ? 20 : 28,
                       paddingBottom: idx < 2 ? (isVertical ? 22 : 20) : 0,
-                      borderBottom: idx < 2 ? `1px solid rgba(220, 213, 201, 0.7)` : "none",
-                      opacity: rowVisible ? rowOpacity : 0,
-                      transform: isFirst
-                        ? "none"
-                        : `translateY(${interpolate(s, [0, 1], [28, 0])}px) scale(${interpolate(s, [0, 1], [0.97, 1])})`,
+                      borderBottom: idx < 2 ? "1px solid rgba(220, 213, 201, 0.7)" : "none",
+                      opacity: frame >= row.enterAt ? rowOpacity : 0,
+                      transform: `translateY(${interpolate(s, [0, 1], [24, 0])}px) scale(${interpolate(s, [0, 1], [0.97, 1])})`,
                     }}
                   >
                     <span
@@ -281,71 +256,8 @@ export const Act1Problem: React.FC = () => {
         </AbsoluteFill>
       )}
 
-      {/* BEAT 2: How much of it do you actually know? / Try explaining one. Out loud. */}
-      {frame >= 94 && frame < 188 && (
-        <AbsoluteFill
-          style={{
-            justifyContent: "center",
-            alignItems: "center",
-            padding: `0 ${sidePad}px`,
-            opacity:
-              b2Out *
-              interpolate(frame, [96, 105], [0, 1], {
-                extrapolateLeft: "clamp",
-                extrapolateRight: "clamp",
-              }),
-          }}
-        >
-          <div style={{ textAlign: "center", maxWidth: isVertical ? 900 : 1260 }}>
-            <div
-              style={{
-                fontFamily: FONTS.serif,
-                fontSize: isVertical ? 70 : 88,
-                fontWeight: 700,
-                color: COLORS.ink,
-                lineHeight: 1.12,
-                letterSpacing: "-0.025em",
-                transform: `translateY(${interpolate(b2In, [0, 1], [34, 0])}px)`,
-              }}
-            >
-              How much of it do you
-              <br />
-              actually{" "}
-              <span style={{ color: COLORS.terra, fontStyle: "italic" }}>know</span>?
-              <span
-                style={{
-                  display: "inline-block",
-                  width: 5,
-                  height: isVertical ? 58 : 74,
-                  background: COLORS.olive,
-                  marginLeft: 14,
-                  verticalAlign: "-8px",
-                  borderRadius: 3,
-                  opacity: cursorBlink,
-                }}
-              />
-            </div>
-
-            <div
-              style={{
-                marginTop: 30,
-                fontFamily: FONTS.serif,
-                fontStyle: "italic",
-                fontSize: isVertical ? 36 : 40,
-                fontWeight: 400,
-                color: COLORS.muted,
-                opacity: interpolate(b2SubIn, [0, 1], [0, 1]),
-                transform: `translateY(${interpolate(b2SubIn, [0, 1], [22, 0])}px)`,
-              }}
-            >
-              Try explaining one. Out loud.
-            </div>
-          </div>
-        </AbsoluteFill>
-      )}
-
-      {/* BEAT 3: Feeling informed / isn't the same as knowing. */}
-      {frame >= 184 && (
+      {/* BEAT 3 (214..270f): Feeling informed / isn't the same as knowing. */}
+      {frame >= 214 && (
         <AbsoluteFill
           style={{
             justifyContent: "center",
@@ -371,7 +283,7 @@ export const Act1Problem: React.FC = () => {
                 color: COLORS.muted,
                 letterSpacing: "-0.02em",
                 opacity: interpolate(b3In, [0, 1], [0, 1]),
-                transform: `translate(${interpolate(crackProgress, [0, 1], [0, -18])}px, ${interpolate(b3In, [0, 1], [26, 0])}px)`,
+                transform: `translate(${interpolate(crackProgress, [0, 1], [0, -18])}px, ${interpolate(b3In, [0, 1], [24, 0])}px)`,
               }}
             >
               Feeling informed
@@ -395,7 +307,7 @@ export const Act1Problem: React.FC = () => {
                 letterSpacing: "-0.025em",
                 lineHeight: 1.1,
                 opacity: interpolate(b3In, [0, 1], [0, 1]),
-                transform: `translate(${interpolate(crackProgress, [0, 1], [0, 18])}px, ${interpolate(b3In, [0, 1], [32, 0])}px)`,
+                transform: `translate(${interpolate(crackProgress, [0, 1], [0, 18])}px, ${interpolate(b3In, [0, 1], [30, 0])}px)`,
               }}
             >
               isn&apos;t the same as{" "}
@@ -419,8 +331,8 @@ export const Act1Problem: React.FC = () => {
         </AbsoluteFill>
       )}
 
-      {/* Smooth olive chalkboard curtain transition into Act 2 */}
-      {frame >= 250 && (
+      {/* Smooth olive chalkboard curtain transition into Act 2 (Richard Feynman) */}
+      {frame >= 252 && (
         <AbsoluteFill
           style={{
             background: COLORS.chalkboard,

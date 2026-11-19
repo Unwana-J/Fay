@@ -13,21 +13,30 @@ fs.mkdirSync(stillsDir, { recursive: true });
 const CHROME = "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 
 const onlyTeasers = process.argv.includes("--teasers");
+const stillsOnly = process.argv.includes("--stills-only");
 
 const POLISHED_STILLS = onlyTeasers
   ? [
-      { id: "FeyTeaser", frame: 45, name: "t01-soft-hook.png" },
+      { id: "FeyTeaser", frame: 0, name: "open-01-f00-start.png" },
+      { id: "FeyTeaser", frame: 32, name: "open-02-f32-typing.png" },
+      { id: "FeyTeaser", frame: 66, name: "poster-teaser-16x9.png" },
+      { id: "FeyTeaserVertical", frame: 66, name: "poster-teaser-9x16.png" },
+      { id: "FeyTeaser", frame: 87, name: "open-04-f87-tension-wave.png" },
+      { id: "FeyTeaser", frame: 104, name: "open-05-f104-cream-cut.png" },
       { id: "FeyTeaser", frame: 275, name: "t02-soft-showcase.png" },
-      { id: "FeyTeaser", frame: 410, name: "t03-soft-end.png" },
       { id: "FeyTeaserVertical", frame: 275, name: "t04-soft-vert-showcase.png" },
     ]
   : [
-      { id: "FeyBeta", frame: 705, name: "s01-study-read.png" },
-      { id: "FeyBeta", frame: 810, name: "s02-study-cue.png" },
-      { id: "FeyBeta", frame: 910, name: "s03-study-speak.png" },
-      { id: "FeyBeta", frame: 1005, name: "s04-study-recall.png" },
-      { id: "FeyBeta", frame: 1072, name: "s05-bridge-parlor.png" },
-      { id: "FeyBetaVertical", frame: 810, name: "s06-vert-study-cue.png" },
+      // Exact opening sequence QA frames + Frame-66 Poster Covers (recommended cover thumbnail!)
+      { id: "FeyBeta", frame: 0, name: "open-01-f00-start.png" },
+      { id: "FeyBeta", frame: 32, name: "open-02-f32-typing.png" },
+      { id: "FeyBeta", frame: 66, name: "poster-beta-16x9.png" },
+      { id: "FeyBetaVertical", frame: 66, name: "poster-beta-9x16.png" },
+      { id: "FeyTeaser", frame: 66, name: "poster-teaser-16x9.png" },
+      { id: "FeyTeaserVertical", frame: 66, name: "poster-teaser-9x16.png" },
+      { id: "FeyBeta", frame: 87, name: "open-04-f87-tension-wave.png" },
+      { id: "FeyBeta", frame: 104, name: "open-05-f104-cream-cut.png" },
+      { id: "FeyBeta", frame: 194, name: "open-06-f194-receipt.png" },
       { id: "FeyTeaserVertical", frame: 275, name: "t04-soft-vert-showcase.png" },
     ];
 
@@ -78,30 +87,32 @@ for (const item of POLISHED_STILLS) {
   console.log(`  ✓ ${item.name}`);
 }
 
-for (const v of VIDEOS) {
-  const composition = await getComp(v.id);
-  const outputLocation = path.join(outDir, v.file);
-  let lastLogged = -1;
-  console.log(`3. Rendering ${v.file} (${composition.width}x${composition.height}, ${composition.durationInFrames}f @ ${composition.fps}fps)...`);
-  await renderMedia({
-    composition,
-    serveUrl,
-    codec: "h264",
-    audioCodec: "aac",
-    crf: 18,
-    pixelFormat: "yuv420p",
-    outputLocation,
-    browserExecutable: CHROME,
-    concurrency: 4,
-    onProgress: ({ progress }) => {
-      const pct = Math.floor(progress * 10) * 10;
-      if (pct !== lastLogged && pct % 20 === 0) {
-        lastLogged = pct;
-        console.log(`  [${v.file}] ${pct}%`);
-      }
-    },
-  });
-  const sizeMB = (fs.statSync(outputLocation).size / (1024 * 1024)).toFixed(2);
-  console.log(`  ✓ Done: out/${v.file} (${sizeMB} MB)`);
+if (!stillsOnly) {
+  for (const v of VIDEOS) {
+    const composition = await getComp(v.id);
+    const outputLocation = path.join(outDir, v.file);
+    let lastLogged = -1;
+    console.log(`3. Rendering ${v.file} (${composition.width}x${composition.height}, ${composition.durationInFrames}f @ ${composition.fps}fps)...`);
+    await renderMedia({
+      composition,
+      serveUrl,
+      codec: "h264",
+      audioCodec: "aac",
+      crf: 18,
+      pixelFormat: "yuv420p",
+      outputLocation,
+      browserExecutable: CHROME,
+      concurrency: 4,
+      onProgress: ({ progress }) => {
+        const pct = Math.floor(progress * 10) * 10;
+        if (pct !== lastLogged && pct % 20 === 0) {
+          lastLogged = pct;
+          console.log(`  [${v.file}] ${pct}%`);
+        }
+      },
+    });
+    const sizeMB = (fs.statSync(outputLocation).size / (1024 * 1024)).toFixed(2);
+    console.log(`  ✓ Done: out/${v.file} (${sizeMB} MB)`);
+  }
 }
-console.log("ALL 4 RENDERS COMPLETE.");
+console.log("ALL RENDERS COMPLETE.");

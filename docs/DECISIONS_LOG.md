@@ -566,3 +566,24 @@
      - Added two new curated 10-question custom challenges: **`🦅 Super Eagles, Falcons & Olympic Glory`** (`pub_super_eagles_olympic_glory`, Sports) and **`👑 Ancient Kingdoms, Rebels & Democratic Icons`** (`pub_kingdoms_activists_icons`, History), plus a `Sports` discipline filter pill in the Public Community Arena.
 - **"Building in Public" Content Takeaway**:
   > *"Featured challenges shouldn't become permanent dashboard wallpaper after a player beats them. Letting players close completed challenges turns a static showcase into a zero-inbox discovery feed where fresh custom challenges automatically rotate into view."*
+
+---
+
+## 30. Real Screen Recordings Over Stylized Mockups for Honest-Craft Product Marketing
+
+- **Date / Phase**: Phase 2 — Pre-Launch Marketing & Feature Spotlight Series
+- **The Problem / Context**:
+  Initial feature teaser videos and the 15s brand teaser recreated the app's UI as stylized motion-graphics mockups and abstract card graphics inside Remotion. While glossy, stylized mockups introduce two credibility risks: (1) small inaccuracies drift from how games are actually played (e.g., depicting Taboo-style forbidden word lists or local Pass-the-Phone instead of Fey Articulate's real **Online Room (Friends)** flow, live lobby, rapid word cards, Word Audit, and 20-tile board), and (2) audiences increasingly distrust slick fake-UI promo animations when evaluating indie products.
+- **User Insight & Guiding Philosophy**:
+  Fey's entire brand thesis is **honest craft**—real understanding over performative polish. Showing the **actual, live interface** with light, restrained editorial motion polish (clean framing, concise synced captions, smooth focal framing on 9:16 mobile) is far more convincing than animated reconstructions—and creates a true historical archive of Fey's early days.
+- **Architectural & Product Landing**:
+  1. **Automated 30fps Retina Screen Recorder (`video/capture/record-clips.mjs`)**:
+     - Captures authentic `1920×1200` (1.5× Retina) H.264 MP4 clips directly from the live production Next.js app via Puppeteer CDP `Page.startScreencast` piped into Remotion's bundled `ffmpeg` (`libx264`, constant-FPS grid timing).
+     - Uses smooth eased pointer choreography, fake media streams (`--use-fake-device-for-media-stream`) for live microphone waveforms, and emits exact millisecond beat markers (`video/public/clips/markers.json`) for frame-accurate caption and SFX alignment.
+  2. **Shared Real-Footage Showcase Shell (`video/src/spotlights/SpotlightShell.tsx` → `RealClipStage`) & Real-UI Teaser Previews (`video/src/FeyTeaserVideo.tsx`)**:
+     - Replaces thousands of lines of recreated mockup JSX across all 5 Feature Spotlights (`The Study`, `Articulate Online Room`, `The Podium`, `Naija Trivia`, `Quant`) with `<OffthreadVideo>` playback inside a floating archival `BrowserFrame`, and replaces the 4 abstract wireframe cards in the 15s teaser with tightly cropped Retina real-UI captures (`video/public/shots/card-*.png`).
+     - Automatically scales `9:16` vertical views (`1.22–1.25×` anchored at `100%`) to push the desktop sidebar cleanly off-edge so the core interactive workspace fills mobile screens with zero half-cropped navigation labels.
+  3. **Lightweight Git Footprint (`video/.gitignore`)**:
+     - Raw captured clips (`video/public/clips/*.mp4`) remain local and gitignored while `record-clips.mjs` and `markers.json` stay committed, making all 5 spotlights 100% reproducible whenever UI copy or branding evolves (such as the live Mathletics → Quant rebrand).
+- **"Building in Public" Content Takeaway**:
+  > *"When your pitch is honest craft, stylized UI mockups work against you. Record the real product at 30fps, wrap it in quiet editorial framing, and let the interface speak for itself."*

@@ -1,0 +1,86 @@
+{
+  "study": {
+    "durationSec": 38.73,
+    "totalFrames": 1162,
+    "width": 1920,
+    "height": 1200,
+    "marks": {
+      "discover_ready": 0,
+      "spin_clicked": 2.95,
+      "topic_landed": 5.65,
+      "begin_research_clicked": 8.88,
+      "research_loaded": 10.62,
+      "summary_visible": 14.4,
+      "typing_notes": 15.92,
+      "notes_ready": 23.83,
+      "speak_clicked": 26.63,
+      "mic_live": 31.44
+    }
+  },
+  "articulate": {
+    "durationSec": 56.93,
+    "totalFrames": 1708,
+    "width": 1920,
+    "height": 1200,
+    "marks": {
+      "online_setup_ready": 0,
+      "room_created": 9.08,
+      "lobby_visible": 11.06,
+      "teams_visible": 12.68,
+      "round_started": 15.5,
+      "cards_live": 18.81,
+      "word_1_got_it": 22.96,
+      "word_2_got_it": 25.68,
+      "word_3_passed": 29.51,
+      "word_4_got_it": 36.96,
+      "round_end_visible": 40.02,
+      "board_expanded": 46.71
+    }
+  },
+  "podium": {
+    "durationSec": 31.8,
+    "totalFrames": 954,
+    "width": 1920,
+    "height": 1200,
+    "marks": {
+      "lobby_ready": 0,
+      "spin_clicked": 2.78,
+      "topic_landed": 4.58,
+      "notes_phase": 7.57,
+      "studio_open": 16.13,
+      "theme_switched": 20.18,
+      "present_slide_1": 22.08,
+      "present_slide_2": 23.78,
+      "present_slide_3": 25.59,
+      "present_slide_4": 27.37
+    }
+  },
+  "trivia": {
+    "durationSec": 22.8,
+    "totalFrames": 684,
+    "width": 1920,
+    "height": 1200,
+    "marks": {
+      "league_hub_ready": 0,
+      "leaderboard_view": 2.07,
+      "drop_3_q1": 7.94,
+      "q1_answered": 11.58,
+      "drop_3_q2": 15.28,
+      "q2_answered": 19.06
+    }
+  },
+  "mathletics": {
+    "durationSec": 35.33,
+    "totalFrames": 1060,
+    "width": 1920,
+    "height": 1200,
+    "marks": {
+      "setup_ready": 0,
+      "qr_selected": 5.69,
+      "q1_live": 10.54,
+      "q1_shortcut": 16.54,
+      "q2_live": 23.37,
+      "q2_shortcut": 29.63
+    }
+  }
+}

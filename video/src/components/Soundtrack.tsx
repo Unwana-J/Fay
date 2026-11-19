@@ -1,6 +1,7 @@
 import React from "react";
 import { Audio, Sequence, interpolate, staticFile } from "remotion";
 import { TIMELINE, TOTAL_FRAMES } from "../theme";
+import { OPENING_SFX_CUES } from "./OpeningSequence";
 
 interface SfxCue {
   from: number;
@@ -24,11 +25,13 @@ const A5 = TIMELINE.act5.start; // 1710
 
 // Subtle acoustic SFX balanced cleanly over the Pixabay groove (65s / 1950f)
 const SFX_CUES: SfxCue[] = [
-  // Act 1: The Receipt slaps, freeze stop, and paper split
-  { from: A1 + 24, file: "audio/sfx/tap-soft.wav", volume: 0.42 },
-  { from: A1 + 48, file: "audio/sfx/tap-soft.wav", volume: 0.46 },
-  { from: A1 + 95, file: "audio/sfx/freeze-stop.wav", volume: 0.36 },
-  { from: A1 + 196, file: "audio/sfx/paper-split.wav", volume: 0.38 },
+  // Opening (0..90f): soft keyboard ticks during type-on + single soft thud on the hard cut at frame 90
+  ...OPENING_SFX_CUES,
+
+  // Act 1 (150..270f): The Receipt slaps & paper split
+  { from: A1 + 166, file: "audio/sfx/tap-soft.wav", volume: 0.42 },
+  { from: A1 + 182, file: "audio/sfx/tap-soft.wav", volume: 0.46 },
+  { from: A1 + 220, file: "audio/sfx/paper-split.wav", volume: 0.38 },
 
   // Act 2: Feynman chalkboard texture
   { from: A2 + 12, file: "audio/sfx/chalk-write.wav", volume: 0.30 },
@@ -81,8 +84,8 @@ const SFX_CUES: SfxCue[] = [
 function musicVolume(frame: number): number {
   const base = interpolate(
     frame,
-    [0, 14, 1275, 1305, TOTAL_FRAMES - 75, TOTAL_FRAMES],
-    [0, 0.54, 0.54, 0.62, 0.62, 0],
+    [0, 14, 88, 92, 1275, 1305, TOTAL_FRAMES - 75, TOTAL_FRAMES],
+    [0, 0.36, 0.40, 0.54, 0.54, 0.62, 0.62, 0],
     { extrapolateLeft: "clamp", extrapolateRight: "clamp" }
   );
 

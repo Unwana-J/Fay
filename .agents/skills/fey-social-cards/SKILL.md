@@ -66,18 +66,23 @@ node video/scripts/make-card.mjs --preset starter-pack
 All compositions live in `video/src/Root.tsx` and render to `video/out/`:
 - **Flagship 65s Launch Film:** `FeyBeta` (`16:9`) · `FeyBetaVertical` (`9:16`) → `video/out/fey-beta-*.mp4`
 - **15s Brand Soft-Launch Film:** `FeyTeaser` (`16:9`) · `FeyTeaserVertical` (`9:16`) → `video/out/fey-teaser-15s-*.mp4`
-- **5-Film Feature Spotlight Series (20s each, `16:9` + `9:16`)** → `video/out/spotlights/`:
-  - `FeySpotStudy` / `FeySpotStudyVertical` (Daily Study loop — Music & Memory)
-  - `FeySpotArticulate` / `FeySpotArticulateVertical` (3 fun word cards + live moving snake-order race board)
-  - `FeySpotPodium` / `FeySpotPodiumVertical` (Spinner + 5-slide presenter deck: *Owambe Is the Peak of Human Social Engineering*)
-  - `FeySpotTrivia` / `FeySpotTriviaVertical` (Live Drop 3 + mocked Friendship League with animated #3 → #1 climb)
-  - `FeySpotMathletics` / `FeySpotMathleticsVertical` (25s Quantitative Reasoning `(3, 4 → 15)` + 1v1 Sprint Duel card)
+- **5-Film Feature Spotlight Series (20s each, `16:9` + `9:16`, Real App Footage + Light Motion Polish)** → `video/out/spotlights/`:
+  - `FeySpotStudy` / `FeySpotStudyVertical` (Real `/discover` roulette spin → cited Research Reader & TipTap notes → live Active Mic 90s countdown & waveform)
+  - `FeySpotArticulate` / `FeySpotArticulateVertical` (Real Online Room setup → live `FEY-FRI8` multiplayer lobby & team rosters → synchronized word cards with `Got It! (+1)` confetti & `Pass` → Round Audit & expanded 20-tile Board Map)
+  - `FeySpotPodium` / `FeySpotPodiumVertical` (Real hot-take spin *Owambe Is the Peak of Human Social Engineering* → live Slide Studio with Fey Olive theme switch → fullscreen Presenter Mode)
+  - `FeySpotTrivia` / `FeySpotTriviaVertical` (Real seeded *Lagos Friday Crew* Friendship League hub & Cumulative Standings → live Drop 3 questions & insights)
+  - `FeySpotQuant` / `FeySpotQuantVertical` (Real Quantitative Reasoning 25s sprint → instant *The Feynman Shortcut* reveals)
 
 ```bash
-# Re-render 65s launch films & 15s soft-launch teasers (pass --teasers for 15s only)
+# 1. Re-capture real 30fps Retina app screen recordings (requires `npm start -- -p 3123`)
+node video/capture/record-clips.mjs
+# Or capture specific clips:
+node video/capture/record-clips.mjs study quant
+
+# 2. Re-render 65s launch films & 15s soft-launch teasers (pass --teasers for 15s only)
 node video/scripts/render-videos.mjs
 
-# Re-render all 5 Feature Spotlights (or pass --only study,articulate,podium,trivia,mathletics)
+# 3. Re-render all 5 Feature Spotlights (or pass --only study,articulate,podium,trivia,quant)
 node video/scripts/render-spotlights.mjs
 ```
 
