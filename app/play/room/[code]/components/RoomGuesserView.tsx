@@ -143,6 +143,13 @@ export default function RoomGuesserView({
         </span>
       </div>
 
+      {/* Wheel Skip / Encore Notice Banner */}
+      {room.last_turn_skip_notice && (
+        <div className="px-3.5 py-2 rounded-2xl bg-[var(--gold)]/15 border border-[var(--gold)]/40 text-xs font-space font-bold text-[var(--text)] text-center">
+          {room.last_turn_skip_notice}
+        </div>
+      )}
+
       {/* Countdown Timer with glowing aura */}
       <motion.div
         animate={isUrgent ? { scale: [1, 1.05, 1] } : {}}

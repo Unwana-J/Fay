@@ -37,6 +37,8 @@
 27. [In-App Sourced Research Pack & Speaking Cues](#27-in-app-sourced-research-pack--speaking-cues)
 28. [Dual-Hue Activity Heatmaps & Streak Calendars: Distinguishing Deep Research from Parlor Games](#28-dual-hue-activity-heatmaps--streak-calendars-distinguishing-deep-research-from-parlor-games)
 29. [Dismissible Live Arena Challenges & Curated Custom Challenge Rotation](#29-dismissible-live-arena-challenges--curated-custom-challenge-rotation)
+30. [Real Screen Recordings Over Stylized Mockups for Honest-Craft Product Marketing](#30-real-screen-recordings-over-stylized-mockups-for-honest-craft-product-marketing)
+31. [Synchronized Wheel Checkpoints & Tactical Board Agency in Online Articulate](#31-synchronized-wheel-checkpoints--tactical-board-agency-in-online-articulate)
 
 ---
 
@@ -587,3 +589,26 @@
      - Raw captured clips (`video/public/clips/*.mp4`) remain local and gitignored while `record-clips.mjs` and `markers.json` stay committed, making all 5 spotlights 100% reproducible whenever UI copy or branding evolves (such as the live Mathletics → Quant rebrand).
 - **"Building in Public" Content Takeaway**:
   > *"When your pitch is honest craft, stylized UI mockups work against you. Record the real product at 30fps, wrap it in quiet editorial framing, and let the interface speak for itself."*
+
+---
+
+## 31. Synchronized Wheel Checkpoints & Tactical Board Agency in Online Articulate
+
+- **Date / Phase**: Phase 2 — Real-Time Multiplayer Party Dynamics (Online Articulate)
+- **The Problem / Context**:
+  In Online Articulate rooms (`/play/room/[code]`), teams raced linearly toward the winning score goal (`20` or `30` pts), while the board map previously displayed four different decorative icons every 7 tiles (`Chance`, `Double`, `Bonus`, `Challenge`) that had no real effect in online multiplayer. A team that built an early 5-point lead could coast comfortably without board friction, table politics, or comeback opportunities.
+- **User Insight & Guiding Philosophy**:
+  1. **Clean Board Checkpoints (Option A)**: Instead of cluttering the board with four different icons every few steps, place **Wheel Checkpoints exclusively on every 7th tile (`7, 14, 21, 28...`)**. Every other space remains a clean category tile so landing on `7`, `14`, or `21` feels like a genuine room-wide climax.
+  2. **Tactical Player Agency over Pure RNG**: When a team lands on a movement wedge (`±2` or `±3`), don't decide for them—give the team a **tactical choice** between boosting themselves forward (`+2` / `+3`) or sabotaging a chosen rival team backward (`-2` / `-3`), plus high-stakes wedges like **Take Next Turn (Encore)** and **Freeze Opponent's Next Turn**.
+- **Architectural & Product Landing**:
+  1. **Authoritative Server Wheel State & Dispute-Aware Sync (`lib/articulate-room.ts`, `app/api/articulate/room/[code]/action/route.ts`)**:
+     - Added `wheel_state`, `frozen_teams`, and `extra_turn_team` to `ArticulateRoom`, persisted inside the Supabase `teams` JSONB payload for zero-migration backward compatibility.
+     - `syncWheelCheckpoint` evaluates whether the active team's score is on a checkpoint tile (`score > 0 && score < scoreGoal && score % 7 === 0`) both at `end_round` and dynamically after `resolve_dispute` or `resolve_passed_claim` so a word dispute or buzzer-beater claim that moves a team onto (or off) tile `7 / 14 / 21 / 28` updates wheel eligibility automatically.
+     - Added `spin_wheel` and `resolve_wheel_choice` server actions with a cap that prevents free wheel steps from crossing the final winning score (`scoreGoal - 1`), ensuring the final winning point must always be earned by articulating a word.
+  2. **Turn Schedule Engine (`peekNextTurnSchedule` in `lib/articulate-room.ts`)**:
+     - Computes the next active team in both `RoomRoundEnd` preview and `start_round` execution, honoring `extra_turn_team` (back-to-back Encore turn) and automatically skipping and unfreezing any team in `frozen_teams`.
+  3. **Synchronized Multi-Device Wheel UI (`RoomWheelCheckpointCard.tsx`, `BoardMap.tsx`)**:
+     - Simplified `BoardMap.tsx` to highlight only every 7th tile (`7, 14, 21, 28`) with a golden `WHEEL` badge.
+     - Built `RoomWheelCheckpointCard` inside `RoomRoundEnd`, where `spinNonce` triggers a synchronized 3.6s cubic-bezier SVG wheel spin across every connected device in the room, followed by an interactive tactical decision panel (`Advance +2/+3 Steps` vs. `Push Rival -2/-3 Steps`, or `Freeze [Rival]'s Next Turn` across 2–4 teams).
+- **"Building in Public" Content Takeaway**:
+  > *"Pure RNG feels cheap in multiplayer party games; player agency creates table politics. When a team lands on a checkpoint wheel in Fey Articulate, we don't just move their token—we force them to choose in front of the whole call: boost yourselves +3 forward, or drag the leading team -3 back?"*

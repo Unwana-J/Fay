@@ -1,7 +1,13 @@
 "use client";
 
 import React from "react";
-import { ArticulateRoom, RoomPlayer, getNextSpeakerForTeam, calculateMatchPlayTime } from "@/lib/articulate-room";
+import {
+  ArticulateRoom,
+  RoomPlayer,
+  getNextSpeakerForTeam,
+  calculateMatchPlayTime,
+  peekNextTurnSchedule,
+} from "@/lib/articulate-room";
 import {
   Check,
   FastForward,
@@ -28,9 +34,12 @@ import {
   ChevronDown,
   ChevronUp,
   Map,
+  Snowflake,
+  Repeat,
 } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import BoardMap from "@/app/play/BoardMap";
+import RoomWheelCheckpointCard from "./RoomWheelCheckpointCard";
 
 interface RoomRoundEndProps {
   room: ArticulateRoom;
@@ -54,6 +63,13 @@ interface RoomRoundEndProps {
   onOpenLobbyQueue?: () => void;
   onAdmitPlayer?: (targetPlayerId: string, targetTeam: "A" | "B" | "C" | "D") => void;
   onAutoAdmitAll?: () => void;
+  onSpinWheel?: () => Promise<void> | void;
+  onResolveWheelChoice?: (
+    choiceType: "forward" | "back" | "freeze" | "freeze_player",
+    targetTeam?: "A" | "B" | "C" | "D",
+    targetPlayerId?: string,
+    targetPlayerName?: string
+  ) => Promise<void> | void;
 }
 
 export default function RoomRoundEnd({
@@ -78,6 +94,8 @@ export default function RoomRoundEnd({
   onOpenLobbyQueue,
   onAdmitPlayer,
   onAutoAdmitAll,
+  onSpinWheel,
+  onResolveWheelChoice,
 }: RoomRoundEndProps) {
   const currentTurn = room.current_turn;
   const scoredWords = room.round_words_scored || [];
@@ -113,6 +131,15 @@ export default function RoomRoundEnd({
     (room.round_words_scored || []).some((w) => w.disputeStatus === "disputed") ||
     (room.round_words_passed || []).some((w) => w.claimStatus === "claimed");
 
+  const isWheelUnresolved = Boolean(
+    room.wheel_state &&
+      (room.wheel_state.status === "ready" || room.wheel_state.status === "choosing")
+  );
+  const isWheelAlreadySpun = Boolean(
+    room.wheel_state &&
+      (room.wheel_state.status === "choosing" || room.wheel_state.status === "resolved")
+  );
+
   const [showWordAudit, setShowWordAudit] = React.useState<boolean>(true);
   const [showTeamRosters, setShowTeamRosters] = React.useState<boolean>(false);
   const [showWaitingQueue, setShowWaitingQueue] = React.useState<boolean>(true);
@@ -144,10 +171,12 @@ export default function RoomRoundEnd({
   const winningTeamColor = isTie ? "var(--gold)" : topTeam.team.color;
   const winningScore = topTeam.team.score;
 
-  // Next round calculation
+  // Next round calculation (factors in Wheel Encore turns and Frozen opponent skips)
   const nextRoundNumber = (currentTurn?.roundNumber || 1) + 1;
-  const activeTeamKeys = activeTeamsList.map((t) => t.key);
-  const nextActiveTeamKey: "A" | "B" | "C" | "D" = activeTeamKeys[(nextRoundNumber - 1) % activeTeamKeys.length];
+  const turnSchedule = peekNextTurnSchedule(room);
+  const nextActiveTeamKey: "A" | "B" | "C" | "D" = turnSchedule.nextTeamKey;
+  const skippedFrozenTeams = turnSchedule.skippedFrozenTeams;
+  const isExtraTurn = turnSchedule.isExtraTurn;
 
   const nextTeam =
     nextActiveTeamKey === "A"
@@ -315,9 +344,11 @@ export default function RoomRoundEnd({
     rawNextIds,
     room.inactive_players || [],
     lastSpeakerId,
-    lastSpeakerIndex
+    lastSpeakerIndex,
+    room.frozen_players || []
   );
   const nextSpeakerId = nextSpeakerResult.speakerId || null;
+  const skippedFrozenPlayers = nextSpeakerResult.skippedFrozenPlayerIds || [];
 
   const nextSpeakerDisplay = nextSpeakerId ? getPlayerDisplay(nextSpeakerId) : null;
   const isMeNextSpeaker = nextSpeakerId === myPlayerId;
@@ -365,9 +396,9 @@ export default function RoomRoundEnd({
   ];
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6 text-center">
+    <div className="max-w-2xl mx-auto space-y-5 text-center">
       {/* Round Complete Header */}
-      <div className="space-y-2">
+      <div className="space-y-1.5">
         <span className="text-xs uppercase tracking-wider font-extrabold text-[var(--olive)]">
           Intermission • Round {currentTurn?.roundNumber} Complete
         </span>
@@ -379,63 +410,535 @@ export default function RoomRoundEnd({
         </p>
       </div>
 
-      {/* Victory Threshold Notice (Allows full review & contesting before declaring game over) */}
-      {isGoalReached && (
-        <motion.div
-          initial={{ opacity: 0, y: 10, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          className="surface rounded-3xl p-5 border-2 border-[var(--gold)] bg-[var(--gold)]/10 shadow-lg text-center space-y-2.5 relative overflow-hidden"
-        >
-          <div className="inline-flex items-center gap-2 px-3.5 py-1 rounded-full bg-[var(--gold)] text-black font-space font-extrabold text-xs shadow-xs">
-            <Trophy className="w-3.5 h-3.5" />
-            <span>Target Goal Reached! ({scoreGoal} pts)</span>
-          </div>
-          <h3 className="font-space font-extrabold text-xl sm:text-2xl text-[var(--text)]">
-            {winningTeamKey === "tie"
-              ? "Tied at the Victory Threshold!"
-              : `${winningTeamName} has reached the winning score (${winningScore} pts)!`}
-          </h3>
-          <p className="text-xs text-[var(--text-dim)] max-w-md mx-auto leading-relaxed">
-            Review and contest any words below to settle fouls or claims. Once everyone has reviewed, the Host can announce the final champion or launch another round.
-          </p>
-        </motion.div>
+      {/* SECTION 1 (Conditional): Wheel Checkpoint Card (Triggers when landing on tile 7, 14, 21, 28...) */}
+      {room.wheel_state && (
+        <RoomWheelCheckpointCard
+          room={room}
+          myPlayerId={myPlayerId}
+          myTeam={myTeam}
+          isHost={isHost}
+          presencePlayers={presencePlayers}
+          knownNames={knownNames}
+          onSpinWheel={onSpinWheel}
+          onResolveWheelChoice={onResolveWheelChoice}
+        />
       )}
 
-      {/* Spectator Admission Notice */}
-      <motion.div
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="p-4 rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300 text-xs flex items-center justify-center gap-2 font-medium"
-      >
-        <Sparkles className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-        <span>Room is unlocked! Waiting spectators are now drafted into the active roster for Round {nextRoundNumber}.</span>
-      </motion.div>
-
-      {/* Maker-Checker Dispute Notice */}
-      <div className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-[11px] text-[var(--text-dim)] flex items-center justify-center gap-2 text-left">
-        <ShieldCheck className="w-4 h-4 text-[var(--gold)] flex-shrink-0" />
-        <span>
-          <strong>Maker-Checker Consensus:</strong> Opponents can challenge questionable words (maker). A point is only voided if the describing team agrees and confirms the concession (checker).
-        </span>
-      </div>
-
-      {/* Words Scored & Maker-Checker Disputes */}
-      <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4 text-left">
-        <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)]">
-          <div className="flex items-center gap-2">
-            <h3 className="font-space font-bold text-sm text-[var(--text)]">Word Audit &amp; Disputes</h3>
-            {hasActiveDisputes && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 border border-amber-500/30 animate-pulse">
-                Action Needed
+      {/* SECTION 2: Unified Match Stage Card (Team Standings + Inline Player Rosters + Board Track Drawer + Next Round CTA) */}
+      <div className="surface rounded-3xl p-5 sm:p-6 border border-[var(--border-dim)] shadow-sm space-y-5 text-left">
+        {/* Top Header: Standings, Your Personal Status & Step Away Toggle */}
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Map className="w-4 h-4 text-[var(--olive)] shrink-0" />
+            <h2 className="font-space font-bold text-sm text-[var(--text)]">
+              Match Standings &amp; Players
+            </h2>
+            {isMeInactive ? (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-space font-bold bg-amber-500/12 text-amber-700 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap">
+                <Moon className="w-3 h-3 text-amber-500 shrink-0" />
+                <span>You: Away</span>
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-[11px] font-space font-bold bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                <span>You: Active</span>
               </span>
             )}
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-bold text-emerald-600">+{netPoints} Confirmed</span>
+
+          <div className="flex items-center gap-2 flex-wrap">
+            {onToggleInactive && (
+              <button
+                type="button"
+                onClick={() => onToggleInactive()}
+                className={`px-2.5 py-1 rounded-xl text-xs font-space font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-2xs whitespace-nowrap ${
+                  isMeInactive
+                    ? "bg-emerald-600 hover:bg-emerald-500 text-white"
+                    : "bg-amber-500/12 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border border-amber-500/35"
+                }`}
+              >
+                {isMeInactive ? (
+                  <>
+                    <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                    <span>Mark Active</span>
+                  </>
+                ) : (
+                  <>
+                    <Moon className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+                    <span>Step Away</span>
+                  </>
+                )}
+              </button>
+            )}
+            <span className="text-[11px] font-mono font-bold text-[var(--text-mute)]">
+              Goal: {scoreGoal} pts
+            </span>
+          </div>
+        </div>
+
+        {/* Team Score Cards (With Players & Availability Directly Inside Each Team Card) + Collapsible Board Grid */}
+        <BoardMap
+          scoreA={room.teams.teamA.score}
+          scoreB={room.teams.teamB.score}
+          scoreC={room.teams.teamC?.score}
+          scoreD={room.teams.teamD?.score}
+          scoreGoal={room.settings.scoreGoal || 20}
+          colorA={room.teams.teamA.color}
+          colorB={room.teams.teamB.color}
+          colorC={room.teams.teamC?.color || "#10B981"}
+          colorD={room.teams.teamD?.color || "#F59E0B"}
+          nameA={room.teams.teamA.name}
+          nameB={room.teams.teamB.name}
+          nameC={room.teams.teamC?.name || "Team Delta"}
+          nameD={room.teams.teamD?.name || "Team Sigma"}
+          activeTeam={nextActiveTeamKey}
+          gameMode="classic"
+          collapsibleGrid={true}
+          defaultGridCollapsed={true}
+          renderTeamFooter={(teamId) => {
+            const rosterEntry = teamRosterList.find((tr) => tr.key === teamId);
+            const players = rosterEntry?.players || [];
+            const isTeamFrozen = Boolean((room.frozen_teams || []).includes(teamId));
+
+            return (
+              <div className="space-y-1.5">
+                {isTeamFrozen && (
+                  <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-space font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25 whitespace-nowrap">
+                    <Snowflake className="w-2.5 h-2.5 shrink-0" />
+                    <span>Frozen Next Turn</span>
+                  </div>
+                )}
+
+                {players.length === 0 ? (
+                  <p className="text-[11px] text-[var(--text-mute)] italic py-0.5">
+                    No players on this team
+                  </p>
+                ) : (
+                  <div className="space-y-1.5">
+                    {players.map((pId) => {
+                      const p = getPlayerDisplay(pId);
+                      const isMe = pId === myPlayerId;
+                      const inactive = isPlayerInactive(pId);
+                      const isFrozenPlayer = Boolean((room.frozen_players || []).includes(pId));
+                      const isNextSpeaker = nextActiveTeamKey === teamId && nextSpeakerId === pId;
+
+                      return (
+                        <div
+                          key={pId}
+                          className={`flex items-center justify-between gap-2 px-2.5 py-1.5 rounded-xl border text-xs transition ${
+                            inactive
+                              ? "bg-amber-500/5 border-amber-500/20 opacity-75"
+                              : isFrozenPlayer
+                              ? "bg-blue-500/5 border-blue-500/25"
+                              : isMe
+                              ? "bg-[var(--bg)] border-[var(--olive)]/35 font-semibold"
+                              : "bg-[var(--bg)]/80 border-[var(--border-dim)]/70"
+                          }`}
+                        >
+                          <div className="flex items-center gap-1.5 min-w-0">
+                            {/* eslint-disable-next-line @next/next/no-img-element */}
+                            <img
+                              src={p.avatar}
+                              alt={p.name}
+                              className="w-5 h-5 rounded-full border border-[var(--border-dim)] flex-shrink-0 bg-[var(--bg-card)] object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                              }}
+                            />
+                            <span className="truncate text-[var(--text)] font-medium text-xs">
+                              {p.name}
+                            </span>
+                            {isMe && (
+                              <span className="text-[10px] text-[var(--olive)] font-bold shrink-0">
+                                (You)
+                              </span>
+                            )}
+                            {p.isHost && (
+                              <span
+                                className="inline-flex items-center justify-center p-0.5 rounded text-[var(--gold)] shrink-0"
+                                title="Room Host"
+                              >
+                                <Crown className="w-3 h-3 fill-current" />
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="flex items-center gap-1 flex-shrink-0">
+                            {isNextSpeaker && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-space font-bold bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 border border-emerald-500/25 whitespace-nowrap">
+                                <Mic className="w-2.5 h-2.5 shrink-0" /> Speaker
+                              </span>
+                            )}
+                            {isFrozenPlayer && (
+                              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[9px] font-space font-bold bg-blue-500/10 text-blue-700 dark:text-blue-300 border border-blue-500/25 whitespace-nowrap">
+                                <Snowflake className="w-2.5 h-2.5 shrink-0" /> Frozen
+                              </span>
+                            )}
+                            {isHost && onTransferHost && pId !== myPlayerId && pId !== room.host_id && (
+                              <button
+                                type="button"
+                                onClick={() => onTransferHost(pId)}
+                                className="p-1 rounded-full border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer inline-flex items-center justify-center"
+                                title={`Make ${p.name} Host`}
+                              >
+                                <Crown className="w-2.5 h-2.5 text-[var(--gold)] shrink-0" />
+                              </button>
+                            )}
+                            {(isHost || isMe) && onToggleInactive ? (
+                              <button
+                                type="button"
+                                onClick={() => onToggleInactive(isMe ? undefined : pId)}
+                                className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-space font-bold border transition cursor-pointer whitespace-nowrap ${
+                                  inactive
+                                    ? "bg-amber-500/12 hover:bg-amber-500/20 text-amber-700 dark:text-amber-400 border-amber-500/30"
+                                    : "bg-emerald-500/12 hover:bg-emerald-500/20 text-emerald-700 dark:text-emerald-400 border-emerald-500/30"
+                                }`}
+                                title={inactive ? "Tap to mark Active" : "Tap to mark Away"}
+                              >
+                                {inactive ? (
+                                  <>
+                                    <Moon className="w-2.5 h-2.5 shrink-0" />
+                                    <span>Away</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                    <span>Active</span>
+                                  </>
+                                )}
+                              </button>
+                            ) : inactive ? (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-space font-bold bg-amber-500/12 text-amber-700 dark:text-amber-400 border border-amber-500/30 whitespace-nowrap">
+                                <Moon className="w-2.5 h-2.5 shrink-0" /> Away
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-space font-bold bg-emerald-500/12 text-emerald-700 dark:text-emerald-400 border border-emerald-500/30 whitespace-nowrap">
+                                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse shrink-0" />
+                                Active
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }}
+        />
+
+        {/* Victory Threshold or Next Turn Launch Stage */}
+        {isGoalReached ? (
+          <div className="p-4 sm:p-5 rounded-2xl border-2 border-[var(--gold)] bg-[var(--gold)]/10 space-y-4 text-center">
+            <div className="space-y-1.5">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[var(--gold)] text-black font-space font-extrabold text-xs shadow-2xs">
+                <Trophy className="w-3.5 h-3.5" />
+                <span>Target Goal Reached ({scoreGoal} pts) • {playTime.formatted} played</span>
+              </div>
+              <h3 className="font-space font-extrabold text-xl text-[var(--text)]">
+                {winningTeamKey === "tie"
+                  ? "Tied at the Victory Threshold!"
+                  : `${winningTeamName} Reached the Winning Score (${winningScore} pts)!`}
+              </h3>
+              <p className="text-xs text-[var(--text-dim)] max-w-md mx-auto leading-relaxed">
+                Settle any word challenges below first, then announce the final champion or launch another round.
+              </p>
+            </div>
+
+            {isHost ? (
+              <div className="space-y-2.5">
+                <motion.button
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={() => {
+                    try {
+                      navigator.vibrate?.(20);
+                    } catch {}
+                    onFinishGame?.();
+                  }}
+                  className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md flex items-center justify-center gap-2.5 transition cursor-pointer touch-manipulation select-none"
+                >
+                  <Trophy className="w-5 h-5 text-[var(--gold)]" />
+                  <span>Announce Winner &amp; Declare Victory ({winningTeamName})</span>
+                </motion.button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      navigator.vibrate?.(15);
+                    } catch {}
+                    if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
+                  }}
+                  disabled={isStartingRound}
+                  className="w-full py-2.5 rounded-xl border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-xs font-space font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer flex items-center justify-center gap-1.5"
+                >
+                  <Play className="w-3.5 h-3.5" />
+                  <span>Continue to Round {nextRoundNumber}</span>
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <p className="text-xs text-[var(--text-dim)]">
+                  Host (<strong>{room.host_name}</strong>) will announce the official match winner once word review is complete.
+                </p>
+                {!isHostOnline && (
+                  <div className="pt-2 space-y-2">
+                    {onClaimHost && (
+                      <button
+                        type="button"
+                        onClick={onClaimHost}
+                        className="w-full py-3 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm transition"
+                      >
+                        <Crown className="w-4 h-4" />
+                        <span>Claim Host Privileges to Conclude Match</span>
+                      </button>
+                    )}
+                    {onFinishGame && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (window.confirm(`Declare ${winningTeamName} the official winner and conclude the match now?`)) {
+                            onFinishGame();
+                          }
+                        }}
+                        className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-3 rounded-2xl font-space font-extrabold text-xs shadow-sm flex items-center justify-center gap-2 transition cursor-pointer"
+                      >
+                        <Trophy className="w-4 h-4 text-[var(--gold)]" />
+                        <span>Announce Winner &amp; Finish Match ({winningTeamName})</span>
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="p-4 rounded-2xl bg-[var(--bg)] border border-[var(--border-dim)] space-y-3 text-center">
+            {isExtraTurn && (
+              <div className="p-2.5 rounded-xl bg-[var(--gold)]/15 border border-[var(--gold)]/35 text-xs font-space font-bold text-[var(--text)] flex items-center justify-center gap-2">
+                <Repeat className="w-4 h-4 text-[var(--gold)] shrink-0" />
+                <span>
+                  <strong>Encore Turn Active!</strong> {nextTeamName} takes the stage back-to-back!
+                </span>
+              </div>
+            )}
+
+            {skippedFrozenTeams.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs font-space font-bold text-blue-700 dark:text-blue-300 flex items-center justify-center gap-2">
+                <Snowflake className="w-4 h-4 text-blue-500 shrink-0" />
+                <span>
+                  {skippedFrozenTeams
+                    .map((k) => activeTeamsList.find((t) => t.key === k)?.team.name || `Team ${k}`)
+                    .join(", ")}{" "}
+                  is frozen this turn — skipping to <strong>{nextTeamName}</strong>!
+                </span>
+              </div>
+            )}
+
+            {skippedFrozenPlayers.length > 0 && (
+              <div className="p-2.5 rounded-xl bg-blue-500/10 border border-blue-500/25 text-xs font-space font-bold text-blue-700 dark:text-blue-300 flex items-center justify-center gap-2">
+                <Snowflake className="w-4 h-4 text-blue-500 shrink-0" />
+                <span>
+                  {skippedFrozenPlayers.map((pid) => getPlayerDisplay(pid).name).join(", ")} is frozen this round — passing the mic to{" "}
+                  <strong>{nextSpeakerDisplay?.name || nextTeamName}</strong>!
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-between text-xs px-1">
+              <div className="flex items-center gap-2 text-[var(--text-dim)]">
+                <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: nextTeamColor }} />
+                <span>
+                  Next up: <strong style={{ color: nextTeamColor }}>{nextTeamName}</strong>
+                  {nextSpeakerDisplay?.name ? ` • ${nextSpeakerDisplay.name}` : ""}
+                </span>
+              </div>
+              <span className="text-[11px] font-mono font-bold text-[var(--text-mute)]">
+                Round {nextRoundNumber}
+              </span>
+            </div>
+
+            {nextTeamActiveIds.length === 0 && (
+              <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-center gap-2">
+                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+                <span>
+                  All players on <strong>{nextTeamName}</strong> are marked Away. Mark one Active below to start.
+                </span>
+              </div>
+            )}
+
+            {isMeNextSpeaker ? (
+              <div className="space-y-1.5">
+                <motion.button
+                  whileHover={!isStartingRound && !isWheelUnresolved ? { scale: 1.01 } : {}}
+                  whileTap={!isStartingRound && !isWheelUnresolved ? { scale: 0.98 } : {}}
+                  onClick={() => {
+                    try {
+                      navigator.vibrate?.(15);
+                    } catch {}
+                    if (!isStartingRound && !isWheelUnresolved) onStartNextRound(nextSpeakerId || undefined);
+                  }}
+                  disabled={isStartingRound || isWheelUnresolved}
+                  className={`w-full text-white py-3.5 rounded-2xl font-space font-extrabold text-base shadow-md flex items-center justify-center gap-2 transition touch-manipulation select-none ${
+                    isStartingRound || isWheelUnresolved ? "opacity-55 cursor-not-allowed" : "cursor-pointer hover:brightness-105"
+                  }`}
+                  style={{ backgroundColor: "var(--terra)" }}
+                >
+                  {isStartingRound ? (
+                    <>
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      <span>Starting Turn...</span>
+                    </>
+                  ) : isWheelUnresolved ? (
+                    <>
+                      <Sparkles className="w-5 h-5" />
+                      <span>Complete Wheel Checkpoint Above First</span>
+                    </>
+                  ) : (
+                    <>
+                      <Mic className="w-5 h-5" />
+                      <span>I&apos;m the Speaker — Start My Turn</span>
+                    </>
+                  )}
+                </motion.button>
+                <p className="text-[11px] text-[var(--text-dim)]">
+                  You are describing this round. When you tap start, the 3-second countdown begins for everyone.
+                </p>
+              </div>
+            ) : isHost ? (
+              <div className="space-y-1.5">
+                <motion.button
+                  whileHover={!isStartingRound && !isWheelUnresolved ? { scale: 1.01 } : {}}
+                  whileTap={!isStartingRound && !isWheelUnresolved ? { scale: 0.98 } : {}}
+                  onClick={() => {
+                    try {
+                      navigator.vibrate?.(15);
+                    } catch {}
+                    if (!isStartingRound && !isWheelUnresolved) onStartNextRound(nextSpeakerId || undefined);
+                  }}
+                  disabled={isStartingRound || isWheelUnresolved}
+                  className={`w-full bg-[var(--terra)] text-white py-3.5 px-4 rounded-2xl font-space font-extrabold text-sm sm:text-base shadow-md flex items-center justify-center gap-2 transition touch-manipulation select-none ${
+                    isStartingRound || isWheelUnresolved ? "opacity-55 cursor-not-allowed" : "cursor-pointer hover:brightness-105"
+                  }`}
+                >
+                  {isStartingRound ? (
+                    <>
+                      <Loader2 className="w-4 h-4 sm:w-5 sm:h-5 animate-spin shrink-0" />
+                      <span className="truncate">Launching Round {nextRoundNumber}...</span>
+                    </>
+                  ) : isWheelUnresolved ? (
+                    <>
+                      <Sparkles className="w-4 h-4 sm:w-5 sm:h-5 shrink-0" />
+                      <span className="truncate">Complete Wheel Checkpoint First</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-4 h-4 sm:w-5 sm:h-5 fill-current shrink-0" />
+                      <span className="truncate">Start Round {nextRoundNumber} ({nextSpeakerDisplay?.name || nextTeamName})</span>
+                    </>
+                  )}
+                </motion.button>
+                <p className="text-[11px] text-[var(--text-dim)]">
+                  You can launch as Host, or wait for {nextSpeakerDisplay?.name || nextTeamName} to start when ready.
+                </p>
+              </div>
+            ) : !isHostOnline ? (
+              <div className="space-y-2">
+                <div className="p-2.5 rounded-xl bg-amber-500/15 border border-amber-500/35 text-xs font-bold text-amber-900 dark:text-amber-300">
+                  Host ({room.host_name || "Host"}) appears offline
+                </div>
+                {onClaimHost && (
+                  <button
+                    type="button"
+                    onClick={onClaimHost}
+                    className="w-full py-3 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-sm transition"
+                  >
+                    <Crown className="w-4 h-4" />
+                    <span>Claim Host &amp; Start Round {nextRoundNumber}</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="py-1.5 space-y-1">
+                <div className="flex items-center justify-center gap-2 text-xs font-bold text-[var(--text)]">
+                  <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
+                  <span>
+                    Waiting for <strong>{nextSpeakerDisplay?.name || nextTeamName}</strong> to start Round {nextRoundNumber}...
+                  </span>
+                </div>
+                <p className="text-[11px] text-[var(--text-dim)]">
+                  The round will launch automatically on your screen as soon as they tap Start.
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Quiet Match Control Footer inside Match Standings Card */}
+        {((isHost && onFinishGame && !isGoalReached) || onLeaveRoom) && (
+          <div className="flex items-center justify-between gap-2 pt-1 flex-wrap">
+            <span className="text-[11px] text-[var(--text-mute)]">
+              Tap your status pill above to step away or rejoin speaker rotation.
+            </span>
+            <div className="flex items-center gap-2 ml-auto">
+              {isHost && onFinishGame && !isGoalReached && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (window.confirm("Conclude this match and show the final podium leaderboard now?")) {
+                      onFinishGame();
+                    }
+                  }}
+                  className="px-3 py-1.5 rounded-xl text-xs font-space font-bold bg-[var(--bg)] hover:bg-[var(--bg-hover)] text-[var(--text-dim)] hover:text-[var(--text)] border border-[var(--border-dim)] transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  title="Conclude match early and reveal final match podium"
+                >
+                  <Trophy className="w-3.5 h-3.5 text-[var(--gold)] shrink-0" />
+                  <span>End Match Early</span>
+                </button>
+              )}
+
+              {onLeaveRoom && (
+                <button
+                  type="button"
+                  onClick={onLeaveRoom}
+                  className="px-3 py-1.5 rounded-xl text-xs font-space font-bold bg-[var(--bg)] hover:bg-[var(--terra)]/10 text-[var(--text-dim)] hover:text-[var(--terra)] border border-[var(--border-dim)] hover:border-[var(--terra)]/30 transition inline-flex items-center gap-1.5 cursor-pointer whitespace-nowrap"
+                  title="Leave this match and return to the parlor"
+                >
+                  <LogOut className="w-3.5 h-3.5 shrink-0" />
+                  <span>Leave Match</span>
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* SECTION 3: Word Audit & Disputes (With Maker-Checker Subtitle Inside) */}
+      <div className="surface rounded-3xl p-5 sm:p-6 border border-[var(--border-dim)] shadow-sm space-y-3.5 text-left">
+        <div className="flex items-start justify-between gap-3">
+          <div className="space-y-0.5 min-w-0">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h3 className="font-space font-bold text-sm text-[var(--text)]">Word Audit &amp; Disputes</h3>
+              {hasActiveDisputes && (
+                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 border border-amber-500/30 animate-pulse">
+                  Action Needed
+                </span>
+              )}
+            </div>
+            {(scoredWords.length > 0 || passedWords.length > 0) && (
+              <p className="text-[11px] text-[var(--text-dim)]">
+                Opponents can challenge questionable words; a point is only voided if the describing team confirms.
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <span className="text-xs font-bold text-emerald-600 whitespace-nowrap">+{netPoints} Confirmed</span>
             <button
               type="button"
               onClick={() => setShowWordAudit((v) => !v)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
+              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs whitespace-nowrap touch-manipulation select-none active:scale-95"
               title={showWordAudit ? "Collapse Word List" : "Expand Word List"}
             >
               {showWordAudit ? (
@@ -504,7 +1007,7 @@ export default function RoomRoundEnd({
                     {/* Status Badge or Challenge Action */}
                     <div className="flex items-center gap-2 flex-wrap justify-end">
                       {!w.disputeStatus || w.disputeStatus === "none" ? (
-                        isOpposingTeam ? (
+                        isOpposingTeam && !isWheelAlreadySpun ? (
                           <button
                             type="button"
                             onClick={() => onDisputeWord(idx)}
@@ -526,7 +1029,7 @@ export default function RoomRoundEnd({
                           <span className="text-[11px] font-bold text-red-500">
                             Voided (Confirmed by {w.concededBy})
                           </span>
-                          {canDisputeAgain && isDescribingTeam && (
+                          {canDisputeAgain && isDescribingTeam && !isWheelAlreadySpun && (
                             <button
                               type="button"
                               onClick={() => onDisputeWord(idx)}
@@ -542,7 +1045,7 @@ export default function RoomRoundEnd({
                           <span className="text-[11px] font-bold text-emerald-600">
                             Point Upheld (Dispute Contested)
                           </span>
-                          {canDisputeAgain && isOpposingTeam && (
+                          {canDisputeAgain && isOpposingTeam && !isWheelAlreadySpun && (
                             <button
                               type="button"
                               onClick={() => onDisputeWord(idx)}
@@ -647,7 +1150,7 @@ export default function RoomRoundEnd({
 
                       <div className="flex items-center gap-2 flex-wrap justify-end">
                         {!w.claimStatus || w.claimStatus === "none" ? (
-                          isDescribingTeam ? (
+                          isDescribingTeam && !isWheelAlreadySpun ? (
                             <button
                               type="button"
                               onClick={() => onClaimPassedWord?.(idx)}
@@ -667,7 +1170,7 @@ export default function RoomRoundEnd({
                             <span className="text-[11px] font-bold text-emerald-600">
                               +1 Point Awarded (Confirmed by {w.awardedBy})
                             </span>
-                            {canClaimAgain && isOpposingTeam && (
+                            {canClaimAgain && isOpposingTeam && !isWheelAlreadySpun && (
                               <button
                                 type="button"
                                 onClick={() => onResolvePassedClaim?.(idx, "reject")}
@@ -683,7 +1186,7 @@ export default function RoomRoundEnd({
                             <span className="text-[11px] font-bold text-[var(--text-mute)] line-through">
                               Claim Declined
                             </span>
-                            {canClaimAgain && isDescribingTeam && (
+                            {canClaimAgain && isDescribingTeam && !isWheelAlreadySpun && (
                               <button
                                 type="button"
                                 onClick={() => onClaimPassedWord?.(idx)}
@@ -743,256 +1246,10 @@ export default function RoomRoundEnd({
         </AnimatePresence>
       </div>
 
-      {/* Team Rosters & Player Availability */}
-      <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4 text-left">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--border-dim)]">
-          <div>
-            <h3 className="font-space font-bold text-sm text-[var(--text)] flex items-center gap-2">
-              <Users className="w-4 h-4 text-[var(--olive)]" />
-              Team Rosters &amp; Availability
-            </h3>
-            <p className="text-[11px] text-[var(--text-dim)]">
-              Check who is active before launching Round {nextRoundNumber}. Away scholars are skipped for speaking.
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-[11px] font-mono text-[var(--text-mute)]">
-              {teamRosterList.reduce((acc, t) => acc + t.players.length, 0)} scholars
-            </span>
-            <button
-              type="button"
-              onClick={() => setShowTeamRosters((v) => !v)}
-              className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
-              title={showTeamRosters ? "Collapse team rosters" : "View team rosters"}
-            >
-              {showTeamRosters ? (
-                <>
-                  <ChevronUp size={13} />
-                  <span>Hide Rosters</span>
-                </>
-              ) : (
-                <>
-                  <ChevronDown size={13} />
-                  <span>View Rosters</span>
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-
-        <AnimatePresence initial={false}>
-          {showTeamRosters && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className={`grid grid-cols-1 ${teamRosterList.length > 2 ? "sm:grid-cols-2" : "md:grid-cols-2"} gap-4`}>
-          {teamRosterList.map(({ key, team, players, activeCount, inactiveCount }) => (
-            <div
-              key={key}
-              className="p-4 rounded-2xl border space-y-3 bg-[var(--bg-card)]"
-              style={{ borderColor: `${team.color}35` }}
-            >
-              <div className="flex items-center justify-between pb-2 border-b border-[var(--border-dim)]/60">
-                <div className="flex items-center gap-2">
-                  <span
-                    className="w-3 h-3 rounded-full shadow-xs shrink-0"
-                    style={{ backgroundColor: team.color }}
-                  />
-                  <strong className="font-space font-bold text-xs text-[var(--text)]">
-                    {team.name}
-                  </strong>
-                  <span className="text-[10px] font-bold text-[var(--text-mute)]">
-                    ({team.score} pts)
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg)] border border-[var(--border-dim)] text-[var(--text-dim)]">
-                  {activeCount} Active · {inactiveCount} Away
-                </span>
-              </div>
-
-              <div className="space-y-2">
-                {players.length === 0 ? (
-                  <p className="text-xs text-[var(--text-mute)] italic py-2 text-center">
-                    No scholars on this team
-                  </p>
-                ) : (
-                  players.map((pId) => {
-                    const p = getPlayerDisplay(pId);
-                    const isMe = pId === myPlayerId;
-                    const inactive = isPlayerInactive(pId);
-                    const isNextSpeaker = nextActiveTeamKey === key && nextSpeakerId === pId;
-
-                    return (
-                      <div
-                        key={pId}
-                        className={`flex items-center justify-between p-2 rounded-xl border text-xs transition ${
-                          inactive
-                            ? "bg-amber-500/5 border-amber-500/20 opacity-70"
-                            : isMe
-                            ? "bg-[var(--olive)]/10 border-[var(--olive)]/30 font-semibold"
-                            : "bg-[var(--bg)] border-[var(--border-dim)]/70"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 min-w-0">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={p.avatar}
-                            alt={p.name}
-                            className="w-6 h-6 rounded-full border border-[var(--border-dim)] flex-shrink-0 bg-[var(--bg-card)] object-cover"
-                            onError={(e) => {
-                              (e.target as HTMLElement).style.display = "none";
-                            }}
-                          />
-                          <span className="truncate text-[var(--text)]">
-                            {p.name} {isMe && <span className="text-[10px] text-[var(--olive)] font-bold">(You)</span>}
-                          </span>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 flex-shrink-0">
-                          {p.isHost && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-amber-500/15 text-amber-600 font-bold border border-amber-500/30">
-                              <Crown className="w-2.5 h-2.5" /> Host
-                            </span>
-                          )}
-                          {isNextSpeaker && (
-                            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] bg-emerald-500/15 text-emerald-600 font-bold border border-emerald-500/30">
-                              <Mic className="w-2.5 h-2.5" /> Speaker
-                            </span>
-                          )}
-                          {isHost && onTransferHost && pId !== myPlayerId && pId !== room.host_id && (
-                            <button
-                              type="button"
-                              onClick={() => onTransferHost(pId)}
-                              className="text-[9px] font-bold px-1.5 py-0.5 rounded border border-amber-500/40 bg-amber-500/15 hover:bg-amber-500/25 text-amber-950 transition cursor-pointer inline-flex items-center gap-0.5 shadow-2xs"
-                              title={`Transfer host privileges to ${p.name}`}
-                            >
-                              <Crown className="w-2.5 h-2.5" />
-                              <span className="hidden sm:inline">Make Host</span>
-                            </button>
-                          )}
-                          {isHost && onToggleInactive && (
-                            <button
-                              type="button"
-                              onClick={() => onToggleInactive(pId)}
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded border transition cursor-pointer inline-flex items-center gap-1 shadow-2xs ${
-                                inactive
-                                  ? "bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 border-emerald-500/40"
-                                  : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-700 dark:text-amber-300 border-amber-500/30"
-                              }`}
-                              title={inactive ? "Host Control: Mark scholar as Active" : "Host Control: Mark scholar as Away"}
-                            >
-                              {inactive ? "Active" : "Away"}
-                            </button>
-                          )}
-                          {inactive ? (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-amber-500/15 text-amber-600 dark:text-amber-400 font-medium border border-amber-500/30">
-                              <Moon className="w-2.5 h-2.5" /> Away
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 font-medium border border-emerald-500/30">
-                              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Active
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                    );
-                  })
-                )}
-              </div>
-            </div>
-          ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Your Match Status & Availability Controls */}
-      <div className="surface rounded-3xl p-5 border border-[var(--border-dim)] shadow-sm space-y-3 text-left">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="text-xs uppercase tracking-wider font-extrabold text-[var(--olive)]">
-                Your Status
-              </span>
-              {isMeInactive ? (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30 inline-flex items-center gap-1">
-                  <Moon className="w-2.5 h-2.5" /> Away / Inactive
-                </span>
-              ) : (
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30 inline-flex items-center gap-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" /> Active &amp; Ready
-                </span>
-              )}
-            </div>
-            <p className="text-xs text-[var(--text-dim)] mt-0.5">
-              {isMeInactive
-                ? "You are marked Away. Teammates can see you are unavailable on WhatsApp/call, and you won't be picked to describe words."
-                : "You are marked Active and available to describe or guess in the upcoming sprints."}
-            </p>
-          </div>
-
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {onToggleInactive && (
-              <button
-                type="button"
-                onClick={() => onToggleInactive()}
-                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs ${
-                  isMeInactive
-                    ? "bg-emerald-600 hover:bg-emerald-500 text-white"
-                    : "bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
-                }`}
-              >
-                {isMeInactive ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5" /> I&apos;m Back (Mark Active)
-                  </>
-                ) : (
-                  <>
-                    <Moon className="w-3.5 h-3.5" /> Step Away (Mark Inactive)
-                  </>
-                )}
-              </button>
-            )}
-
-            {isHost && onFinishGame && !isGoalReached && (
-              <button
-                type="button"
-                onClick={() => {
-                  if (window.confirm("Conclude this match and show the final podium leaderboard now?")) {
-                    onFinishGame();
-                  }
-                }}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-[var(--terra)]/10 hover:bg-[var(--terra)]/20 text-[var(--terra)] border border-[var(--terra)]/30 transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                title="Conclude match early and reveal final match podium"
-              >
-                <Trophy className="w-3.5 h-3.5" /> End Match Early
-              </button>
-            )}
-
-            {onLeaveRoom && (
-              <button
-                type="button"
-                onClick={onLeaveRoom}
-                className="px-3.5 py-2 rounded-xl text-xs font-bold bg-red-500/10 hover:bg-red-500/20 text-red-600 dark:text-red-400 border border-red-500/30 transition inline-flex items-center gap-1.5 cursor-pointer shadow-xs"
-                title="Leave this match and return to the parlor"
-              >
-                <LogOut className="w-3.5 h-3.5" /> Leave Match
-              </button>
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Waiting Scholars & Spectators Queue (Admit to balance before next round) */}
+      {/* Waiting Scholars & Spectators Queue (Only rendered when someone is waiting) */}
       {sortedWaitingScholars.length > 0 && (
         <div className="surface rounded-3xl p-5 border border-[var(--gold)]/40 bg-[var(--gold)]/5 shadow-sm space-y-4 text-left">
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-[var(--gold)]/20">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <span className="w-3 h-3 rounded-full bg-[var(--gold)] animate-pulse" />
               <h2 className="font-space font-extrabold text-sm text-[var(--text)]">
@@ -1043,355 +1300,64 @@ export default function RoomRoundEnd({
                 className="space-y-4 overflow-hidden"
               >
                 <p className="text-xs text-[var(--text-dim)]">
-                  These scholars joined during the sprint. Admit them into Team Alpha or Team Omega before launching Round {nextRoundNumber} to balance the teams.
+                  These scholars joined during the sprint. Admit them into a team before launching Round {nextRoundNumber}.
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {sortedWaitingScholars.map((scholar, idx) => (
-              <div
-                key={scholar.id}
-                className="surface rounded-2xl p-3 border border-[var(--border-dim)] flex items-center justify-between gap-2 shadow-2xs"
-              >
-                <div className="flex items-center gap-2 min-w-0">
-                  <span className="w-5 h-5 rounded-md bg-[var(--bg)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
-                    #{idx + 1}
-                  </span>
-                  {scholar.avatar?.startsWith("/") || scholar.avatar?.includes(".svg") ? (
-                    <img src={scholar.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
-                  ) : (
-                    <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
-                  )}
-                  <div className="min-w-0">
-                    <div className="font-space font-bold text-xs text-[var(--text)] truncate">
-                      {scholar.name}
-                    </div>
-                    <div className="text-[9px] text-[var(--text-dim)]">
-                      {idx === 0 ? "First to join" : `Joined #${idx + 1}`}
-                    </div>
-                  </div>
-                </div>
+                    <div
+                      key={scholar.id}
+                      className="surface rounded-2xl p-3 border border-[var(--border-dim)] flex items-center justify-between gap-2 shadow-2xs"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="w-5 h-5 rounded-md bg-[var(--bg)] border border-[var(--border-dim)] text-[10px] font-mono font-bold flex items-center justify-center text-[var(--text-mute)] flex-shrink-0">
+                          #{idx + 1}
+                        </span>
+                        {scholar.avatar?.startsWith("/") || scholar.avatar?.includes(".svg") ? (
+                          <img src={scholar.avatar} alt="" className="w-6 h-6 rounded-full object-cover flex-shrink-0" />
+                        ) : (
+                          <span className="text-lg flex-shrink-0">{scholar.avatar || "🎓"}</span>
+                        )}
+                        <div className="min-w-0">
+                          <div className="font-space font-bold text-xs text-[var(--text)] truncate">
+                            {scholar.name}
+                          </div>
+                          <div className="text-[9px] text-[var(--text-dim)]">
+                            {idx === 0 ? "First to join" : `Joined #${idx + 1}`}
+                          </div>
+                        </div>
+                      </div>
 
-                <div className="flex items-center gap-1.5 flex-shrink-0">
-                  {onAdmitPlayer && (
-                    <div className="flex items-center gap-1 flex-wrap">
-                      {activeTeamsList.map((t) => (
-                        <button
-                          key={t.key}
-                          type="button"
-                          onClick={() => onAdmitPlayer(scholar.id, t.key)}
-                          className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
-                          style={{
-                            backgroundColor: `${t.team.color}15`,
-                            color: t.team.color,
-                            borderColor: `${t.team.color}40`,
-                          }}
-                          title={`Admit ${scholar.name} into ${t.team.name}`}
-                        >
-                          <UserPlus className="w-3 h-3" /> + {t.team.name.replace("Team ", "")}
-                        </button>
-                      ))}
+                      <div className="flex items-center gap-1.5 flex-shrink-0">
+                        {onAdmitPlayer && (
+                          <div className="flex items-center gap-1 flex-wrap">
+                            {activeTeamsList.map((t) => (
+                              <button
+                                key={t.key}
+                                type="button"
+                                onClick={() => onAdmitPlayer(scholar.id, t.key)}
+                                className="text-[11px] font-space font-bold px-2.5 py-1 rounded-lg border transition cursor-pointer flex items-center gap-1 hover:brightness-110"
+                                style={{
+                                  backgroundColor: `${t.team.color}15`,
+                                  color: t.team.color,
+                                  borderColor: `${t.team.color}40`,
+                                }}
+                                title={`Admit ${scholar.name} into ${t.team.name}`}
+                              >
+                                <UserPlus className="w-3 h-3" /> + {t.team.name.replace("Team ", "")}
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  )}
-                </div>
-              </div>
-            ))}
+                  ))}
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
         </div>
       )}
-
-      {/* Articulate Board Map Progression (Roadmap from Start to Finish) */}
-      <div className="space-y-2 text-left">
-        <div className="flex items-center justify-between px-1">
-          <span className="text-[11px] font-bold uppercase tracking-wider text-[var(--text-mute)] flex items-center gap-1.5">
-            <Map className="w-3.5 h-3.5 text-[var(--olive)]" />
-            <span>Articulate Roadmap Progression</span>
-          </span>
-          <button
-            type="button"
-            onClick={() => setShowRoadmap((v) => !v)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
-            title={showRoadmap ? "Collapse Roadmap Progression" : "Expand Roadmap Progression"}
-          >
-            {showRoadmap ? (
-              <>
-                <ChevronUp className="w-3.5 h-3.5 text-[var(--olive)]" />
-                <span>Hide Roadmap</span>
-              </>
-            ) : (
-              <>
-                <ChevronDown className="w-3.5 h-3.5 text-[var(--olive)]" />
-                <span>View Roadmap</span>
-              </>
-            )}
-          </button>
-        </div>
-
-        <AnimatePresence initial={false}>
-          {showRoadmap && (
-            <motion.div
-              initial={{ opacity: 0, height: 0 }}
-              animate={{ opacity: 1, height: "auto" }}
-              exit={{ opacity: 0, height: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <BoardMap
-                scoreA={room.teams.teamA.score}
-                scoreB={room.teams.teamB.score}
-                scoreC={room.teams.teamC?.score}
-                scoreD={room.teams.teamD?.score}
-                scoreGoal={room.settings.scoreGoal || 20}
-                colorA={room.teams.teamA.color}
-                colorB={room.teams.teamB.color}
-                colorC={room.teams.teamC?.color || "#10B981"}
-                colorD={room.teams.teamD?.color || "#F59E0B"}
-                nameA={room.teams.teamA.name}
-                nameB={room.teams.teamB.name}
-                nameC={room.teams.teamC?.name || "Team Delta"}
-                nameD={room.teams.teamD?.name || "Team Sigma"}
-                activeTeam={nextActiveTeamKey}
-                gameMode="classic"
-                collapsibleGrid={true}
-                defaultGridCollapsed={true}
-              />
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
-
-      {/* Next Round CTA / Match Victory Controls */}
-      <div className="surface rounded-3xl p-6 border border-[var(--border-dim)] shadow-sm space-y-4">
-        {isGoalReached ? (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between pb-3 border-b border-[var(--border-dim)] flex-wrap gap-2">
-              <div className="flex items-center gap-2 text-xs font-bold text-[var(--gold)]">
-                <Crown className="w-4 h-4" />
-                <span>Match Deciding Phase</span>
-              </div>
-              <div className="flex items-center gap-2 text-[11px] font-bold text-[var(--text-mute)]">
-                <span className="inline-flex items-center gap-1 font-mono text-[var(--text)]">
-                  <Timer className="w-3 h-3 text-[var(--gold)]" />
-                  {playTime.formatted} played
-                </span>
-                <span>•</span>
-                <span>Goal: {scoreGoal} pts</span>
-              </div>
-            </div>
-
-            {isHost ? (
-              <div className="space-y-3">
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={() => {
-                    try {
-                      navigator.vibrate?.(20);
-                    } catch {}
-                    onFinishGame?.();
-                  }}
-                  className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2.5 transition cursor-pointer touch-manipulation select-none active:scale-[0.98]"
-                >
-                  <Trophy className="w-5 h-5 text-[var(--gold)]" />
-                  Announce Winner & Declare Victory ({winningTeamName})
-                </motion.button>
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      navigator.vibrate?.(15);
-                    } catch {}
-                    if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
-                  }}
-                  disabled={isStartingRound}
-                  className="w-full py-3 rounded-xl border border-[var(--border-dim)] hover:bg-[var(--bg-hover)] text-xs font-bold text-[var(--text-dim)] hover:text-[var(--text)] transition cursor-pointer flex items-center justify-center gap-1.5 touch-manipulation select-none"
-                >
-                  <Play className="w-3.5 h-3.5" /> Continue to Round {nextRoundNumber} (Play Another Round)
-                </button>
-
-                <p className="text-xs text-[var(--text-dim)]">
-                  👑 As Host, verify all word disputes and claims above are settled before announcing the final winner.
-                </p>
-              </div>
-            ) : (
-              <div className="py-4 space-y-3 text-center">
-                <div className="inline-flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
-                  <Trophy className="w-4 h-4 text-[var(--gold)] animate-bounce" />
-                  <span>Victory Threshold Reached by <strong>{winningTeamName}</strong>!</span>
-                </div>
-                <p className="text-xs text-[var(--text-dim)] max-w-sm mx-auto">
-                  Review the words above and dispute any fouls. Host ({room.host_name}) will announce the official match winner when review is concluded.
-                </p>
-
-                {!isHostOnline && (
-                  <div className="pt-2 space-y-2.5">
-                    <div className="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center gap-2 text-xs font-bold text-amber-950">
-                      <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
-                      Host ({room.host_name || "Host"}) appears offline or has left
-                    </div>
-                    {onClaimHost && (
-                      <button
-                        type="button"
-                        onClick={onClaimHost}
-                        className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
-                      >
-                        <Crown className="w-4 h-4 text-neutral-950" />
-                        Claim Host Privileges to Conclude Match
-                      </button>
-                    )}
-                    {onFinishGame && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (window.confirm(`Declare ${winningTeamName} the official winner and conclude the match now?`)) {
-                            onFinishGame();
-                          }
-                        }}
-                        className="w-full bg-[var(--terra)] hover:brightness-110 text-white py-3.5 rounded-2xl font-space font-extrabold text-sm shadow-md flex items-center justify-center gap-2 transition cursor-pointer touch-manipulation select-none active:scale-[0.98]"
-                      >
-                        <Trophy className="w-4 h-4 text-[var(--gold)]" />
-                        Announce Winner & Finish Match ({winningTeamName})
-                      </button>
-                    )}
-                    <p className="text-xs text-[var(--text-dim)]">
-                      The original host is unavailable. Any active scholar can claim host privileges or conclude the match.
-                    </p>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-        ) : (
-          <>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2 text-xs text-[var(--text-dim)]">
-                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: nextTeamColor }} />
-                <span>Next turn: <strong style={{ color: nextTeamColor }}>{nextTeamName}</strong></span>
-              </div>
-              <span className="text-[11px] font-bold text-[var(--text-mute)]">Round {nextRoundNumber}</span>
-            </div>
-
-            {nextTeamActiveIds.length === 0 && (
-              <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs flex items-center justify-center gap-2">
-                <AlertTriangle className="w-4 h-4 text-amber-500 flex-shrink-0" />
-                <span>
-                  All scholars in <strong>{nextTeamName}</strong> are currently marked Away. One member should tap &quot;I&apos;m Back&quot; above before starting.
-                </span>
-              </div>
-            )}
-
-            {isMeNextSpeaker ? (
-              <div className="space-y-2">
-                <motion.button
-                  whileHover={!isStartingRound ? { scale: 1.02 } : {}}
-                  whileTap={!isStartingRound ? { scale: 0.98 } : {}}
-                  onClick={() => {
-                    try {
-                      navigator.vibrate?.(15);
-                    } catch {}
-                    if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
-                  }}
-                  disabled={isStartingRound}
-                  className={`w-full text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition touch-manipulation select-none active:scale-[0.98] ${
-                    isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer animate-pulse"
-                  }`}
-                  style={{ backgroundColor: nextTeamColor }}
-                >
-                  {isStartingRound ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Starting Sprint...
-                    </>
-                  ) : (
-                    <>
-                      <Mic className="w-5 h-5 fill-current" />
-                      I&apos;m the Speaker — Start My Turn
-                    </>
-                  )}
-                </motion.button>
-                <p className="text-xs text-[var(--text-dim)]">
-                  🎤 You are describing this round! When you tap start, the 3s countdown begins for everyone.
-                </p>
-              </div>
-            ) : isHost ? (
-              <div className="space-y-2">
-                <motion.button
-                  whileHover={!isStartingRound ? { scale: 1.02 } : {}}
-                  whileTap={!isStartingRound ? { scale: 0.98 } : {}}
-                  onClick={() => {
-                    try {
-                      navigator.vibrate?.(15);
-                    } catch {}
-                    if (!isStartingRound) onStartNextRound(nextSpeakerId || undefined);
-                  }}
-                  disabled={isStartingRound}
-                  className={`w-full bg-[var(--terra)] text-white py-4 rounded-2xl font-space font-extrabold text-base shadow-md hover:shadow-lg flex items-center justify-center gap-2 transition touch-manipulation select-none active:scale-[0.98] ${
-                    isStartingRound ? "opacity-75 cursor-not-allowed" : "cursor-pointer"
-                  }`}
-                >
-                  {isStartingRound ? (
-                    <>
-                      <Loader2 className="w-5 h-5 animate-spin" />
-                      Launching Round {nextRoundNumber}...
-                    </>
-                  ) : (
-                    <>
-                      <Play className="w-5 h-5 fill-current" />
-                      Start Round {nextRoundNumber} as Host ({nextSpeakerDisplay?.name || nextTeamName})
-                    </>
-                  )}
-                </motion.button>
-                <p className="text-xs text-[var(--text-dim)]">
-                  👑 You can launch as Host, or wait for {nextSpeakerDisplay?.name || nextTeamName} to start when ready.
-                </p>
-              </div>
-            ) : !isHostOnline ? (
-              <div className="py-2 space-y-3">
-                <div className="p-3 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-center gap-2 text-xs font-bold text-amber-950">
-                  <span className="w-2 h-2 rounded-full bg-amber-600 animate-pulse" />
-                  Host ({room.host_name || "Host"}) appears offline or has left
-                </div>
-                {onClaimHost && (
-                  <button
-                    type="button"
-                    onClick={onClaimHost}
-                    className="w-full py-3.5 px-4 rounded-2xl bg-amber-500 hover:bg-amber-600 text-neutral-950 font-space font-extrabold text-sm flex items-center justify-center gap-2 cursor-pointer shadow-md transition touch-manipulation select-none active:scale-[0.98]"
-                  >
-                    <Crown className="w-4 h-4 text-neutral-950" />
-                    Claim Host & Start Round {nextRoundNumber}
-                  </button>
-                )}
-                <p className="text-xs text-[var(--text-dim)]">
-                  The original host left or lost connection. You can claim host controls to launch Round {nextRoundNumber}.
-                </p>
-              </div>
-            ) : myTeam === nextActiveTeamKey ? (
-              <div className="py-3 space-y-1">
-                <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
-                  <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
-                  Waiting for <strong>{nextSpeakerDisplay?.name || "your speaker"}</strong> to start the sprint...
-                </div>
-                <p className="text-xs text-[var(--text-dim)]">
-                  Your teammate will describe words. The round will launch on your screen as soon as they tap Start!
-                </p>
-              </div>
-            ) : (
-              <div className="py-3 space-y-1">
-                <div className="flex items-center justify-center gap-2 text-sm font-bold text-[var(--text)]">
-                  <span className="w-2 h-2 rounded-full animate-ping" style={{ backgroundColor: nextTeamColor }} />
-                  Waiting for {nextSpeakerDisplay?.name ? `${nextSpeakerDisplay.name} (${nextTeamName})` : nextTeamName} to start...
-                </div>
-                <p className="text-xs text-[var(--text-dim)]">
-                  The round will automatically launch on your screen as soon as they start!
-                </p>
-              </div>
-            )}
-          </>
-        )}
-      </div>
     </div>
   );
 }

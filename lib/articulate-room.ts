@@ -75,6 +75,95 @@ export interface PassedWordEntry extends GameWord {
   claimCount?: number; // Number of claim attempts (up to 3)
 }
 
+export type WheelWedgeId =
+  | "tactical_2"
+  | "tactical_3"
+  | "extra_turn"
+  | "freeze_opponent"
+  | "bonus_1"
+  | "push_leader_2";
+
+export interface WheelWedgeSpec {
+  id: WheelWedgeId;
+  label: string;
+  shortLabel: string;
+  description: string;
+  color: string;
+  needsChoice: boolean;
+}
+
+export const WHEEL_WEDGES: WheelWedgeSpec[] = [
+  {
+    id: "tactical_2",
+    label: "Tactical ±2",
+    shortLabel: "±2 Step",
+    description: "Move +2 steps forward OR push an opponent -2 steps back",
+    color: "#3B6360",
+    needsChoice: true,
+  },
+  {
+    id: "tactical_3",
+    label: "Power Swing ±3",
+    shortLabel: "±3 Step",
+    description: "Move +3 steps forward OR push an opponent -3 steps back",
+    color: "#7A1C2E",
+    needsChoice: true,
+  },
+  {
+    id: "extra_turn",
+    label: "Take Next Turn",
+    shortLabel: "Encore",
+    description: "Encore! Your team takes the very next turn back-to-back",
+    color: "#A67C1E",
+    needsChoice: false,
+  },
+  {
+    id: "freeze_opponent",
+    label: "Freeze Player / Team",
+    shortLabel: "Freeze",
+    description: "Freeze a rival team's next turn OR freeze a rival speaker in their tracks",
+    color: "#2563EB",
+    needsChoice: true,
+  },
+  {
+    id: "bonus_1",
+    label: "Forward +1",
+    shortLabel: "+1 Step",
+    description: "Instant +1 bonus step forward on the board",
+    color: "#444E2C",
+    needsChoice: false,
+  },
+  {
+    id: "push_leader_2",
+    label: "Leader Setback -2",
+    shortLabel: "Top -2",
+    description: "Automatically pushes the leading rival team back 2 steps",
+    color: "#5A4565",
+    needsChoice: false,
+  },
+];
+
+export function isWheelCheckpointTile(score: number, scoreGoal: number): boolean {
+  return score > 0 && score < scoreGoal && score % 7 === 0;
+}
+
+export interface RoomWheelState {
+  roundNumber: number;
+  team: "A" | "B" | "C" | "D";
+  tileIndex: number;
+  status: "ready" | "choosing" | "resolved";
+  wedgeIndex?: number;
+  wedgeId?: WheelWedgeId;
+  wedgeLabel?: string;
+  spinNonce?: number;
+  spunBy?: string;
+  resultSummary?: string;
+  targetTeam?: "A" | "B" | "C" | "D";
+  targetPlayerId?: string;
+  targetPlayerName?: string;
+  resolvedAt?: number;
+}
+
 export interface ArticulateRoom {
   id?: string;
   room_code: string;
@@ -102,6 +191,12 @@ export interface ArticulateRoom {
   player_details?: Record<string, { id: string; name: string; avatar: string; isHost?: boolean; joinedAt?: number }>; // Persisted identity map
   last_speaker_indices?: { teamA?: number; teamB?: number; teamC?: number; teamD?: number }; // Track strict round-robin index per team
   last_speaker_ids?: { teamA?: string; teamB?: string; teamC?: string; teamD?: string }; // Track strict last speaker ID per team
+  wheel_state?: RoomWheelState | null; // Active or resolved wheel checkpoint event for the current round
+  wheel_checkpoints_claimed?: Partial<Record<"A" | "B" | "C" | "D", number[]>>; // Track claimed checkpoints per team (e.g. { A: [7, 14] }) so a team cannot farm the same tile twice
+  frozen_teams?: ("A" | "B" | "C" | "D")[]; // Teams whose next turn is frozen/skipped
+  frozen_players?: string[]; // Individual player IDs whose next speaking turn is frozen/skipped
+  extra_turn_team?: "A" | "B" | "C" | "D" | null; // Team granted an immediate back-to-back encore turn
+  last_turn_skip_notice?: string | null; // Banner notice when a frozen team/player was skipped or encore turn triggered
   match_started_at?: string; // ISO timestamp when first round started
   match_ended_at?: string; // ISO timestamp when match concluded / winner declared
   goal_reached_at?: string; // ISO timestamp when victory scoreGoal was achieved
@@ -229,9 +324,10 @@ export function getNextSpeakerForTeam(
   playerIds: string[],
   inactivePlayerIds: string[] = [],
   lastSpeakerId?: string,
-  lastSpeakerIndex?: number
-): { speakerId: string; speakerIndex: number } {
-  if (!playerIds || playerIds.length === 0) return { speakerId: "", speakerIndex: -1 };
+  lastSpeakerIndex?: number,
+  frozenPlayerIds: string[] = []
+): { speakerId: string; speakerIndex: number; skippedFrozenPlayerIds: string[] } {
+  if (!playerIds || playerIds.length === 0) return { speakerId: "", speakerIndex: -1, skippedFrozenPlayerIds: [] };
 
   let lastIdx = -1;
   if (lastSpeakerId && playerIds.includes(lastSpeakerId)) {
@@ -240,17 +336,75 @@ export function getNextSpeakerForTeam(
     lastIdx = lastSpeakerIndex;
   }
 
+  const skippedFrozenPlayerIds: string[] = [];
   const n = playerIds.length;
   for (let step = 1; step <= n; step++) {
     const candidateIdx = (lastIdx + step) % n;
     const candidateId = playerIds[candidateIdx];
-    if (!inactivePlayerIds.includes(candidateId)) {
-      return { speakerId: candidateId, speakerIndex: candidateIdx };
+    if (inactivePlayerIds.includes(candidateId)) continue;
+    if (frozenPlayerIds.includes(candidateId) && skippedFrozenPlayerIds.length < n - 1) {
+      skippedFrozenPlayerIds.push(candidateId);
+      continue;
     }
+    return { speakerId: candidateId, speakerIndex: candidateIdx, skippedFrozenPlayerIds };
   }
 
   const fallbackIdx = (lastIdx + 1) % n;
-  return { speakerId: playerIds[fallbackIdx] || playerIds[0], speakerIndex: fallbackIdx };
+  return { speakerId: playerIds[fallbackIdx] || playerIds[0], speakerIndex: fallbackIdx, skippedFrozenPlayerIds };
+}
+
+/**
+ * Computes which team takes the next turn in an ArticulateRoom, accounting for:
+ * 1. `extra_turn_team` (Take Next Turn / Encore wedge from the Wheel)
+ * 2. `frozen_teams` (Freeze Opponent wedge from the Wheel — skips frozen teams in rotation)
+ */
+export function peekNextTurnSchedule(room: ArticulateRoom): {
+  nextTeamKey: "A" | "B" | "C" | "D";
+  skippedFrozenTeams: ("A" | "B" | "C" | "D")[];
+  isExtraTurn: boolean;
+} {
+  const activeKeys: ("A" | "B" | "C" | "D")[] = ["A", "B"];
+  if (room.teams?.teamC) activeKeys.push("C");
+  if (room.teams?.teamD) activeKeys.push("D");
+
+  if (room.extra_turn_team && activeKeys.includes(room.extra_turn_team)) {
+    return {
+      nextTeamKey: room.extra_turn_team,
+      skippedFrozenTeams: [],
+      isExtraTurn: true,
+    };
+  }
+
+  const currentTeam = room.current_turn?.activeTeam;
+  let candidateIdx = 0;
+  if (currentTeam && activeKeys.includes(currentTeam)) {
+    candidateIdx = (activeKeys.indexOf(currentTeam) + 1) % activeKeys.length;
+  } else {
+    const nextRoundNumber = (room.current_turn?.roundNumber || 0) + 1;
+    candidateIdx = (nextRoundNumber - 1) % activeKeys.length;
+  }
+
+  const frozenList = [...(room.frozen_teams || [])];
+  const skippedFrozenTeams: ("A" | "B" | "C" | "D")[] = [];
+
+  for (let i = 0; i < activeKeys.length; i++) {
+    const candidateKey = activeKeys[(candidateIdx + i) % activeKeys.length];
+    if (frozenList.includes(candidateKey) && skippedFrozenTeams.length < activeKeys.length - 1) {
+      skippedFrozenTeams.push(candidateKey);
+      continue;
+    }
+    return {
+      nextTeamKey: candidateKey,
+      skippedFrozenTeams,
+      isExtraTurn: false,
+    };
+  }
+
+  return {
+    nextTeamKey: activeKeys[candidateIdx] || "A",
+    skippedFrozenTeams,
+    isExtraTurn: false,
+  };
 }
 
 // In-memory server fallback map for zero-setup resilience

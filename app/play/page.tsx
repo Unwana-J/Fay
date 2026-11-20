@@ -85,7 +85,7 @@ export default function PlayPage() {
     // Read live store scores at call-time to avoid stale closure
     const { getScore: liveGetScore, activeTeam: liveActiveTeam, scoreGoal: liveScoreGoal } = useGameStore.getState();
     const liveScore = liveGetScore(liveActiveTeam ?? "A");
-    const isChanceTile = liveScore > 0 && liveScore < liveScoreGoal - 1 && liveScore % 7 === 4;
+    const isChanceTile = liveScore > 0 && liveScore < liveScoreGoal - 1 && liveScore % 7 === 0;
 
     if (isChanceTile) {
       setPhase("spinner");
@@ -230,33 +230,12 @@ export default function PlayPage() {
 
               {/* Special Spaces List */}
               <div className="border-t border-[var(--border-dim)]/40 pt-4 space-y-2.5">
-                <h4 className="font-space font-extrabold text-[10px] text-[var(--text)] tracking-wider uppercase">Special Spaces</h4>
+                <h4 className="font-space font-extrabold text-[10px] text-[var(--text)] tracking-wider uppercase">Wheel Checkpoints</h4>
                 <div className="flex items-start gap-3 text-xs leading-tight">
-                  <span className="text-sm">🎲</span>
+                  <span className="text-sm">🎡</span>
                   <div>
-                    <span className="font-bold text-[var(--text)] block text-[10px]">Chance</span>
-                    <span className="text-[9px] text-[var(--text-mute)]">Spin virtual modifier wheel</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 text-xs leading-tight">
-                  <span className="text-sm">🔥</span>
-                  <div>
-                    <span className="font-bold text-[var(--text)] block text-[10px]">Double Move</span>
-                    <span className="text-[9px] text-[var(--text-mute)]">Next turn points count double</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 text-xs leading-tight">
-                  <span className="text-sm">⭐</span>
-                  <div>
-                    <span className="font-bold text-[var(--text)] block text-[10px]">Bonus</span>
-                    <span className="text-[9px] text-[var(--text-mute)]">Get +1 extra point advantage</span>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 text-xs leading-tight">
-                  <span className="text-sm">🧠</span>
-                  <div>
-                    <span className="font-bold text-[var(--text)] block text-[10px]">Challenge</span>
-                    <span className="text-[9px] text-[var(--text-mute)]">Special speaking restrictions</span>
+                    <span className="font-bold text-[var(--text)] block text-[10px]">Wheel Spaces (7, 14, 21, 28)</span>
+                    <span className="text-[9px] text-[var(--text-mute)]">Land on every 7th tile to spin for tactical boosts, encores, or opponent freezes</span>
                   </div>
                 </div>
               </div>
@@ -297,10 +276,8 @@ export default function PlayPage() {
                 >
                   {(() => {
                     const currentTeamScore = activeTeam ? getScore(activeTeam) : 0;
-                    const isChance = currentTeamScore > 0 && currentTeamScore < scoreGoal - 1 && currentTeamScore % 7 === 4;
-                    const isDouble = currentTeamScore > 0 && currentTeamScore < scoreGoal - 1 && currentTeamScore % 7 === 2;
-                    const isChallenge = currentTeamScore > 0 && currentTeamScore < scoreGoal - 1 && currentTeamScore % 7 === 5;
-                    const specialSpaceType = isChance ? "chance" : isDouble ? "double" : isChallenge ? "challenge" : null;
+                    const isChance = currentTeamScore > 0 && currentTeamScore < scoreGoal - 1 && currentTeamScore % 7 === 0;
+                    const specialSpaceType = isChance ? "chance" : null;
 
                     return (
                       <HandoffScreen

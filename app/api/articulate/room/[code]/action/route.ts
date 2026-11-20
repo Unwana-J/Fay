@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
-import { memoryRooms, ArticulateRoom, RoomTeam, getNextSpeakerForTeam, sanitizeRoomPlayers, toClientRoom } from "@/lib/articulate-room";
+import {
+  memoryRooms,
+  ArticulateRoom,
+  RoomTeam,
+  getNextSpeakerForTeam,
+  sanitizeRoomPlayers,
+  toClientRoom,
+  WHEEL_WEDGES,
+  isWheelCheckpointTile,
+  peekNextTurnSchedule,
+} from "@/lib/articulate-room";
 import { buildDeck } from "@/lib/game-words";
 import { logArticulateMatch } from "@/lib/articulate-matches";
 
@@ -41,6 +51,12 @@ async function persistRoom(room: ArticulateRoom) {
         kicked_players: room.kicked_players || [],
         last_speaker_indices: room.last_speaker_indices,
         last_speaker_ids: room.last_speaker_ids,
+        wheel_state: room.wheel_state || null,
+        wheel_checkpoints_claimed: room.wheel_checkpoints_claimed || {},
+        frozen_teams: room.frozen_teams || [],
+        frozen_players: room.frozen_players || [],
+        extra_turn_team: room.extra_turn_team || null,
+        last_turn_skip_notice: room.last_turn_skip_notice || null,
         _version: room.version,
       };
 
@@ -172,6 +188,12 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
           player_details: rawTeams.player_details || {},
           last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
           last_speaker_ids: rawTeams.last_speaker_ids || {},
+          wheel_state: rawTeams.wheel_state || null,
+          wheel_checkpoints_claimed: rawTeams.wheel_checkpoints_claimed || {},
+          frozen_teams: Array.isArray(rawTeams.frozen_teams) ? rawTeams.frozen_teams : [],
+          frozen_players: Array.isArray(rawTeams.frozen_players) ? rawTeams.frozen_players : [],
+          extra_turn_team: rawTeams.extra_turn_team || null,
+          last_turn_skip_notice: rawTeams.last_turn_skip_notice || null,
           match_started_at: rawTeams.match_started_at || undefined,
           match_ended_at: rawTeams.match_ended_at || undefined,
           goal_reached_at: rawTeams.goal_reached_at || undefined,
@@ -281,9 +303,75 @@ const ACTIVE_GAMEPLAY_ACTIONS = new Set([
   "resolve_dispute",
   "claim_passed_word",
   "resolve_passed_claim",
+  "spin_wheel",
+  "resolve_wheel_choice",
   "finish_game",
   "declare_winner",
 ]);
+
+function hasPendingWordAudit(room: ArticulateRoom): boolean {
+  const hasDisputed = (room.round_words_scored || []).some(
+    (w) => w.disputeStatus === "disputed"
+  );
+  const hasClaimed = (room.round_words_passed || []).some(
+    (w) => w.claimStatus === "claimed"
+  );
+  return hasDisputed || hasClaimed;
+}
+
+function isWheelAlreadySpunThisRound(room: ArticulateRoom): boolean {
+  const roundNum = room.current_turn?.roundNumber;
+  if (!room.wheel_state || typeof roundNum !== "number") return false;
+  return (
+    room.wheel_state.roundNumber === roundNum &&
+    (room.wheel_state.status === "choosing" || room.wheel_state.status === "resolved")
+  );
+}
+
+function canPlayerControlWheel(room: ArticulateRoom, callerId: string | undefined, targetTeam: "A" | "B" | "C" | "D"): boolean {
+  if (!callerId) return true;
+  const teamIds = getTeamObj(room, targetTeam).playerIds || [];
+  if (teamIds.includes(callerId)) return true;
+  if (room.current_turn?.speakerId === callerId) return true;
+  // Allow host fallback if the spinning team has no active human players or only ghost players
+  const hasActiveHumanOnTeam = teamIds.some(
+    (id) => !id.startsWith("ghost-") && !(room.inactive_players || []).includes(id)
+  );
+  if (!hasActiveHumanOnTeam && room.host_id === callerId) return true;
+  return false;
+}
+
+function syncWheelCheckpoint(room: ArticulateRoom) {
+  if (!room.current_turn) return;
+  const activeTeam = room.current_turn.activeTeam || "A";
+  const roundNumber = room.current_turn.roundNumber || 1;
+  const scoreGoal = room.settings?.scoreGoal || 20;
+  const teamScore = getTeamObj(room, activeTeam).score;
+
+  // If this round's wheel was already spun (choosing or resolved), keep it intact
+  if (
+    room.wheel_state &&
+    room.wheel_state.roundNumber === roundNumber &&
+    (room.wheel_state.status === "choosing" || room.wheel_state.status === "resolved")
+  ) {
+    return;
+  }
+
+  const claimedForTeam = room.wheel_checkpoints_claimed?.[activeTeam] || [];
+  const alreadyClaimedThisTile = claimedForTeam.includes(teamScore);
+
+  if (isWheelCheckpointTile(teamScore, scoreGoal) && !alreadyClaimedThisTile) {
+    room.wheel_state = {
+      roundNumber,
+      team: activeTeam,
+      tileIndex: teamScore,
+      status: "ready",
+    };
+  } else if (room.wheel_state && room.wheel_state.roundNumber === roundNumber && room.wheel_state.status === "ready") {
+    // Score moved off the checkpoint tile due to dispute/claim before spinning
+    room.wheel_state = null;
+  }
+}
 
 function recordRoomActivity(room: ArticulateRoom, action: string) {
   if (!ACTIVE_GAMEPLAY_ACTIONS.has(action)) return;
@@ -700,6 +788,18 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
           return actionResponse({ success: true, room });
         }
 
+        // Prevent starting next round if a Wheel Checkpoint is still waiting to be spun or resolved
+        if (
+          room.status === "round_end" &&
+          room.wheel_state &&
+          (room.wheel_state.status === "ready" || room.wheel_state.status === "choosing")
+        ) {
+          return actionResponse(
+            { error: "Please complete the Wheel Checkpoint spin before starting the next round." },
+            { status: 400 }
+          );
+        }
+
         // Sync any knownNames sent from host's client cache into room.player_details
         if (body.knownNames && typeof body.knownNames === "object") {
           if (!room.player_details) room.player_details = {};
@@ -742,14 +842,30 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
 
         const roundNumber = (room.current_turn?.roundNumber || 0) + 1;
 
-        // Cycle through active teams: Round 1 -> Team A, Round 2 -> Team B, Round 3 -> Team C, Round 4 -> Team D, etc.
-        const teamIndex = (roundNumber - 1) % activeKeys.length;
-        let activeTeam: "A" | "B" | "C" | "D" = activeKeys[teamIndex];
+        // Determine next active team factoring in Wheel effects (Encore extra_turn_team or skipped frozen_teams)
+        const schedule = peekNextTurnSchedule(room);
+        let activeTeam: "A" | "B" | "C" | "D" = schedule.nextTeamKey;
+
+        // Consume any extra turn or skipped frozen teams
+        if (schedule.isExtraTurn) {
+          room.extra_turn_team = null;
+          room.last_turn_skip_notice = `${getTeamObj(room, activeTeam).name} launched their Encore Turn from the Wheel!`;
+        } else if (schedule.skippedFrozenTeams.length > 0) {
+          const skippedNames = schedule.skippedFrozenTeams.map((k) => getTeamObj(room, k).name).join(", ");
+          room.frozen_teams = (room.frozen_teams || []).filter((k) => !schedule.skippedFrozenTeams.includes(k));
+          room.last_turn_skip_notice = `${skippedNames} was frozen and skipped this turn!`;
+        } else {
+          room.last_turn_skip_notice = null;
+        }
+
+        // Clear previous round's wheel state on new round start
+        room.wheel_state = null;
 
         // If the chosen team has 0 players, fallback to the next active team with players
+        const teamIndex = activeKeys.indexOf(activeTeam);
         if ((getTeamObj(room, activeTeam).playerIds?.length || 0) === 0) {
           for (let step = 1; step < activeKeys.length; step++) {
-            const nextCandidate = activeKeys[(teamIndex + step) % activeKeys.length];
+            const nextCandidate = activeKeys[(Math.max(0, teamIndex) + step) % activeKeys.length];
             if ((getTeamObj(room, nextCandidate).playerIds?.length || 0) > 0) {
               activeTeam = nextCandidate;
               break;
@@ -769,22 +885,35 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         let speakerId = "";
         let speakerIndex = -1;
 
+        const result = getNextSpeakerForTeam(
+          rawTeamPlayerIds,
+          room.inactive_players || [],
+          lastSpeakerId,
+          lastSpeakerIndex,
+          room.frozen_players || []
+        );
+
         if (
           body.speakerId &&
           rawTeamPlayerIds.includes(body.speakerId) &&
-          !(room.inactive_players || []).includes(body.speakerId)
+          !(room.inactive_players || []).includes(body.speakerId) &&
+          !(room.frozen_players || []).includes(body.speakerId)
         ) {
           speakerId = body.speakerId;
           speakerIndex = rawTeamPlayerIds.indexOf(speakerId);
         } else {
-          const result = getNextSpeakerForTeam(
-            rawTeamPlayerIds,
-            room.inactive_players || [],
-            lastSpeakerId,
-            lastSpeakerIndex
-          );
           speakerId = result.speakerId;
           speakerIndex = result.speakerIndex;
+        }
+
+        if (result.skippedFrozenPlayerIds && result.skippedFrozenPlayerIds.length > 0) {
+          const skippedPlayerNames = result.skippedFrozenPlayerIds
+            .map((pid) => room.player_details?.[pid]?.name || "A player")
+            .join(", ");
+          room.frozen_players = (room.frozen_players || []).filter(
+            (pid) => !result.skippedFrozenPlayerIds.includes(pid)
+          );
+          room.last_turn_skip_notice = `${skippedPlayerNames} was frozen and skipped as speaker this round!`;
         }
 
         if (!speakerId) {
@@ -882,6 +1011,13 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
       // 4b. DISPUTE WORD (Maker: Opponent flags a word)
       // -------------------------------------------------------------
       case "dispute_word": {
+        if (isWheelAlreadySpunThisRound(room)) {
+          return actionResponse(
+            { error: "Word disputes are locked after the Checkpoint Wheel has been spun for this round." },
+            { status: 400 }
+          );
+        }
+
         const { wordIndex, opponentName } = body;
         if (typeof wordIndex !== "number" || !room.round_words_scored[wordIndex]) {
           return actionResponse({ error: "Invalid word index" }, { status: 400 });
@@ -931,6 +1067,7 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
           }
         }
 
+        syncWheelCheckpoint(room);
         await persistRoom(room);
         return actionResponse({ success: true, room });
       }
@@ -939,6 +1076,13 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
       // 4d. CLAIM PASSED WORD (Maker: Describing team claims an unmarked passed word)
       // -------------------------------------------------------------
       case "claim_passed_word": {
+        if (isWheelAlreadySpunThisRound(room)) {
+          return actionResponse(
+            { error: "Word claims are locked after the Checkpoint Wheel has been spun for this round." },
+            { status: 400 }
+          );
+        }
+
         const { wordIndex, claimantName } = body;
         if (typeof wordIndex !== "number" || !room.round_words_passed[wordIndex]) {
           return actionResponse({ error: "Invalid passed word index" }, { status: 400 });
@@ -986,6 +1130,206 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
           if (prevStatus === "awarded") {
             turnTeamObj.score = Math.max(0, turnTeamObj.score - 1);
           }
+        }
+
+        syncWheelCheckpoint(room);
+        await persistRoom(room);
+        return actionResponse({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 4f. SPIN CHECKPOINT WHEEL (When landing on tile 7, 14, 21, 28...)
+      // -------------------------------------------------------------
+      case "spin_wheel": {
+        const ws = room.wheel_state;
+        if (!ws || ws.status !== "ready") {
+          return actionResponse({ success: true, room });
+        }
+
+        if (hasPendingWordAudit(room)) {
+          return actionResponse(
+            { error: "Please resolve any pending word challenges or claims before spinning the Checkpoint Wheel." },
+            { status: 400 }
+          );
+        }
+
+        const activeTeam = ws.team;
+        if (!canPlayerControlWheel(room, playerId ? String(playerId) : undefined, activeTeam)) {
+          return actionResponse(
+            { error: "Only members of the team on the Wheel Checkpoint can spin." },
+            { status: 403 }
+          );
+        }
+
+        const activeTeamObj = getTeamObj(room, activeTeam);
+        const scoreGoal = room.settings?.scoreGoal || 20;
+        const activeKeys = getActiveTeamKeys(room);
+        const opponentKeys = activeKeys.filter((k) => k !== activeTeam);
+
+        // Mark this checkpoint tile as claimed for this team so they cannot farm the same tile twice
+        if (!room.wheel_checkpoints_claimed) room.wheel_checkpoints_claimed = {};
+        const prevClaimed = room.wheel_checkpoints_claimed[activeTeam] || [];
+        if (!prevClaimed.includes(ws.tileIndex)) {
+          room.wheel_checkpoints_claimed[activeTeam] = [...prevClaimed, ws.tileIndex];
+        }
+
+        // Check if any rival team has > 0 points; if all rivals are at Start (0 pts), avoid a wasted "push_leader_2"
+        const anyRivalAboveZero = opponentKeys.some((k) => (getTeamObj(room, k).score || 0) > 0);
+        const eligibleIndices = WHEEL_WEDGES.map((w, idx) => ({ w, idx }))
+          .filter(({ w }) => anyRivalAboveZero || w.id !== "push_leader_2")
+          .map(({ idx }) => idx);
+
+        const wedgeIndex =
+          eligibleIndices[Math.floor(Math.random() * eligibleIndices.length)] ??
+          Math.floor(Math.random() * WHEEL_WEDGES.length);
+        const wedge = WHEEL_WEDGES[wedgeIndex];
+
+        ws.wedgeIndex = wedgeIndex;
+        ws.wedgeId = wedge.id;
+        ws.wedgeLabel = wedge.label;
+        ws.spinNonce = Date.now();
+        ws.spunBy = String(playerName || room.current_turn?.speakerName || activeTeamObj.name);
+
+        if (wedge.id === "extra_turn") {
+          room.extra_turn_team = activeTeam;
+          ws.status = "resolved";
+          ws.resultSummary = `${activeTeamObj.name} unlocked an Encore Turn — they take the very next round!`;
+          ws.resolvedAt = Date.now();
+        } else if (wedge.id === "bonus_1") {
+          const maxScore = Math.max(activeTeamObj.score, scoreGoal - 1);
+          activeTeamObj.score = Math.min(maxScore, activeTeamObj.score + 1);
+          ws.status = "resolved";
+          ws.resultSummary = `${activeTeamObj.name} advanced +1 bonus step to tile ${activeTeamObj.score}!`;
+          ws.resolvedAt = Date.now();
+        } else if (wedge.id === "push_leader_2") {
+          let leaderKey = opponentKeys[0] || "B";
+          let maxRivalScore = -1;
+          for (const k of opponentKeys) {
+            const s = getTeamObj(room, k).score;
+            if (s > maxRivalScore) {
+              maxRivalScore = s;
+              leaderKey = k;
+            }
+          }
+          const leaderObj = getTeamObj(room, leaderKey);
+          const before = leaderObj.score;
+          leaderObj.score = Math.max(0, leaderObj.score - 2);
+          const delta = before - leaderObj.score;
+          ws.status = "resolved";
+          ws.targetTeam = leaderKey;
+          ws.resultSummary =
+            delta > 0
+              ? `${leaderObj.name} was pushed back -${delta} ${delta === 1 ? "step" : "steps"} to tile ${leaderObj.score}!`
+              : `${leaderObj.name} was targeted for a -2 setback (already at Start)!`;
+          ws.resolvedAt = Date.now();
+        } else if (wedge.id === "freeze_opponent") {
+          // Always transition to "choosing" so the spinning team can pick WHICH rival team OR rival player to freeze!
+          ws.status = "choosing";
+        } else {
+          // tactical_2 or tactical_3 requires tactical choice (Forward vs Sabotage Opponent)
+          ws.status = "choosing";
+        }
+
+        await persistRoom(room);
+        return actionResponse({ success: true, room });
+      }
+
+      // -------------------------------------------------------------
+      // 4g. RESOLVE WHEEL TACTICAL CHOICE (Forward Boost vs Sabotage / Freeze Target)
+      // -------------------------------------------------------------
+      case "resolve_wheel_choice": {
+        const ws = room.wheel_state;
+        if (!ws || ws.status !== "choosing") {
+          return actionResponse({ success: true, room });
+        }
+
+        const activeTeam = ws.team;
+        if (!canPlayerControlWheel(room, playerId ? String(playerId) : undefined, activeTeam)) {
+          return actionResponse(
+            { error: "Only members of the team on the Wheel Checkpoint can lock in this tactical choice." },
+            { status: 403 }
+          );
+        }
+
+        const choiceType: "forward" | "back" | "freeze" | "freeze_player" = body.choiceType;
+        const activeTeamObj = getTeamObj(room, activeTeam);
+        const scoreGoal = room.settings?.scoreGoal || 20;
+        const activeKeys = getActiveTeamKeys(room);
+        const opponentKeys = activeKeys.filter((k) => k !== activeTeam);
+        const chosenTarget: "A" | "B" | "C" | "D" =
+          body.targetTeam && opponentKeys.includes(body.targetTeam)
+            ? body.targetTeam
+            : opponentKeys[0] || (activeTeam === "A" ? "B" : "A");
+        const targetObj = getTeamObj(room, chosenTarget);
+
+        const steps = ws.wedgeId === "tactical_3" ? 3 : 2;
+
+        // Check how many active (non-away) players the target team has
+        const targetTeamActivePlayers = (targetObj.playerIds || []).filter(
+          (pid) => !(room.inactive_players || []).includes(pid)
+        );
+
+        if (choiceType === "freeze_player" && body.targetPlayerId) {
+          const targetPlayerId = String(body.targetPlayerId);
+          const targetPlayerName =
+            String(body.targetPlayerName || "").trim() ||
+            room.player_details?.[targetPlayerId]?.name ||
+            "Rival Speaker";
+
+          // If this rival team only has 1 active player, freezing that player is equivalent to freezing their team turn
+          if (targetTeamActivePlayers.length <= 1) {
+            if (!room.frozen_teams) room.frozen_teams = [];
+            if (!room.frozen_teams.includes(chosenTarget)) {
+              room.frozen_teams.push(chosenTarget);
+            }
+            ws.status = "resolved";
+            ws.targetTeam = chosenTarget;
+            ws.targetPlayerId = targetPlayerId;
+            ws.targetPlayerName = targetPlayerName;
+            ws.resultSummary = `${activeTeamObj.name} froze ${targetPlayerName} (${targetObj.name}) — their team skips their next turn!`;
+            ws.resolvedAt = Date.now();
+          } else {
+            if (!room.frozen_players) room.frozen_players = [];
+            if (!room.frozen_players.includes(targetPlayerId)) {
+              room.frozen_players.push(targetPlayerId);
+            }
+            ws.status = "resolved";
+            ws.targetTeam = chosenTarget;
+            ws.targetPlayerId = targetPlayerId;
+            ws.targetPlayerName = targetPlayerName;
+            ws.resultSummary = `${activeTeamObj.name} froze ${targetPlayerName} (${targetObj.name}) — they will be skipped on their next speaking turn!`;
+            ws.resolvedAt = Date.now();
+          }
+        } else if (ws.wedgeId === "freeze_opponent" || choiceType === "freeze") {
+          if (!room.frozen_teams) room.frozen_teams = [];
+          if (!room.frozen_teams.includes(chosenTarget)) {
+            room.frozen_teams.push(chosenTarget);
+          }
+          ws.status = "resolved";
+          ws.targetTeam = chosenTarget;
+          ws.resultSummary = `${activeTeamObj.name} froze ${targetObj.name}'s entire next turn!`;
+          ws.resolvedAt = Date.now();
+        } else if (choiceType === "forward") {
+          const maxScore = Math.max(activeTeamObj.score, scoreGoal - 1);
+          const before = activeTeamObj.score;
+          activeTeamObj.score = Math.min(maxScore, activeTeamObj.score + steps);
+          const gained = activeTeamObj.score - before;
+          ws.status = "resolved";
+          ws.targetTeam = activeTeam;
+          ws.resultSummary = `${activeTeamObj.name} chose to surge forward +${gained} ${gained === 1 ? "step" : "steps"} to tile ${activeTeamObj.score}!`;
+          ws.resolvedAt = Date.now();
+        } else {
+          // Sabotage opponent back
+          const before = targetObj.score;
+          targetObj.score = Math.max(0, targetObj.score - steps);
+          const lost = before - targetObj.score;
+          ws.status = "resolved";
+          ws.targetTeam = chosenTarget;
+          ws.resultSummary =
+            lost > 0
+              ? `${activeTeamObj.name} pushed ${targetObj.name} back -${lost} ${lost === 1 ? "step" : "steps"} to tile ${targetObj.score}!`
+              : `${activeTeamObj.name} targeted ${targetObj.name} (already at Start)!`;
+          ws.resolvedAt = Date.now();
         }
 
         await persistRoom(room);
@@ -1068,6 +1412,9 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
           room.spectators = [];
         }
 
+        // Check if active team landed on a Wheel Checkpoint tile (7, 14, 21, 28...)
+        syncWheelCheckpoint(room);
+
         await persistRoom(room);
         return actionResponse({
           success: true,
@@ -1119,6 +1466,12 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         room.current_word_index = 0;
         room.round_words_scored = [];
         room.round_words_passed = [];
+        room.wheel_state = null;
+        room.wheel_checkpoints_claimed = {};
+        room.frozen_teams = [];
+        room.frozen_players = [];
+        room.extra_turn_team = null;
+        room.last_turn_skip_notice = null;
         room.deck = buildDeck(
           room.settings.categories,
           room.settings.difficulty,
@@ -1588,6 +1941,108 @@ async function handleAction(room: ArticulateRoom, body: any): Promise<NextRespon
         sanitizeRoomPlayers(room);
         await persistRoom(room);
         return actionResponse({ success: true, room, previousHostId, newHostId: claimantId });
+      }
+
+      // -------------------------------------------------------------
+      // 16. DEV PLAYTEST: ADD GHOST PLAYER (Local testing helper)
+      // -------------------------------------------------------------
+      case "dev_add_ghost": {
+        const ghostNames = ["Ghost Tunde", "Ghost Amaka", "Ghost Chidi", "Ghost Zainab", "Ghost Femi", "Ghost Ngozi"];
+        const existingNames = new Set(
+          Object.values(room.player_details || {}).map((d) => d.name?.trim().toLowerCase())
+        );
+        const pickedName =
+          body.ghostName ||
+          ghostNames.find((n) => !existingNames.has(n.toLowerCase())) ||
+          `Ghost #${Object.keys(room.player_details || {}).length + 1}`;
+        const ghostId = `ghost-${Math.random().toString(36).slice(2, 8)}`;
+
+        const activeKeys = getActiveTeamKeys(room);
+        let assignTeam: "A" | "B" | "C" | "D" =
+          body.targetTeam && activeKeys.includes(body.targetTeam) ? body.targetTeam : "B";
+        if (!body.targetTeam) {
+          // Pick team with fewest players (preferring B over A if tied so user on A gets an opponent)
+          let minCount = Infinity;
+          for (const key of [...activeKeys].reverse()) {
+            const count = getTeamObj(room, key).playerIds?.length || 0;
+            if (count < minCount) {
+              minCount = count;
+              assignTeam = key;
+            }
+          }
+        }
+
+        getTeamObj(room, assignTeam).playerIds.push(ghostId);
+        if (!room.active_players.includes(ghostId)) {
+          room.active_players.push(ghostId);
+        }
+        if (!room.player_details) room.player_details = {};
+        room.player_details[ghostId] = {
+          id: ghostId,
+          name: pickedName,
+          avatar: "/avatars/avatar-scholar.svg",
+          isHost: false,
+          joinedAt: Date.now(),
+        };
+
+        sanitizeRoomPlayers(room);
+        await persistRoom(room);
+        return actionResponse({ success: true, room, ghostId, ghostName: pickedName, team: assignTeam });
+      }
+
+      // -------------------------------------------------------------
+      // 17. DEV PLAYTEST: JUMP TO TILE 7 / TRIGGER WHEEL CHECKPOINT
+      // -------------------------------------------------------------
+      case "dev_trigger_wheel": {
+        const targetTeamKey: "A" | "B" | "C" | "D" =
+          body.targetTeam || room.current_turn?.activeTeam || "A";
+        const teamObj = getTeamObj(room, targetTeamKey);
+        const scoreGoal = room.settings?.scoreGoal || 20;
+
+        // Pick the next checkpoint tile (7, 14, 21...) or 7 by default
+        const currentScore = teamObj.score || 0;
+        let nextCheckpoint = 7;
+        if (currentScore >= 7 && currentScore < 14 && scoreGoal > 14) {
+          nextCheckpoint = 14;
+        } else if (currentScore >= 14 && currentScore < 21 && scoreGoal > 21) {
+          nextCheckpoint = 21;
+        }
+        teamObj.score = nextCheckpoint;
+
+        // Ensure this checkpoint is un-claimed for dev testing so it can be spun repeatedly
+        if (room.wheel_checkpoints_claimed?.[targetTeamKey]) {
+          room.wheel_checkpoints_claimed[targetTeamKey] =
+            room.wheel_checkpoints_claimed[targetTeamKey]!.filter((t) => t !== nextCheckpoint);
+        }
+
+        const roundNum = room.current_turn?.roundNumber || 1;
+        const speakerId =
+          teamObj.playerIds?.[0] || room.current_turn?.speakerId || room.host_id;
+        const speakerName =
+          room.player_details?.[speakerId]?.name ||
+          room.current_turn?.speakerName ||
+          room.host_name ||
+          "Speaker";
+
+        room.status = "round_end";
+        room.locked = false;
+        room.current_turn = {
+          roundNumber: roundNum,
+          activeTeam: targetTeamKey,
+          speakerId,
+          speakerName,
+          startedAt: Date.now() - 30000,
+          durationSeconds: room.settings?.timerSeconds || 45,
+        };
+        room.wheel_state = {
+          roundNumber: roundNum,
+          team: targetTeamKey,
+          tileIndex: nextCheckpoint,
+          status: "ready",
+        };
+
+        await persistRoom(room);
+        return actionResponse({ success: true, room });
       }
 
       default:

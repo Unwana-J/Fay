@@ -62,6 +62,12 @@ export async function POST(req: NextRequest) {
       kicked_players: newRoom.kicked_players || [],
       last_speaker_indices: newRoom.last_speaker_indices || { teamA: -1, teamB: -1 },
       last_speaker_ids: newRoom.last_speaker_ids || {},
+      wheel_state: newRoom.wheel_state || null,
+      wheel_checkpoints_claimed: newRoom.wheel_checkpoints_claimed || {},
+      frozen_teams: newRoom.frozen_teams || [],
+      frozen_players: newRoom.frozen_players || [],
+      extra_turn_team: newRoom.extra_turn_team || null,
+      last_turn_skip_notice: newRoom.last_turn_skip_notice || null,
     };
 
     // Persist in Supabase if available
@@ -184,6 +190,12 @@ export async function GET(req: NextRequest) {
             player_details: rawTeams.player_details || {},
             last_speaker_indices: rawTeams.last_speaker_indices || { teamA: -1, teamB: -1 },
             last_speaker_ids: rawTeams.last_speaker_ids || {},
+            wheel_state: rawTeams.wheel_state || null,
+            wheel_checkpoints_claimed: rawTeams.wheel_checkpoints_claimed || {},
+            frozen_teams: Array.isArray(rawTeams.frozen_teams) ? rawTeams.frozen_teams : [],
+            frozen_players: Array.isArray(rawTeams.frozen_players) ? rawTeams.frozen_players : [],
+            extra_turn_team: rawTeams.extra_turn_team || null,
+            last_turn_skip_notice: rawTeams.last_turn_skip_notice || null,
             match_started_at: rawTeams.match_started_at || undefined,
             match_ended_at: rawTeams.match_ended_at || undefined,
             goal_reached_at: rawTeams.goal_reached_at || undefined,

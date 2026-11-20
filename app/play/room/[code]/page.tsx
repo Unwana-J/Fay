@@ -157,6 +157,16 @@ export default function ArticulateRoomPage({
   const [showLobbyQueueModal, setShowLobbyQueueModal] = useState(false);
   const [isStartingRound, setIsStartingRound] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [simPlayerId, setSimPlayerId] = useState<string | null>(null);
+  const [isLocalDev, setIsLocalDev] = useState(false);
+  useEffect(() => {
+    if (
+      typeof window !== "undefined" &&
+      (window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1")
+    ) {
+      setIsLocalDev(true);
+    }
+  }, []);
   const [knownNames, setKnownNames] = useState<Record<string, { name: string; avatar: string }>>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -782,17 +792,28 @@ export default function ArticulateRoomPage({
   }, [effectivePlayerName, isRealtimeConnected, myAvatar, myPlayerId, room?.host_id]);
 
   // 5. Adaptive Polling Fallback
-  // Broadcasts are fire-and-forget, so during live play we sanity-poll every 15s even when connected.
+  // Broadcasts are fire-and-forget, so during live play or active wheel spins we poll faster even when connected.
   const isLivePlay = room?.status === "playing";
+  const hasActiveWheel = Boolean(
+    room?.status === "round_end" &&
+      room?.wheel_state &&
+      (room.wheel_state.status === "ready" || room.wheel_state.status === "choosing")
+  );
   useEffect(() => {
-    const pollInterval = !isRealtimeConnected ? 4000 : isLivePlay ? 15000 : 35000;
+    const pollInterval = hasActiveWheel
+      ? 1500
+      : !isRealtimeConnected
+      ? 2500
+      : isLivePlay
+      ? 10000
+      : 4000;
     const interval = setInterval(() => {
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
       fetchRoomState();
     }, pollInterval);
 
     return () => clearInterval(interval);
-  }, [fetchRoomState, isRealtimeConnected, isLivePlay]);
+  }, [fetchRoomState, isRealtimeConnected, isLivePlay, hasActiveWheel]);
 
   // Instant resync when a phone wakes / tab regains focus / network returns
   useEffect(() => {
@@ -1127,6 +1148,51 @@ export default function ArticulateRoomPage({
       resolverId: myPlayerId,
       resolverName: effectivePlayerName,
       resolution,
+    });
+  };
+
+  const handleSpinWheel = async () => {
+    await dispatchAction({
+      action: "spin_wheel",
+      playerId: simPlayerId || myPlayerId,
+      playerName:
+        simPlayerId && room?.player_details?.[simPlayerId]?.name
+          ? room.player_details[simPlayerId].name
+          : effectivePlayerName,
+    });
+  };
+
+  const handleResolveWheelChoice = async (
+    choiceType: "forward" | "back" | "freeze" | "freeze_player",
+    targetTeam?: "A" | "B" | "C" | "D",
+    targetPlayerId?: string,
+    targetPlayerName?: string
+  ) => {
+    await dispatchAction({
+      action: "resolve_wheel_choice",
+      playerId: simPlayerId || myPlayerId,
+      playerName:
+        simPlayerId && room?.player_details?.[simPlayerId]?.name
+          ? room.player_details[simPlayerId].name
+          : effectivePlayerName,
+      choiceType,
+      targetTeam,
+      targetPlayerId,
+      targetPlayerName,
+    });
+  };
+
+  const handleDevAddGhost = async (targetTeam?: "A" | "B" | "C" | "D") => {
+    await dispatchAction({
+      action: "dev_add_ghost",
+      targetTeam,
+    });
+  };
+
+  const handleDevTriggerWheel = async (targetTeam?: "A" | "B" | "C" | "D") => {
+    await dispatchAction({
+      action: "dev_trigger_wheel",
+      targetTeam,
     });
   };
 
@@ -1483,7 +1549,15 @@ export default function ArticulateRoomPage({
 
   const isPlaying = room.status === "playing";
 
-  const myPlayerNameNormalized = (effectivePlayerName || "").trim().toLowerCase();
+  // Allow switching perspective in local dev mode (View as Yourself vs View as Ghost Rival)
+  const viewPlayerId = simPlayerId || myPlayerId;
+  const viewPlayerName =
+    simPlayerId && room.player_details?.[simPlayerId]?.name
+      ? room.player_details[simPlayerId].name
+      : effectivePlayerName;
+  const isViewHost = Boolean(room && room.host_id === viewPlayerId);
+
+  const myPlayerNameNormalized = (viewPlayerName || "").trim().toLowerCase();
   const currentSpeakerNameNormalized = (room.current_turn?.speakerName || "").trim().toLowerCase();
 
   const isSpeakerByName = Boolean(
@@ -1495,19 +1569,19 @@ export default function ArticulateRoomPage({
   );
 
   const isSpeakerById = Boolean(
-    room.current_turn?.speakerId === myPlayerId ||
+    room.current_turn?.speakerId === viewPlayerId ||
     (room.player_details?.[room.current_turn?.speakerId || ""] &&
-      room.player_details[room.current_turn?.speakerId || ""].id === myPlayerId)
+      room.player_details[room.current_turn?.speakerId || ""].id === viewPlayerId)
   );
 
   const isSpeaker = isPlaying && (isSpeakerById || isSpeakerByName);
-  const isMeInactive = Boolean(room.inactive_players?.includes(myPlayerId));
+  const isMeInactive = Boolean(room.inactive_players?.includes(viewPlayerId));
 
   const isPlayerInTeamA = Boolean(
-    (room.teams?.teamA?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamA?.playerIds || []).includes(viewPlayerId) ||
     (room.teams?.teamA?.playerIds || []).some(
       (pid) =>
-        room.player_details?.[pid]?.id === myPlayerId ||
+        room.player_details?.[pid]?.id === viewPlayerId ||
         (myPlayerNameNormalized &&
           myPlayerNameNormalized !== "scholar" &&
           room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
@@ -1515,10 +1589,10 @@ export default function ArticulateRoomPage({
   );
 
   const isPlayerInTeamB = Boolean(
-    (room.teams?.teamB?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamB?.playerIds || []).includes(viewPlayerId) ||
     (room.teams?.teamB?.playerIds || []).some(
       (pid) =>
-        room.player_details?.[pid]?.id === myPlayerId ||
+        room.player_details?.[pid]?.id === viewPlayerId ||
         (myPlayerNameNormalized &&
           myPlayerNameNormalized !== "scholar" &&
           room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
@@ -1526,10 +1600,10 @@ export default function ArticulateRoomPage({
   );
 
   const isPlayerInTeamC = Boolean(
-    (room.teams?.teamC?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamC?.playerIds || []).includes(viewPlayerId) ||
     (room.teams?.teamC?.playerIds || []).some(
       (pid) =>
-        room.player_details?.[pid]?.id === myPlayerId ||
+        room.player_details?.[pid]?.id === viewPlayerId ||
         (myPlayerNameNormalized &&
           myPlayerNameNormalized !== "scholar" &&
           room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
@@ -1537,10 +1611,10 @@ export default function ArticulateRoomPage({
   );
 
   const isPlayerInTeamD = Boolean(
-    (room.teams?.teamD?.playerIds || []).includes(myPlayerId) ||
+    (room.teams?.teamD?.playerIds || []).includes(viewPlayerId) ||
     (room.teams?.teamD?.playerIds || []).some(
       (pid) =>
-        room.player_details?.[pid]?.id === myPlayerId ||
+        room.player_details?.[pid]?.id === viewPlayerId ||
         (myPlayerNameNormalized &&
           myPlayerNameNormalized !== "scholar" &&
           room.player_details?.[pid]?.name?.trim().toLowerCase() === myPlayerNameNormalized)
@@ -1752,8 +1826,95 @@ export default function ArticulateRoomPage({
         </div>
       </div>
 
+      {/* Local Dev Playtest Simulator Toolbar (Only visible on localhost) */}
+      {isLocalDev && (
+        <div className="mb-3 p-2.5 sm:p-3 rounded-2xl bg-[var(--bg-card)] border-2 border-dashed border-[var(--gold)]/60 flex flex-wrap items-center justify-between gap-2 text-xs shadow-sm">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="px-2 py-0.5 rounded-md bg-[var(--gold)] text-black font-mono font-extrabold text-[10px] uppercase">
+              Dev Playtest
+            </span>
+
+            {/* Perspective Switcher Pills */}
+            <div className="flex items-center gap-1 flex-wrap">
+              <span className="text-[10px] font-bold text-[var(--text-mute)] mr-0.5">
+                View As:
+              </span>
+              <button
+                type="button"
+                onClick={() => setSimPlayerId(null)}
+                className={`px-2.5 py-1 rounded-lg font-space font-bold text-[11px] border transition cursor-pointer flex items-center gap-1 ${
+                  !simPlayerId
+                    ? "bg-[var(--olive)] text-white border-[var(--olive)] shadow-2xs"
+                    : "bg-[var(--bg)] text-[var(--text-dim)] border-[var(--border-dim)] hover:text-[var(--text)]"
+                }`}
+              >
+                <span>You ({effectivePlayerName})</span>
+              </button>
+
+              {Object.values(room.player_details || {})
+                .filter((p) => p.id !== myPlayerId)
+                .map((p) => {
+                  const pTeam = (room.teams.teamA.playerIds || []).includes(p.id)
+                    ? room.teams.teamA.name
+                    : (room.teams.teamB.playerIds || []).includes(p.id)
+                    ? room.teams.teamB.name
+                    : (room.teams.teamC?.playerIds || []).includes(p.id)
+                    ? room.teams.teamC?.name
+                    : (room.teams.teamD?.playerIds || []).includes(p.id)
+                    ? room.teams.teamD?.name
+                    : "Spectator";
+                  const isActiveSim = simPlayerId === p.id;
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => setSimPlayerId(p.id)}
+                      className={`px-2.5 py-1 rounded-lg font-space font-bold text-[11px] border transition cursor-pointer flex items-center gap-1 ${
+                        isActiveSim
+                          ? "bg-[var(--terra)] text-white border-[var(--terra)] shadow-2xs"
+                          : "bg-[var(--bg)] text-[var(--text-dim)] border-[var(--border-dim)] hover:text-[var(--text)]"
+                      }`}
+                    >
+                      <span>{p.name}</span>
+                      <span className="text-[9px] opacity-80">({pTeam})</span>
+                    </button>
+                  );
+                })}
+            </div>
+          </div>
+
+          {/* 1-Click Ghost & Wheel Triggers */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <button
+              type="button"
+              onClick={() => handleDevAddGhost("A")}
+              className="px-2.5 py-1 rounded-lg bg-red-500/15 hover:bg-red-500/25 text-red-600 dark:text-red-300 border border-red-500/30 font-space font-bold text-[11px] cursor-pointer transition"
+              title="Spawn a simulated teammate on Team Alpha"
+            >
+              + Ghost to Alpha
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDevAddGhost("B")}
+              className="px-2.5 py-1 rounded-lg bg-blue-500/15 hover:bg-blue-500/25 text-blue-600 dark:text-blue-300 border border-blue-500/30 font-space font-bold text-[11px] cursor-pointer transition"
+              title="Spawn a simulated opponent on Team Omega"
+            >
+              + Ghost to Omega
+            </button>
+            <button
+              type="button"
+              onClick={() => handleDevTriggerWheel(myTeam || "A")}
+              className="px-2.5 py-1 rounded-lg bg-[var(--gold)]/20 hover:bg-[var(--gold)]/30 text-[var(--text)] border border-[var(--gold)]/50 font-space font-bold text-[11px] cursor-pointer transition"
+              title="Jump active team to Tile 7 / 14 and open the Wheel Checkpoint immediately"
+            >
+              🎡 Jump to Wheel (Tile 7)
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Offline Host Recovery Banner */}
-      {!isHost && !isHostOnline && (
+      {!isViewHost && !isHostOnline && (
         <div className="mb-4 p-3 sm:p-3.5 rounded-2xl bg-amber-500/15 border-2 border-amber-500/40 flex items-center justify-between gap-3 text-xs shadow-xs">
           <div className="flex items-center gap-2.5 text-amber-950 font-space font-bold">
             <AlertTriangle className="w-4 h-4 shrink-0 text-amber-700" />
@@ -1785,7 +1946,7 @@ export default function ArticulateRoomPage({
               <SpectatorLounge
                 room={room}
                 secondsRemaining={secondsRemaining}
-                myPlayerId={myPlayerId}
+                myPlayerId={viewPlayerId}
                 onSendReaction={handleSendReaction}
                 presencePlayers={presencePlayers}
                 knownNames={knownNames}
@@ -1800,8 +1961,8 @@ export default function ArticulateRoomPage({
             >
               <RoomLobby
                 room={room}
-                myPlayerId={myPlayerId}
-                isHost={isHost}
+                myPlayerId={viewPlayerId}
+                isHost={isViewHost}
                 isStartingRound={isStartingRound}
                 presencePlayers={presencePlayers}
                 knownNames={knownNames}
@@ -1852,7 +2013,7 @@ export default function ArticulateRoomPage({
                 <RoomGuesserView
                   room={room}
                   secondsRemaining={secondsRemaining}
-                  myPlayerId={myPlayerId}
+                  myPlayerId={viewPlayerId}
                   myTeam={myTeam}
                   onSendReaction={handleSendReaction}
                   speakerName={activeSpeakerName}
@@ -1870,9 +2031,9 @@ export default function ArticulateRoomPage({
             >
               <RoomRoundEnd
                 room={room}
-                myPlayerId={myPlayerId}
-                myPlayerName={effectivePlayerName}
-                isHost={isHost}
+                myPlayerId={viewPlayerId}
+                myPlayerName={viewPlayerName}
+                isHost={isViewHost}
                 isStartingRound={isStartingRound}
                 presencePlayers={presencePlayers}
                 knownNames={knownNames}
@@ -1890,6 +2051,8 @@ export default function ArticulateRoomPage({
                 onOpenLobbyQueue={() => setShowLobbyQueueModal(true)}
                 onAdmitPlayer={handleAdmitPlayer}
                 onAutoAdmitAll={handleAutoAdmitAll}
+                onSpinWheel={handleSpinWheel}
+                onResolveWheelChoice={handleResolveWheelChoice}
               />
             </motion.div>
           ) : room.status === "game_over" ? (

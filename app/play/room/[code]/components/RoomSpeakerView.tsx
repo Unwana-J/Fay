@@ -126,6 +126,13 @@ export default function RoomSpeakerView({
         </div>
       </div>
 
+      {/* Wheel Skip / Encore Notice Banner */}
+      {room.last_turn_skip_notice && (
+        <div className="px-3.5 py-2 rounded-2xl bg-[var(--gold)]/15 border border-[var(--gold)]/40 text-xs font-space font-bold text-[var(--text)] text-center">
+          {room.last_turn_skip_notice}
+        </div>
+      )}
+
       {/* Synchronized Circular/Bar Countdown with glowing aura */}
       <div className="flex flex-col items-center justify-center p-2 sm:p-4 relative">
         {isUrgent && (

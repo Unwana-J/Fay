@@ -36,6 +36,7 @@ interface BoardMapProps {
   teams?: TeamBoardData[];
   collapsibleGrid?: boolean;
   defaultGridCollapsed?: boolean;
+  renderTeamFooter?: (teamId: TeamId) => React.ReactNode;
 }
 
 interface TileInfo {
@@ -81,22 +82,10 @@ const getTileInfo = (idx: number, totalTiles: number): TileInfo => {
   let type: TileInfo["type"] = "normal";
   let tileIcon: string | undefined = undefined;
 
-  if (idx % 7 === 4) {
+  if (idx > 0 && idx < totalTiles - 1 && idx % 7 === 0) {
     type = "chance";
-    tileIcon = "🎲";
-    label = "Chance";
-  } else if (idx % 7 === 2) {
-    type = "double";
-    tileIcon = "🔥";
-    label = "Double";
-  } else if (idx % 7 === 0) {
-    type = "bonus";
-    tileIcon = "⭐";
-    label = "Bonus";
-  } else if (idx % 7 === 5) {
-    type = "challenge";
-    tileIcon = "🧠";
-    label = "Challenge";
+    tileIcon = "🎡";
+    label = "Wheel";
   }
 
   return {
@@ -130,6 +119,7 @@ export default function BoardMap({
   teams,
   collapsibleGrid = true,
   defaultGridCollapsed = false,
+  renderTeamFooter,
 }: BoardMapProps) {
   const [isGridCollapsed, setIsGridCollapsed] = React.useState<boolean>(defaultGridCollapsed);
   const isMasterchef = gameMode === "masterchef";
@@ -157,12 +147,18 @@ export default function BoardMap({
     return { row, col, isEvenRow };
   };
 
-  const gridColsClass =
-    teamsList.length === 2
-      ? "grid-cols-2"
+  const hasTeamFooter = Boolean(renderTeamFooter);
+  const gridColsClass = hasTeamFooter
+    ? teamsList.length === 2
+      ? "grid-cols-1 sm:grid-cols-2"
       : teamsList.length === 3
-      ? "grid-cols-3"
-      : "grid-cols-2 sm:grid-cols-4";
+      ? "grid-cols-1 md:grid-cols-3"
+      : "grid-cols-1 sm:grid-cols-2"
+    : teamsList.length === 2
+    ? "grid-cols-2"
+    : teamsList.length === 3
+    ? "grid-cols-3"
+    : "grid-cols-2 sm:grid-cols-4";
 
   return (
     <div className="w-full flex flex-col gap-3 max-w-2xl mx-auto">
@@ -178,38 +174,40 @@ export default function BoardMap({
               return (
                 <div
                   key={t.id}
-                  className="p-2.5 sm:p-3 rounded-2xl border flex flex-col justify-between shadow-2xs"
+                  className="p-3 sm:p-3.5 rounded-2xl border flex flex-col justify-start shadow-2xs transition-colors"
                   style={{
-                    borderColor: `${t.color}35`,
-                    backgroundColor: `${t.color}0C`,
+                    borderColor: isActive ? `${t.color}65` : `${t.color}30`,
+                    backgroundColor: isActive ? `${t.color}10` : "var(--bg-card)",
                   }}
                 >
-                  <div className="flex items-center justify-between gap-1">
-                    <span className="text-[11px] font-bold font-space flex items-center gap-1.5 truncate" style={{ color: t.color }}>
-                      <span className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-xs font-bold font-space flex items-center gap-1.5 truncate" style={{ color: t.color }}>
+                      <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
                       <span className="truncate">{t.name}</span>
                     </span>
                     {isActive && (
                       <span
-                        className="text-[9px] uppercase px-1.5 py-0.2 rounded font-black shrink-0"
+                        className="inline-flex items-center gap-1 text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-full font-space font-extrabold border shrink-0 whitespace-nowrap"
                         style={{
-                          backgroundColor: `${t.color}20`,
+                          backgroundColor: `${t.color}18`,
+                          borderColor: `${t.color}45`,
                           color: t.color,
                         }}
                       >
-                        Active
+                        <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                        <span>Next Up</span>
                       </span>
                     )}
                   </div>
-                  <div className="flex items-baseline justify-between mt-1">
-                    <span className="font-space font-black text-lg sm:text-2xl text-[var(--text)]">
+                  <div className="flex items-baseline justify-between mt-1.5">
+                    <span className="font-space font-black text-xl sm:text-2xl text-[var(--text)]">
                       {safeScore}
-                      <span className="text-[10px] font-normal text-[var(--text-mute)] font-mono ml-1">/ {scoreGoal}</span>
+                      <span className="text-[11px] font-normal text-[var(--text-mute)] font-mono ml-1">/ {scoreGoal}</span>
                     </span>
                     <span className="text-[10px] font-mono font-bold text-[var(--text-dim)]">{pct}%</span>
                   </div>
                   {/* Progress Line */}
-                  <div className="w-full h-1.5 rounded-full bg-[var(--bg)] overflow-hidden mt-1.5 border border-[var(--border-dim)]/40">
+                  <div className="w-full h-1.5 rounded-full bg-[var(--bg)] overflow-hidden mt-2 border border-[var(--border-dim)]/50">
                     <motion.div
                       className="h-full rounded-full"
                       initial={{ width: 0 }}
@@ -218,6 +216,11 @@ export default function BoardMap({
                       style={{ backgroundColor: t.color }}
                     />
                   </div>
+                  {renderTeamFooter && (
+                    <div className="mt-3 pt-2.5 border-t border-[var(--border-dim)]/50">
+                      {renderTeamFooter(t.id)}
+                    </div>
+                  )}
                 </div>
               );
             })}
@@ -227,25 +230,25 @@ export default function BoardMap({
 
       {/* Race Track Header & Grid Toggle */}
       {!compact && collapsibleGrid && (
-        <div className="flex items-center justify-between px-1 pt-0.5">
-          <span className="text-[11px] font-space font-bold text-[var(--text-dim)] flex items-center gap-1.5">
-            <MapPin className="w-3.5 h-3.5 text-[var(--olive)]" />
-            <span>Articulate Board Track ({tileCount} Tiles)</span>
+        <div className="flex items-center justify-between gap-2 px-1 pt-0.5 flex-wrap">
+          <span className="text-[11px] font-space font-bold text-[var(--text-dim)] flex items-center gap-1.5 whitespace-nowrap">
+            <MapPin className="w-3.5 h-3.5 text-[var(--olive)] shrink-0" />
+            <span>Board Track ({tileCount} Tiles)</span>
           </span>
           <button
             type="button"
             onClick={() => setIsGridCollapsed((v) => !v)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs touch-manipulation select-none active:scale-95"
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-space font-bold border border-[var(--border-dim)] bg-[var(--bg-card)] hover:bg-[var(--bg-hover)] text-[var(--text)] transition cursor-pointer shadow-2xs whitespace-nowrap touch-manipulation select-none active:scale-95"
             title={isGridCollapsed ? "Expand board tile grid" : "Collapse board tile grid"}
           >
             {isGridCollapsed ? (
               <>
-                <ChevronDown className="w-3.5 h-3.5 text-[var(--olive)]" />
-                <span>Peek Track ({tileCount} Tiles)</span>
+                <ChevronDown className="w-3.5 h-3.5 text-[var(--olive)] shrink-0" />
+                <span>Peek Track</span>
               </>
             ) : (
               <>
-                <ChevronUp className="w-3.5 h-3.5 text-[var(--olive)]" />
+                <ChevronUp className="w-3.5 h-3.5 text-[var(--olive)] shrink-0" />
                 <span>Hide Track</span>
               </>
             )}
@@ -277,6 +280,7 @@ export default function BoardMap({
 
           const isStart = tile.type === "start";
           const isFinish = tile.type === "finish";
+          const isWheelTile = tile.type === "chance";
 
           // Find teams on this tile
           const teamsOnTile = teamsList.filter((t) => {
@@ -297,6 +301,8 @@ export default function BoardMap({
                   ? "bg-[var(--bg-card)] border-[var(--border-dim)] shadow-xs"
                   : isCurrent
                   ? "bg-[var(--bg-card)] shadow-md ring-2 ring-offset-1 ring-offset-[var(--bg)]"
+                  : isWheelTile
+                  ? "bg-[var(--gold)]/10 border-[var(--gold)]/50 shadow-xs ring-1 ring-[var(--gold)]/20"
                   : "bg-[var(--bg-card)]/80 hover:bg-[var(--bg-card)] border-[var(--border-dim)]/70 shadow-2xs"
               }`}
               style={{
@@ -382,8 +388,12 @@ export default function BoardMap({
                   })}
                 </div>
                 {!isStart && !isFinish && (
-                  <span className="text-[7.5px] font-medium text-[var(--text-mute)] opacity-60 truncate max-w-[34px]">
-                    {tile.category}
+                  <span
+                    className={`text-[7.5px] font-bold truncate max-w-[38px] ${
+                      isWheelTile ? "text-[var(--gold)] uppercase tracking-wider" : "text-[var(--text-mute)] opacity-60 font-medium"
+                    }`}
+                  >
+                    {isWheelTile ? "WHEEL" : tile.category}
                   </span>
                 )}
               </div>
