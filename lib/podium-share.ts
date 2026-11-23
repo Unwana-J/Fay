@@ -45,6 +45,19 @@ export function decodePodiumDeck(encoded: string): PodiumDeck | null {
     if (decompressed) {
       const data = JSON.parse(decompressed);
       if (data && data.topic && Array.isArray(data.slides)) {
+        data.slides = data.slides.map((slide: Record<string, unknown>) => {
+          if (typeof slide.imageUrl === "string") {
+            const url = slide.imageUrl.trim();
+            const isSafeImage =
+              /^https?:\/\//i.test(url) ||
+              /^data:image\/(?:png|jpeg|jpg|webp|gif);base64,/i.test(url) ||
+              url.startsWith("/");
+            if (!isSafeImage) {
+              return { ...slide, imageUrl: undefined };
+            }
+          }
+          return slide;
+        });
         return data as PodiumDeck;
       }
     }

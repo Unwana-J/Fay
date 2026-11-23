@@ -17,7 +17,7 @@ import {
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import FeyLogo from "@/components/ui/FeyLogo";
-import { decodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
+import { decodeSharedNote, sanitizeSharedNoteHtml, type SharedNotePayload } from "@/lib/share-note";
 import {
   CATEGORY_COLORS,
   CATEGORY_ICONS,
@@ -470,7 +470,7 @@ export default function NoteContent({
               <div
                 className="font-serif leading-relaxed text-[1.12rem] selection:bg-[var(--terra)] selection:text-white prose prose-stone max-w-none"
                 style={{ color: "var(--text)" }}
-                dangerouslySetInnerHTML={{ __html: note.notes }}
+                dangerouslySetInnerHTML={{ __html: sanitizeSharedNoteHtml(note.notes) }}
               />
             ) : (
               <div

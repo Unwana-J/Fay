@@ -1,7 +1,17 @@
 import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/lib/seo";
 
-const PRIVATE_PATHS = ["/admin", "/api/", "/profile", "/library", "/analytics", "/session/"];
+const PRIVATE_PATHS = [
+  "/admin",
+  "/api/",
+  "/profile",
+  "/library",
+  "/analytics",
+  "/session/",
+  "/note/",
+  "/podium/slides/",
+  "/community/room/",
+];
 
 /**
  * Explicitly welcome AI crawlers/answer engines so Fey can be cited when people

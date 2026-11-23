@@ -32,6 +32,63 @@ export interface SharedNotePayload {
 const DEFAULT_NOTES_FALLBACK =
   "Understanding proven through Feynman vocal articulation and synthesis.";
 
+const ALLOWED_HTML_TAGS = new Set([
+  "p",
+  "br",
+  "strong",
+  "b",
+  "em",
+  "i",
+  "u",
+  "s",
+  "ul",
+  "ol",
+  "li",
+  "blockquote",
+  "code",
+  "pre",
+  "h1",
+  "h2",
+  "h3",
+  "h4",
+  "hr",
+  "span",
+  "a",
+]);
+
+/**
+ * Strips potentially dangerous HTML tags/attributes (script, iframe, event handlers,
+ * javascript:/data: hrefs) from decoded URL payloads to prevent reflected XSS.
+ */
+export function sanitizeSharedNoteHtml(html: string): string {
+  if (!html || typeof html !== "string") return "";
+
+  return html
+    // Remove script, style, iframe, object, embed, form, input blocks completely
+    .replace(/<(script|style|iframe|object|embed|form|input|button|textarea|meta|link|base|svg|math)[\s\S]*?>[\s\S]*?<\/\1>/gi, "")
+    .replace(/<(script|style|iframe|object|embed|form|input|button|textarea|meta|link|base|svg|math)[^>]*\/?>/gi, "")
+    // Sanitize remaining tags and strip event handlers / dangerous attributes
+    .replace(/<\/?([a-zA-Z0-9-]+)([^>]*)>/g, (match, rawTag: string, rawAttrs: string) => {
+      const tag = rawTag.toLowerCase();
+      if (!ALLOWED_HTML_TAGS.has(tag)) {
+        return "";
+      }
+      if (match.startsWith("</")) {
+        return `</${tag}>`;
+      }
+      if (tag === "a" && rawAttrs) {
+        const hrefMatch = rawAttrs.match(/href\s*=\s*(?:"([^"]*)"|'([^']*)'|([^\s>]+))/i);
+        const rawHref = (hrefMatch?.[1] || hrefMatch?.[2] || hrefMatch?.[3] || "").trim();
+        if (/^https?:\/\//i.test(rawHref)) {
+          const safeHref = rawHref.replace(/"/g, "&quot;");
+          return `<a href="${safeHref}" target="_blank" rel="noopener noreferrer">`;
+        }
+        return "<a>";
+      }
+      return tag === "br" || tag === "hr" ? `<${tag} />` : `<${tag}>`;
+    });
+}
+
 // ── Encode ────────────────────────────────────────────────────────────────────
 
 export function encodeSharedNote(payload: SharedNotePayload): string {
@@ -85,6 +142,8 @@ export function decodeSharedNote(encoded: string): SharedNotePayload | null {
       if (data && data.topicText) {
         if (!data.notes || typeof data.notes !== "string" || data.notes.trim().length === 0) {
           data.notes = DEFAULT_NOTES_FALLBACK;
+        } else {
+          data.notes = sanitizeSharedNoteHtml(data.notes);
         }
         return data as SharedNotePayload;
       }
@@ -116,6 +175,8 @@ export function decodeSharedNote(encoded: string): SharedNotePayload | null {
     if (data && data.topicText) {
       if (!data.notes || typeof data.notes !== "string" || data.notes.trim().length === 0) {
         data.notes = DEFAULT_NOTES_FALLBACK;
+      } else {
+        data.notes = sanitizeSharedNoteHtml(data.notes);
       }
       return data as SharedNotePayload;
     }

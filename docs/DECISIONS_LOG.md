@@ -612,3 +612,29 @@
      - Built `RoomWheelCheckpointCard` inside `RoomRoundEnd`, where `spinNonce` triggers a synchronized 3.6s cubic-bezier SVG wheel spin across every connected device in the room, followed by an interactive tactical decision panel (`Advance +2/+3 Steps` vs. `Push Rival -2/-3 Steps`, or `Freeze [Rival]'s Next Turn` across 2–4 teams).
 - **"Building in Public" Content Takeaway**:
   > *"Pure RNG feels cheap in multiplayer party games; player agency creates table politics. When a team lands on a checkpoint wheel in Fey Articulate, we don't just move their token—we force them to choose in front of the whole call: boost yourselves +3 forward, or drag the leading team -3 back?"*
+
+---
+
+## 32. Domain Reputation & Security Hardening for Social Platform Link Previews (X / t.co Trust Signals)
+
+- **Date / Phase**: Phase 2 — Pre-Launch Distribution & Domain Trust Hardening
+- **The Problem / Context**:
+  When sharing `https://fey.lokinlabs.com.ng/` on X (Twitter), X's `t.co` link safety engine blocked the post with: *"We can't complete this request because this link has been identified by X or our partners as being potentially harmful."*
+  Automated threat-intelligence feeds used by X (Spamhaus, Cloudflare Radar, Google Safe Browsing, Surbl, URLhaus) disproportionately flag newly active `.com.ng` / `.ng` domains when paired with:
+  1. Missing HTTP security headers (`Strict-Transport-Security`, `X-Content-Type-Options`, `X-Frame-Options`, `Referrer-Policy`, `Permissions-Policy`).
+  2. High-entropy LZ-string / Base64 URL paths (`/note/[code]`, `/podium/slides/[code]`) that resemble obfuscated phishing payloads to heuristic scanners.
+  3. Unsanitized HTML rendering (`dangerouslySetInnerHTML`) on URL-encoded user notes, or an unauthenticated `/api/shorten` proxy that could shorten arbitrary third-party URLs.
+- **User Insight & Guiding Philosophy**:
+  If a link cannot be posted on X, social distribution and build-in-public momentum stall immediately. Even when a block is triggered by aggressive ccTLD heuristics on `.com.ng`, our own security posture must be airtight so automated scanners and manual trust-and-safety reviewers score the domain as an A+ verified web application.
+- **Architectural & Product Landing**:
+  1. **Global HTTP Security Headers (`next.config.ts`)**:
+     - Added site-wide `Strict-Transport-Security` (2-year HSTS with `includeSubDomains; preload`), `X-Content-Type-Options: nosniff`, `X-Frame-Options: SAMEORIGIN`, `Referrer-Policy: strict-origin-when-cross-origin`, `Permissions-Policy` (restricting camera, geolocation, payment, USB, and scoping microphone to `self`), and disabled `X-Powered-By`.
+  2. **Reflected XSS Prevention on Portable URL State (`lib/share-note.ts`, `lib/podium-share.ts`, `app/note/[code]/NoteContent.tsx`)**:
+     - Built `sanitizeSharedNoteHtml()` to strip `<script>`, `<iframe>`, `<object>`, event handlers, and non-HTTPS `href` attributes before any URL-compressed note payload is decoded or rendered via `dangerouslySetInnerHTML`.
+     - Restricted `slide.imageUrl` in decoded Podium decks to valid `https://`, `/`, or `data:image/(png|jpeg|webp|gif);base64,` URIs.
+  3. **Hardened URL Shortener Proxy (`app/api/shorten/route.ts`)**:
+     - Locked `/api/shorten` to an explicit host allowlist (`fey.lokinlabs.com.ng`) with per-IP rate limiting so external bots cannot abuse our endpoint to generate TinyURL links for third-party domains.
+  4. **Crawler & Reputation Hygiene (`app/robots.ts`, `public/.well-known/security.txt`)**:
+     - Added `noindex, nofollow` and `robots.txt` disallow rules for dynamic base64/LZ-string payload routes (`/note/`, `/podium/slides/`, `/community/room/`) so threat crawlers only index clean canonical routes, and published an RFC 9116 `/.well-known/security.txt`.
+- **"Building in Public" Content Takeaway**:
+  > *"Shipping on a `.com.ng` domain means social platforms' automated link filters judge you guilty until proven innocent. Harden your HTTP security headers to A+, lock down every URL payload decoder against reflected XSS, and never leave high-entropy state URLs open to search indexing."*

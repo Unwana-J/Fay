@@ -99,6 +99,10 @@ export async function generateMetadata({
       description,
       images: [ogImageUrl],
     },
+    robots: {
+      index: false,
+      follow: false,
+    },
     other: {
       "og:site_name": "Fey",
       "article:author": deck.author || "Scholar",

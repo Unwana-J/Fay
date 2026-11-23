@@ -1,14 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
 // Server-side in-memory cache to return instantly on repeat requests
 const serverUrlCache = new Map<string, string>();
 
+const ALLOWED_SHORTEN_HOSTS = new Set([
+  "fey.lokinlabs.com.ng",
+  "www.fey.lokinlabs.com.ng",
+  "localhost",
+  "127.0.0.1",
+]);
+
+function isAllowedFeyUrl(rawUrl: string): boolean {
+  try {
+    const parsed = new URL(rawUrl);
+    if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
+      return false;
+    }
+    return ALLOWED_SHORTEN_HOSTS.has(parsed.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rate = checkRateLimit(`shorten:${clientIp}`, 20, 60);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Rate limit exceeded" }, { status: 429 });
+    }
+
     const { url } = await req.json();
 
-    if (!url || typeof url !== "string") {
-      return NextResponse.json({ error: "Missing or invalid url" }, { status: 400 });
+    if (!url || typeof url !== "string" || !isAllowedFeyUrl(url)) {
+      return NextResponse.json({ error: "Missing or unauthorized URL host" }, { status: 400 });
     }
 
     if (serverUrlCache.has(url)) {
