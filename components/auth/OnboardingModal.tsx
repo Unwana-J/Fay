@@ -417,7 +417,7 @@ export default function OnboardingModal({
                 style={{ color: "var(--text-mute)" }}
               >
                 {phase === "quiz"
-                  ? `Profile Calibration · ${quizStep} of 3`
+                  ? "Profile Calibration"
                   : phase === "calibrating"
                   ? "Synthesizing Archetype..."
                   : "Archetype Unlocked"}

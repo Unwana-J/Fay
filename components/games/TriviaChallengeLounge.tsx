@@ -445,7 +445,7 @@ export default function TriviaChallengeLounge({
             )}
           >
             <Globe size={13} className="text-[var(--olive)]" />
-            <span>🌍 Public Community Arena ({publicChallenges.length})</span>
+            <span>Community Arena ({publicChallenges.length})</span>
           </button>
 
           <button
@@ -459,7 +459,7 @@ export default function TriviaChallengeLounge({
             )}
           >
             <Swords size={13} className="text-[var(--terra)]" />
-            <span>⚔️ My Challenges ({localChallenges.length})</span>
+            <span>My Challenges ({localChallenges.length})</span>
           </button>
         </div>
 
@@ -604,8 +604,9 @@ export default function TriviaChallengeLounge({
                             <div className="flex flex-wrap items-center gap-2">
                               <VisibleCountdownTimer challenge={c} compact />
                               {c.isPublic && (
-                                <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/30 font-bold">
-                                  Public Arena
+                                <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--olive)]/10 text-[var(--olive)] border border-[var(--olive)]/25 font-bold whitespace-nowrap shrink-0">
+                                  <Globe size={10} />
+                                  <span>Public</span>
                                 </span>
                               )}
                               <span className="text-[10px] font-mono capitalize px-2 py-0.5 rounded-full bg-[var(--bg-input)] text-[var(--text-dim)] border border-[var(--border-dim)]">
@@ -786,24 +787,25 @@ export default function TriviaChallengeLounge({
           }}
         >
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] font-mono font-bold uppercase tracking-wider text-[var(--terra)]">
+            <div className="space-y-2 min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[10px] font-mono font-bold uppercase tracking-wider text-[var(--terra)] whitespace-nowrap">
                   Group Challenge
                 </span>
                 {currentChallenge.isPublic && (
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 font-bold border border-blue-500/30">
-                    Public Community Arena
+                  <span className="inline-flex items-center gap-1 text-[10px] font-mono px-2 py-0.5 rounded-full bg-[var(--olive)]/10 text-[var(--olive)] font-bold border border-[var(--olive)]/25 whitespace-nowrap shrink-0">
+                    <Globe size={10} />
+                    <span>Public</span>
                   </span>
                 )}
               </div>
 
-              <h2 className="font-space font-extrabold text-2xl sm:text-3xl text-[var(--text)] tracking-tight">
+              <h2 className="font-space font-extrabold text-2xl sm:text-3xl text-[var(--text)] tracking-tight leading-tight">
                 {currentChallenge.title}
               </h2>
 
-              <p className="text-xs sm:text-sm text-[var(--text-dim)]">
-                Host: <strong>{currentChallenge.creatorName && currentChallenge.creatorName !== "Scholar" ? currentChallenge.creatorName : "Host"}</strong> • {currentChallenge.questionCount} Questions •{" "}
+              <p className="text-xs sm:text-sm text-[var(--text-dim)] leading-relaxed">
+                Host: <strong className="text-[var(--text)]">{currentChallenge.creatorName && currentChallenge.creatorName !== "Scholar" ? currentChallenge.creatorName : "Host"}</strong> • {currentChallenge.questionCount} Questions •{" "}
                 <span className="capitalize">{currentChallenge.difficulty}</span> pool
               </p>
             </div>
