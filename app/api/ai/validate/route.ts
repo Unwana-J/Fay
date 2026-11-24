@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  const rate = checkRateLimit(`ai-validate:${clientIp}`, 35, 60);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { correct: false, confidence: 0, reason: "Rate limit exceeded." },
+      { status: 429 }
+    );
+  }
+
   if (!GEMINI_API_KEY) {
     return NextResponse.json(
       { correct: false, confidence: 0, reason: "AI referee not configured." },
@@ -11,16 +21,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { targetWord, guess, difficulty = "mixed" } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { targetWord, guess, difficulty = "mixed" } = body;
 
-  if (!targetWord || !guess) {
+  if (!targetWord || !guess || typeof targetWord !== "string" || typeof guess !== "string") {
     return NextResponse.json({ error: "Missing targetWord or guess" }, { status: 400 });
   }
 
+  const safeTarget = targetWord.slice(0, 100);
+  const safeGuess = guess.slice(0, 150);
+
   const prompt = `You are a fair and lenient referee for a fast-paced multiplayer word-description party game called Fey.
 
-The secret target word is: "${targetWord}"
-A player guessed: "${guess}"
+The secret target word is: "${safeTarget}"
+A player guessed: "${safeGuess}"
 Game difficulty mode: ${difficulty}
 
 Your job is to decide if the guess should be accepted as correct.
@@ -50,6 +64,7 @@ Set phoneticMatch to true if you are accepting a mispronunciation.`;
     const res = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(7000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {

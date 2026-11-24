@@ -408,6 +408,7 @@ export function peekNextTurnSchedule(room: ArticulateRoom): {
 }
 
 // In-memory server fallback map for zero-setup resilience
+const MAX_MEMORY_ROOMS = 250;
 const globalRooms = globalThis as unknown as {
   _articulate_rooms?: Map<string, ArticulateRoom>;
 };
@@ -417,6 +418,18 @@ if (!globalRooms._articulate_rooms) {
 }
 
 export const memoryRooms = globalRooms._articulate_rooms;
+
+/**
+ * Stores a room in the in-memory cache with automatic FIFO eviction to prevent serverless memory exhaustion.
+ */
+export function setMemoryRoom(code: string, room: ArticulateRoom): void {
+  const key = code.toUpperCase().trim();
+  if (!memoryRooms.has(key) && memoryRooms.size >= MAX_MEMORY_ROOMS) {
+    const oldestKey = memoryRooms.keys().next().value;
+    if (oldestKey) memoryRooms.delete(oldestKey);
+  }
+  memoryRooms.set(key, room);
+}
 
 export function generateRoomCode(): string {
   // Generate 4-letter memorable uppercase alphanumeric code

@@ -32,3 +32,11 @@ yarn-error.log*
 # TypeScript
 *.tsbuildinfo
 next-env.d.ts
+
+# Remotion & Desktop Pet local outputs / binaries
+/video/node_modules
+/video/out
+/desktop-pet/Ollie.app
+/desktop-pet/*.webm
+/desktop-pet/node_modules
+

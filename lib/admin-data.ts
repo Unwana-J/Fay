@@ -42,6 +42,7 @@ export interface AdminUserItem {
 }
 
 // ─── Live In-Memory Cache (Initialized Empty, Populated Strictly by Real Submissions & Supabase) ──
+const MAX_FALLBACK_ITEMS = 500;
 const fallbackFeedback: FeedbackItem[] = [];
 const fallbackIncidents: IncidentReportItem[] = [];
 let fallbackUsers: AdminUserItem[] = [];
@@ -81,6 +82,9 @@ export async function saveFeedback(item: Omit<FeedbackItem, "id" | "createdAt">)
   }
 
   fallbackFeedback.unshift(newItem);
+  if (fallbackFeedback.length > MAX_FALLBACK_ITEMS) {
+    fallbackFeedback.length = MAX_FALLBACK_ITEMS;
+  }
   return newItem;
 }
 
@@ -150,6 +154,9 @@ export async function saveIncidentReport(item: Omit<IncidentReportItem, "id" | "
   }
 
   fallbackIncidents.unshift(newIncident);
+  if (fallbackIncidents.length > MAX_FALLBACK_ITEMS) {
+    fallbackIncidents.length = MAX_FALLBACK_ITEMS;
+  }
   return newIncident;
 }
 

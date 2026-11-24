@@ -367,10 +367,8 @@ create policy "Allow public insert on feedback_responses"
   on public.feedback_responses for insert
   with check (true);
 
+-- Restricted to server-side service_role only (prevents anonymous scraping of user feedback)
 drop policy if exists "Allow public read on feedback_responses" on public.feedback_responses;
-create policy "Allow public read on feedback_responses"
-  on public.feedback_responses for select
-  using (true);
 
 create index if not exists idx_feedback_rating on public.feedback_responses (rating, created_at desc);
 
@@ -395,15 +393,9 @@ create policy "Allow public insert on incident_reports"
   on public.incident_reports for insert
   with check (true);
 
+-- Restricted to server-side service_role only (protects reporter emails & safety reports)
 drop policy if exists "Allow public read on incident_reports" on public.incident_reports;
-create policy "Allow public read on incident_reports"
-  on public.incident_reports for select
-  using (true);
-
 drop policy if exists "Allow public update on incident_reports" on public.incident_reports;
-create policy "Allow public update on incident_reports"
-  on public.incident_reports for update
-  using (true);
 
 create index if not exists idx_incident_status on public.incident_reports (status, created_at desc);
 
@@ -431,11 +423,8 @@ create policy "Allow public read access on feature_flags"
   on public.feature_flags for select
   using (true);
 
+-- Writes restricted to server-side service_role (admin portal only)
 drop policy if exists "Allow public insert/update on feature_flags" on public.feature_flags;
-create policy "Allow public insert/update on feature_flags"
-  on public.feature_flags for all
-  using (true)
-  with check (true);
 
 -- Seed default feature flags
 insert into public.feature_flags (key, enabled)
@@ -481,10 +470,8 @@ create policy "Allow public insert on trivia_answer_contests"
   on public.trivia_answer_contests for insert
   with check (true);
 
+-- Updates restricted to server-side service_role (admin portal only)
 drop policy if exists "Allow public update on trivia_answer_contests" on public.trivia_answer_contests;
-create policy "Allow public update on trivia_answer_contests"
-  on public.trivia_answer_contests for update
-  using (true);
 
 create index if not exists idx_contests_question on public.trivia_answer_contests (question_id, contested_answer);
 create index if not exists idx_contests_status on public.trivia_answer_contests (status, created_at desc);

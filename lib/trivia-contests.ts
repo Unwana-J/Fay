@@ -39,6 +39,7 @@ export interface AnswerContest {
 
 const AI_AUTO_THRESHOLD = 0.85;
 const TABLE = "trivia_answer_contests";
+const MAX_MEMORY_CONTESTS = 500;
 
 const memoryContests: AnswerContest[] = [];
 let overrideCache: { at: number; map: AnswerOverrideMap } | null = null;
@@ -167,6 +168,9 @@ export async function saveContest(c: Omit<AnswerContest, "id" | "createdAt">): P
   }
 
   memoryContests.unshift(item);
+  if (memoryContests.length > MAX_MEMORY_CONTESTS) {
+    memoryContests.length = MAX_MEMORY_CONTESTS;
+  }
   overrideCache = null;
   return item;
 }

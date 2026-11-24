@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { checkRateLimit, getClientIp, isBannedIdentifier, isBotPattern } from "@/lib/security-guard";
 import {
   generateDailyLeagueQuestions,
   getLeagueStatus,
@@ -26,6 +27,12 @@ function generateLeagueCode(): string {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rate = checkRateLimit(`league-create:${clientIp}`, 10, 60);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many leagues created recently. Please wait a moment." }, { status: 429 });
+    }
+
     const body = await req.json();
     const {
       title,
@@ -41,8 +48,12 @@ export async function POST(req: NextRequest) {
       totalDropSeconds,
     } = body;
 
-    if (!title || !creatorName) {
+    if (!title || !creatorName || typeof title !== "string" || typeof creatorName !== "string") {
       return NextResponse.json({ error: "Title and Creator Name are required." }, { status: 400 });
+    }
+
+    if (isBotPattern(creatorName) || isBannedIdentifier(creatorName) || (creatorId && isBannedIdentifier(String(creatorId)))) {
+      return NextResponse.json({ error: "Action not permitted." }, { status: 403 });
     }
 
     const numDuration = Number(durationDays);

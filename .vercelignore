@@ -1,0 +1,19 @@
+# Exclude Remotion video studio & social card rendering workspace (839 MB)
+video/
+
+# Exclude local macOS desktop pet workspace (1.6 MB)
+desktop-pet/
+
+# Exclude documentation, design transcripts, and agent skills
+docs/
+.agents/
+.gemini/
+supabase/
+
+# Exclude development artifacts & caches
+.next/
+out/
+node_modules/
+*.tsbuildinfo
+*.log
+.DS_Store

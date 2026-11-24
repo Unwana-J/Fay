@@ -39,6 +39,8 @@
 29. [Dismissible Live Arena Challenges & Curated Custom Challenge Rotation](#29-dismissible-live-arena-challenges--curated-custom-challenge-rotation)
 30. [Real Screen Recordings Over Stylized Mockups for Honest-Craft Product Marketing](#30-real-screen-recordings-over-stylized-mockups-for-honest-craft-product-marketing)
 31. [Synchronized Wheel Checkpoints & Tactical Board Agency in Online Articulate](#31-synchronized-wheel-checkpoints--tactical-board-agency-in-online-articulate)
+32. [Domain Reputation & Security Hardening for Social Platform Link Previews (X / t.co Trust Signals)](#32-domain-reputation--security-hardening-for-social-platform-link-previews-x--tco-trust-signals)
+33. [Pre-Launch Security & Vercel Hobby Free-Tier Optimization Audit](#33-pre-launch-security--vercel-hobby-free-tier-optimization-audit)
 
 ---
 
@@ -638,3 +640,32 @@
      - Added `noindex, nofollow` and `robots.txt` disallow rules for dynamic base64/LZ-string payload routes (`/note/`, `/podium/slides/`, `/community/room/`) so threat crawlers only index clean canonical routes, and published an RFC 9116 `/.well-known/security.txt`.
 - **"Building in Public" Content Takeaway**:
   > *"Shipping on a `.com.ng` domain means social platforms' automated link filters judge you guilty until proven innocent. Harden your HTTP security headers to A+, lock down every URL payload decoder against reflected XSS, and never leave high-entropy state URLs open to search indexing."*
+
+---
+
+## 33. Pre-Launch Security & Vercel Hobby Free-Tier Optimization Audit
+
+- **Date / Phase**: Phase 2 — Launch Readiness, Traffic Resilience & Vercel Hobby Tier Engineering
+- **The Problem / Context**:
+  Ahead of public traffic spikes while operating on **Vercel's Hobby (Free) plan** (100 GB Fast Origin Transfer, 100 GB-Hrs Serverless Function memory/duration, 10s–60s execution timeouts, and 1,000 Image Optimization source images/month), an end-to-end audit uncovered five structural vulnerabilities:
+  1. **Unthrottled Gemini AI Endpoints**: All 6 `/api/ai/*` routes (`research`, `generate-slides`, `validate`, `podium-topic`, `check-violation`, `pronunciation-coach`) lacked IP rate limiting and strict payload size caps—meaning a single bot loop could drain Gemini API quota and Vercel function duration in minutes.
+  2. **Unbounded In-Memory Serverless Caches**: `rateLimitStore`, `memoryRooms`, `serverUrlCache`, `fallbackFeedback`, `fallbackIncidents`, and `memoryContests` had no upper size cap, risking `1024 MB` serverless OOM crashes under high-cardinality IP or room-creation floods.
+  3. **840+ MB Local Studio Footprint in Repository Root**: `video/` (839 MB Remotion studio, `node_modules`, and MP4 renders) and `desktop-pet/` (1.6 MB macOS binary workspace) sat in the repo root without a `.vercelignore`, risking massive CLI upload payloads and build cache bloat.
+  4. **Permissive Public RLS on Administrative Tables**: In `supabase/schema.sql`, `incident_reports`, `feedback_responses`, `feature_flags`, and `trivia_answer_contests` allowed public `SELECT` or `UPDATE` policies, exposing reporter emails or feature flags if an anonymous client queried Supabase directly.
+  5. **Stateless Token Replay**: `/api/vatar/round/finish` verified HMAC signatures and expiry windows on stateless round tokens, but did not block replaying the exact same `roundId` multiple times within the grace window.
+- **User Insight & Guiding Philosophy**:
+  Surviving launch-week traffic on a free-tier infrastructure budget isn't about upgrading cloud plans prematurely—it's about **deterministic bounds**: bounding every in-memory map, every LLM request rate, every external fetch timeout, and every static asset byte before traffic arrives.
+- **Architectural & Product Landing**:
+  1. **Universal AI & Mutation Rate Limiting (`app/api/ai/*`, `app/api/articulate/*`, `app/api/trivia/league/*`, `app/api/mathletics/league/*`, `app/api/feedback`, `app/api/safety/report`)**:
+     - Added sliding-window per-IP rate limiting, banned-identifier/bot-pattern checks, input length slicing, and explicit `AbortSignal.timeout(7000–14000)` guards across every AI and write endpoint so hung upstream calls never consume Vercel function GB-seconds.
+  2. **Bounded FIFO Serverless Memory Caches (`lib/security-guard.ts`, `lib/articulate-room.ts`, `app/api/shorten/route.ts`, `lib/admin-data.ts`, `lib/trivia-contests.ts`)**:
+     - Capped `rateLimitStore` (10,000 keys), `memoryRooms` via `setMemoryRoom()` (250 rooms), `serverUrlCache` (1,000 URLs), and admin/contest fallback arrays (500 entries) with automatic oldest-entry eviction.
+  3. **Stateless Round Replay Guard & Hardened Secrets (`app/api/vatar/round/finish/route.ts`, `lib/admin-auth.ts`, `lib/vatar/server.ts`)**:
+     - Added in-memory `usedRoundIds` + Supabase `vatar_rounds` deduplication on round completion so a signed round token can only be redeemed once, and chained production secret fallbacks so hardcoded seeds cannot be forged in production.
+  4. **Supabase RLS Lockdown (`supabase/schema.sql`)**:
+     - Dropped public `SELECT`/`UPDATE` policies on `incident_reports` and `feedback_responses`, and dropped public write policies on `feature_flags` and `trivia_answer_contests` so all administrative reads/mutations flow strictly through server-authenticated routes.
+  5. **Vercel Hobby Footprint & Quota Optimization (`.vercelignore`, `next.config.ts`, `ParlorShowcaseDeck.tsx`)**:
+     - Added `.vercelignore` excluding `video/` (839 MB), `desktop-pet/`, `docs/`, `.agents/`, and `supabase/` from deployment uploads.
+     - Enabled `optimizePackageImports: ["lucide-react", "framer-motion", "recharts"]`, disabled production browser source maps, added 1-year `immutable` CDN cache headers for `/showcase/*`, `/avatars/*`, and `/icons/*`, and marked static showcase screenshots `unoptimized` to preserve Vercel's 1,000-image monthly optimization limit.
+- **"Building in Public" Content Takeaway**:
+  > *"How to survive launch-day traffic on Vercel's Free Tier: cap every in-memory Map with FIFO eviction, put a 7–14s AbortSignal timeout and IP rate limit in front of every LLM route, `.vercelignore` your 800MB Remotion video studio, and never let public Supabase RLS policies read your incident reports."*

@@ -8,7 +8,11 @@ const VATAR_RESULTS_SECRET = process.env.VATAR_RESULTS_SECRET || "";
 
 // Internal secret for HMAC-signing stateless round tokens
 const ROUND_SIGNING_SECRET =
-  process.env.VATAR_ROUND_SECRET || process.env.VATAR_SECRET || "fey-vatar-stateless-round-secret-seed";
+  process.env.VATAR_ROUND_SECRET ||
+  process.env.VATAR_SECRET ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  process.env.GEMINI_API_KEY ||
+  "fey-vatar-stateless-round-secret-seed";
 
 export interface VatarSessionVerifyResult {
   playerId: string;

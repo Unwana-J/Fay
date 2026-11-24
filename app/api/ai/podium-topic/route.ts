@@ -1,22 +1,32 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  const rate = checkRateLimit(`ai-podium-topic:${clientIp}`, 15, 60);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Too many topic requests. Please wait a moment." }, { status: 429 });
+  }
+
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: "AI not configured." }, { status: 503 });
   }
 
-  const { vibe, exclude = [] } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { vibe, exclude = [] } = body;
+  const safeVibe = typeof vibe === "string" ? vibe.slice(0, 60) : "";
+  const safeExclude = Array.isArray(exclude) ? exclude.slice(0, 20).map((e) => String(e).slice(0, 120)) : [];
 
-  const vibeInstruction = vibe
-    ? `The topic should fit the vibe: "${vibe}".`
+  const vibeInstruction = safeVibe
+    ? `The topic should fit the vibe: "${safeVibe}".`
     : `Pick any vibe from: Hot Take, Culture, Social Commentary, Pseudo-Science, Economics, Pop Culture.`;
 
   const excludeInstruction =
-    exclude.length > 0
-      ? `Do NOT generate topics similar to any of these (already used): ${exclude.join(", ")}.`
+    safeExclude.length > 0
+      ? `Do NOT generate topics similar to any of these (already used): ${safeExclude.join(", ")}.`
       : "";
 
   const prompt = `You are the host of a chaotic, fun party presentation game. Generate ONE bold, opinionated presentation topic for a house party.
@@ -44,6 +54,7 @@ Respond ONLY with valid JSON matching this exact shape:
     const res = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(8000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {

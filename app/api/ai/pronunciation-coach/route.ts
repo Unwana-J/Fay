@@ -1,13 +1,21 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  const rate = checkRateLimit(`ai-coach:${clientIp}`, 12, 60);
+  if (!rate.allowed) {
+    return NextResponse.json({ error: "Too many coaching requests. Please wait a moment." }, { status: 429 });
+  }
+
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: "Not configured" }, { status: 503 });
   }
 
+  const body = await req.json().catch(() => ({}));
   const {
     speakerName,
     wordsCorrect,
@@ -15,17 +23,18 @@ export async function POST(req: NextRequest) {
     timeSeconds,
     wordsPerMinute,
     phoneticMatches, // words where guesser was accepted on phonetic leniency
-  } = await req.json();
+  } = body;
 
-  const correctList = (wordsCorrect as string[]).join(", ") || "none";
-  const skippedList = (wordsSkipped as string[]).join(", ") || "none";
-  const phoneticList = (phoneticMatches as string[] || []).join(", ") || "none";
+  const safeSpeaker = typeof speakerName === "string" ? speakerName.slice(0, 60) : "Speaker";
+  const correctList = Array.isArray(wordsCorrect) ? wordsCorrect.slice(0, 40).map(String).join(", ") || "none" : "none";
+  const skippedList = Array.isArray(wordsSkipped) ? wordsSkipped.slice(0, 40).map(String).join(", ") || "none" : "none";
+  const phoneticList = Array.isArray(phoneticMatches) ? phoneticMatches.slice(0, 40).map(String).join(", ") || "none" : "none";
 
   const prompt = `You are Fey, an AI speaking coach for a multiplayer word-description party game like Articulate.
 
 A player just completed their speaking turn. Here are their stats:
 
-Speaker: ${speakerName}
+Speaker: ${safeSpeaker}
 Words successfully described (teammates guessed): ${correctList}
 Words skipped (teammates couldn't guess): ${skippedList}
 Words guessed via phonetic approximation: ${phoneticList}
@@ -60,6 +69,7 @@ All scores are out of 10. Be honest but encouraging. Keep all text under 15 word
     const res = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(9000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {

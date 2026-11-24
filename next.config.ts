@@ -29,12 +29,44 @@ const GLOBAL_SECURITY_HEADERS = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  compress: true,
+  productionBrowserSourceMaps: false,
+  experimental: {
+    optimizePackageImports: ["lucide-react", "framer-motion", "recharts"],
+  },
   allowedDevOrigins: ["192.168.18.2", "192.168.18.2:3000", "localhost", "localhost:3000"],
   async headers() {
     return [
       {
         source: "/:path*",
         headers: GLOBAL_SECURITY_HEADERS,
+      },
+      {
+        source: "/showcase/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/avatars/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
+      },
+      {
+        source: "/icons/:path*",
+        headers: [
+          {
+            key: "Cache-Control",
+            value: "public, max-age=31536000, immutable",
+          },
+        ],
       },
       {
         source: "/vatar/:path*",

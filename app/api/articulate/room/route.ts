@@ -1,9 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { checkRateLimit, getClientIp, isBannedIdentifier, isBotPattern } from "@/lib/security-guard";
 import {
   generateRoomCode,
   createInitialRoom,
   memoryRooms,
+  setMemoryRoom,
   ArticulateRoom,
   sanitizeRoomPlayers,
   toClientRoom,
@@ -11,13 +13,26 @@ import {
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rate = checkRateLimit(`articulate-create:${clientIp}`, 10, 60);
+    if (!rate.allowed) {
+      return NextResponse.json(
+        { error: "Too many rooms created recently. Please wait a moment." },
+        { status: 429 }
+      );
+    }
+
     const body = await req.json().catch(() => ({}));
     const { hostId, hostName, settings, roomName, teamAName, teamBName, teamCName, teamDName, teamCount } = body;
 
-    const effectiveHostId = (hostId && String(hostId).trim()) || `host-${Math.random().toString(36).slice(2, 9)}`;
+    if (isBotPattern(hostName) || isBannedIdentifier(hostName) || (hostId && isBannedIdentifier(String(hostId)))) {
+      return NextResponse.json({ error: "Action not permitted" }, { status: 403 });
+    }
+
+    const effectiveHostId = (hostId && String(hostId).trim().slice(0, 80)) || `host-${Math.random().toString(36).slice(2, 9)}`;
     const effectiveHostName =
       hostName && String(hostName).trim() && hostName !== "Scholar" && hostName !== "Scholar Host"
-        ? String(hostName).trim()
+        ? String(hostName).trim().slice(0, 60)
         : "Host";
 
     // Generate unique code
@@ -44,7 +59,7 @@ export async function POST(req: NextRequest) {
     );
 
     // Save in memory cache
-    memoryRooms.set(code, newRoom);
+    setMemoryRoom(code, newRoom);
 
     const teamsPayload = {
       room_name: newRoom.room_name || "",
@@ -96,7 +111,7 @@ export async function POST(req: NextRequest) {
 
         if (!error && data) {
           newRoom.id = data.id;
-          memoryRooms.set(code, newRoom);
+          setMemoryRoom(code, newRoom);
         } else if (error) {
           console.warn("Supabase articulate_rooms insert notice:", error.message);
         }
@@ -227,7 +242,7 @@ export async function GET(req: NextRequest) {
           }
 
           room = sanitizeRoomPlayers(room);
-          memoryRooms.set(code, room);
+          setMemoryRoom(code, room);
         }
       } catch (err) {
         console.warn("Could not query Supabase in GET room:", err);

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
-// Server-side in-memory cache to return instantly on repeat requests
+// Server-side in-memory cache to return instantly on repeat requests (capped at 1000 entries)
+const MAX_URL_CACHE_SIZE = 1000;
 const serverUrlCache = new Map<string, string>();
 
 const ALLOWED_SHORTEN_HOSTS = new Set([
@@ -94,6 +95,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Shortener provider unavailable" }, { status: 502 });
     }
 
+    if (serverUrlCache.size >= MAX_URL_CACHE_SIZE) {
+      const oldestKey = serverUrlCache.keys().next().value;
+      if (oldestKey) serverUrlCache.delete(oldestKey);
+    }
     serverUrlCache.set(url, shortUrl);
     return NextResponse.json({ shortUrl });
   } catch (err: any) {

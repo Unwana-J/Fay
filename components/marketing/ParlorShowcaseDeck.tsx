@@ -433,6 +433,7 @@ export default function ParlorShowcaseDeck() {
                       src={currentItem.image}
                       alt={`${currentItem.title} interface screenshot`}
                       fill
+                      unoptimized
                       sizes="(max-width: 1024px) 100vw, 55vw"
                       className="object-cover object-top"
                       priority={currentIndex === 0}

@@ -3,11 +3,22 @@ import { getQuestionsByIds } from "@/lib/trivia-questions";
 import { verifySignedRoundToken } from "@/lib/vatar/server";
 import { getTriviaPerformanceRemark } from "@/lib/trivia-remarks";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
+
+// In-memory replay guard for stateless round tokens
+const usedRoundIds = new Set<string>();
+const MAX_USED_ROUNDS = 5000;
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rate = checkRateLimit(`vatar-finish:${clientIp}`, 12, 60);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many round completions. Please pace your rounds." }, { status: 429 });
+    }
+
     const body = await req.json();
     const { roundToken, answers, playerName, avatar } = body;
 
@@ -23,11 +34,36 @@ export async function POST(req: NextRequest) {
 
     const { roundId, playerId, questionIds, durationSeconds, startedAt, difficulty } = tokenPayload;
 
+    // Prevent replay submission of the exact same roundToken
+    if (usedRoundIds.has(roundId)) {
+      return NextResponse.json({ error: "Round token already submitted" }, { status: 409 });
+    }
+
     // Check reasonable duration sanity (allow generous grace window for network lag)
     const elapsedSeconds = (Date.now() - startedAt) / 1000;
     if (elapsedSeconds > durationSeconds + 120) {
       return NextResponse.json({ error: "Round submission exceeded time window" }, { status: 400 });
     }
+
+    // Also check if roundId already exists in Supabase vatar_rounds
+    if (isSupabaseConfigured && supabase) {
+      const { data: existingRound } = await supabase
+        .from("vatar_rounds")
+        .select("round_id")
+        .eq("round_id", roundId)
+        .maybeSingle();
+
+      if (existingRound) {
+        usedRoundIds.add(roundId);
+        return NextResponse.json({ error: "Round already completed" }, { status: 409 });
+      }
+    }
+
+    if (usedRoundIds.size >= MAX_USED_ROUNDS) {
+      const oldest = usedRoundIds.values().next().value;
+      if (oldest) usedRoundIds.delete(oldest);
+    }
+    usedRoundIds.add(roundId);
 
     // 2. Fetch authoritative questions directly by IDs
     const authoritativeQuestions = getQuestionsByIds(questionIds);

@@ -1,9 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
 
 export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  const rate = checkRateLimit(`ai-violation:${clientIp}`, 35, 60);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { violation: false, type: "none", excerpt: "" },
+      { status: 429 }
+    );
+  }
+
   if (!GEMINI_API_KEY) {
     return NextResponse.json(
       { violation: false, type: "none", excerpt: "" },
@@ -11,16 +21,20 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  const { targetWord, description } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { targetWord, description } = body;
 
-  if (!targetWord || !description) {
+  if (!targetWord || !description || typeof targetWord !== "string" || typeof description !== "string") {
     return NextResponse.json({ error: "Missing targetWord or description" }, { status: 400 });
   }
 
+  const safeTarget = targetWord.slice(0, 100);
+  const safeDesc = description.slice(0, 600);
+
   const prompt = `You are a strict rule enforcement referee for a word-description party game called Fey.
 
-The secret word the speaker must NOT say is: "${targetWord}"
-The speaker said: "${description}"
+The secret word the speaker must NOT say is: "${safeTarget}"
+The speaker said: "${safeDesc}"
 
 Check for these rule violations only:
 1. said-word: The speaker said the exact target word (or a direct conjugation, e.g. "playing" for "play")
@@ -41,6 +55,7 @@ or if there is a violation:
     const res = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(7000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {

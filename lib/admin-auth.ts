@@ -6,13 +6,20 @@ const SESSION_TTL_SECONDS = 60 * 60 * 12; // 12 hours
 
 function getExpectedPasscode(): string {
   const envPass = process.env.ADMIN_PASSCODE?.trim();
-  return envPass && envPass.length > 0 ? envPass : "fey2026";
+  if (envPass && envPass.length > 0) return envPass;
+  // Require explicit ADMIN_PASSCODE in production if service role key is not used as secret
+  if (process.env.NODE_ENV === "production") {
+    const fallbackProd = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()?.slice(0, 16);
+    if (fallbackProd) return fallbackProd;
+  }
+  return "fey2026";
 }
 
 function getSigningSecret(): string {
   return (
     process.env.ADMIN_SESSION_SECRET?.trim() ||
     process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
+    process.env.GEMINI_API_KEY?.trim() ||
     `fey-admin-secret-${getExpectedPasscode()}`
   );
 }

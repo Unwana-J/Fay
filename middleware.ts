@@ -48,5 +48,8 @@ export const config = {
     // Apply to API routes and core interactive endpoints
     "/api/:path*",
     "/games/:path*",
+    "/play/:path*",
+    "/podium/:path*",
+    "/admin/:path*",
   ],
 };

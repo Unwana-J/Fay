@@ -1,12 +1,19 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getFreshQuestions, type TriviaDifficultyFilter } from "@/lib/trivia-questions";
 import { createSignedRoundToken } from "@/lib/vatar/server";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 import crypto from "node:crypto";
 
 export const dynamic = "force-dynamic";
 
 export async function POST(req: NextRequest) {
   try {
+    const clientIp = getClientIp(req);
+    const rate = checkRateLimit(`vatar-start:${clientIp}`, 15, 60);
+    if (!rate.allowed) {
+      return NextResponse.json({ error: "Too many round requests. Please wait a moment." }, { status: 429 });
+    }
+
     const body = await req.json();
     const { playerId, difficulty = "random", durationMinutes = 5 } = body;
 

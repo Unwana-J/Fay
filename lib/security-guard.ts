@@ -27,6 +27,7 @@ interface RateLimitEntry {
   blockedUntil?: number;
 }
 
+const MAX_RATE_LIMIT_ENTRIES = 10_000;
 const rateLimitStore = new Map<string, RateLimitEntry>();
 
 // Cleanup stale entries every 10 minutes to prevent memory leaks
@@ -77,6 +78,11 @@ export function checkRateLimit(
 
   let entry = rateLimitStore.get(key);
   if (!entry) {
+    // Evict oldest keys if map grows beyond safe serverless memory limit
+    if (rateLimitStore.size >= MAX_RATE_LIMIT_ENTRIES) {
+      const oldestKey = rateLimitStore.keys().next().value;
+      if (oldestKey) rateLimitStore.delete(oldestKey);
+    }
     entry = { timestamps: [] };
     rateLimitStore.set(key, entry);
   }

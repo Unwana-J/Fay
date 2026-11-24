@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { type SlideStyle } from "@/lib/podium-types";
 import { PODIUM_THEMES } from "@/lib/podium-themes";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const GEMINI_URL = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${GEMINI_API_KEY}`;
@@ -17,33 +18,48 @@ function getStyleInstruction(style: SlideStyle): string {
 }
 
 export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  const rate = checkRateLimit(`ai-slides:${clientIp}`, 8, 60);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many slide generation requests. Please wait a moment.", retryAfter: rate.retryAfter },
+      { status: 429 }
+    );
+  }
+
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: "AI not configured." }, { status: 503 });
   }
 
-  const { topic, subtitle, notes, author, style = "bold", category = "General" } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { topic, subtitle, notes, author, style = "bold", category = "General" } = body;
 
-  if (!topic) {
-    return NextResponse.json({ error: "Missing topic" }, { status: 400 });
+  if (!topic || typeof topic !== "string" || topic.length > 300) {
+    return NextResponse.json({ error: "Missing or invalid topic" }, { status: 400 });
   }
+
+  const safeSubtitle = typeof subtitle === "string" ? subtitle.slice(0, 200) : "";
+  const safeNotes = typeof notes === "string" ? notes.slice(0, 3000) : "";
+  const safeAuthor = typeof author === "string" ? author.slice(0, 80) : "Scholar";
+  const safeCategory = typeof category === "string" ? category.slice(0, 60) : "General";
 
   // Pick a curated theme for this deck
   const palette = PODIUM_THEMES[Math.floor(Math.random() * PODIUM_THEMES.length)];
   const styleInstruction = getStyleInstruction(style as SlideStyle);
 
-  const hasUserNotes = notes && notes.trim().length > 0;
+  const hasUserNotes = safeNotes.trim().length > 0;
   const notesSection = hasUserNotes
     ? `THE PRESENTER'S PERSONAL NOTES & TALKING POINTS:
 """
-${notes.trim()}
+${safeNotes.trim()}
 """`
     : `No specific notes provided — generate authentic, witty, high-conviction points from the topic thesis.`;
 
   const prompt = `You are a world-class speechwriter and presentation editor designing a 5-slide deck for a live talk.
 
 Topic: "${topic}"
-Subtitle: "${subtitle}"
-Presenter: "${author || "Scholar"}"
+Subtitle: "${safeSubtitle}"
+Presenter: "${safeAuthor || "Scholar"}"
 
 ${notesSection}
 
@@ -83,6 +99,7 @@ Respond ONLY with a valid JSON array of exactly 5 slide objects:
     const res = await fetch(GEMINI_URL, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
+      signal: AbortSignal.timeout(14000),
       body: JSON.stringify({
         contents: [{ parts: [{ text: prompt }] }],
         generationConfig: {

@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { checkRateLimit, getClientIp, isBannedIdentifier, isBotPattern } from "@/lib/security-guard";
 import {
   memoryRooms,
+  setMemoryRoom,
   ArticulateRoom,
   RoomTeam,
   getNextSpeakerForTeam,
@@ -98,7 +100,7 @@ async function persistRoom(room: ArticulateRoom) {
     }
   }
 
-  memoryRooms.set(room.room_code, room);
+  setMemoryRoom(room.room_code, room);
 }
 
 function getActiveTeamKeys(room: ArticulateRoom): ("A" | "B" | "C" | "D")[] {
@@ -226,7 +228,7 @@ async function getRoom(code: string): Promise<ArticulateRoom | null> {
         }
 
         room = sanitizeRoomPlayers(room);
-        memoryRooms.set(normalized, room);
+        setMemoryRoom(normalized, room);
       }
     } catch (err) {
       console.warn("Could not query Supabase in action getRoom:", err);
@@ -262,8 +264,22 @@ export async function POST(
   req: NextRequest,
   { params }: { params: Promise<{ code: string }> }
 ) {
+  const clientIp = getClientIp(req);
+  const rate = checkRateLimit(`articulate-action:${clientIp}`, 120, 60);
+  if (!rate.allowed) {
+    return actionResponse({ error: "Too many actions, please slow down." }, { status: 429 });
+  }
+
   const { code } = await params;
   const body = await req.json().catch(() => ({}));
+
+  if (
+    isBotPattern(body?.playerName) ||
+    isBannedIdentifier(body?.playerName) ||
+    (body?.playerId && isBannedIdentifier(String(body.playerId)))
+  ) {
+    return actionResponse({ error: "Action not permitted." }, { status: 403 });
+  }
 
   for (let attempt = 1; attempt <= MAX_WRITE_ATTEMPTS; attempt++) {
     try {

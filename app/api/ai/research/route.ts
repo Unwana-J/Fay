@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import type { ResearchPack, ResearchQuizQuestion, ResearchSource } from "@/lib/research-types";
+import { checkRateLimit, getClientIp } from "@/lib/security-guard";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 // Gemini 3 models use thinkingLevel: "minimal" to respond in ~2-3s instead of spending 15s+ reasoning
@@ -403,10 +404,20 @@ function normalizeQuiz(raw: any, fallback: ResearchQuizQuestion[]): ResearchQuiz
 }
 
 export async function POST(req: NextRequest) {
+  const clientIp = getClientIp(req);
+  const rate = checkRateLimit(`ai-research:${clientIp}`, 12, 60);
+  if (!rate.allowed) {
+    return NextResponse.json(
+      { error: "Too many research pack requests. Please wait a moment.", retryAfter: rate.retryAfter },
+      { status: 429 }
+    );
+  }
+
   if (!GEMINI_API_KEY) {
     return NextResponse.json({ error: "AI not configured." }, { status: 503 });
   }
-  const { topicId, topic, category, tags } = await req.json();
+  const body = await req.json().catch(() => ({}));
+  const { topicId, topic, category, tags } = body;
   if (!topicId || !topic || typeof topic !== "string" || topic.length > 300) {
     return NextResponse.json({ error: "Invalid topic" }, { status: 400 });
   }
