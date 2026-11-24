@@ -66,6 +66,7 @@ import {
 } from "@/lib/trivia-challenge";
 import { relativeDate, cn } from "@/lib/utils";
 import { triggerCelestialAscension } from "@/lib/celestial-events";
+import CategoryIcon from "@/components/ui/CategoryIcon";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -672,6 +673,135 @@ const SAMPLE_CELESTIAL_BODIES: CelestialBodyItem[] = [
       ],
     },
   },
+  // Additional rich Suns, Moons, and Stars for a full 60+ Power-Scholar Solar System
+  ...[
+    { id: "s-extra-1", cat: "Economics", title: "How do currency pegs collapse under speculative attacks?", sec: 92, xp: 160, date: "2026-10-09" },
+    { id: "s-extra-2", cat: "Product Management", title: "Why do network effects create winner-take-all marketplaces?", sec: 88, xp: 150, date: "2026-10-08" },
+    { id: "s-extra-3", cat: "Technology", title: "How does zero-knowledge cryptography verify truth without revealing data?", sec: 95, xp: 180, date: "2026-10-07" },
+    { id: "s-extra-4", cat: "Psychology", title: "Why does loss aversion outweigh equivalent gains by 2x in human choice?", sec: 90, xp: 140, date: "2026-10-06" },
+    { id: "s-extra-5", cat: "Startups", title: "How do you solve the cold-start problem in two-sided platforms?", sec: 86, xp: 150, date: "2026-10-05" },
+    { id: "s-extra-6", cat: "Software Engineering", title: "Explain the CAP theorem and eventual consistency in distributed databases.", sec: 94, xp: 175, date: "2026-10-04" },
+    { id: "s-extra-7", cat: "Design", title: "Why does physical continuity in UI animation reduce cognitive load?", sec: 89, xp: 145, date: "2026-10-03" },
+  ].map((s): CelestialBodyItem => ({
+    id: s.id,
+    kind: "sun",
+    subType: "solo_session",
+    title: s.title,
+    subtitle: `${s.cat} · ${s.sec}s speech`,
+    badgeText: s.cat,
+    category: s.cat,
+    date: s.date,
+    timestamp: new Date(s.date + "T12:00:00Z").getTime(),
+    xpOrPoints: s.xp,
+    xpLabel: `+${s.xp} XP`,
+    magnitude: 0.9,
+    isSample: true,
+    sessionData: {
+      id: s.id,
+      topicId: s.id,
+      topicText: s.title,
+      category: s.cat,
+      difficulty: "Scholar",
+      date: s.date,
+      researchMinutes: 15,
+      notes: "First-principles breakdown and key mechanisms.",
+      summary: s.title,
+      speakingSeconds: s.sec,
+      reflection: { interesting: "Core mechanism clarity.", hardest: "Concise pacing.", different: "Sharper opening hook." },
+      ratings: { confidence: 5, understanding: 5, communication: 5 },
+      xpEarned: s.xp,
+      tags: [s.cat.toLowerCase()],
+    },
+  })),
+  // Additional League Drops & Challenges (Moons — 24 more for 30 total Moons)
+  ...Array.from({ length: 24 }).map((_, i): CelestialBodyItem => {
+    const leagues = [
+      { code: "LOKIN1", title: "Lokin Scholars Cup", cat: "History" },
+      { code: "FOUND9", title: "Naija Founders League", cat: "Economics" },
+      { code: "QUANT7", title: "Lagos Quant Marathon", cat: "Finance" },
+      { code: "TECH26", title: "Frontier Builders League", cat: "Technology" },
+      { code: "CULT55", title: "Afrobeats & Culture Cup", cat: "Pop Culture" },
+      { code: "POLY99", title: "Grand Polymath Gauntlet", cat: "Philosophy" },
+    ];
+    const lg = leagues[i % leagues.length];
+    const dayNum = Math.floor(i / leagues.length) + 2;
+    const score = 4 + (i % 2);
+    const pct = score * 20;
+    const pts = 520 + (i % 5) * 45;
+    const dayStr = String(Math.max(1, 28 - i)).padStart(2, "0");
+    return {
+      id: `sample-moon-extra-${i}`,
+      kind: "moon",
+      subType: i % 5 === 0 ? "challenge" : "league_drop",
+      title: `${lg.title} · Drop ${dayNum}`,
+      subtitle: `${score}/5 Correct · ${pct}% Accuracy`,
+      badgeText: `Drop ${dayNum}`,
+      category: lg.cat,
+      date: `2026-09-${dayStr}`,
+      timestamp: new Date(`2026-09-${dayStr}T15:00:00Z`).getTime(),
+      xpOrPoints: pts,
+      xpLabel: `+${pts} pts`,
+      magnitude: pct / 100,
+      groupId: lg.code,
+      isSample: true,
+      dropData: {
+        leagueCode: lg.code,
+        leagueTitle: lg.title,
+        dayNumber: dayNum,
+        score,
+        totalQuestions: 5,
+        pct,
+        points: pts,
+        durationSeconds: 30 + (i % 15),
+      },
+    };
+  }),
+  // Additional Solo Quizzes (Stars — 16 more across 8 categories for 22 total Stars)
+  ...Array.from({ length: 16 }).map((_, i): CelestialBodyItem => {
+    const cats = [
+      "History",
+      "Pop Culture",
+      "General Knowledge",
+      "Sports",
+      "Economics",
+      "Science",
+      "Technology",
+      "Philosophy",
+    ];
+    const cat = cats[i % cats.length];
+    const score = 12 + (i % 4);
+    const pct = Math.round((score / 15) * 100);
+    const xp = 175 + (i % 4) * 20;
+    const dayStr = String(Math.max(1, 25 - i)).padStart(2, "0");
+    return {
+      id: `sample-star-extra-${i}`,
+      kind: "star",
+      subType: "solo_quiz",
+      title: `${cat} Mastery Quiz #${Math.floor(i / cats.length) + 2}`,
+      subtitle: `${score}/15 Correct · Naija Expert (${pct}%)`,
+      badgeText: `${pct}%`,
+      category: cat,
+      date: `2026-09-${dayStr}`,
+      timestamp: new Date(`2026-09-${dayStr}T18:00:00Z`).getTime(),
+      xpOrPoints: xp,
+      xpLabel: `+${xp} XP`,
+      magnitude: pct / 100,
+      isSample: true,
+      quizData: {
+        id: `sq-extra-${i}`,
+        timestamp: new Date(`2026-09-${dayStr}T18:00:00Z`).getTime(),
+        date: `2026-09-${dayStr}`,
+        score,
+        total: 15,
+        pct,
+        gradeLabel: "Naija Expert",
+        xpEarned: xp,
+        durationMinutes: 8,
+        questionIds: ["q1", "q2"],
+        categoryBreakdown: [{ category: cat, correct: score, total: 15 }],
+      },
+    };
+  }),
 ];
 
 // ─── Color Lookup Helper ──────────────────────────────────────────────────────
@@ -686,6 +816,36 @@ const EXTENDED_CATEGORY_COLORS: Record<string, string> = {
 
 function getCategoryAccent(category: string): string {
   return EXTENDED_CATEGORY_COLORS[category] || CATEGORY_COLORS[category] || "#444E2C";
+}
+
+// ─── Custom Engraved Compass Star Icon (Replaces generic AI Sparkles) ─────────
+function CompassStarIcon({
+  size = 14,
+  className,
+  style,
+}: {
+  size?: number;
+  className?: string;
+  style?: React.CSSProperties;
+}) {
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      style={style}
+      aria-hidden="true"
+    >
+      <circle cx="12" cy="12" r="8" stroke="currentColor" strokeOpacity="0.35" strokeWidth="1.3" />
+      <polygon
+        points="12,1.5 14.3,9.7 22.5,12 14.3,14.3 12,22.5 9.7,14.3 1.5,12 9.7,9.7"
+        fill="currentColor"
+      />
+      <circle cx="12" cy="12" r="2.2" fill="var(--bg-card)" />
+    </svg>
+  );
 }
 
 // ─── Custom Node 1: Engraved Astrolabe Orbital Rings Backdrop ─────────────────
@@ -743,33 +903,32 @@ function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} fill="none">
         <defs>
           <radialGradient id="solarGlowBg" cx="50%" cy="50%" r="50%">
-            <stop offset="0%" stopColor="#D89B2B" stopOpacity="0.28" />
-            <stop offset="35%" stopColor="#A67C1E" stopOpacity="0.14" />
-            <stop offset="70%" stopColor="#444E2C" stopOpacity="0.06" />
+            <stop offset="0%" stopColor="#A67C1E" stopOpacity="0.11" />
+            <stop offset="45%" stopColor="#444E2C" stopOpacity="0.045" />
             <stop offset="100%" stopColor="#F4EFE6" stopOpacity="0" />
           </radialGradient>
         </defs>
 
-        {/* Warm celestial glow */}
-        <circle cx={cx} cy={cy} r={outerRimRadius + 25} fill="url(#solarGlowBg)" />
+        {/* Subtle editorial parchment wash */}
+        <circle cx={cx} cy={cy} r={outerRimRadius + 20} fill="url(#solarGlowBg)" />
 
-        {/* Ambient stardust */}
+        {/* Ambient cartographic star points */}
         {ambientStars.map((st, idx) => (
           <circle
             key={idx}
             cx={st.x}
             cy={st.y}
-            r={st.r}
+            r={st.r * 0.85}
             fill={idx % 3 === 0 ? "#A67C1E" : idx % 3 === 1 ? "#7A1C2E" : "#444E2C"}
-            opacity={st.opacity}
+            opacity={st.opacity * 0.85}
           />
         ))}
 
         {/* Cardinal & Diagonal Astrolabe Meridians */}
         {[0, 45, 90, 135, 180, 225, 270, 315].map((deg) => {
           const rad = (deg * Math.PI) / 180;
-          const x1 = cx + Math.cos(rad) * 58;
-          const y1 = cy + Math.sin(rad) * 58;
+          const x1 = cx + Math.cos(rad) * 62;
+          const y1 = cy + Math.sin(rad) * 62;
           const x2 = cx + Math.cos(rad) * outerRimRadius;
           const y2 = cy + Math.sin(rad) * outerRimRadius;
           return (
@@ -780,27 +939,35 @@ function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
               x2={x2}
               y2={y2}
               stroke="#444E2C"
-              strokeOpacity={deg % 90 === 0 ? 0.22 : 0.12}
-              strokeWidth={deg % 90 === 0 ? 1.4 : 1}
-              strokeDasharray={deg % 90 === 0 ? "none" : "4 7"}
+              strokeOpacity={deg % 90 === 0 ? 0.26 : 0.14}
+              strokeWidth={deg % 90 === 0 ? 1.25 : 0.9}
+              strokeDasharray={deg % 90 === 0 ? "none" : "3 6"}
             />
           );
         })}
 
-        {/* Outer Astrolabe Degree Rim */}
+        {/* Outer Astrolabe Double Degree Rim */}
+        <circle
+          cx={cx}
+          cy={cy}
+          r={outerRimRadius + 6}
+          stroke="#444E2C"
+          strokeOpacity="0.18"
+          strokeWidth="1"
+        />
         <circle
           cx={cx}
           cy={cy}
           r={outerRimRadius}
           stroke="#444E2C"
-          strokeOpacity="0.26"
+          strokeOpacity="0.35"
           strokeWidth="1.5"
         />
         {Array.from({ length: 72 }).map((_, i) => {
           const deg = i * 5;
           const rad = (deg * Math.PI) / 180;
           const isMajor = deg % 30 === 0;
-          const rInner = isMajor ? outerRimRadius - 12 : outerRimRadius - 6;
+          const rInner = isMajor ? outerRimRadius - 11 : outerRimRadius - 5;
           const rOuter = outerRimRadius;
           return (
             <line
@@ -810,8 +977,8 @@ function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
               x2={cx + Math.cos(rad) * rOuter}
               y2={cy + Math.sin(rad) * rOuter}
               stroke="#444E2C"
-              strokeOpacity={isMajor ? 0.42 : 0.2}
-              strokeWidth={isMajor ? 1.6 : 1}
+              strokeOpacity={isMajor ? 0.48 : 0.22}
+              strokeWidth={isMajor ? 1.5 : 0.9}
             />
           );
         })}
@@ -824,17 +991,17 @@ function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
               cy={cy}
               r={r}
               stroke="#A67C1E"
-              strokeOpacity={idx === 0 ? 0.14 : 0.08}
-              strokeWidth={idx === 0 ? 10 : 6}
+              strokeOpacity={idx === 0 ? 0.12 : 0.06}
+              strokeWidth={idx === 0 ? 6 : 4}
             />
             <circle
               cx={cx}
               cy={cy}
               r={r}
               stroke="#A67C1E"
-              strokeOpacity={idx === 0 ? 0.72 : 0.45}
-              strokeWidth={idx === 0 ? 2.4 : 1.6}
-              strokeDasharray="8 5"
+              strokeOpacity={idx === 0 ? 0.65 : 0.42}
+              strokeWidth={idx === 0 ? 1.8 : 1.3}
+              strokeDasharray="6 4"
             />
           </g>
         ))}
@@ -847,17 +1014,17 @@ function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
               cy={cy}
               r={r}
               stroke="#444E2C"
-              strokeOpacity={idx === 0 ? 0.1 : 0.06}
-              strokeWidth={idx === 0 ? 10 : 6}
+              strokeOpacity={idx === 0 ? 0.1 : 0.05}
+              strokeWidth={idx === 0 ? 6 : 4}
             />
             <circle
               cx={cx}
               cy={cy}
               r={r}
               stroke="#444E2C"
-              strokeOpacity={idx === 0 ? 0.62 : 0.4}
-              strokeWidth={idx === 0 ? 2.4 : 1.6}
-              strokeDasharray="10 6"
+              strokeOpacity={idx === 0 ? 0.6 : 0.38}
+              strokeWidth={idx === 0 ? 1.8 : 1.3}
+              strokeDasharray="8 5"
             />
           </g>
         ))}
@@ -870,39 +1037,39 @@ function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
               cy={cy}
               r={r}
               stroke="#7A1C2E"
-              strokeOpacity={idx === 0 ? 0.1 : 0.06}
-              strokeWidth={idx === 0 ? 10 : 6}
+              strokeOpacity={idx === 0 ? 0.1 : 0.05}
+              strokeWidth={idx === 0 ? 6 : 4}
             />
             <circle
               cx={cx}
               cy={cy}
               r={r}
               stroke="#7A1C2E"
-              strokeOpacity={idx === 0 ? 0.55 : 0.36}
-              strokeWidth={idx === 0 ? 2.4 : 1.6}
-              strokeDasharray="4 6"
+              strokeOpacity={idx === 0 ? 0.55 : 0.35}
+              strokeWidth={idx === 0 ? 1.8 : 1.3}
+              strokeDasharray="3 5"
             />
           </g>
         ))}
 
         {/* Crisp High-Contrast Orbit Labels */}
         <g transform={`translate(${cx}, ${cy - primarySunR})`}>
-          <rect x="-78" y="-11" width="156" height="22" rx="11" fill="#FDFCFA" stroke="#A67C1E" strokeOpacity="0.65" strokeWidth="1.4" />
-          <text x="0" y="3.5" textAnchor="middle" fill="#8C6210" fontSize="9.5" fontWeight="800" letterSpacing="1.1" fontFamily="monospace">
+          <rect x="-78" y="-11" width="156" height="22" rx="11" fill="#F4EFE6" stroke="#A67C1E" strokeWidth="1.4" />
+          <text x="0" y="3.5" textAnchor="middle" fill="#8C6210" fontSize="9.5" fontWeight="800" letterSpacing="1.2" fontFamily="monospace">
             SUNS · SPEAKING
           </text>
         </g>
 
         <g transform={`translate(${cx}, ${cy - primaryMoonR})`}>
-          <rect x="-118" y="-11" width="236" height="22" rx="11" fill="#FDFCFA" stroke="#444E2C" strokeOpacity="0.6" strokeWidth="1.4" />
-          <text x="0" y="3.5" textAnchor="middle" fill="#444E2C" fontSize="9.5" fontWeight="800" letterSpacing="1.1" fontFamily="monospace">
+          <rect x="-118" y="-11" width="236" height="22" rx="11" fill="#F4EFE6" stroke="#444E2C" strokeWidth="1.4" />
+          <text x="0" y="3.5" textAnchor="middle" fill="#444E2C" fontSize="9.5" fontWeight="800" letterSpacing="1.2" fontFamily="monospace">
             MOONS · DROPS &amp; CHALLENGES
           </text>
         </g>
 
         <g transform={`translate(${cx}, ${cy - primaryStarR})`}>
-          <rect x="-82" y="-11" width="164" height="22" rx="11" fill="#FDFCFA" stroke="#7A1C2E" strokeOpacity="0.6" strokeWidth="1.4" />
-          <text x="0" y="3.5" textAnchor="middle" fill="#7A1C2E" fontSize="9.5" fontWeight="800" letterSpacing="1.1" fontFamily="monospace">
+          <rect x="-82" y="-11" width="164" height="22" rx="11" fill="#F4EFE6" stroke="#7A1C2E" strokeWidth="1.4" />
+          <text x="0" y="3.5" textAnchor="middle" fill="#7A1C2E" fontSize="9.5" fontWeight="800" letterSpacing="1.2" fontFamily="monospace">
             STARS · QUIZZES
           </text>
         </g>
@@ -911,7 +1078,7 @@ function OrbitBackdropNode({ data }: { data: OrbitBackdropData }) {
   );
 }
 
-// ─── Custom Node 2: Central Solar Core (The Scholar) ──────────────────────────
+// ─── Custom Node 2: Central Solar Core (Engraved Scholar's Medallion) ─────────
 function SolarCoreNode({
   data,
 }: {
@@ -937,51 +1104,80 @@ function SolarCoreNode({
       <Handle type="source" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="target" position={Position.Bottom} style={{ opacity: 0 }} />
 
-      {/* Outer pulsing corona */}
-      <div
-        className="absolute inset-0 rounded-full transition-transform duration-500 group-hover:scale-110"
-        style={{
-          background:
-            "radial-gradient(circle, rgba(217,155,38,0.45) 0%, rgba(122,28,46,0.22) 55%, rgba(166,124,30,0) 75%)",
-          animation: "pulse 4s ease-in-out infinite",
-        }}
-      />
-
-      {/* Rotating SVG Solar Corona Rays */}
+      {/* Engraved Astrolabe Compass Dial Ring */}
       <svg
         viewBox="0 0 128 128"
-        className="absolute inset-0 w-full h-full pointer-events-none"
-        style={{ animation: "spinSlow 36s linear infinite" }}
+        className="absolute inset-0 w-full h-full pointer-events-none transition-transform duration-700 group-hover:rotate-12"
       >
-        {Array.from({ length: 16 }).map((_, i) => {
-          const angle = i * 22.5;
-          const isLong = i % 2 === 0;
+        {/* Outer fine brass ring */}
+        <circle
+          cx="64"
+          cy="64"
+          r="60"
+          fill="#F4EFE6"
+          stroke="#A67C1E"
+          strokeWidth="1.5"
+        />
+        <circle
+          cx="64"
+          cy="64"
+          r="55"
+          fill="none"
+          stroke="#444E2C"
+          strokeOpacity="0.4"
+          strokeWidth="1"
+          strokeDasharray="3 3"
+        />
+        {/* 24 fine engraved degree ticks + 4 cardinal diamond pointers */}
+        {Array.from({ length: 24 }).map((_, i) => {
+          const deg = i * 15;
+          const isCardinal = deg % 90 === 0;
           return (
-            <g key={i} transform={`rotate(${angle} 64 64)`}>
-              <polygon
-                points={isLong ? "60,11 68,11 64,1" : "61,15 67,15 64,6"}
-                fill="#A67C1E"
-                opacity={isLong ? 0.85 : 0.55}
-              />
+            <g key={i} transform={`rotate(${deg} 64 64)`}>
+              {isCardinal ? (
+                <polygon
+                  points="64,3 67,11 64,14 61,11"
+                  fill="#7A1C2E"
+                />
+              ) : (
+                <line
+                  x1="64"
+                  y1="5.5"
+                  x2="64"
+                  y2={deg % 45 === 0 ? "12" : "9.5"}
+                  stroke="#A67C1E"
+                  strokeWidth={deg % 45 === 0 ? "1.6" : "1.1"}
+                />
+              )}
             </g>
           );
         })}
       </svg>
 
-      {/* Main Golden-Terracotta Sun Sphere */}
+      {/* Main Editorial Wine-Terracotta Medallion Seal */}
       <div
-        className="relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center text-center transition-transform duration-200 group-hover:scale-105 shadow-lg"
+        className="relative z-10 w-24 h-24 rounded-full flex flex-col items-center justify-center text-center transition-transform duration-200 group-hover:scale-105"
         style={{
-          background: "radial-gradient(circle at 32% 30%, #FFE299 0%, #D89B2B 45%, #7A1C2E 100%)",
-          border: "3px solid #FDFCFA",
-          boxShadow: "0 0 32px rgba(166,124,30,0.55), inset 0 2px 8px rgba(255,255,255,0.5)",
+          background: "#7A1C2E",
+          border: "2.5px solid #F4EFE6",
+          boxShadow: "0 0 0 2px #A67C1E, 0 8px 20px rgba(30, 34, 17, 0.22)",
         }}
       >
-        <Sun size={22} className="text-[#FDFCFA] mb-0.5 drop-shadow-xs" />
-        <span className="font-space font-extrabold text-xs leading-tight text-[#FDFCFA] max-w-[78px] truncate px-1">
+        {/* Inner engraved gold thread ring */}
+        <div
+          className="absolute inset-1.5 rounded-full pointer-events-none"
+          style={{
+            border: "1px dashed rgba(244, 239, 230, 0.45)",
+          }}
+        />
+        <Compass size={18} className="text-[#E6C67C] mb-0.5" />
+        <span className="font-serif font-bold text-xs leading-tight text-[#F4EFE6] max-w-[76px] truncate px-1">
           {data.username || "Scholar"}
         </span>
-        <span className="font-mono text-[9px] font-bold uppercase tracking-wider text-[#FDFCFA]/95 mt-0.5">
+        <span
+          className="font-mono text-[9px] font-bold uppercase tracking-wider mt-0.5 px-1.5 py-0.2 rounded"
+          style={{ color: "#E6C67C" }}
+        >
           Lv {data.level} · {data.streakDays}d
         </span>
       </div>
@@ -992,7 +1188,7 @@ function SolarCoreNode({
           className="rounded-xl px-3.5 py-2 text-center whitespace-nowrap surface-raised shadow-md"
           style={{ color: "var(--text)" }}
         >
-          <div className="font-space font-bold text-xs">
+          <div className="font-serif font-bold text-xs">
             {data.isPreview ? "Reference Solar Core" : `${data.username || "Scholar"}'s Solar Core`}
           </div>
           <div className="text-[10px] font-mono mt-0.5" style={{ color: "var(--text-dim)" }}>
@@ -1004,7 +1200,7 @@ function SolarCoreNode({
   );
 }
 
-// ─── Custom Node 3: Speaking Session / Presentation (Radiant Sun) ─────────────
+// ─── Custom Node 3: Speaking Session / Presentation (Engraved Sun Medallion) ──
 function SunBodyNode({
   data,
 }: {
@@ -1013,7 +1209,7 @@ function SunBodyNode({
   const { item, isSelected } = data;
   const accent = getCategoryAccent(item.category);
   const count = item.clusterCount || 1;
-  const diameter = Math.round(54 + item.magnitude * 12 + (count > 1 ? Math.min(10, count * 1.5) : 0));
+  const diameter = Math.round(52 + item.magnitude * 10 + (count > 1 ? Math.min(10, count * 1.5) : 0));
 
   return (
     <div
@@ -1024,41 +1220,73 @@ function SunBodyNode({
       <Handle type="target" position={Position.Top} style={{ opacity: 0 }} />
       <Handle type="source" position={Position.Bottom} style={{ opacity: 0 }} />
 
-      {/* Solar Rays SVG */}
+      {/* Engraved Fine-Line Sunburst Etching */}
       <svg
         viewBox="0 0 100 100"
-        className="absolute inset-0 w-full h-full pointer-events-none transition-transform duration-300 group-hover:rotate-45"
+        className="absolute inset-0 w-full h-full pointer-events-none transition-transform duration-500 group-hover:rotate-45"
       >
-        {Array.from({ length: 12 }).map((_, i) => {
-          const deg = i * 30;
+        <circle
+          cx="50"
+          cy="50"
+          r="42"
+          fill="none"
+          stroke="#A67C1E"
+          strokeOpacity={isSelected ? "0.8" : "0.38"}
+          strokeWidth="1"
+          strokeDasharray="2 3"
+        />
+        {Array.from({ length: 16 }).map((_, i) => {
+          const deg = i * 22.5;
+          const isMajor = i % 2 === 0;
           return (
             <g key={i} transform={`rotate(${deg} 50 50)`}>
-              <polygon
-                points="46,12 54,12 50,1"
-                fill="#A67C1E"
-                opacity={isSelected ? 0.95 : 0.72}
+              <line
+                x1="50"
+                y1={isMajor ? "2" : "7"}
+                x2="50"
+                y2="14"
+                stroke={isMajor ? "#7A1C2E" : "#A67C1E"}
+                strokeWidth={isMajor ? "1.8" : "1.2"}
+                strokeLinecap="round"
+                opacity={isSelected ? 1 : 0.8}
               />
             </g>
           );
         })}
       </svg>
 
-      {/* Sun Sphere */}
+      {/* Crisp Editorial Sun Medallion */}
       <div
         className={cn(
-          "relative z-10 rounded-full flex flex-col items-center justify-center transition-all duration-200 group-hover:scale-110",
-          isSelected && "ring-4 ring-[var(--terra)] ring-offset-2 ring-offset-[var(--bg-base)]"
+          "relative z-10 rounded-full flex flex-col items-center justify-center transition-all duration-200 group-hover:scale-108",
+          isSelected && "ring-3 ring-[var(--terra)] ring-offset-2 ring-offset-[var(--bg-base)]"
         )}
         style={{
           width: diameter,
           height: diameter,
-          background: `radial-gradient(circle at 30% 30%, #FFF7DB 0%, #E5A52C 45%, ${accent} 100%)`,
-          border: "2.5px solid #FDFCFA",
-          boxShadow: "0 4px 20px rgba(166,124,30,0.52)",
+          background: "#FBF5E6",
+          border: "2.2px solid #A67C1E",
+          boxShadow: "0 0 0 2px #F4EFE6, 0 4px 12px rgba(30, 34, 17, 0.16)",
         }}
       >
-        <Mic size={Math.max(15, Math.round(diameter * 0.28))} className="text-[#1E2211] drop-shadow-2xs" />
-        <span className="font-mono font-extrabold text-[8.5px] uppercase tracking-tight text-[#1E2211] mt-0.5">
+        {/* Inner engraved category ring */}
+        <div
+          className="absolute inset-[3px] rounded-full pointer-events-none"
+          style={{
+            border: `1.2px solid ${accent}`,
+            opacity: 0.55,
+          }}
+        />
+        <span style={{ color: "#7A1C2E" }}>
+          <CategoryIcon
+            category={item.category}
+            size={Math.max(14, Math.round(diameter * 0.27))}
+          />
+        </span>
+        <span
+          className="font-mono font-extrabold text-[8px] uppercase tracking-wider mt-0.5"
+          style={{ color: "#1E2211" }}
+        >
           {count > 1 ? `×${count}` : "SUN"}
         </span>
       </div>
@@ -1066,11 +1294,11 @@ function SunBodyNode({
       {/* Cluster Count Badge */}
       {count > 1 && (
         <div
-          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-sm pointer-events-none"
+          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-xs pointer-events-none"
           style={{
-            background: "#1E2211",
-            borderColor: "#FDFCFA",
-            color: "#FDFCFA",
+            background: "#7A1C2E",
+            borderColor: "#F4EFE6",
+            color: "#F4EFE6",
           }}
         >
           ×{count}
@@ -1089,7 +1317,7 @@ function SunBodyNode({
             </span>
             <span className="text-[9px] font-mono font-bold text-[var(--olive)]">{item.xpLabel}</span>
           </div>
-          <p className="font-space font-bold text-[11px] leading-snug line-clamp-2">{item.title}</p>
+          <p className="font-serif font-bold text-[11px] leading-snug line-clamp-2">{item.title}</p>
           <p className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
             {item.subtitle}
           </p>
@@ -1099,7 +1327,7 @@ function SunBodyNode({
   );
 }
 
-// ─── Custom Node 4: Completed Drop / Challenge (Luminous Moon / Lunar System) ─
+// ─── Custom Node 4: Completed Drop / Challenge (High-Contrast Olive Lunar Seal) ─
 function MoonBodyNode({
   data,
 }: {
@@ -1108,7 +1336,7 @@ function MoonBodyNode({
   const { item, isSelected } = data;
   const accent = getCategoryAccent(item.category);
   const count = item.clusterCount || 1;
-  const diameter = Math.round(44 + item.magnitude * 10 + (count > 1 ? Math.min(12, count * 1.4) : 0));
+  const diameter = Math.round(44 + item.magnitude * 8 + (count > 1 ? Math.min(10, count * 1.3) : 0));
 
   return (
     <div
@@ -1122,62 +1350,70 @@ function MoonBodyNode({
       {/* Outer Planetary Ring Halo when Clustered (×N) */}
       {count > 1 && (
         <div
-          className="absolute inset-0 rounded-full pointer-events-none transition-transform duration-300 group-hover:scale-110"
+          className="absolute inset-0.5 rounded-full pointer-events-none transition-transform duration-300 group-hover:scale-108"
           style={{
-            border: `1.5px dashed ${accent}`,
-            opacity: 0.55,
+            border: "1.5px dashed #444E2C",
+            opacity: 0.65,
           }}
         />
       )}
 
-      {/* Lunar Body with Crescent Highlight & Craters */}
+      {/* High-Contrast Engraved Lunar Medallion */}
       <div
         className={cn(
-          "relative z-10 rounded-full flex flex-col items-center justify-center transition-all duration-200 group-hover:scale-110 overflow-hidden",
-          isSelected && "ring-4 ring-[var(--olive)] ring-offset-2 ring-offset-[var(--bg-base)]"
+          "relative z-10 rounded-full flex flex-col items-center justify-center transition-all duration-200 group-hover:scale-108 overflow-hidden",
+          isSelected && "ring-3 ring-[var(--olive)] ring-offset-2 ring-offset-[var(--bg-base)]"
         )}
         style={{
           width: diameter,
           height: diameter,
-          background: "radial-gradient(circle at 28% 26%, #FDFCFA 0%, #E5DFD0 55%, #848C72 100%)",
-          border: `2.5px solid ${accent}`,
-          boxShadow: "0 4px 16px rgba(68,78,44,0.34)",
+          background: "#2C331B",
+          border: `2px solid ${accent}`,
+          boxShadow: "0 0 0 1.5px #F4EFE6, 0 4px 10px rgba(30, 34, 17, 0.18)",
         }}
       >
-        {/* Crescent shadow & craters SVG */}
+        {/* Engraved Astronomical Crescent Phase Diagram */}
         <svg viewBox="0 0 60 60" className="absolute inset-0 w-full h-full pointer-events-none">
+          {/* Illuminated parchment lunar crescent */}
           <path
-            d="M 38 4 A 26 26 0 1 1 14 52 A 22 24 0 1 0 38 4 Z"
-            fill="#444E2C"
+            d="M 32 5 A 25 25 0 1 0 32 55 A 17 23 0 1 1 32 5 Z"
+            fill="#EAE3D2"
             opacity="0.22"
           />
-          <circle cx="19" cy="21" r="4.5" fill="#444E2C" opacity="0.14" />
-          <circle cx="34" cy="37" r="3.2" fill="#444E2C" opacity="0.14" />
-          <circle cx="22" cy="39" r="2.2" fill="#444E2C" opacity="0.11" />
+          {/* Fine inner engraved meridian ring */}
+          <circle
+            cx="30"
+            cy="30"
+            r="24"
+            fill="none"
+            stroke="#F4EFE6"
+            strokeOpacity="0.28"
+            strokeWidth="1"
+          />
         </svg>
 
         <Moon
-          size={Math.max(15, Math.round(diameter * 0.34))}
+          size={Math.max(14, Math.round(diameter * 0.34))}
           className="relative z-10"
-          style={{ color: accent }}
+          style={{ color: "#F4EFE6" }}
         />
       </div>
 
-      {/* Compact Top-Right Cluster Badge (Only when ×2 or more; zero bottom text clutter!) */}
+      {/* Compact Top-Right Cluster Badge */}
       {count > 1 && (
         <div
-          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-sm pointer-events-none"
+          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-xs pointer-events-none"
           style={{
             background: "#444E2C",
-            borderColor: "#FDFCFA",
-            color: "#FDFCFA",
+            borderColor: "#F4EFE6",
+            color: "#F4EFE6",
           }}
         >
           ×{count}
         </div>
       )}
 
-      {/* Hover Card (Shows full details cleanly on hover/tap) */}
+      {/* Hover Card */}
       <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none z-40">
         <div
           className="rounded-xl px-3 py-2 text-xs w-56 surface-raised shadow-md"
@@ -1189,7 +1425,7 @@ function MoonBodyNode({
             </span>
             <span className="text-[9px] font-mono font-bold text-[var(--gold)]">{item.xpLabel}</span>
           </div>
-          <p className="font-space font-bold text-[11px] leading-snug line-clamp-2">{item.title}</p>
+          <p className="font-serif font-bold text-[11px] leading-snug line-clamp-2">{item.title}</p>
           <p className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
             {item.subtitle}
           </p>
@@ -1199,7 +1435,7 @@ function MoonBodyNode({
   );
 }
 
-// ─── Custom Node 5: Completed Solo Quiz (Celestial Star / Star Cluster) ───────
+// ─── Custom Node 5: Completed Solo Quiz (Engraved Compass Rose Star) ──────────
 function StarBodyNode({
   data,
 }: {
@@ -1208,7 +1444,7 @@ function StarBodyNode({
   const { item, isSelected } = data;
   const accent = getCategoryAccent(item.category);
   const count = item.clusterCount || 1;
-  const size = Math.round(48 + item.magnitude * 12 + (count > 1 ? Math.min(14, count * 1.2) : 0));
+  const size = Math.round(50 + item.magnitude * 10 + (count > 1 ? Math.min(12, count * 1.2) : 0));
 
   return (
     <div
@@ -1222,71 +1458,83 @@ function StarBodyNode({
       {/* Outer Stellar Cluster Halo when Clustered (×N) */}
       {count > 1 && (
         <div
-          className="absolute inset-0 rounded-full pointer-events-none transition-transform duration-300 group-hover:scale-110"
+          className="absolute inset-0.5 rounded-full pointer-events-none transition-transform duration-300 group-hover:scale-108"
           style={{
             border: `1.5px dashed ${accent}`,
-            opacity: 0.5,
+            opacity: 0.6,
           }}
         />
       )}
 
-      {/* 8-Point Celestial Compass Star SVG */}
+      {/* Engraved Cartographic 8-Point Compass Rose SVG (Zero gradient ID bugs!) */}
       <div
         className={cn(
-          "relative z-10 w-full h-full flex items-center justify-center transition-transform duration-200 group-hover:scale-115",
-          isSelected && "scale-115"
+          "relative z-10 w-full h-full flex items-center justify-center transition-transform duration-200 group-hover:scale-110",
+          isSelected && "scale-110"
         )}
       >
-        <svg viewBox="0 0 80 80" className="w-full h-full overflow-visible drop-shadow-sm">
-          <defs>
-            <radialGradient id={`starGrad-${item.id}`} cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#FFF8E7" />
-              <stop offset="45%" stopColor="#E09F28" />
-              <stop offset="100%" stopColor={accent} />
-            </radialGradient>
-          </defs>
-          {/* Outer Halo */}
+        <svg viewBox="0 0 80 80" className="w-full h-full overflow-visible">
+          {/* Fine outer astrolabe ring */}
           <circle
             cx="40"
             cy="40"
-            r={isSelected ? 32 : 25}
-            fill={accent}
-            opacity={isSelected ? 0.28 : 0.16}
+            r="28"
+            fill="#F4EFE6"
+            stroke="#A67C1E"
+            strokeWidth="1.2"
           />
-          {/* Secondary 45-deg minor star points */}
+          <circle
+            cx="40"
+            cy="40"
+            r="24"
+            fill="none"
+            stroke={accent}
+            strokeOpacity="0.35"
+            strokeWidth="0.9"
+            strokeDasharray="2 2"
+          />
+          {/* Secondary 45-deg bronze points */}
           <polygon
-            points="40,12 46,34 68,40 46,46 40,68 34,46 12,40 34,34"
+            points="40,10 45,35 70,40 45,45 40,70 35,45 10,40 35,35"
             transform="rotate(45 40 40)"
             fill="#A67C1E"
-            opacity="0.8"
+            stroke="#F4EFE6"
+            strokeWidth="1.2"
           />
-          {/* Primary 4-point compass star */}
+          {/* Primary 4-point compass star in solid category/terracotta ink */}
           <polygon
-            points="40,2 48,32 78,40 48,48 40,78 32,48 2,40 32,32"
-            fill={`url(#starGrad-${item.id})`}
-            stroke="#FDFCFA"
-            strokeWidth="2.2"
+            points="40,3 46.5,33.5 77,40 46.5,46.5 40,77 33.5,46.5 3,40 33.5,33.5"
+            fill="#7A1C2E"
+            stroke="#F4EFE6"
+            strokeWidth="1.6"
           />
-          {/* Center gem */}
-          <circle cx="40" cy="40" r="11.5" fill="#FDFCFA" opacity="0.96" />
+          {/* Crisp parchment center medallion for score percentage */}
+          <circle
+            cx="40"
+            cy="40"
+            r="14.5"
+            fill="#FBF5E6"
+            stroke="#7A1C2E"
+            strokeWidth="1.6"
+          />
         </svg>
 
         <span
           className="absolute font-mono font-extrabold text-[8.5px] tracking-tighter"
-          style={{ color: "#1E2211" }}
+          style={{ color: "#7A1C2E" }}
         >
           {item.badgeText}
         </span>
       </div>
 
-      {/* Compact Top-Right Cluster Badge (Only when ×2 or more; zero bottom text clutter!) */}
+      {/* Compact Top-Right Cluster Badge */}
       {count > 1 && (
         <div
-          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-sm pointer-events-none"
+          className="absolute -top-0.5 -right-0.5 z-20 px-1.5 py-0.5 rounded-full text-[9px] font-mono font-extrabold border shadow-xs pointer-events-none"
           style={{
             background: "#7A1C2E",
-            borderColor: "#FDFCFA",
-            color: "#FDFCFA",
+            borderColor: "#F4EFE6",
+            color: "#F4EFE6",
           }}
         >
           ×{count}
@@ -1305,7 +1553,7 @@ function StarBodyNode({
             </span>
             <span className="text-[9px] font-mono font-bold text-[var(--gold)]">{item.xpLabel}</span>
           </div>
-          <p className="font-space font-bold text-[11px] leading-snug line-clamp-2">{item.title}</p>
+          <p className="font-serif font-bold text-[11px] leading-snug line-clamp-2">{item.title}</p>
           <p className="text-[10px] mt-0.5" style={{ color: "var(--text-dim)" }}>
             {item.subtitle}
           </p>
@@ -1526,11 +1774,20 @@ function buildSolarSystemGraph(
       const slice = remaining.slice(0, capacity);
       remaining = remaining.slice(capacity);
 
-      // Stagger angle offset slightly on alternating sub-rings so radial lines don't stack
-      const baseOffset = -Math.PI / 2.4 + ringIdx * (Math.PI / Math.max(slice.length, 6));
+      // Leave a clean top-center arc gap around -90 deg (-PI/2) on the primary ring so the orbit label pill is never covered
+      const n = Math.max(slice.length, 1);
+      const labelGapRad = ringIdx === 0 ? Math.min(0.68, Math.max(0.42, 130 / currentRadius)) : 0;
+      const usableArc = 2 * Math.PI - labelGapRad;
+      const startAngle =
+        ringIdx === 0
+          ? -Math.PI / 2 + labelGapRad / 2 + usableArc / (2 * n)
+          : -Math.PI / 2.2 + ringIdx * (Math.PI / Math.max(slice.length, 6));
+
       slice.forEach((item, idx) => {
-        // Avoid placing nodes directly at -90 deg (top center) where the orbit title badge sits
-        const rawAngle = baseOffset + (2 * Math.PI * idx) / Math.max(slice.length, 1);
+        const rawAngle =
+          ringIdx === 0
+            ? startAngle + (usableArc * idx) / n
+            : startAngle + (2 * Math.PI * idx) / n;
         placements.push({ item, radius: currentRadius, angle: rawAngle });
       });
 
@@ -2110,7 +2367,7 @@ function CelestialActivityDetail({
               color: isMoon ? "var(--olive)" : "var(--terra)",
             }}
           >
-            {isMoon ? <Moon size={18} /> : <Sparkles size={18} />}
+            {isMoon ? <Moon size={18} /> : <CompassStarIcon size={18} />}
           </div>
           <div>
             <div className="flex items-center gap-1.5">
@@ -2550,7 +2807,7 @@ function SolarCoreDetail({
           </div>
           <div className="flex items-center justify-between text-xs">
             <span className="flex items-center gap-2" style={{ color: "var(--text-dim)" }}>
-              <Sparkles size={14} className="text-[var(--terra)]" /> Stars (Quizzes)
+              <CompassStarIcon size={14} className="text-[var(--terra)]" /> Stars (Quizzes)
             </span>
             <span className="font-mono font-bold" style={{ color: "var(--text)" }}>
               {starCount}
@@ -2603,6 +2860,86 @@ export default function ConstellationPage() {
 
   // Preview toggle: if user has 0 real bodies after hydration, default to showing Sample Preview
   const [manualPreviewToggle, setManualPreviewToggle] = useState<boolean | null>(null);
+  // Grouped Clusters (×N) vs All Individual Nodes toggle (defaults to Grouped for clean scaling)
+  const [isGroupedView, setIsGroupedView] = useState(true);
+
+  const seedDemoPowerUser = useCallback(() => {
+    const sampleTrivia: TriviaHistoryItem[] = SAMPLE_CELESTIAL_BODIES.filter(
+      (b) => b.kind === "star" && b.quizData
+    ).map((b) => b.quizData!);
+
+    const sampleDropsAsTrivia: TriviaHistoryItem[] = SAMPLE_CELESTIAL_BODIES.filter(
+      (b) => b.kind === "moon" && b.dropData
+    ).map((b, idx) => ({
+      id: `seed-drop-${idx}`,
+      timestamp: b.timestamp,
+      date: b.date,
+      score: b.dropData!.score,
+      total: b.dropData!.totalQuestions,
+      pct: b.dropData!.pct,
+      gradeLabel: `${b.dropData!.leagueTitle} · Drop ${b.dropData!.dayNumber} (${b.dropData!.pct}%)`,
+      xpEarned: b.dropData!.points,
+      durationMinutes: 3,
+      questionIds: ["q1", "q2", "q3", "q4", "q5"],
+      categoryBreakdown: [
+        {
+          category: b.category,
+          correct: b.dropData!.score,
+          total: b.dropData!.totalQuestions,
+        },
+      ],
+    }));
+
+    const sampleSessions: CompletedSession[] = SAMPLE_CELESTIAL_BODIES.filter(
+      (b) => b.kind === "sun" && b.sessionData
+    ).map((b) => b.sessionData!);
+
+    const sampleArticulate: ArticulateHistoryItem[] = SAMPLE_CELESTIAL_BODIES.filter(
+      (b) => b.kind === "moon" && b.articulateData
+    ).map((b) => b.articulateData!);
+
+    useAppStore.setState((state) => ({
+      ...state,
+      isOnboarded: true,
+      profile: {
+        ...state.profile,
+        id: state.profile.id || "scholar-titan-1",
+        username:
+          state.profile.username && state.profile.username !== "Scholar"
+            ? state.profile.username
+            : "Adaeze",
+        bio: "Explaining complex ideas in simple, memorable terms",
+        avatar: state.profile.avatar || "/avatars/avatar-architect.svg",
+        xp: Math.max(state.profile.xp, 6840),
+      },
+      streak: {
+        ...state.streak,
+        current: Math.max(state.streak.current, 14),
+        longest: Math.max(state.streak.longest, 21),
+        total: Math.max(state.streak.total, 42),
+        shields: 2,
+      },
+      sessions: sampleSessions,
+      triviaHistory: [...sampleTrivia, ...sampleDropsAsTrivia],
+      articulateHistory: sampleArticulate,
+    }));
+
+    setManualPreviewToggle(false);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("seed") === "1") {
+        seedDemoPowerUser();
+      } else if (params.get("demo") === "1" || params.get("example") === "1") {
+        setManualPreviewToggle(true);
+      }
+      if (params.get("grouped") === "0" || params.get("all") === "1") {
+        setIsGroupedView(false);
+      }
+    }
+  }, [seedDemoPowerUser]);
 
   // Hydrate League Drops, Challenges, and Cloud Quiz History from localStorage + Cloud API
   useEffect(() => {
@@ -3105,9 +3442,6 @@ export default function ConstellationPage() {
     [activeDataset]
   );
 
-  // Grouped Clusters (×N) vs All Individual Nodes toggle (defaults to Grouped for clean scaling)
-  const [isGroupedView, setIsGroupedView] = useState(true);
-
   const displayBodies = useMemo(() => {
     return isGroupedView ? buildClusteredBodies(filteredBodies) : filteredBodies;
   }, [isGroupedView, filteredBodies]);
@@ -3270,7 +3604,7 @@ export default function ConstellationPage() {
               className="px-2.5 sm:px-3 py-1.5 sm:py-2 rounded-xl text-[11px] sm:text-xs font-space font-bold flex items-center gap-1.5 border transition-all cursor-pointer bg-[var(--bg-card)] text-[var(--gold)] border-[var(--gold)]/50 hover:border-[var(--gold)] shadow-2xs"
               title="See the animation that plays when you finish a game or speaking session"
             >
-              <Sparkles size={13} />
+              <Compass size={13} />
               <span>Test Animation</span>
             </button>
 
@@ -3352,7 +3686,7 @@ export default function ConstellationPage() {
               id: "star" as const,
               label: "Stars · Quizzes",
               count: starTotal,
-              icon: Sparkles,
+              icon: CompassStarIcon,
               accent: "var(--terra)",
             },
           ].map((tab) => {
@@ -3503,7 +3837,7 @@ export default function ConstellationPage() {
             >
               <div className="space-y-0.5">
                 <div className="flex items-center gap-1.5">
-                  <Sparkles size={13} className="text-[var(--gold)] shrink-0" />
+                  <Compass size={13} className="text-[var(--gold)] shrink-0" />
                   <span className="font-space font-bold text-xs" style={{ color: "var(--text)" }}>
                     Example Constellation
                   </span>

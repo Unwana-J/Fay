@@ -5,15 +5,16 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Shuffle, Search, ChevronRight, Star, StarOff,
-  Plus, Trash2, SlidersHorizontal, Zap, Sparkles
+  Plus, Trash2, SlidersHorizontal, Zap, Sparkles, BookOpen
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import {
-  TOPIC_BANK, CATEGORIES, CATEGORY_ICONS,
+  TOPIC_BANK, CATEGORIES,
   DIFFICULTIES, type Topic
 } from "@/lib/topics";
 import { cn } from "@/lib/utils";
 import FeyLogo from "@/components/ui/FeyLogo";
+import CategoryIcon from "@/components/ui/CategoryIcon";
 
 const ROULETTE_DURATION = 2000; // ms
 
@@ -105,7 +106,9 @@ function RouletteCard({ topic, spinning }: { topic: Topic | null; spinning: bool
             className="flex flex-col items-center justify-center"
           >
             <div className="flex items-center gap-2 mb-5">
-              <span className="text-2xl">{CATEGORY_ICONS[topic.category]}</span>
+              <span className="text-[var(--olive)]">
+                <CategoryIcon category={topic.category} size={20} />
+              </span>
               <span className="tag tag-olive">
                 {topic.category}
               </span>
@@ -158,9 +161,9 @@ function TopicPickerCard({ topic, onSelect }: { topic: Topic; onSelect: (t: Topi
       <div className="flex items-start gap-3">
         <div
           className="w-8 h-8 rounded-lg flex items-center justify-center text-sm flex-shrink-0 border"
-          style={{ background: "var(--bg-input)", borderColor: "var(--border-dim)" }}
+          style={{ background: "var(--bg-input)", borderColor: "var(--border-dim)", color: "var(--olive)" }}
         >
-          {CATEGORY_ICONS[topic.category]}
+          <CategoryIcon category={topic.category} size={15} />
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium leading-snug" style={{ color: "var(--text)" }}>{topic.text}</p>
@@ -210,7 +213,9 @@ function ConfirmModal({
         className="rounded-2xl p-6 md:p-8 max-w-lg w-full surface-raised max-h-[85vh] overflow-y-auto flex flex-col gap-6"
       >
         <div className="text-center">
-          <div className="text-3xl mb-3">{CATEGORY_ICONS[topic.category]}</div>
+          <div className="w-11 h-11 rounded-2xl mx-auto mb-3 flex items-center justify-center border" style={{ background: "var(--bg-input)", borderColor: "var(--border)", color: "var(--olive)" }}>
+            <CategoryIcon category={topic.category} size={22} />
+          </div>
           <h2 
             className="font-space font-bold leading-snug mb-3 text-display" 
             style={{ 
@@ -471,7 +476,9 @@ function DiscoverPageContent() {
                         textDecoration: enabled ? "none" : "line-through",
                       }}
                     >
-                      <span>{CATEGORY_ICONS[cat]}</span>
+                      <span className="shrink-0" style={{ color: enabled ? "var(--olive)" : "var(--text-mute)" }}>
+                        <CategoryIcon category={cat} size={14} />
+                      </span>
                       <span className="truncate">{cat}</span>
                     </button>
                     <button
@@ -501,7 +508,7 @@ function DiscoverPageContent() {
                 key={tab}
                 onClick={() => setActiveTab(tab)}
                 className={cn(
-                  "px-5 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all",
+                  "px-5 py-2 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all inline-flex items-center gap-1.5 cursor-pointer",
                   activeTab === tab
                     ? "bg-white/40 text-black shadow-sm"
                     : "text-white/40 hover:text-white/70"
@@ -511,7 +518,17 @@ function DiscoverPageContent() {
                   color: activeTab === tab ? "var(--text)" : "var(--text-mute)"
                 }}
               >
-                {tab === "roulette" ? "🎰 Roulette" : "📚 Browse"}
+                {tab === "roulette" ? (
+                  <>
+                    <Shuffle size={13} />
+                    <span>Roulette</span>
+                  </>
+                ) : (
+                  <>
+                    <BookOpen size={13} />
+                    <span>Browse</span>
+                  </>
+                )}
               </button>
             ))}
           </div>

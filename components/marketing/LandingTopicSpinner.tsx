@@ -7,18 +7,17 @@ import {
   Shuffle,
   ArrowRight,
   CheckCircle2,
-  Sparkles,
   Mic,
   Timer,
   Flame,
 } from "lucide-react";
 import {
   ACCESSIBLE_ONBOARDING_TOPICS,
-  CATEGORY_ICONS,
   type Topic,
 } from "@/lib/topics";
 import { useAppStore } from "@/store/useAppStore";
 import FeyLogo from "@/components/ui/FeyLogo";
+import CategoryIcon from "@/components/ui/CategoryIcon";
 
 interface LandingTopicSpinnerProps {
   onStartClick?: () => void;
@@ -104,9 +103,22 @@ export default function LandingTopicSpinner({
 
       {/* Main interactive card */}
       <div
-        className="relative surface-hero rounded-3xl p-5 sm:p-7 shadow-[0_20px_50px_-20px_rgba(30,34,17,0.22)] border"
-        style={{ borderColor: "var(--border)" }}
+        className="relative surface-hero rounded-3xl p-5 sm:p-7 shadow-[0_20px_50px_-20px_rgba(30,34,17,0.22)] border overflow-hidden"
+        style={{
+          borderColor: "var(--border)",
+          background:
+            "radial-gradient(circle at 50% 35%, rgba(166, 124, 30, 0.09) 0%, rgba(68, 78, 44, 0.04) 48%, var(--bg-card) 82%)",
+        }}
       >
+        {/* Subtle editorial dot-grid texture */}
+        <div
+          className="absolute inset-0 pointer-events-none opacity-35"
+          style={{
+            backgroundImage:
+              "radial-gradient(rgba(68, 78, 44, 0.22) 1px, transparent 1px)",
+            backgroundSize: "18px 18px",
+          }}
+        />
         {/* Top Header Bar */}
         <div className="flex items-center justify-between mb-5 pb-3 border-b" style={{ borderColor: "var(--border-dim)" }}>
           <div className="flex items-center gap-2">
@@ -167,10 +179,10 @@ export default function LandingTopicSpinner({
 
                 <div className="mt-3.5">
                   <span
-                    className="font-space font-bold text-lg sm:text-xl block tracking-tight group-hover:text-[var(--terra)] transition-colors"
+                    className="font-serif font-bold text-lg sm:text-xl block tracking-tight group-hover:text-[var(--terra)] transition-colors"
                     style={{ color: "var(--text)" }}
                   >
-                    Spin me
+                    Spin Today&apos;s Prompt
                   </span>
                   <p
                     className="text-xs mt-1 max-w-xs"
@@ -181,13 +193,17 @@ export default function LandingTopicSpinner({
                 </div>
 
                 <div
-                  className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono font-medium border surface hover:border-[var(--olive)] transition-colors"
+                  className="mt-3.5 inline-flex items-center gap-2 px-4 py-1.5 rounded-full text-xs font-mono font-bold border transition-all duration-200 group-hover:scale-[1.03] group-active:scale-95"
                   style={{
-                    borderColor: "var(--border-dim)",
-                    color: "var(--olive)",
+                    background:
+                      "linear-gradient(135deg, rgba(122, 28, 46, 0.11) 0%, rgba(166, 124, 30, 0.14) 100%)",
+                    borderColor: "rgba(122, 28, 46, 0.35)",
+                    color: "var(--terra)",
+                    boxShadow:
+                      "0 2px 10px -2px rgba(122, 28, 46, 0.18), inset 0 1px 0 rgba(255, 255, 255, 0.6)",
                   }}
                 >
-                  <Sparkles className="w-3.5 h-3.5" />
+                  <Shuffle className="w-3.5 h-3.5" />
                   <span>Tap to spin a topic</span>
                 </div>
               </button>
@@ -258,17 +274,15 @@ export default function LandingTopicSpinner({
               {/* Category Badges & Respin Header */}
               <div className="flex items-center justify-between gap-2 mb-3">
                 <div className="flex items-center gap-1.5 flex-wrap">
-                  <span className="text-base">
-                    {CATEGORY_ICONS[currentTopic.category] || "💡"}
-                  </span>
                   <span
-                    className="text-[11px] font-bold font-mono tracking-wider uppercase px-2.5 py-0.5 rounded-full"
+                    className="inline-flex items-center gap-1.5 text-[11px] font-bold font-mono tracking-wider uppercase px-2.5 py-0.5 rounded-full"
                     style={{
                       background: "rgba(68, 78, 44, 0.08)",
                       color: "var(--olive)",
                     }}
                   >
-                    {currentTopic.category}
+                    <CategoryIcon category={currentTopic.category} size={12} />
+                    <span>{currentTopic.category}</span>
                   </span>
                   <span
                     className="text-[10px] font-mono px-2 py-0.5 rounded-full"
@@ -415,10 +429,7 @@ export default function LandingTopicSpinner({
                       <span>Challenge Accepted!</span>
                     </>
                   ) : (
-                    <>
-                      <span>Accept Topic &amp; Start Sprint</span>
-                      <ArrowRight className="w-3.5 h-3.5" />
-                    </>
+                    <span>Accept Topic &amp; Start Sprint</span>
                   )}
                 </button>
               </div>

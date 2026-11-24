@@ -256,6 +256,7 @@ export default function Dashboard() {
   const progress  = getLevelProgress(profile.xp);
   const [mounted, setMounted] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
+  const [onboardingInitialMode, setOnboardingInitialMode] = useState<"create" | "signin">("create");
   const [showStreakModal, setShowStreakModal] = useState(false);
   const [skippedToday, setSkippedToday] = useState<string[]>([]);
   const [spinning, setSpinning] = useState(false);
@@ -328,7 +329,11 @@ export default function Dashboard() {
     fetchFeatures();
     if (typeof window !== "undefined") {
       const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get("accepted") === "1" || urlParams.get("onboard") === "1") {
+      if (urlParams.get("login") === "1") {
+        setOnboardingInitialMode("signin");
+        setShowOnboardingModal(true);
+      } else if (urlParams.get("accepted") === "1" || urlParams.get("onboard") === "1") {
+        setOnboardingInitialMode("create");
         setShowOnboardingModal(true);
       }
       if (urlParams.get("tab") === "parlor" || urlParams.get("parlor") === "1") {
@@ -340,8 +345,23 @@ export default function Dashboard() {
   if (!mounted || !isOnboarded) {
     return (
       <>
-        <LandingPageView onStartClick={() => setShowOnboardingModal(true)} />
-        {mounted && showOnboardingModal && <OnboardingModal isOpen={true} />}
+        <LandingPageView
+          onStartClick={() => {
+            setOnboardingInitialMode("create");
+            setShowOnboardingModal(true);
+          }}
+          onLoginClick={() => {
+            setOnboardingInitialMode("signin");
+            setShowOnboardingModal(true);
+          }}
+        />
+        {mounted && showOnboardingModal && (
+          <OnboardingModal
+            isOpen={true}
+            initialMode={onboardingInitialMode}
+            onClose={() => setShowOnboardingModal(false)}
+          />
+        )}
       </>
     );
   }

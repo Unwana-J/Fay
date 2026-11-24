@@ -11,12 +11,72 @@ import {
   Calculator,
   MessagesSquare,
   Presentation,
-  Sparkles,
+  Compass,
   ChevronLeft,
   ChevronRight,
   ArrowRight,
   ExternalLink,
+  Check,
+  X,
+  RotateCcw,
 } from "lucide-react";
+
+interface MiniQuizQuestion {
+  badge: string;
+  question: string;
+  options: string[];
+  correctIndex: number;
+  explanation: string;
+}
+
+const MINI_TASTE_TESTS: Record<string, MiniQuizQuestion[]> = {
+  trivia: [
+    {
+      badge: "Live Naija Trivia Sample",
+      question: "Which Nigerian author won the 2006 Orange Prize for Fiction for her novel 'Half of a Yellow Sun'?",
+      options: ["Buchi Emecheta", "Chimamanda Ngozi Adichie", "Flora Nwapa", "Sefi Atta"],
+      correctIndex: 1,
+      explanation: "Chimamanda Ngozi Adichie won the Orange Prize in 2007 for Half of a Yellow Sun, chronicling the Biafran War.",
+    },
+    {
+      badge: "Live Naija Trivia Sample",
+      question: "What sits at the confluence of the Niger and Benue rivers in central Nigeria?",
+      options: ["Makurdi", "Onitsha", "Lokoja", "Calabar"],
+      correctIndex: 2,
+      explanation: "Lokoja, the capital of Kogi State, lies directly at the confluence of the Niger and Benue rivers.",
+    },
+    {
+      badge: "Live Naija Trivia Sample",
+      question: "In economics, what term describes a market structure with a single buyer controlling demand?",
+      options: ["Oligopoly", "Monopsony", "Monopoly", "Cartel"],
+      correctIndex: 1,
+      explanation: "While a monopoly has one seller, a monopsony has a single buyer dominating the market.",
+    },
+  ],
+  mathletics: [
+    {
+      badge: "25s Quant Mental Shortcut",
+      question: "Shortcut check: What is 25 × 36 in your head?",
+      options: ["850", "900", "925", "960"],
+      correctIndex: 1,
+      explanation: "Since 25 = 100 ÷ 4, divide 36 by 4 to get 9, then multiply by 100 → 900 in 2 seconds!",
+    },
+    {
+      badge: "25s Quant Mental Shortcut",
+      question: "If a startup's revenue grows by 20% and then drops by 20%, what is the net change?",
+      options: ["0% (Break even)", "-2%", "-4%", "+4%"],
+      correctIndex: 2,
+      explanation: "1.20 × 0.80 = 0.96, which is a 4% net decrease.",
+    },
+    {
+      badge: "25s Quant Mental Shortcut",
+      question: "What is 15% of 160?",
+      options: ["22", "24", "26", "28"],
+      correctIndex: 1,
+      explanation: "10% of 160 is 16, and half of that (5%) is 8. 16 + 8 = 24.",
+    },
+  ],
+};
 
 export interface ParlorItem {
   id: string;
@@ -51,7 +111,7 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     accentBorder: "rgba(122, 28, 46, 0.28)",
     tags: ["Feynman Technique", "Solo Habit", "1,000+ Topics"],
     Icon: Mic,
-    image: "/showcase/discover-preview.png",
+    image: "/showcase/discover-preview.png?v=vector",
     urlPath: "fey.lokinlabs.com.ng/discover",
     stat: "1,000+ Topics · Timed Research · Solo Habit",
   },
@@ -69,7 +129,7 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     accentBorder: "rgba(68, 78, 44, 0.28)",
     tags: ["Multiplayer", "Voice Rooms", "Peer Voting"],
     Icon: Users,
-    image: "/showcase/community-preview.png",
+    image: "/showcase/community-preview.png?v=light",
     urlPath: "fey.lokinlabs.com.ng/community",
     stat: "Zero-Database URL Sharing · Peer Audio Playback",
   },
@@ -87,7 +147,7 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     accentBorder: "rgba(68, 78, 44, 0.28)",
     tags: ["1,000+ Questions", "1v1 Challenges", "Leaderboard"],
     Icon: Brain,
-    image: "/showcase/trivia-preview.png",
+    image: "/showcase/trivia-preview.png?v=light",
     urlPath: "fey.lokinlabs.com.ng/games/trivia",
     stat: "1,000+ Questions · 1v1 Challenge Links · Leaderboard",
   },
@@ -105,7 +165,7 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     accentBorder: "rgba(68, 78, 44, 0.28)",
     tags: ["25s Clock", "Mental Math", "Titans Leaderboard"],
     Icon: Calculator,
-    image: "/showcase/mathletics-preview.png",
+    image: "/showcase/mathletics-preview.png?v=quant",
     urlPath: "fey.lokinlabs.com.ng/games/mathletics",
     stat: "25s Rapid Duels · 6 Categories · Titans Rankings",
   },
@@ -123,7 +183,7 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     accentBorder: "rgba(122, 28, 46, 0.28)",
     tags: ["Team Party", "Word Game", "AI Referee"],
     Icon: MessagesSquare,
-    image: "/showcase/articulate-preview.png",
+    image: "/showcase/articulate-preview.png?v=light",
     urlPath: "fey.lokinlabs.com.ng/play",
     stat: "Speech Recognition · AI Referee · Party Turns",
   },
@@ -141,7 +201,7 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     accentBorder: "rgba(166, 124, 30, 0.32)",
     tags: ["Hot Takes", "AI Slide Decks", "Party Night"],
     Icon: Presentation,
-    image: "/showcase/podium-preview.png",
+    image: "/showcase/podium-preview.png?v=light",
     urlPath: "fey.lokinlabs.com.ng/podium",
     stat: "60+ Hot Takes · 5-Slide AI Decks · Presenter Mode",
   },
@@ -158,8 +218,8 @@ export const PARLOR_EXPERIENCES: ParlorItem[] = [
     accentBg: "rgba(166, 124, 30, 0.10)",
     accentBorder: "rgba(166, 124, 30, 0.32)",
     tags: ["Interactive Graph", "Topical Proximity", "Growth Map"],
-    Icon: Sparkles,
-    image: "/showcase/constellation-preview.png",
+    Icon: Compass,
+    image: "/showcase/constellation-preview.png?v=atlas",
     urlPath: "fey.lokinlabs.com.ng/constellation",
     stat: "Topical Proximity Canvas · Audio Archive · Graph Map",
   },
@@ -191,10 +251,24 @@ const slideVariants = {
 export default function ParlorShowcaseDeck() {
   const [[page, direction], setPage] = useState<[number, number]>([0, 0]);
   const [touchStart, setTouchStart] = useState<number | null>(null);
+  const [quizIndexMap, setQuizIndexMap] = useState<Record<string, number>>({});
+  const [selectedAnsMap, setSelectedAnsMap] = useState<Record<string, number | null>>({});
 
   const total = PARLOR_EXPERIENCES.length;
   const currentIndex = ((page % total) + total) % total;
   const currentItem = PARLOR_EXPERIENCES[currentIndex];
+  const miniList = MINI_TASTE_TESTS[currentItem.id];
+  const currentQIdx = (quizIndexMap[currentItem.id] ?? 0) % (miniList?.length || 1);
+  const activeMiniQuiz = miniList ? miniList[currentQIdx] : null;
+  const activeAnswerKey = `${currentItem.id}-${currentQIdx}`;
+  const selectedAns = selectedAnsMap[activeAnswerKey] ?? null;
+
+  const handleNextMiniQuestion = () => {
+    setQuizIndexMap((prev) => ({
+      ...prev,
+      [currentItem.id]: (prev[currentItem.id] ?? 0) + 1,
+    }));
+  };
 
   const paginate = useCallback(
     (newDirection: number) => {
@@ -334,7 +408,7 @@ export default function ParlorShowcaseDeck() {
                     {currentItem.description}
                   </p>
 
-                  <div className="flex flex-wrap gap-1.5 mb-6">
+                  <div className="flex flex-wrap gap-1.5 mb-5">
                     {currentItem.tags.map((tag) => (
                       <span
                         key={tag}
@@ -349,19 +423,128 @@ export default function ParlorShowcaseDeck() {
                       </span>
                     ))}
                   </div>
+
+                  {/* Interactive 1-Question Taste Test (Trivia & Quant) */}
+                  {activeMiniQuiz && (
+                    <div
+                      className="mb-5 p-3.5 rounded-2xl border"
+                      style={{
+                        background: "var(--bg-base)",
+                        borderColor: "var(--border)",
+                      }}
+                    >
+                      <div className="flex items-center justify-between gap-2 mb-2">
+                        <span
+                          className="font-mono text-[10px] uppercase tracking-wider font-bold px-2 py-0.5 rounded-full"
+                          style={{
+                            background: currentItem.accentBg,
+                            color: currentItem.accent,
+                          }}
+                        >
+                          {activeMiniQuiz.badge}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={handleNextMiniQuestion}
+                          className="inline-flex items-center gap-1 text-[11px] font-semibold hover:underline cursor-pointer"
+                          style={{ color: "var(--olive)" }}
+                        >
+                          <RotateCcw size={11} />
+                          <span>New Question</span>
+                        </button>
+                      </div>
+
+                      <p
+                        className="font-serif font-bold text-xs sm:text-sm leading-snug mb-2.5"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {activeMiniQuiz.question}
+                      </p>
+
+                      <div className="grid grid-cols-2 gap-1.5">
+                        {activeMiniQuiz.options.map((opt, idx) => {
+                          const isAnswered = selectedAns !== null;
+                          const isSelected = selectedAns === idx;
+                          const isCorrect = idx === activeMiniQuiz.correctIndex;
+
+                          let borderColor = "var(--border-dim)";
+                          let bg = "var(--bg-card)";
+                          let textColor = "var(--text)";
+
+                          if (isAnswered) {
+                            if (isCorrect) {
+                              borderColor = "var(--olive)";
+                              bg = "rgba(68, 78, 44, 0.12)";
+                              textColor = "var(--olive)";
+                            } else if (isSelected && !isCorrect) {
+                              borderColor = "var(--terra)";
+                              bg = "rgba(122, 28, 46, 0.08)";
+                              textColor = "var(--terra)";
+                            }
+                          }
+
+                          return (
+                            <button
+                              key={opt}
+                              type="button"
+                              onClick={() =>
+                                setSelectedAnsMap((prev) => ({
+                                  ...prev,
+                                  [activeAnswerKey]: idx,
+                                }))
+                              }
+                              className="px-2.5 py-2 rounded-xl border text-left text-xs font-semibold transition-all flex items-center justify-between gap-1.5 cursor-pointer"
+                              style={{
+                                borderColor,
+                                background: bg,
+                                color: textColor,
+                              }}
+                            >
+                              <span className="truncate">{opt}</span>
+                              {isAnswered && isCorrect && (
+                                <Check size={13} className="shrink-0" />
+                              )}
+                              {isAnswered && isSelected && !isCorrect && (
+                                <X size={13} className="shrink-0" />
+                              )}
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {selectedAns !== null && (
+                        <p
+                          className="mt-2.5 text-[11px] leading-relaxed pt-2 border-t"
+                          style={{
+                            borderColor: "var(--border-dim)",
+                            color: "var(--text-dim)",
+                          }}
+                        >
+                          <strong
+                            style={{
+                              color:
+                                selectedAns === activeMiniQuiz.correctIndex
+                                  ? "var(--olive)"
+                                  : "var(--terra)",
+                            }}
+                          >
+                            {selectedAns === activeMiniQuiz.correctIndex
+                              ? "Spot on! "
+                              : "Not quite — "}
+                          </strong>
+                          {activeMiniQuiz.explanation}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <Link
                     href={currentItem.href}
-                    className="py-3 px-5 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center gap-2 transition-transform hover:scale-[1.02] active:scale-[0.98]"
-                    style={{
-                      background: currentItem.accent,
-                      color: "#FFFFFF",
-                    }}
+                    className="btn-terra py-3 px-5 rounded-xl text-xs sm:text-sm font-bold inline-flex items-center justify-center transition-transform hover:scale-[1.02] active:scale-[0.98]"
                   >
                     <span>{currentItem.cta}</span>
-                    <ArrowRight size={14} />
                   </Link>
 
                   <button
@@ -453,15 +636,6 @@ export default function ParlorShowcaseDeck() {
                       style={{ color: "var(--text-dim)" }}
                     >
                       {currentItem.stat}
-                    </span>
-                    <span
-                      className="font-mono text-[9px] sm:text-[10px] uppercase font-bold px-2 py-0.5 rounded-full shrink-0 whitespace-nowrap"
-                      style={{
-                        background: currentItem.accentBg,
-                        color: currentItem.accent,
-                      }}
-                    >
-                      Live in Browser
                     </span>
                   </div>
                 </div>

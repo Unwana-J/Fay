@@ -41,6 +41,7 @@
 31. [Synchronized Wheel Checkpoints & Tactical Board Agency in Online Articulate](#31-synchronized-wheel-checkpoints--tactical-board-agency-in-online-articulate)
 32. [Domain Reputation & Security Hardening for Social Platform Link Previews (X / t.co Trust Signals)](#32-domain-reputation--security-hardening-for-social-platform-link-previews-x--tco-trust-signals)
 33. [Pre-Launch Security & Vercel Hobby Free-Tier Optimization Audit](#33-pre-launch-security--vercel-hobby-free-tier-optimization-audit)
+34. [Interactive Archetype Calibration Quiz & Playable Landing Page Discovery](#34-interactive-archetype-calibration-quiz--playable-landing-page-discovery)
 
 ---
 
@@ -669,3 +670,26 @@
      - Enabled `optimizePackageImports: ["lucide-react", "framer-motion", "recharts"]`, disabled production browser source maps, added 1-year `immutable` CDN cache headers for `/showcase/*`, `/avatars/*`, and `/icons/*`, and marked static showcase screenshots `unoptimized` to preserve Vercel's 1,000-image monthly optimization limit.
 - **"Building in Public" Content Takeaway**:
   > *"How to survive launch-day traffic on Vercel's Free Tier: cap every in-memory Map with FIFO eviction, put a 7–14s AbortSignal timeout and IP rate limit in front of every LLM route, `.vercelignore` your 800MB Remotion video studio, and never let public Supabase RLS policies read your incident reports."*
+
+---
+
+## 34. Interactive Archetype Calibration Quiz & Playable Landing Page Discovery
+
+- **Date / Phase**: Phase 2 — Onboarding Activation & Interactive Landing Page Conversion
+- **The Problem / Context**:
+  The landing page hero spinner (`LandingTopicSpinner.tsx`) created an immediate, tactile sense of curiosity—visitors loved spinning a topic. However, clicking "Start Today's Topic" dropped them into a conventional 3-step SaaS registration form: a 12-avatar scrollable picker grid, a text field, a `<select>` mission dropdown, and a 23-checkbox category list. Meanwhile, the middle sections of the landing page ("23 Disciplines" pill list and The Parlor showcase) were passive reading blocks rather than playable surfaces.
+- **User Insight & Guiding Philosophy**:
+  Onboarding shouldn't feel like filling out an HR form after playing with an interactive spinner—it should feel like **discovering your learning identity**. Instead of forcing new users to manually pick an avatar from a 12-item grid and read a dropdown of mission statements, a 3-tap scenario mini-game can assign their Scholar Archetype, calibrate their mission, and seed their starting topic feed in 10 seconds, leaving only their name sign-off at the reveal.
+- **Architectural & Product Landing**:
+  1. **3-Tap Archetype Calibration Quiz (`components/auth/OnboardingModal.tsx`)**:
+     - Replaced the static Step 1/Step 2 form grids with a 3-question interactive card deck:
+       - *Q1 (Your Instinct)*: Maps how the user approaches a strange new idea (Systems, Rhetoric, Synthesis, Frontier).
+       - *Q2 (Your Speaking Edge)*: Automatically sets their Learning Mission without a dropdown (Clarity, Presence, Range, Speed).
+       - *Q3 (Starting Territory)*: Seeds their initial 4 topic categories (plus any topic they spun on the landing page).
+     - Transitions through a 650ms Fey butterfly calibration spin into an **Archetype Reveal Card** (e.g., *The Architect*, *The Orator*, *The Polymath*) with a custom trait bio, `+50 Starter XP` badge, a single Display Name input to sign their card, and collapsible drawers to swap avatars or fine-tune categories if desired.
+  2. **Interactive 23-Discipline Prompt Explorer (`components/marketing/InteractiveCategoryExplorer.tsx`)**:
+     - Transformed the static discipline pill cloud on the landing page into a live prompt explorer where clicking any discipline (*Philosophy*, *Economics*, *Startups*, etc.) reveals real 90-second speaking prompts from `TOPIC_BANK`, complete with difficulty badges, prompt shuffling, and a 1-click *"Articulate This Topic"* action.
+  3. **In-Deck Playable Taste-Tests (`components/marketing/ParlorShowcaseDeck.tsx`)**:
+     - Embedded live 1-question interactive mini-challenges inside the **Naija Trivia** and **Quant** slides of the Parlor showcase so visitors can test a question and see the Socratic shortcut explanation directly on the landing page before launching a full round.
+- **"Building in Public" Content Takeaway**:
+  > *"If your landing page hero is an interactive toy, don't follow it with a boring form. We replaced our 12-avatar grid, mission dropdown, and 23-category checklist with a 3-tap Archetype Calibration Quiz that assigns your scholar identity in 10 seconds—and made every discipline pill on the landing page playable."*

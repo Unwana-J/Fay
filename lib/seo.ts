@@ -180,7 +180,7 @@ export const PUBLIC_GAMES = [...CORE_FEATURES, ...GAMES];
 export const SITE_FAQ: { q: string; a: string }[] = [
   {
     q: "What is Fey?",
-    a: "Fey is a curated daily learning and speaking platform. Each day you discover a fresh topic outside your usual circle, research it for a few minutes, and explain it out loud in 90 seconds. It also includes community rooms and smart games like Naija Trivia, Online Articulate, and The Podium.",
+    a: "Fey is a curated daily learning and speaking platform. Each day you discover a fresh topic outside your usual circle, research it for a few minutes, and explain it out loud in 90 seconds. It also includes community rooms and smart games like Naija Trivia, Quant (25-second mental math), Online Articulate, and The Podium.",
   },
   {
     q: "How can I build a daily learning habit?",
@@ -200,7 +200,7 @@ export const SITE_FAQ: { q: string; a: string }[] = [
   },
   {
     q: "What fun intellectual games can I play on Fey?",
-    a: "Alongside the daily learning and speaking challenge, Fey includes Naija Trivia (1,000+ curated questions with 1v1 challenge links), Online Articulate (a fast team word-description party game), and The Podium (an AI-assisted hot-take presentation game), all free in your browser.",
+    a: "Alongside the daily learning and speaking challenge, Fey includes Naija Trivia (1,000+ curated questions with 1v1 challenge links), Quant (25-second rapid mental calculation and quantitative reasoning duels), Online Articulate (a fast team word-description party game), and The Podium (an AI-assisted hot-take presentation game), all free in your browser.",
   },
   {
     q: "Is Fey free?",
