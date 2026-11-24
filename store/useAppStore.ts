@@ -682,6 +682,9 @@ export const useAppStore = create<AppState>()(
         });
 
         if (res.success && res.user) {
+          const prevDeviceId = state.profile.id;
+          const prevUsername = state.profile.username;
+
           set((s) => ({
             authEmail: trimmed,
             authUserId: res.user!.id,
@@ -701,6 +704,21 @@ export const useAppStore = create<AppState>()(
           if (typeof window !== "undefined") {
             localStorage.setItem("fey_player_name", chosenUsername);
             localStorage.setItem("fey_device_player_id", res.user!.id);
+
+            // Migrate pre-auth scores from local deviceId to the cloud account ID
+            if (prevDeviceId && prevDeviceId !== res.user.id && chosenUsername) {
+              fetch("/api/trivia/scores", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  oldUsername: prevUsername,
+                  newUsername: chosenUsername,
+                  oldDeviceId: prevDeviceId,
+                  newDeviceId: res.user.id,
+                  authUserId: res.user.id,
+                }),
+              }).catch(() => {});
+            }
           }
 
           analytics.identify(res.user.id, {
@@ -760,6 +778,11 @@ export const useAppStore = create<AppState>()(
 
           const finalXP = Math.max(local.profile.xp, cloud.profile.xp || 0);
 
+          const resolvedUsername =
+            (cloud.profile.username && cloud.profile.username !== "Scholar" && cloud.profile.username !== "Learner" ? cloud.profile.username : "") ||
+            (local.profile.username && local.profile.username !== "Scholar" && local.profile.username !== "Learner" ? local.profile.username : "") ||
+            "";
+
           set({
             isOnboarded: true,
             authEmail: res.user.email,
@@ -770,10 +793,7 @@ export const useAppStore = create<AppState>()(
               ...local.profile,
               id: res.user.id,
               email: res.user.email,
-              username:
-                (cloud.profile.username && cloud.profile.username !== "Scholar" && cloud.profile.username !== "Learner" ? cloud.profile.username : "") ||
-                (local.profile.username && local.profile.username !== "Scholar" && local.profile.username !== "Learner" ? local.profile.username : "") ||
-                "",
+              username: resolvedUsername,
               avatar: cloud.profile.avatar || local.profile.avatar || "/avatars/avatar-scholar.svg",
               bio: cloud.profile.bio || local.profile.bio,
               xp: finalXP,
@@ -785,6 +805,28 @@ export const useAppStore = create<AppState>()(
             claimedQuestIds: mergedQuests,
             settings: cloud.settings || local.settings,
           });
+
+          if (typeof window !== "undefined") {
+            if (resolvedUsername) {
+              localStorage.setItem("fey_player_name", resolvedUsername);
+            }
+            localStorage.setItem("fey_device_player_id", res.user.id);
+
+            // Migrate pre-auth scores from local deviceId to the cloud account ID
+            if (local.profile.id && local.profile.id !== res.user.id && resolvedUsername) {
+              fetch("/api/trivia/scores", {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  oldUsername: local.profile.username,
+                  newUsername: resolvedUsername,
+                  oldDeviceId: local.profile.id,
+                  newDeviceId: res.user.id,
+                  authUserId: res.user.id,
+                }),
+              }).catch(() => {});
+            }
+          }
 
           analytics.identify(res.user.id, {
             email: res.user.email,
@@ -1196,7 +1238,7 @@ export const useAppStore = create<AppState>()(
               localStorage.setItem("fey_player_name", newUsername);
             } catch {}
 
-            // 2. Sync to Supabase so past scores in trivia_scores reflect the new name
+            // 2. Sync to Supabase so past scores in trivia_scores, league_scores & sessions reflect the new name
             fetch("/api/trivia/scores", {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
@@ -1204,6 +1246,7 @@ export const useAppStore = create<AppState>()(
                 oldUsername,
                 newUsername,
                 deviceId: get().profile.id,
+                authUserId: get().authUserId,
               }),
             }).catch(() => {});
           }

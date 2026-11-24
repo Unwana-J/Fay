@@ -693,3 +693,23 @@
      - Embedded live 1-question interactive mini-challenges inside the **Naija Trivia** and **Quant** slides of the Parlor showcase so visitors can test a question and see the Socratic shortcut explanation directly on the landing page before launching a full round.
 - **"Building in Public" Content Takeaway**:
   > *"If your landing page hero is an interactive toy, don't follow it with a boring form. We replaced our 12-avatar grid, mission dropdown, and 23-category checklist with a 3-tap Archetype Calibration Quiz that assigns your scholar identity in 10 seconds—and made every discipline pill on the landing page playable."*
+
+---
+
+## 35. Unified Leaderboard Identity Resolution & Cross-Table Rename Propagation
+
+- **Date / Phase**: Phase 2 — Live Cloud Leaderboard Integrity & Account Continuity
+- **The Problem / Context**:
+  When a scholar changed their display name (e.g. `Unwana` -> `AfangBender` -> `Wana_Bee`) or later claimed a cloud account (changing `profile.id` from a local `uid()` to a Supabase Auth UUID), the Global Scholars leaderboard split their history into multiple separate accounts. Three compounding issues caused this: (1) `GET /api/trivia/leaderboard` grouped scores strictly by lowercase `username` string rather than stable `device_id`/`user_id`, (2) `PATCH /api/trivia/scores` only updated `trivia_scores` and never propagated renames to `league_scores`, `mathletics_scores`, or `play_sessions`, and (3) internal `__LEAGUE_SYNC__` metadata rows in `league_scores` leaked into the global ranking query.
+- **User Insight & Guiding Philosophy**:
+  Identity on a competitive leaderboard should follow the **person**, not a frozen snapshot of their display name. Renaming a profile or upgrading from anonymous local play to a cloud-synced account must never fracture a player's accumulated XP, game count, or league drops—and internal system sync records should never appear alongside human players.
+- **Architectural & Product Landing**:
+  1. **Disjoint-Set Identity Unification (`app/api/trivia/leaderboard/route.ts`)**:
+     - Selected `device_id` (`trivia_scores`) and `user_id` (`league_scores`, stripping `__ext_*` bonus suffixes) and filtered out `__LEAGUE_SYNC__` / `day_number <= 0` sentinel rows.
+     - Sorted all score events newest-first and ran Union-Find across `(stableId, nonGenericNormName)` so rows sharing an account/device ID across renames AND rows sharing a non-generic username across devices merge cleanly into one entry displaying the player's latest username and avatar.
+     - Extended Challenge Board first-attempt locking to deduplicate by `device_id` as well as username.
+  2. **Cross-Table Rename & Pre-Auth Migration (`app/api/trivia/scores/route.ts`, `store/useAppStore.ts`)**:
+     - Expanded `PATCH /api/trivia/scores` to accept `deviceId`, `oldDeviceId`, `newDeviceId`, and `authUserId`, propagating renames across `trivia_scores`, `league_scores` (including `__ext_*` extension rows), `mathletics_scores`, and `play_sessions`, plus legacy `device_id IS NULL` rows for non-generic usernames.
+     - Wired `registerWithCloud` and `loginWithCloud` in `store/useAppStore.ts` to automatically migrate pre-auth local `deviceId` scores to the authenticated Supabase user ID on sign-in/sign-up.
+- **"Building in Public" Content Takeaway**:
+  > *"Never key a global leaderboard by display name alone. If a player renames themselves or upgrades from anonymous play to an account, they'll end up competing against their own ghost—Union-Find on `(device_id, non_generic_username)` plus cross-table rename propagation keeps every scholar's history whole."*

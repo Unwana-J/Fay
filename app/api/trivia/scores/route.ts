@@ -165,16 +165,26 @@ export async function GET(req: NextRequest) {
   }
 }
 
+const GENERIC_PLACEHOLDER_NAMES = new Set([
+  "scholar",
+  "learner",
+  "player",
+  "you",
+  "anonymous",
+  "guest",
+  "challenger",
+]);
+
 export async function PATCH(req: NextRequest) {
   try {
     const clientIp = getClientIp(req);
-    const rateCheck = checkRateLimit(`trivia-patch:${clientIp}`, 5, 60);
+    const rateCheck = checkRateLimit(`trivia-patch:${clientIp}`, 10, 60);
     if (!rateCheck.allowed) {
       return NextResponse.json({ error: "Too many updates. Please wait." }, { status: 429 });
     }
 
     const body = await req.json();
-    const { oldUsername, newUsername, deviceId } = body;
+    const { oldUsername, newUsername, deviceId, oldDeviceId, newDeviceId, authUserId } = body;
 
     if (!newUsername || typeof newUsername !== "string") {
       return NextResponse.json({ error: "Invalid username" }, { status: 400 });
@@ -193,24 +203,147 @@ export async function PATCH(req: NextRequest) {
       return NextResponse.json({ success: true, stored: false });
     }
 
-    // Update historical scores in Supabase
-    let query = supabase.from("trivia_scores").update({ username: cleanNewName });
+    const cleanOldName =
+      typeof oldUsername === "string" && oldUsername.trim()
+        ? sanitizeScholarName(oldUsername.trim())
+        : "";
+    const isGenericOldName =
+      !cleanOldName || GENERIC_PLACEHOLDER_NAMES.has(cleanOldName.toLowerCase());
 
-    if (deviceId) {
-      query = query.eq("device_id", deviceId);
-    } else if (oldUsername) {
-      query = query.ilike("username", oldUsername.trim());
-    } else {
+    const targetDeviceId =
+      (typeof newDeviceId === "string" && newDeviceId.trim()) ||
+      (typeof authUserId === "string" && authUserId.trim()) ||
+      (typeof deviceId === "string" && deviceId.trim()) ||
+      null;
+
+    const candidateIds = Array.from(
+      new Set(
+        [deviceId, oldDeviceId, newDeviceId, authUserId]
+          .filter((v): v is string => typeof v === "string" && v.trim().length > 0)
+          .map((v) => v.trim())
+      )
+    );
+
+    if (candidateIds.length === 0 && isGenericOldName) {
       return NextResponse.json({ error: "Missing identifier" }, { status: 400 });
     }
 
-    const { data, error } = await query.select();
-    if (error) {
-      console.error("Error updating score usernames:", error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+    let triviaUpdated = 0;
+    let leagueUpdated = 0;
+
+    // 1. Update trivia_scores (matching any of the user's known device IDs)
+    const triviaPayload: Record<string, string> = { username: cleanNewName };
+    if (targetDeviceId) {
+      triviaPayload.device_id = targetDeviceId;
     }
 
-    return NextResponse.json({ success: true, updatedCount: data?.length || 0 });
+    if (candidateIds.length > 0) {
+      const { data, error } = await supabase
+        .from("trivia_scores")
+        .update(triviaPayload)
+        .in("device_id", candidateIds)
+        .select("id");
+
+      if (error) {
+        console.error("Error updating trivia_scores by device_id:", error);
+      } else {
+        triviaUpdated += data?.length || 0;
+      }
+
+      // Also catch legacy trivia_scores rows where device_id was null
+      if (!isGenericOldName) {
+        const { data: legacyData } = await supabase
+          .from("trivia_scores")
+          .update(triviaPayload)
+          .ilike("username", cleanOldName)
+          .is("device_id", null)
+          .select("id");
+        triviaUpdated += legacyData?.length || 0;
+      }
+    } else if (!isGenericOldName) {
+      const { data, error } = await supabase
+        .from("trivia_scores")
+        .update({ username: cleanNewName })
+        .ilike("username", cleanOldName)
+        .select("id");
+
+      if (error) {
+        console.error("Error updating trivia_scores by username:", error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      triviaUpdated += data?.length || 0;
+    }
+
+    // 2. Update league_scores (both direct user_id matches and __ext_* bonus extension rows)
+    try {
+      if (candidateIds.length > 0) {
+        const { data: directLeague } = await supabase
+          .from("league_scores")
+          .update({ username: cleanNewName })
+          .in("user_id", candidateIds)
+          .neq("username", "__LEAGUE_SYNC__")
+          .select("id");
+        leagueUpdated += directLeague?.length || 0;
+
+        for (const id of candidateIds) {
+          const { data: extLeague } = await supabase
+            .from("league_scores")
+            .update({ username: cleanNewName })
+            .like("user_id", `${id}__ext_%`)
+            .neq("username", "__LEAGUE_SYNC__")
+            .select("id");
+          leagueUpdated += extLeague?.length || 0;
+        }
+      }
+
+      if (!isGenericOldName) {
+        // Legacy fallback rows where user_id was set to oldUsername.toLowerCase() (or when no deviceId was passed)
+        let legacyLeagueQuery = supabase
+          .from("league_scores")
+          .update({ username: cleanNewName })
+          .ilike("username", cleanOldName)
+          .neq("username", "__LEAGUE_SYNC__");
+
+        if (candidateIds.length > 0) {
+          legacyLeagueQuery = legacyLeagueQuery.eq("user_id", cleanOldName.toLowerCase());
+        }
+
+        const { data: legacyLeague } = await legacyLeagueQuery.select("id");
+        leagueUpdated += legacyLeague?.length || 0;
+      }
+    } catch (leagueErr) {
+      console.warn("Could not propagate rename to league_scores:", leagueErr);
+    }
+
+    // 3. Best-effort propagation to mathletics_scores and play_sessions
+    try {
+      if (candidateIds.length > 0) {
+        await supabase
+          .from("mathletics_scores")
+          .update({ username: cleanNewName })
+          .in("user_id", candidateIds)
+          .neq("username", "__LEAGUE_SYNC__");
+
+        const sessionPayload: Record<string, string> = { username: cleanNewName };
+        if (targetDeviceId) {
+          sessionPayload.user_id = targetDeviceId;
+          sessionPayload.device_id = targetDeviceId;
+        }
+        await supabase
+          .from("play_sessions")
+          .update(sessionPayload)
+          .or(`device_id.in.(${candidateIds.join(",")}),user_id.in.(${candidateIds.join(",")})`);
+      }
+    } catch {
+      // Optional tables may not exist in all environments
+    }
+
+    return NextResponse.json({
+      success: true,
+      updatedCount: triviaUpdated + leagueUpdated,
+      triviaUpdated,
+      leagueUpdated,
+    });
   } catch (err) {
     console.error("Error patching score username:", err);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });
