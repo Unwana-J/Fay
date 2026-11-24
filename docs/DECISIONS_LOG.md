@@ -42,6 +42,8 @@
 32. [Domain Reputation & Security Hardening for Social Platform Link Previews (X / t.co Trust Signals)](#32-domain-reputation--security-hardening-for-social-platform-link-previews-x--tco-trust-signals)
 33. [Pre-Launch Security & Vercel Hobby Free-Tier Optimization Audit](#33-pre-launch-security--vercel-hobby-free-tier-optimization-audit)
 34. [Interactive Archetype Calibration Quiz & Playable Landing Page Discovery](#34-interactive-archetype-calibration-quiz--playable-landing-page-discovery)
+35. [Unified Leaderboard Identity Resolution & Cross-Table Rename Propagation](#35-unified-leaderboard-identity-resolution--cross-table-rename-propagation)
+36. [Unified Classrooms: Merging Library & Community into Asynchronous Speak-to-Unlock Friend Circles](#36-unified-classrooms-merging-library--community-into-asynchronous-speak-to-unlock-friend-circles)
 
 ---
 
@@ -713,3 +715,32 @@
      - Wired `registerWithCloud` and `loginWithCloud` in `store/useAppStore.ts` to automatically migrate pre-auth local `deviceId` scores to the authenticated Supabase user ID on sign-in/sign-up.
 - **"Building in Public" Content Takeaway**:
   > *"Never key a global leaderboard by display name alone. If a player renames themselves or upgrades from anonymous play to an account, they'll end up competing against their own ghost—Union-Find on `(device_id, non_generic_username)` plus cross-table rename propagation keeps every scholar's history whole."*
+
+---
+
+## 36. Unified Classrooms: Merging Library & Community into Asynchronous Speak-to-Unlock Friend Circles
+
+- **Date / Phase**: Phase 2 — Core Feynman Social Loop & Navigation Consolidation
+- **The Problem / Context**:
+  Fey's Parlor games (Naija Trivia and Quant Arena) thrived on asynchronous multi-day friend leagues, yet Fey's core Learn → Speak ritual was split across two under-leveraged destinations:
+  1. `/community` relied on synchronous "Live Research Rooms" that required busy friends to be online at the exact same minute for 15 minutes of research + speaking, plus a public stranger feed that felt quiet without massive scale.
+  2. `/library` held personal speech recordings alongside a 7-Day Study Schedule that lacked social pull or friend accountability.
+  Meanwhile, `MediaRecorder` defaulted to unthrottled `audio/webm` (~1.4 MB per 90s clip), risking cross-platform playback issues on iOS Safari and heavy mobile data usage when listening to multiple friends.
+- **User Insight & Guiding Philosophy**:
+  Learning is naturally communal when anchored around **small friend circles (2–8 people)** rather than noisy public feeds. By merging `Community` and `Library` into **Classrooms** (`/classroom`), friends can commit to a 3, 5, or 7-topic syllabus together—or turn their personal 7-Day Study Schedule into a shared Classroom in one click—where **recording your own voice synthesis is the key that unlocks everyone else's recording**.
+- **Architectural & Product Landing**:
+  1. **3-Tab Unified Classroom Hub (`app/classroom/page.tsx`)**:
+     - Consolidated `Community` and `Library` into `/classroom` across `Sidebar.tsx` (trimming 8 items to 7) and `MobileBottomNav.tsx`, with lossless redirects from `/library` and `/community`.
+     - Houses **Classrooms** (active & archived friend circles), **Study Schedule** (with a 1-click *"Invite Friends to This Schedule"* upgrade), and **Recordings** (unified vault distinguishing `Solo · Private` clips from shared `Classroom` takes).
+  2. **Speak-to-Unlock + Consensus & 24h Safety Valve Pacing (`lib/classroom-types.ts`, `app/classroom/[code]/ClassroomDetailClient.tsx`)**:
+     - **Speak-to-Unlock**: Friends see *who* has already recorded on Topic $N$, but peer audio remains locked until the viewer records their own take—preventing cognitive anchoring and making curiosity the reward for speaking.
+     - **Consensus Unlock + 24h Safety Valve**: Topic $N+1$ unlocks *immediately* once all circle members submit Topic $N$, with an automatic 24-hour rollover timer once at least one person submits so a single busy friend can never freeze a 5-person group.
+     - **Record-First Invites & Live Syllabus Swaps**: Hosts can record Topic 1 immediately after creating a Classroom (turning the WhatsApp invite into *"I already recorded Topic 1 — record yours to unlock & listen"*), while joining friends can swap any unstarted future slot.
+     - **Evergreen Circle Continuation & Archiving**: Hosts can close/archive a Classroom at any point (preserving all recordings in the Replay Archive with a 1-click Reopen option), and any member can append `+1`, `+3`, `+5`, or `+7` non-repeating topics (or a custom prompt) once the initial schedule is exhausted—keeping the same circle code and group momentum going across weeks.
+     - **Purely Collaborative Presence**: Replaced competitive star ratings with **"Heard by" avatar receipts**, editorial appreciation stamps (`Clear Analogy`, `Sharp Breakdown`, `New Angle`), and 1-line margin notes.
+  3. **Cross-Platform 24 kbps Voice Pipeline & Dual-Table Persistence (`lib/audio-recorder.ts`, `lib/classroom-db.ts`)**:
+     - Prioritized `audio/mp4` (AAC) before `audio/webm;codecs=opus` at `audioBitsPerSecond: 24000` (~260 KB per 90s clip — 5× smaller) for universal iPhone ↔ Android playback and `1x / 1.25x / 1.5x` listening speeds.
+     - Backed audio clips with Supabase Storage (`classroom-audio`) and implemented dual-table persistence (`classrooms` / `classroom_submissions` with automatic JSONB fallback to `friendship_leagues` / `league_scores`).
+- **"Building in Public" Content Takeaway**:
+  > *"Synchronous study rooms fail because adults aren't free at the exact same 15-minute window—and solo study schedules fail because nobody notices if you skip. Merging our Library and Community tabs into asynchronous 'Speak-to-Unlock' Classrooms turned recording a 90-second explanation into the key that unlocks your friends' voices."*
+

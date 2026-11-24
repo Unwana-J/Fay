@@ -11,7 +11,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: "/play", priority: 0.8, freq: "weekly" },
     { path: "/podium", priority: 0.8, freq: "weekly" },
     { path: "/discover", priority: 0.95, freq: "daily" },
-    { path: "/community", priority: 0.8, freq: "daily" },
+    { path: "/classroom", priority: 0.85, freq: "daily" },
     { path: "/constellation", priority: 0.6, freq: "monthly" },
   ];
 

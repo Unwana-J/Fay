@@ -522,3 +522,23 @@ body::before {
 @media (max-width: 768px) {
   .ml-64 { margin-left: 0 !important; }
 }
+
+/* Native <details> Accordion Smooth Progressive Enhancement */
+.f-faq-accordion details::details-content {
+  interpolate-size: allow-keywords;
+  overflow: clip;
+  contain: layout;
+}
+
+.f-faq-accordion details:not([open])::details-content {
+  block-size: 0;
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .f-faq-accordion details::details-content {
+    transition: block-size 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+      content-visibility 0.24s cubic-bezier(0.16, 1, 0.3, 1),
+      display 0.24s cubic-bezier(0.16, 1, 0.3, 1);
+    transition-behavior: allow-discrete;
+  }
+}

@@ -19,7 +19,7 @@ export const SITE_TAGLINE = "Think Deeper. Articulate Clearly.";
 export const SITE_TITLE = "Fey: A Daily Learning and Speaking Habit for Curious Minds";
 
 export const SITE_DESCRIPTION =
-  "Fey turns learning into a focused daily habit. Discover ideas outside your circle from AI to philosophy, research them, and explain them out loud in 90 seconds. Free in your browser, with streaks, community rooms, and smart games.";
+  "Fey turns learning into a focused daily habit. Discover ideas outside your circle from AI to philosophy, research them, and explain them out loud in 90 seconds. Free in your browser, with 7-day Speak-to-Unlock friend Classrooms, streaks, and smart games.";
 
 /** One-line positioning statement for bios, footers, and AI summaries. */
 export const SITE_POSITIONING =
@@ -114,13 +114,13 @@ export const CORE_FEATURES: Feature[] = [
     players: "1",
   },
   {
-    slug: "community",
-    name: "Community Salons",
-    path: "/community",
+    slug: "classroom",
+    name: "Friend Classrooms",
+    path: "/classroom",
     description:
-      "Shareable rooms where friends, colleagues, or classmates each explain the same topic, listen to one another, and vote on the clearest explanation.",
+      "Multi-day Speak-to-Unlock study circles for 2–8 close friends, plus your personal 7-Day Study Schedule and Recordings Vault in one unified space.",
     genre: ["Learning", "Social", "Public Speaking"],
-    players: "2 or more",
+    players: "2 to 8",
   },
   {
     slug: "constellation",
@@ -180,7 +180,11 @@ export const PUBLIC_GAMES = [...CORE_FEATURES, ...GAMES];
 export const SITE_FAQ: { q: string; a: string }[] = [
   {
     q: "What is Fey?",
-    a: "Fey is a curated daily learning and speaking platform. Each day you discover a fresh topic outside your usual circle, research it for a few minutes, and explain it out loud in 90 seconds. It also includes community rooms and smart games like Naija Trivia, Quant (25-second mental math), Online Articulate, and The Podium.",
+    a: "Fey is a curated daily learning and speaking platform. Each day you discover a fresh topic outside your usual circle, research it for a few minutes, and explain it out loud in 90 seconds. It also includes 7-day Speak-to-Unlock Friend Classrooms and smart games like Naija Trivia, Quant (25-second mental math), Online Articulate, and The Podium.",
+  },
+  {
+    q: "How do Friend Classrooms work?",
+    a: "You can start a 3, 5, or 7-day Classroom with 2 to 8 close friends around shared interests—or invite friends directly to your personal 7-day topic schedule. On each topic, friends' voice recordings stay locked until you record your own 90-second take. Once everyone submits (or after 24 hours), the next topic unlocks automatically, and you can add more topics anytime to keep the circle going.",
   },
   {
     q: "How can I build a daily learning habit?",

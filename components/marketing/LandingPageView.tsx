@@ -27,12 +27,13 @@ import JsonLd, { faqJsonLd, gamesJsonLd } from "@/components/seo/JsonLd";
 import LandingTopicSpinner from "./LandingTopicSpinner";
 import ParlorShowcaseDeck from "./ParlorShowcaseDeck";
 import InteractiveCategoryExplorer from "./InteractiveCategoryExplorer";
+import InteractiveClassroomPreview from "./InteractiveClassroomPreview";
 
 const QUICK_STRIP = [
   {
     step: "01",
-    title: "Pick a topic or game",
-    detail: "Daily 90s speaking topic, trivia, quant, or party game",
+    title: "Pick a topic or circle",
+    detail: "Solo 90s prompt, 7-day friend Classroom, or smart game",
     Icon: Compass,
   },
   {
@@ -49,8 +50,8 @@ const QUICK_STRIP = [
   },
   {
     step: "04",
-    title: "Share your score",
-    detail: "Send a challenge link or score card to friends",
+    title: "Unlock & challenge",
+    detail: "Record yours to unlock friends' Classroom audio or send a duel",
     Icon: Share2,
   },
 ];
@@ -133,6 +134,12 @@ export default function LandingPageView({
             >
               Daily Habit
             </Link>
+            <Link
+              href="/classroom"
+              className="hover:text-[var(--olive)] transition-colors hidden sm:inline"
+            >
+              Classroom
+            </Link>
             <Link href="/games" className="hover:text-[var(--olive)] transition-colors">
               Games
             </Link>
@@ -192,7 +199,7 @@ export default function LandingPageView({
           <p className="text-lg leading-relaxed max-w-xl mb-7" style={{ color: "var(--text-dim)" }}>
             Discover topics you would never encounter in your everyday routine, packaged into a
             focused 10-minute daily habit. Research a fresh idea, articulate it out loud in 90
-            seconds, or jump into smart games with friends.
+            seconds, start a 7-day Speak-to-Unlock Classroom with friends, or jump into smart games.
           </p>
 
           <div className="flex flex-wrap items-center gap-3.5">
@@ -206,11 +213,18 @@ export default function LandingPageView({
               </Link>
             )}
             <Link
-              href="/games"
+              href="/classroom"
               className="px-5 py-3.5 rounded-xl text-sm font-bold border transition-colors hover:bg-[var(--bg-card)]"
               style={{ borderColor: "var(--olive)", color: "var(--olive)" }}
             >
-              Explore Games Parlor
+              Start a Friend Classroom
+            </Link>
+            <Link
+              href="/games"
+              className="px-4 py-3.5 rounded-xl text-sm font-semibold underline underline-offset-4 transition-colors hover:text-[var(--terra)]"
+              style={{ color: "var(--text-dim)" }}
+            >
+              Games Parlor →
             </Link>
           </div>
 
@@ -339,6 +353,70 @@ export default function LandingPageView({
           <InteractiveCategoryExplorer onStartClick={onStartClick} />
         </section>
 
+        {/* ── Friend Classrooms: Speak-to-Unlock Collaborative Learning ── */}
+        <section
+          id="classroom"
+          className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20 scroll-mt-20"
+        >
+          <div className="grid gap-10 lg:grid-cols-12 items-center">
+            <div className="lg:col-span-5">
+              <SectionLabel>Friend Classrooms · New</SectionLabel>
+              <h2 className="font-serif text-3xl sm:text-4xl font-bold leading-tight mb-4">
+                Turn a 7-day study schedule into a shared ritual with close friends
+              </h2>
+              <p className="text-sm sm:text-base leading-relaxed mb-5" style={{ color: "var(--text-dim)" }}>
+                Start a 3, 5, or 7-day Classroom with 2–8 friends around shared interests—or upgrade
+                your personal 7-day queue in one click. Every friend&apos;s voice recording stays
+                locked until you record yours, keeping your thinking independent and turning
+                curiosity into daily accountability.
+              </p>
+
+              <ul className="space-y-2.5 text-sm mb-7" style={{ color: "var(--text-dim)" }}>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 size={16} className="text-[var(--olive)] shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>
+                    <strong style={{ color: "var(--text)" }}>Speak-to-Unlock Audio:</strong> Hear how
+                    each friend broke down the exact same concept as soon as your take is in.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 size={16} className="text-[var(--olive)] shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>
+                    <strong style={{ color: "var(--text)" }}>Co-Curated &amp; Evergreen:</strong>{" "}
+                    Friends can swap unstarted topics or add +1, +3, or +7 new topics to keep the
+                    circle going into Week 2+.
+                  </span>
+                </li>
+                <li className="flex items-start gap-2.5">
+                  <CheckCircle2 size={16} className="text-[var(--olive)] shrink-0 mt-0.5" aria-hidden="true" />
+                  <span>
+                    <strong style={{ color: "var(--text)" }}>Unified Schedule &amp; Vault:</strong>{" "}
+                    Plan your 7-day queue and keep private solo recordings alongside shared Classroom
+                    takes in one place.
+                  </span>
+                </li>
+              </ul>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Link href="/classroom" className="btn-terra !px-5 !py-3 !text-xs sm:!text-sm">
+                  Start a Classroom
+                </Link>
+                <Link
+                  href="/classroom?tab=schedule"
+                  className="px-4 py-3 rounded-xl border text-xs sm:text-sm font-bold hover:bg-[var(--bg-card)] transition-colors"
+                  style={{ borderColor: "var(--border)", color: "var(--text)" }}
+                >
+                  Plan 7-Day Schedule
+                </Link>
+              </div>
+            </div>
+
+            <div className="lg:col-span-7">
+              <InteractiveClassroomPreview onStartClick={onStartClick} />
+            </div>
+          </div>
+        </section>
+
         {/* ── Who It's For + Scholar Identity & Shareable Proof Showcase ── */}
         <section id="who" className="max-w-6xl mx-auto px-5 pb-16 sm:pb-20 scroll-mt-20">
           <div className="max-w-2xl mb-10">
@@ -404,6 +482,9 @@ export default function LandingPageView({
                       <img
                         src={arch.avatar}
                         alt={arch.title}
+                        width={44}
+                        height={44}
+                        loading="lazy"
                         className="w-11 h-11 rounded-full border shrink-0 object-cover"
                         style={{ borderColor: "var(--olive)" }}
                       />
@@ -493,6 +574,9 @@ export default function LandingPageView({
                       <img
                         src="/avatars/avatar-architect.svg"
                         alt="Scholar avatar"
+                        width={28}
+                        height={28}
+                        loading="lazy"
                         className="w-7 h-7 rounded-full border"
                         style={{ borderColor: "var(--olive)" }}
                       />
@@ -517,25 +601,29 @@ export default function LandingPageView({
         </section>
 
         {/* ── FAQ (Positioned at the bottom for search engines, AI crawlers & deeper readers) ── */}
-        <section id="faq" className="max-w-3xl mx-auto px-5 pb-16 sm:pb-20 scroll-mt-20">
+        <section
+          id="faq"
+          aria-labelledby="faq-heading"
+          className="max-w-3xl mx-auto px-5 pb-16 sm:pb-20 scroll-mt-20"
+        >
           <SectionLabel>Questions</SectionLabel>
-          <h2 className="font-serif text-3xl sm:text-4xl font-bold mb-8">
+          <h2 id="faq-heading" className="font-serif text-3xl sm:text-4xl font-bold mb-8">
             Frequently asked questions
           </h2>
-          <div className="space-y-3">
+          <div className="space-y-3 f-faq-accordion">
             {SITE_FAQ.map((f) => (
               <details key={f.q} className="surface rounded-xl px-5 py-4 group">
-                <summary className="font-semibold cursor-pointer list-none flex justify-between items-center gap-4 [&::-webkit-details-marker]:hidden">
-                  {f.q}
+                <summary className="font-semibold cursor-pointer list-none flex items-center gap-3 [&::-webkit-details-marker]:hidden">
                   <span
-                    aria-hidden
-                    className="text-xl leading-none transition-transform group-open:rotate-45"
+                    aria-hidden="true"
+                    className="text-lg leading-none shrink-0 w-4 text-center transition-transform group-open:rotate-45"
                     style={{ color: "var(--olive)" }}
                   >
                     +
                   </span>
+                  <span>{f.q}</span>
                 </summary>
-                <p className="mt-3 text-[15px] leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                <p className="mt-3 pl-7 text-[15px] leading-relaxed" style={{ color: "var(--text-dim)" }}>
                   {f.a}
                 </p>
               </details>
@@ -598,8 +686,8 @@ export default function LandingPageView({
             <Link href="/discover" className="hover:underline">
               Daily Habit
             </Link>
-            <Link href="/community" className="hover:underline">
-              Community
+            <Link href="/classroom" className="hover:underline">
+              Classroom
             </Link>
             <Link href="/games" className="hover:underline">
               Games

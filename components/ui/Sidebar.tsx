@@ -20,9 +20,8 @@ import StreakCalendarModal from "@/components/ui/StreakCalendarModal";
 const NAV_ITEMS = [
   { href: "/",              label: "Dashboard",     icon: LayoutDashboard },
   { href: "/discover",      label: "Discover",      icon: Compass },
+  { href: "/classroom",     label: "Classroom",     icon: BookOpen },
   { href: "/games",         label: "Games",         icon: Dices },
-  { href: "/community",     label: "Community",     icon: Users },
-  { href: "/library",       label: "Library",       icon: BookOpen },
   { href: "/constellation", label: "Constellation", icon: Orbit },
   { href: "/analytics",     label: "Analytics",     icon: Activity },
   { href: "/profile",       label: "Profile",       icon: User },

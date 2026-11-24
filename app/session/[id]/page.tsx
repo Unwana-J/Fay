@@ -29,6 +29,9 @@ import { analytics } from "@/lib/analytics";
 import ResearchReader from "@/components/research/ResearchReader";
 import ResearchQuizCard from "@/components/research/ResearchQuizCard";
 import type { Cue } from "@/lib/research-types";
+import { createVoiceMediaRecorder } from "@/lib/audio-recorder";
+import { useClassroomStore } from "@/store/useClassroomStore";
+import { normalizeClassroomCode } from "@/lib/classroom-types";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -630,8 +633,7 @@ function StageSpeaking({ session, onComplete, onAbandon }: {
       source.connect(analyserNode);
       setAnalyser(analyserNode);
 
-      const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
-      const mr = new MediaRecorder(stream, { mimeType });
+      const { recorder: mr, mimeType } = createVoiceMediaRecorder(stream);
       mediaRecorderRef.current = mr;
       chunksRef.current = [];
       mr.ondataavailable = (e) => { if (e.data.size > 0) chunksRef.current.push(e.data); };
@@ -1121,6 +1123,7 @@ function StageComplete({
   notes,
   tags,
   speakingSeconds,
+  classroomCode,
 }: {
   sessionId: string;
   xpEarned: number;
@@ -1134,6 +1137,7 @@ function StageComplete({
   notes?: string;
   tags?: string[];
   speakingSeconds: number;
+  classroomCode?: string | null;
 }) {
   const [bonusQuizXP, setBonusQuizXP] = useState(0);
   const { ACHIEVEMENTS } = require("@/lib/achievements");
@@ -1761,10 +1765,10 @@ function StageComplete({
               Up to 7 days of topics can be planned ahead ({(scheduledTopics ?? []).length}/7 scheduled)
             </span>
             <a
-              href="/library?tab=schedule"
+              href="/classroom?tab=schedule"
               className="text-xs font-mono font-semibold text-[var(--olive)] hover:underline"
             >
-              Manage 7-Day Schedule in Library →
+              Manage 7-Day Schedule in Classroom →
             </a>
           </div>
         </motion.div>
@@ -1772,9 +1776,10 @@ function StageComplete({
 
       <button
         onClick={onNext}
-        className="btn-terra h-14 w-64"
+        className="btn-terra h-14 px-8"
       >
-        Back to Dashboard <ChevronRight size={16} />
+        {classroomCode ? "Return to Classroom & Hear Friends" : "Back to Dashboard"}{" "}
+        <ChevronRight size={16} />
       </button>
     </motion.div>
   );
@@ -1808,6 +1813,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const unwrappedParams = use(params);
   const router = useRouter();
   const {
+    profile,
     activeSession,
     updateActiveSessionStage,
     updateActiveSessionSpeakingSec,
@@ -1822,6 +1828,21 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [completionData, setCompletionData] = useState<{ xpEarned: number; newAchievements: string[] } | null>(null);
   const [completedSession, setCompletedSession] = useState<ActiveSession | null>(null);
   const [showExitNudge, setShowExitNudge] = useState(false);
+  const [classroomRef, setClassroomRef] = useState<{ code: string; slot: number } | null>(null);
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      const qs = new URLSearchParams(window.location.search);
+      const rawCode = qs.get("classroom");
+      const rawSlot = Number(qs.get("slot") || "1");
+      if (rawCode) {
+        setClassroomRef({
+          code: normalizeClassroomCode(rawCode),
+          slot: Math.max(1, rawSlot || 1),
+        });
+      }
+    }
+  }, []);
 
   const [hasHydrated, setHasHydrated] = useState(false);
 
@@ -1889,6 +1910,24 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       ratings: data.ratings,
       audioBase64,
     });
+
+    // If this session was launched from a Classroom slot, publish to the Classroom circle
+    if (classroomRef?.code) {
+      await useClassroomStore.getState().submitRecording({
+        classroomCode: classroomRef.code,
+        slotNumber: classroomRef.slot,
+        userId: profile.id || "local-scholar",
+        username: profile.username || "Scholar",
+        avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+        topicId: activeSession.topic.id,
+        topicText: activeSession.topic.text,
+        category: activeSession.topic.category,
+        durationSeconds: speakingSeconds,
+        audioData: audioBase64,
+        notes: activeSession.notes,
+      });
+    }
+
     setCompletionData(result);
     fireConfetti();
 
@@ -1904,13 +1943,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       return;
     }
     abandonSession();
-    router.push("/");
+    router.push(classroomRef?.code ? `/classroom/${classroomRef.code}` : "/");
   }
 
   function handleConfirmAbandon() {
     setShowExitNudge(false);
     abandonSession();
-    router.push("/");
+    router.push(classroomRef?.code ? `/classroom/${classroomRef.code}` : "/");
   }
 
   function handleQuick45sDownsell() {
@@ -1979,7 +2018,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               xpEarned={completionData.xpEarned}
               newAchievements={completionData.newAchievements}
               streak={streak.current}
-              onNext={() => router.push("/")}
+              onNext={() =>
+                router.push(classroomRef?.code ? `/classroom/${classroomRef.code}` : "/")
+              }
               topicId={currentSession.topic.id}
               topicText={currentSession.topic.text}
               topicCategory={currentSession.topic.category}
@@ -1987,6 +2028,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               notes={currentSession.notes}
               tags={currentSession.topic.tags}
               speakingSeconds={speakingSeconds}
+              classroomCode={classroomRef?.code || null}
             />
           </motion.div>
         ) : currentSession.stage === "research" ? (

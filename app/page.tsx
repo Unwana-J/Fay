@@ -8,10 +8,16 @@ import {
   Star, Shuffle, Sparkles, Compass,
   Gamepad2, ChevronRight, Flame, ShieldCheck,
   Target, Presentation, MessageSquareQuote, Trophy,
-  Calculator, ScrollText, CheckCircle2, Radio, Calendar,
+  Calculator, ScrollText, CheckCircle2, Radio, Calendar, Users,
 } from "lucide-react";
 import CategoryIcon from "@/components/ui/CategoryIcon";
 import { useAppStore, getNext7ScheduleDays } from "@/store/useAppStore";
+import { useClassroomStore } from "@/store/useClassroomStore";
+import {
+  computeEffectiveUnlockedSlot,
+  getNextActionableSlotForUser,
+  normalizeClassroomCode,
+} from "@/lib/classroom-types";
 import { getLevelForXP, getLevelProgress, getNextLevel, ACHIEVEMENTS } from "@/lib/achievements";
 import { CATEGORY_COLORS, CATEGORY_ICONS, TOPIC_BANK, DIFFICULTY_LABELS, DIFFICULTY_XP, DIFFICULTY_BONUS_XP, type Difficulty } from "@/lib/topics";
 import { relativeDate, getLast52Weeks, getDayOfWeek, todayStr } from "@/lib/utils";
@@ -253,6 +259,34 @@ export default function Dashboard() {
   const difficultyMode: Difficulty = (settings.difficultyMode as Difficulty) ?? "Scholar";
   const level     = getLevelForXP(profile.xp);
   const nextLevel = getNextLevel(profile.xp);
+  const { classrooms, submissionsByCode, fetchMyClassrooms } = useClassroomStore();
+
+  useEffect(() => {
+    if (isOnboarded && profile?.id) {
+      fetchMyClassrooms(profile.id, profile.username);
+    }
+  }, [isOnboarded, profile?.id, profile?.username, fetchMyClassrooms]);
+
+  const featuredClassroomInfo = useMemo(() => {
+    const activeList = classrooms.filter((c) => c.status !== "completed");
+    if (activeList.length === 0) return null;
+    for (const c of activeList) {
+      const code = normalizeClassroomCode(c.code);
+      const subs = submissionsByCode[code] || [];
+      const actionable = getNextActionableSlotForUser(c, subs, profile.id, profile.username);
+      if (actionable) {
+        return { classroom: c, subs, unlockedSlot: computeEffectiveUnlockedSlot(c, subs), actionable };
+      }
+    }
+    const first = activeList[0];
+    const firstSubs = submissionsByCode[normalizeClassroomCode(first.code)] || [];
+    return {
+      classroom: first,
+      subs: firstSubs,
+      unlockedSlot: computeEffectiveUnlockedSlot(first, firstSubs),
+      actionable: null,
+    };
+  }, [classrooms, submissionsByCode, profile.id, profile.username]);
   const progress  = getLevelProgress(profile.xp);
   const [mounted, setMounted] = useState(false);
   const [showOnboardingModal, setShowOnboardingModal] = useState(false);
@@ -1329,6 +1363,73 @@ export default function Dashboard() {
         )}
       </motion.div>
 
+      {/* ── Active Classroom Circle Surfacing (or Friend Challenge Invitation) ── */}
+      {featuredClassroomInfo ? (
+        <motion.div
+          variants={cardVariants}
+          className="rounded-2xl p-5 mb-6 border-[1.5px] surface flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+          style={{
+            borderColor: featuredClassroomInfo.actionable ? "var(--olive)" : "var(--border)",
+          }}
+        >
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 flex-wrap mb-1">
+              <span className="inline-flex items-center gap-1 text-[10px] font-mono font-bold uppercase tracking-wider px-2 py-0.5 rounded-md bg-[var(--olive)]/12 text-[var(--olive)]">
+                <Users size={11} />
+                <span>Classroom · Topic {featuredClassroomInfo.unlockedSlot} of {featuredClassroomInfo.classroom.totalTopics}</span>
+              </span>
+              <span className="text-xs font-serif font-bold" style={{ color: "var(--text)" }}>
+                {featuredClassroomInfo.classroom.title}
+              </span>
+            </div>
+            <p className="text-xs sm:text-sm leading-snug truncate" style={{ color: "var(--text-dim)" }}>
+              {featuredClassroomInfo.actionable
+                ? `Your turn on "${featuredClassroomInfo.actionable.topicText}" — record yours to unlock circle audio.`
+                : `Caught up on Topic ${featuredClassroomInfo.unlockedSlot} · Waiting on friends to unlock the next prompt.`}
+            </p>
+          </div>
+          <Link
+            href={`/classroom/${featuredClassroomInfo.classroom.code}`}
+            className={cn(
+              "px-4 py-2.5 rounded-xl text-xs font-mono font-bold whitespace-nowrap shrink-0 text-center transition-transform active:scale-[0.98]",
+              featuredClassroomInfo.actionable
+                ? "btn-terra"
+                : "border border-[var(--olive)] text-[var(--olive)] hover:bg-[var(--olive)] hover:text-white"
+            )}
+          >
+            {featuredClassroomInfo.actionable
+              ? `Record Topic ${featuredClassroomInfo.actionable.slotNumber}`
+              : "Open Classroom"}
+          </Link>
+        </motion.div>
+      ) : (
+        <motion.div
+          variants={cardVariants}
+          className="rounded-2xl p-4 sm:p-5 mb-6 border-[1.5px] surface flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          style={{ borderColor: "var(--border)" }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-xl flex items-center justify-center border border-[var(--olive)]/30 bg-[var(--olive)]/10 shrink-0">
+              <Users size={16} className="text-[var(--olive)]" />
+            </div>
+            <div>
+              <div className="text-xs sm:text-sm font-serif font-bold" style={{ color: "var(--text)" }}>
+                Start a 7-Day Friend Classroom
+              </div>
+              <div className="text-xs" style={{ color: "var(--text-dim)" }}>
+                Pick shared topics with close friends, speak daily, and unlock each other&apos;s voice takes.
+              </div>
+            </div>
+          </div>
+          <Link
+            href="/classroom"
+            className="px-4 py-2 rounded-xl border border-[var(--olive)] text-xs font-mono font-bold text-[var(--olive)] hover:bg-[var(--olive)] hover:text-white whitespace-nowrap shrink-0 text-center transition-colors"
+          >
+            Open Classroom
+          </Link>
+        </motion.div>
+      )}
+
       {/* ── Next-Day Scheduled Topic Login Reminder Modal ── */}
       <AnimatePresence>
         {!activeSession &&
@@ -1426,7 +1527,7 @@ export default function Dashboard() {
                   </button>
                   <div className="flex items-center gap-3">
                     <Link
-                      href="/library?tab=schedule"
+                      href="/classroom?tab=schedule"
                       onClick={() => setDismissedTomorrowModal(true)}
                       className="font-medium text-[var(--olive)] hover:underline"
                     >
@@ -1751,9 +1852,9 @@ export default function Dashboard() {
             <span className="font-serif font-semibold text-sm" style={{ color: "var(--text)" }}>
               Recent Sprints
             </span>
-            <Link href="/library">
+            <Link href="/classroom?tab=recordings">
               <span className="text-xs font-semibold hover:underline cursor-pointer" style={{ color: "var(--terra)" }}>
-                View in Library →
+                View in Classroom →
               </span>
             </Link>
           </div>
