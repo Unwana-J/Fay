@@ -155,6 +155,7 @@ export default async function TriviaPage({
   const byRaw = typeof sParams.by === "string" ? sParams.by : undefined;
   const gradeRaw = typeof sParams.grade === "string" ? sParams.grade : undefined;
   const pctRaw = typeof sParams.pct === "string" ? parseInt(sParams.pct, 10) : undefined;
+  const agilityRaw = typeof sParams.agility === "string" ? parseInt(sParams.agility, 10) : undefined;
   const qRaw = typeof sParams.q === "string" ? sParams.q : undefined;
 
   let challenger: ChallengerInfo | null = null;
@@ -169,6 +170,7 @@ export default async function TriviaPage({
       pct: pctRaw ?? Math.round((scoreRaw / totalRaw) * 100),
       by: byRaw && byRaw !== "Scholar" ? byRaw : "Challenger",
       grade: gradeRaw,
+      agilityScore: agilityRaw ?? scoreRaw * 115,
       questionIds: qIds,
     };
   }

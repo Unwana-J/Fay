@@ -102,16 +102,19 @@ export default async function MathleticsPage({
   const totalRaw = typeof sParams.total === "string" ? sParams.total : undefined;
   const byRaw = typeof sParams.by === "string" ? sParams.by : undefined;
   const pctRaw = typeof sParams.pct === "string" ? sParams.pct : undefined;
+  const agilityRaw = typeof sParams.agility === "string" ? sParams.agility : undefined;
 
   if (scoreRaw && totalRaw) {
     const score = parseInt(scoreRaw, 10);
     const total = parseInt(totalRaw, 10);
     const pct = pctRaw ? parseInt(pctRaw, 10) : Math.round((score / total) * 100);
+    const agility = agilityRaw ? parseInt(agilityRaw, 10) : score * 120;
     challengerInfo = {
       name: byRaw || "A fellow scholar",
       score,
       total,
       pct,
+      agilityScore: agility,
     };
   }
 

@@ -18,6 +18,7 @@ export interface MathleticsChallenge {
     score: number;
     total: number;
     pct: number;
+    agilityScore?: number;
     gradeLabel?: string;
   };
 }
@@ -41,6 +42,7 @@ export function encodeChallengeToUrl(challenge: MathleticsChallenge): string {
             sc: challenge.creatorScore.score,
             to: challenge.creatorScore.total,
             pc: challenge.creatorScore.pct,
+            ag: challenge.creatorScore.agilityScore,
             gl: challenge.creatorScore.gradeLabel,
           }
         : undefined,
@@ -78,6 +80,7 @@ export function decodeChallengeFromUrl(code: string): MathleticsChallenge | null
             score: raw.s.sc ?? 0,
             total: raw.s.to ?? raw.q.length,
             pct: raw.s.pc ?? 0,
+            agilityScore: raw.s.ag ?? (raw.s.sc ?? 0) * 120,
             gradeLabel: raw.s.gl,
           }
         : undefined,

@@ -9,6 +9,7 @@ export interface MathleticsScholarEntry {
   bestScore: number;
   bestTotal: number;
   bestPct: number;
+  bestAgilityScore: number;
   gamesPlayed: number;
   mathleticsXP: number;
   isUser: boolean;
@@ -27,6 +28,7 @@ export interface MathleticsHistoryRecord {
   pct: number;
   gradeLabel: string;
   xpEarned: number;
+  agilityScore?: number;
   questionIds: string[];
 }
 
@@ -42,6 +44,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 10,
     bestTotal: 10,
     bestPct: 100,
+    bestAgilityScore: 1460,
     gamesPlayed: 120,
     mathleticsXP: 1250,
     isUser: false,
@@ -55,6 +58,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 10,
     bestTotal: 10,
     bestPct: 98,
+    bestAgilityScore: 1410,
     gamesPlayed: 94,
     mathleticsXP: 980,
     isUser: false,
@@ -68,6 +72,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 10,
     bestTotal: 10,
     bestPct: 97,
+    bestAgilityScore: 1390,
     gamesPlayed: 88,
     mathleticsXP: 920,
     isUser: false,
@@ -81,6 +86,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 10,
     bestTotal: 10,
     bestPct: 95,
+    bestAgilityScore: 1360,
     gamesPlayed: 82,
     mathleticsXP: 860,
     isUser: false,
@@ -94,6 +100,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 10,
     bestTotal: 10,
     bestPct: 95,
+    bestAgilityScore: 1340,
     gamesPlayed: 75,
     mathleticsXP: 800,
     isUser: false,
@@ -107,6 +114,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 9,
     bestTotal: 10,
     bestPct: 90,
+    bestAgilityScore: 1240,
     gamesPlayed: 64,
     mathleticsXP: 680,
     isUser: false,
@@ -120,6 +128,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 9,
     bestTotal: 10,
     bestPct: 90,
+    bestAgilityScore: 1210,
     gamesPlayed: 58,
     mathleticsXP: 620,
     isUser: false,
@@ -133,6 +142,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 8,
     bestTotal: 10,
     bestPct: 88,
+    bestAgilityScore: 1120,
     gamesPlayed: 50,
     mathleticsXP: 540,
     isUser: false,
@@ -146,6 +156,7 @@ const TITAN_MATHEMATICIANS: Omit<MathleticsScholarEntry, "rank" | "rankBadge" | 
     bestScore: 8,
     bestTotal: 10,
     bestPct: 85,
+    bestAgilityScore: 1080,
     gamesPlayed: 45,
     mathleticsXP: 480,
     isUser: false,
@@ -168,10 +179,15 @@ export function getMathleticsLeaderboard(
   let bestScore = 0;
   let bestTotal = 10;
   let bestPct = 0;
+  let bestAgilityScore = 0;
   let totalXP = 0;
 
   history.forEach((h) => {
     totalXP += h.xpEarned || 0;
+    const hAgility = h.agilityScore ?? h.score * 120;
+    if (hAgility > bestAgilityScore) {
+      bestAgilityScore = hAgility;
+    }
     if (h.pct > bestPct || (h.pct === bestPct && h.score > bestScore)) {
       bestPct = h.pct;
       bestScore = h.score;
@@ -198,6 +214,7 @@ export function getMathleticsLeaderboard(
     bestScore,
     bestTotal,
     bestPct,
+    bestAgilityScore,
     gamesPlayed,
     mathleticsXP: totalXP,
     isUser: true,

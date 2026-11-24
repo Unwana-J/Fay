@@ -490,8 +490,8 @@ export default function MathleticsLeagueLounge() {
                               <CheckCircle2 size={13} />
                               <span>
                                 {league.format === "sprint_duel"
-                                  ? `Score: ${summary.todayPoints} pts`
-                                  : `Day ${summary.status.dayNumber} Done (${summary.todayPoints} pts)`}
+                                  ? `Score: ${summary.todayScore ?? 0}/${summary.todayTotalQuestions} · ${summary.todayPoints} agility pts`
+                                  : `Day ${summary.status.dayNumber}: ${summary.todayScore ?? 0}/${summary.todayTotalQuestions} (${summary.todayPoints} agility pts)`}
                               </span>
                             </div>
                           ) : (
@@ -504,7 +504,9 @@ export default function MathleticsLeagueLounge() {
                           {summary.userDaysCompleted > 0 && (
                             <div className="text-xs font-mono text-[var(--text-dim)] flex items-center gap-1 font-bold">
                               <Award size={12} className="text-amber-600 dark:text-amber-400" />
-                              <span>Rank #{summary.userRank} · {summary.userTotalPoints} pts</span>
+                              <span>
+                                Rank #{summary.userRank} · {summary.userTotalCorrect}/{summary.userDaysCompleted * (league.questionsPerDay || 10)} Score · {summary.userTotalPoints} agility pts
+                              </span>
                             </div>
                           )}
 
@@ -654,7 +656,7 @@ export default function MathleticsLeagueLounge() {
               color: "var(--gold)",
             }}
           >
-            <Zap size={18} strokeWidth={2.2} />
+            <Clock size={18} strokeWidth={2.2} />
           </div>
           <div className="font-space font-bold text-xs sm:text-sm text-[var(--text)]">
             Agility Scoring

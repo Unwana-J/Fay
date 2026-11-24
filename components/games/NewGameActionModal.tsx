@@ -12,6 +12,7 @@ import {
   Zap,
   Clock,
   Users,
+  User,
   Gamepad2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -178,7 +179,7 @@ export default function NewGameActionModal({
               <div className="flex items-start justify-between gap-3">
                 <div className="flex items-start gap-3.5">
                   <div className="w-11 h-11 rounded-2xl bg-[var(--gold)]/15 border border-[var(--gold)]/30 flex items-center justify-center text-[var(--gold)] shrink-0 mt-0.5 group-hover:scale-110 transition-transform">
-                    <PersonLaptopIcon size={20} />
+                    <User size={20} />
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2 flex-wrap">

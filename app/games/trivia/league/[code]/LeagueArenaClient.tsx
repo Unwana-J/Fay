@@ -1966,10 +1966,15 @@ export default function LeagueArenaClient({
 
                           <div className="flex items-center gap-3 shrink-0 text-right">
                             <div>
-                              <div className="font-mono font-bold text-sm text-[var(--terra)]">
-                                {entry.totalPoints} pts
+                              <div className="font-mono font-bold text-sm flex items-center justify-end gap-2">
+                                <span className="text-[var(--text)]">
+                                  {entry.totalCorrect}/{entry.totalQuestions || entry.daysCompleted * (league.questionsPerDay || 5)} ({entry.totalQuestions > 0 ? Math.round((entry.totalCorrect / entry.totalQuestions) * 100) : 0}%)
+                                </span>
+                                <span className="px-2 py-0.5 rounded-md text-xs bg-[var(--terra)]/10 text-[var(--terra)] border border-[var(--terra)]/25">
+                                  {entry.totalPoints} agility pts
+                                </span>
                               </div>
-                              <div className="text-[9px] font-semibold text-[var(--text-mute)]">
+                              <div className="text-[9px] font-semibold text-[var(--text-mute)] mt-0.5">
                                 {entry.completedToday ? (
                                   <span className="text-emerald-600">Day {currentDay} Done</span>
                                 ) : (

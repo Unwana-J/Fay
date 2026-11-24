@@ -1119,11 +1119,25 @@ export default function MathleticsLeagueClient({
 
                         <div className="flex items-center gap-3 shrink-0">
                           <div className="text-right">
-                            <div className="text-sm font-bold font-mono" style={{ color: "var(--terra)" }}>
-                              {entry.totalPoints} pts
+                            <div className="text-sm font-bold font-mono flex items-center justify-end gap-2">
+                              <span style={{ color: "var(--text)" }}>
+                                {entry.totalCorrect}/{entry.totalQuestions} ({Math.round((entry.totalCorrect / (entry.totalQuestions || 1)) * 100)}%)
+                              </span>
+                              <span
+                                className="px-2 py-0.5 rounded-md text-xs font-bold border"
+                                style={{
+                                  color: "var(--terra)",
+                                  backgroundColor: "rgba(122, 28, 46, 0.08)",
+                                  borderColor: "rgba(122, 28, 46, 0.25)",
+                                }}
+                              >
+                                {entry.totalPoints} agility pts
+                              </span>
                             </div>
-                            <div className="text-[11px] text-[var(--text-dim)]">
-                              {Math.round((entry.totalCorrect / (entry.totalQuestions || 1)) * 100)}% accuracy
+                            <div className="text-[11px] text-[var(--text-dim)] mt-0.5">
+                              {isSprintDuel
+                                ? "Sprint Score & Speed Agility"
+                                : `${entry.daysCompleted} of ${league.durationDays} Days Completed`}
                             </div>
                           </div>
 

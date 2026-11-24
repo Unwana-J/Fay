@@ -30,6 +30,7 @@ import {
   Moon,
   Sun,
   Mic,
+  User,
 } from "lucide-react";
 import {
   getFreshQuestions,
@@ -93,6 +94,7 @@ export interface ChallengerInfo {
   pct: number;
   by: string;
   grade?: string;
+  agilityScore?: number;
   questionIds?: string[];
 }
 
@@ -129,6 +131,7 @@ function SetupScreen({
   seenQuestionIds,
   onResetSeen,
   challenger,
+  onDismissChallenger,
   activeChallenge,
   onSelectChallenge,
   onStartChallenge,
@@ -142,6 +145,7 @@ function SetupScreen({
   seenQuestionIds: string[];
   onResetSeen: () => void;
   challenger?: ChallengerInfo | null;
+  onDismissChallenger?: () => void;
   activeChallenge: TriviaChallenge | null;
   onSelectChallenge: (challenge: TriviaChallenge | null) => void;
   onStartChallenge: (challenge: TriviaChallenge) => void;
@@ -274,7 +278,7 @@ function SetupScreen({
               className="absolute inset-0 rounded-xl bg-[var(--bg-card)] shadow-xs border border-[var(--border-dim)] z-[-1]"
             />
           )}
-          <Sparkles size={13} className="text-[var(--terra)] shrink-0" />
+          <User size={13} className="text-[var(--terra)] shrink-0" />
           <span className="hidden sm:inline">Play Solo</span>
           <span className="sm:hidden">Solo</span>
         </button>
@@ -397,256 +401,408 @@ function SetupScreen({
       {/* Tab: Solo Quiz Setup */}
       {activeTab === "solo" && (
         <div>
-          {/* Active Arenas, Leagues, Challenges & Parlor Games Showcase */}
-          <ActiveArenasShowcase
-            onTabChange={onTabChange}
-            onStartChallenge={onStartChallenge}
-            onCreateLeague={() => setShowCreateLeagueModal(true)}
-            onCreateChallenge={() => {
-              setChallengeCreateMode(true);
-              onTabChange("challenge");
-            }}
-            showParlorLinks={true}
-          />
-
-          {/* Challenger Benchmark Banner */}
-          {challenger && (
+          {challenger ? (
+            /* ── Dedicated Head-to-Head Challenge Landing Card (Locked Deck & Settings) ── */
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              className="rounded-2xl p-5 border mb-6 relative overflow-hidden"
-              style={{
-                borderColor: "rgba(0, 135, 81, 0.4)",
-                background:
-                  "linear-gradient(135deg, rgba(0, 135, 81, 0.14) 0%, rgba(166, 124, 30, 0.08) 100%)",
-              }}
+              className="space-y-5"
             >
-              <div className="flex items-start gap-3.5">
-                <div className="w-12 h-12 rounded-xl bg-[#008751]/20 border border-[#008751]/40 flex items-center justify-center shrink-0 text-xl text-[#008751]">
-                  <Swords size={22} />
+              <div
+                className="rounded-3xl p-6 sm:p-8 surface border relative overflow-hidden shadow-sm space-y-6"
+                style={{
+                  borderColor: "var(--border)",
+                  background:
+                    "linear-gradient(135deg, rgba(0, 135, 81, 0.08) 0%, rgba(166, 124, 30, 0.07) 100%)",
+                }}
+              >
+                {/* Header Badge */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#008751]/15 border border-[#008751]/30 text-[#008751] dark:text-emerald-400 text-[11px] font-mono uppercase tracking-wider font-extrabold">
+                    <Swords size={12} />
+                    <span>Head-to-Head Challenge</span>
+                  </div>
+                  <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2.5 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                    <ShieldCheck size={12} className="text-[var(--olive)]" />
+                    <span>Locked Identical Deck</span>
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-[#008751] inline-flex items-center gap-1">
-                      <Swords size={11} /> Head-to-Head Challenge
+
+                {/* Challenger Score Plaque */}
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-2xs">
+                  <div className="space-y-1">
+                    <div className="text-xs font-mono uppercase tracking-wider font-bold text-[var(--text-mute)]">
+                      Target Score to Beat
+                    </div>
+                    <h2
+                      className="font-space font-extrabold text-xl sm:text-2xl tracking-tight"
+                      style={{ color: "var(--text)" }}
+                    >
+                      {challenger.by} scored {challenger.score}/{challenger.total} ({challenger.pct}%)
+                    </h2>
+                    <p className="text-xs sm:text-sm text-[var(--text-dim)]">
+                      Clocked{" "}
+                      <strong className="text-[var(--olive)] font-mono">
+                        {challenger.agilityScore ?? challenger.score * 115} agility pts
+                      </strong>{" "}
+                      on the{" "}
+                      <strong className="text-[var(--text)]">
+                        exact same {challenger.total || 10} questions
+                      </strong>
+                      . Can you beat their score and speed?
+                    </p>
+                  </div>
+
+                  <div className="flex sm:flex-col items-center justify-center px-5 py-3 rounded-2xl bg-[#008751]/10 border border-[#008751]/25 shrink-0 gap-2 sm:gap-1 text-center">
+                    <div className="font-mono font-black text-2xl sm:text-3xl text-[#008751] dark:text-emerald-400 leading-none">
+                      {challenger.score}/{challenger.total}
+                      <span className="text-sm font-bold text-[var(--text-dim)] ml-1">({challenger.pct}%)</span>
+                    </div>
+                    <div className="text-[11px] font-mono font-extrabold text-[var(--olive)]">
+                      <span>{challenger.agilityScore ?? challenger.score * 115} Agility Pts</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Locked Match Rules Summary */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                  <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/80 border border-[var(--border-dim)] text-center">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                      Deck Size
+                    </div>
+                    <div className="font-space font-extrabold text-sm sm:text-base text-[var(--text)] mt-0.5">
+                      {challenger.total || 10} Questions
+                    </div>
+                    <div className="text-[10px] text-[var(--text-dim)] mt-0.5">Fixed Cards</div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/80 border border-[var(--border-dim)] text-center">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                      Time Limit
+                    </div>
+                    <div className="font-space font-extrabold text-sm sm:text-base text-[var(--text)] mt-0.5">
+                      {(challenger.total || 10) <= 10 ? "5 Mins" : (challenger.total || 10) <= 25 ? "10 Mins" : "15 Mins"}
+                    </div>
+                    <div className="text-[10px] text-[var(--text-dim)] mt-0.5">Locked Timer</div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/80 border border-[var(--border-dim)] text-center">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                      Agility Target
+                    </div>
+                    <div className="font-space font-extrabold text-sm sm:text-base text-[var(--olive)] mt-0.5">
+                      {challenger.agilityScore ?? challenger.score * 115} pts
+                    </div>
+                    <div className="text-[10px] text-[var(--text-dim)] mt-0.5">Score + Speed</div>
+                  </div>
+
+                  <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/80 border border-[var(--border-dim)] text-center">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                      Stakes
+                    </div>
+                    <div className="font-space font-extrabold text-sm sm:text-base text-[var(--gold)] mt-0.5">
+                      2.4x XP
+                    </div>
+                    <div className="text-[10px] text-[var(--text-dim)] mt-0.5">1-Shot Official</div>
+                  </div>
+                </div>
+
+                {/* Optional Answer Review Preference (Doesn't alter the cards) */}
+                <div className="pt-1">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-mono uppercase tracking-wider font-bold text-[var(--text-mute)]">
+                      When Answers Are Shown
                     </span>
-                    <span className="text-[10px] font-mono text-[var(--gold)]">
-                      {challenger.grade || "Sharp Sharp! 🎯"}
+                    <span className="text-[11px] text-[var(--text-dim)]">
+                      Cards &amp; timer stay locked
                     </span>
                   </div>
-                  <div className="text-base font-extrabold truncate" style={{ color: "var(--text)" }}>
-                    {challenger.by} scored {challenger.pct}% on Naija Trivia!
+                  <div className="grid grid-cols-2 gap-2.5">
+                    <button
+                      type="button"
+                      onClick={() => setMode("instant")}
+                      className={cn(
+                        "rounded-xl p-3 text-left border transition-all cursor-pointer",
+                        mode === "instant"
+                          ? "border-[var(--olive)] bg-[var(--olive)]/10 shadow-2xs"
+                          : "border-[var(--border-dim)] bg-[var(--bg-card)] hover:border-[var(--border)]"
+                      )}
+                    >
+                      <div className="font-space font-bold text-xs flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                        <Zap size={13} className="text-amber-500 shrink-0" />
+                        <span>Instant Feedback</span>
+                      </div>
+                      <div className="text-[11px] mt-0.5 text-[var(--text-dim)]">
+                        See explanation after each card
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMode("suspense")}
+                      className={cn(
+                        "rounded-xl p-3 text-left border transition-all cursor-pointer",
+                        mode === "suspense"
+                          ? "border-[var(--olive)] bg-[var(--olive)]/10 shadow-2xs"
+                          : "border-[var(--border-dim)] bg-[var(--bg-card)] hover:border-[var(--border)]"
+                      )}
+                    >
+                      <div className="font-space font-bold text-xs flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                        <Clock size={13} className="text-[var(--terra)] shrink-0" />
+                        <span>Suspense Mode</span>
+                      </div>
+                      <div className="text-[11px] mt-0.5 text-[var(--text-dim)]">
+                        Reveal all answers at the end
+                      </div>
+                    </button>
                   </div>
-                  <p className="text-xs text-[var(--text-dim)] mt-1">
-                    Can you beat this? You will answer the{" "}
-                    <strong>exact same {challenger.total || 15} questions</strong>.
-                  </p>
+                </div>
+
+                {/* Primary CTA: Accept Challenge */}
+                <div className="space-y-3 pt-1">
+                  <button
+                    onClick={() => {
+                      const lockedMinutes =
+                        (challenger.total || 10) <= 10 ? 5 : (challenger.total || 10) <= 25 ? 10 : 15;
+                      onStartSolo(lockedMinutes, mode, "random");
+                    }}
+                    className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md hover:opacity-95 transition-opacity"
+                  >
+                    <span>Accept Challenge · Play Same {challenger.total || 10} Questions</span>
+                    <ChevronRight size={18} />
+                  </button>
+
+                  {onDismissChallenger && (
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={onDismissChallenger}
+                        className="text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] underline underline-offset-4 cursor-pointer transition-colors"
+                      >
+                        Or switch to a custom Solo Quiz instead
+                      </button>
+                    </div>
+                  )}
                 </div>
               </div>
             </motion.div>
-          )}
+          ) : (
+            <>
+              {/* Active Arenas, Leagues, Challenges & Parlor Games Showcase */}
+              <ActiveArenasShowcase
+                onTabChange={onTabChange}
+                onStartChallenge={onStartChallenge}
+                onCreateLeague={() => setShowCreateLeagueModal(true)}
+                onCreateChallenge={() => {
+                  setChallengeCreateMode(true);
+                  onTabChange("challenge");
+                }}
+                showParlorLinks={true}
+              />
 
-          {/* Bank Progress & Deduplication Tracker */}
-          <div className="surface rounded-2xl p-4 border mb-6 flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-[var(--olive)]/10 text-[var(--olive)] flex items-center justify-center font-space font-bold text-sm">
-                <Target size={18} className="text-[var(--olive)]" />
+              {/* Bank Progress & Deduplication Tracker */}
+              <div className="surface rounded-2xl p-4 border mb-6 flex items-center justify-between gap-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[var(--olive)]/10 text-[var(--olive)] flex items-center justify-center font-space font-bold text-sm">
+                    <Target size={18} className="text-[var(--olive)]" />
+                  </div>
+                  <div>
+                    <div className="text-xs font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
+                      <span>
+                        {currentSeenCount} of {currentTotalCount} questions explored
+                      </span>
+                      {difficulty !== "random" && (
+                        <span className="capitalize text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                          {difficulty} mode
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+                      {currentSeenCount >= currentTotalCount
+                        ? `You have explored all ${difficulty !== "random" ? difficulty : ""} questions! Next game will cycle fresh.`
+                        : "No repeats — you will only see fresh questions until the bank is exhausted."}
+                    </div>
+                  </div>
+                </div>
+                {currentSeenCount > 0 && (
+                  <button
+                    onClick={onResetSeen}
+                    title="Reset question history to allow all questions again"
+                    className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border hover:bg-[var(--bg-input)] transition-colors shrink-0 cursor-pointer"
+                    style={{ color: "var(--text-mute)", borderColor: "var(--border-dim)" }}
+                  >
+                    Reset History
+                  </button>
+                )}
               </div>
-              <div>
-                <div className="text-xs font-bold flex items-center gap-2" style={{ color: "var(--text)" }}>
-                  <span>
-                    {currentSeenCount} of {currentTotalCount} questions explored
-                  </span>
-                  {difficulty !== "random" && (
-                    <span className="capitalize text-[10px] font-bold px-2 py-0.5 rounded-full bg-[var(--bg-input)] border border-[var(--border-dim)] text-[var(--text-dim)]">
-                      {difficulty} mode
+
+              <div className="space-y-6">
+                {/* Duration Selector */}
+                <div id="solo-quiz-config" className="surface rounded-2xl p-5 border scroll-mt-6">
+                  <p
+                    className="text-xs font-bold uppercase tracking-wider mb-3"
+                    style={{ color: "var(--text-mute)" }}
+                  >
+                    <Clock size={10} className="inline mr-1.5" /> Game Duration
+                  </p>
+                  <div className="grid grid-cols-3 gap-3">
+                    {DURATION_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.minutes}
+                        type="button"
+                        onClick={() => setDuration(opt)}
+                        className={cn(
+                          "rounded-xl p-4 text-center border-2 transition-all cursor-pointer",
+                          duration.minutes === opt.minutes
+                            ? "border-[var(--terra)] bg-[var(--terra-bg)] shadow-xs"
+                            : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                        )}
+                      >
+                        <div className="w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center bg-[var(--bg-input)] border border-[var(--border-dim)] shadow-xs">
+                          <opt.icon size={20} className={opt.iconColor} strokeWidth={2.2} />
+                        </div>
+                        <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
+                          {opt.label}
+                        </div>
+                        <div
+                          className="text-[10px] font-semibold mt-1"
+                          style={{ color: "var(--text-mute)" }}
+                        >
+                          {opt.minutes} min · {QUESTION_COUNTS[opt.minutes]} Qs
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Difficulty Mode Selector */}
+                <div className="surface rounded-2xl p-5 border">
+                  <div className="flex items-center justify-between mb-3">
+                    <p
+                      className="text-xs font-bold uppercase tracking-wider"
+                      style={{ color: "var(--text-mute)" }}
+                    >
+                      <Zap size={10} className="inline mr-1.5" /> Difficulty Mode
+                    </p>
+                    <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
+                      {difficulty === "random" ? "Default · All Levels" : `Filtered: ${difficulty}`}
                     </span>
-                  )}
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    {DIFFICULTY_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.id}
+                        type="button"
+                        onClick={() => setDifficulty(opt.id)}
+                        className={cn(
+                          "rounded-xl p-3.5 text-center border-2 transition-all cursor-pointer",
+                          difficulty === opt.id
+                            ? "border-[var(--gold)] bg-[var(--gold)]/10 shadow-xs"
+                            : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                        )}
+                      >
+                        <div className="w-9 h-9 rounded-xl mx-auto mb-1.5 flex items-center justify-center bg-[var(--bg-input)] border border-[var(--border-dim)] shadow-xs">
+                          <opt.icon size={18} className={opt.iconColor} strokeWidth={2.2} />
+                        </div>
+                        <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
+                          {opt.label}
+                        </div>
+                        <div
+                          className="text-[10px] font-semibold mt-0.5"
+                          style={{ color: "var(--text-mute)" }}
+                        >
+                          {opt.desc}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
                 </div>
-                <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
-                  {currentSeenCount >= currentTotalCount
-                    ? `You have explored all ${difficulty !== "random" ? difficulty : ""} questions! Next game will cycle fresh.`
-                    : "No repeats — you will only see fresh questions until the bank is exhausted."}
+
+                {/* Review Cadence Selector */}
+                <div className="surface rounded-2xl p-5 border">
+                  <p
+                    className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5"
+                    style={{ color: "var(--text-mute)" }}
+                  >
+                    <BookOpen size={12} className="text-[var(--text-dim)]" />
+                    <span>When Answers Are Shown</span>
+                  </p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setMode("instant")}
+                      className={cn(
+                        "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
+                        mode === "instant"
+                          ? "border-[var(--olive)] bg-[var(--olive)]/5 shadow-xs"
+                          : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                      )}
+                    >
+                      <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                        <Zap size={15} className="text-amber-500" />
+                        <span>Instant Feedback</span>
+                      </div>
+                      <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                        See correct answers and explanations after every question.
+                      </div>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setMode("suspense")}
+                      className={cn(
+                        "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
+                        mode === "suspense"
+                          ? "border-[var(--olive)] bg-[var(--olive)]/5 shadow-xs"
+                          : "border-[var(--border-dim)] hover:border-[var(--border)]"
+                      )}
+                    >
+                      <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
+                        <Clock size={15} className="text-[var(--terra)]" />
+                        <span>Suspense Mode</span>
+                      </div>
+                      <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
+                        Answer without interruptions; see all answers at the end.
+                      </div>
+                    </button>
+                  </div>
                 </div>
-              </div>
-            </div>
-            {currentSeenCount > 0 && (
-              <button
-                onClick={onResetSeen}
-                title="Reset question history to allow all questions again"
-                className="text-[10px] font-bold uppercase tracking-wider px-2.5 py-1.5 rounded-lg border hover:bg-[var(--bg-input)] transition-colors shrink-0 cursor-pointer"
-                style={{ color: "var(--text-mute)", borderColor: "var(--border-dim)" }}
-              >
-                Reset History
-              </button>
-            )}
-          </div>
 
-          <div className="space-y-6">
-            {/* Duration Selector */}
-            <div id="solo-quiz-config" className="surface rounded-2xl p-5 border scroll-mt-6">
-              <p
-                className="text-xs font-bold uppercase tracking-wider mb-3"
-                style={{ color: "var(--text-mute)" }}
-              >
-                <Clock size={10} className="inline mr-1.5" /> Game Duration
-              </p>
-              <div className="grid grid-cols-3 gap-3">
-                {DURATION_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.minutes}
-                    type="button"
-                    onClick={() => setDuration(opt)}
-                    className={cn(
-                      "rounded-xl p-4 text-center border-2 transition-all cursor-pointer",
-                      duration.minutes === opt.minutes
-                        ? "border-[var(--terra)] bg-[var(--terra-bg)] shadow-xs"
-                        : "border-[var(--border-dim)] hover:border-[var(--border)]"
-                    )}
-                  >
-                    <div className="w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center bg-[var(--bg-input)] border border-[var(--border-dim)] shadow-xs">
-                      <opt.icon size={20} className={opt.iconColor} strokeWidth={2.2} />
-                    </div>
-                    <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
-                      {opt.label}
-                    </div>
-                    <div
-                      className="text-[10px] font-semibold mt-1"
-                      style={{ color: "var(--text-mute)" }}
-                    >
-                      {opt.minutes} min · {QUESTION_COUNTS[opt.minutes]} Qs
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Difficulty Mode Selector */}
-            <div className="surface rounded-2xl p-5 border">
-              <div className="flex items-center justify-between mb-3">
-                <p
-                  className="text-xs font-bold uppercase tracking-wider"
-                  style={{ color: "var(--text-mute)" }}
-                >
-                  <Zap size={10} className="inline mr-1.5" /> Difficulty Mode
-                </p>
-                <span className="text-[10px] font-bold text-[var(--text-dim)] uppercase tracking-wider">
-                  {difficulty === "random" ? "Default · All Levels" : `Filtered: ${difficulty}`}
-                </span>
-              </div>
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                {DIFFICULTY_OPTIONS.map((opt) => (
-                  <button
-                    key={opt.id}
-                    type="button"
-                    onClick={() => setDifficulty(opt.id)}
-                    className={cn(
-                      "rounded-xl p-3.5 text-center border-2 transition-all cursor-pointer",
-                      difficulty === opt.id
-                        ? "border-[var(--gold)] bg-[var(--gold)]/10 shadow-xs"
-                        : "border-[var(--border-dim)] hover:border-[var(--border)]"
-                    )}
-                  >
-                    <div className="w-9 h-9 rounded-xl mx-auto mb-1.5 flex items-center justify-center bg-[var(--bg-input)] border border-[var(--border-dim)] shadow-xs">
-                      <opt.icon size={18} className={opt.iconColor} strokeWidth={2.2} />
-                    </div>
-                    <div className="font-space font-bold text-sm" style={{ color: "var(--text)" }}>
-                      {opt.label}
-                    </div>
-                    <div
-                      className="text-[10px] font-semibold mt-0.5"
-                      style={{ color: "var(--text-mute)" }}
-                    >
-                      {opt.desc}
-                    </div>
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Review Cadence Selector */}
-            <div className="surface rounded-2xl p-5 border">
-              <p
-                className="text-xs font-bold uppercase tracking-wider mb-3 flex items-center gap-1.5"
-                style={{ color: "var(--text-mute)" }}
-              >
-                <BookOpen size={12} className="text-[var(--text-dim)]" />
-                <span>When Answers Are Shown</span>
-              </p>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {/* Start Solo Button */}
                 <button
-                  type="button"
-                  onClick={() => setMode("instant")}
-                  className={cn(
-                    "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
-                    mode === "instant"
-                      ? "border-[var(--olive)] bg-[var(--olive)]/5 shadow-xs"
-                      : "border-[var(--border-dim)] hover:border-[var(--border)]"
-                  )}
+                  onClick={() => onStartSolo(duration.minutes, mode, difficulty)}
+                  className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md hover:opacity-95 transition-opacity"
                 >
-                  <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
-                    <Zap size={15} className="text-amber-500" />
-                    <span>Instant Feedback</span>
-                  </div>
-                  <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
-                    See correct answers and explanations after every question.
-                  </div>
+                  <span>Start Solo Quiz</span>
+                  <ChevronRight size={18} />
                 </button>
 
-                <button
-                  type="button"
-                  onClick={() => setMode("suspense")}
-                  className={cn(
-                    "rounded-xl p-4 text-left border-2 transition-all cursor-pointer",
-                    mode === "suspense"
-                      ? "border-[var(--olive)] bg-[var(--olive)]/5 shadow-xs"
-                      : "border-[var(--border-dim)] hover:border-[var(--border)]"
-                  )}
+                {/* Squad tournament callout */}
+                {enableChallenges && (
+                <div
+                  className="p-4 rounded-2xl border surface flex items-center justify-between gap-3 text-xs"
+                  style={{ borderColor: "var(--border-dim)" }}
                 >
-                  <div className="font-space font-bold text-sm flex items-center gap-1.5" style={{ color: "var(--text)" }}>
-                    <Clock size={15} className="text-[var(--terra)]" />
-                    <span>Suspense Mode</span>
+                  <div>
+                    <span className="font-space font-bold text-[var(--text)] block">
+                      Want to challenge your friends?
+                    </span>
+                    <span className="text-[11px] text-[var(--text-dim)]">
+                      Create a timed challenge and share the link to see who tops the board.
+                    </span>
                   </div>
-                  <div className="text-xs mt-1" style={{ color: "var(--text-dim)" }}>
-                    Answer without interruptions; see all answers at the end.
-                  </div>
-                </button>
+                  <button
+                    onClick={() => onTabChange("challenge")}
+                    className="px-3.5 py-2 rounded-xl border font-space font-bold text-xs hover:bg-[var(--bg-input)] transition-colors cursor-pointer shrink-0"
+                    style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                  >
+                    Start Challenge →
+                  </button>
+                </div>
+                )}
               </div>
-            </div>
-
-            {/* Start Solo Button */}
-            <button
-              onClick={() => onStartSolo(duration.minutes, mode, difficulty)}
-              className="w-full py-4 rounded-2xl btn-terra font-space font-extrabold text-base flex items-center justify-center gap-2 cursor-pointer shadow-md hover:opacity-95 transition-opacity"
-            >
-              <span>{challenger ? `Accept Challenge · Play Same ${challenger.total || 15} Questions` : "Start Solo Quiz"}</span>
-              <ChevronRight size={18} />
-            </button>
-
-            {/* Squad tournament callout */}
-            {enableChallenges && (
-            <div
-              className="p-4 rounded-2xl border surface flex items-center justify-between gap-3 text-xs"
-              style={{ borderColor: "var(--border-dim)" }}
-            >
-              <div>
-                <span className="font-space font-bold text-[var(--text)] block">
-                  Want to challenge your friends?
-                </span>
-                <span className="text-[11px] text-[var(--text-dim)]">
-                  Create a timed challenge and share the link to see who tops the board.
-                </span>
-              </div>
-              <button
-                onClick={() => onTabChange("challenge")}
-                className="px-3.5 py-2 rounded-xl border font-space font-bold text-xs hover:bg-[var(--bg-input)] transition-colors cursor-pointer shrink-0"
-                style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
-              >
-                Start Challenge →
-              </button>
-            </div>
-            )}
-          </div>
+            </>
+          )}
         </div>
       )}
 
@@ -1188,10 +1344,12 @@ function ResultsScreen({
           <span className="text-3xl sm:text-4xl font-bold text-[var(--text-mute)]">/{total}</span>
         </div>
         <div
-          className="text-xs font-mono font-bold uppercase tracking-wider flex items-center justify-center gap-2"
+          className="text-xs font-mono font-bold uppercase tracking-wider flex flex-wrap items-center justify-center gap-2"
           style={{ color: "var(--text-dim)" }}
         >
           <span>{pct}% accuracy</span>
+          <span>•</span>
+          <span className="text-[var(--olive)]">{correct * 115} agility pts</span>
           {difficultyMode && (
             <>
               <span>•</span>
@@ -1537,7 +1695,7 @@ function ResultsScreen({
 // ─── Orchestrator ─────────────────────────────────────────────────────────────
 
 export default function TriviaGameClient({
-  challenger,
+  challenger: initialChallenger,
   initialChallenge = null,
 }: {
   challenger?: ChallengerInfo | null;
@@ -1556,6 +1714,8 @@ export default function TriviaGameClient({
     dismissTriviaGuide,
   } = useAppStore();
 
+  const router = useRouter();
+  const [challenger, setChallenger] = useState<ChallengerInfo | null>(initialChallenger || null);
   const [phase, setPhase] = useState<GamePhase>("setup");
   const [setupTab, setSetupTab] = useState<SetupTab>(initialChallenge ? "challenge" : "solo");
   const [activeChallenge, setActiveChallenge] = useState<TriviaChallenge | null>(initialChallenge || null);
@@ -1666,6 +1826,10 @@ export default function TriviaGameClient({
   }
 
   function handleStartFreshDeck() {
+    if (challenger) {
+      setChallenger(null);
+      router.replace("/games/trivia");
+    }
     const count = QUESTION_COUNTS[lastSoloMinutes] || 15;
     const { questions: freshQuestions, wasReset } = getFreshQuestions(
       count,
@@ -1936,7 +2100,13 @@ export default function TriviaGameClient({
           reviewMode={reviewMode}
           xpEarned={xpEarned}
           difficultyMode={currentDifficulty}
-          onRetry={() => setPhase("setup")}
+          onRetry={() => {
+            if (challenger) {
+              setChallenger(null);
+              router.replace("/games/trivia");
+            }
+            setPhase("setup");
+          }}
           onStartFreshDeck={handleStartFreshDeck}
           onStartRedemption={handleStartRedemption}
           hasUsedRedemption={hasUsedRedemption}
@@ -1978,6 +2148,10 @@ export default function TriviaGameClient({
         seenQuestionIds={seenTriviaQuestionIds}
         onResetSeen={resetSeenTriviaQuestions}
         challenger={challenger}
+        onDismissChallenger={() => {
+          setChallenger(null);
+          router.replace("/games/trivia");
+        }}
         activeChallenge={activeChallenge}
         onSelectChallenge={setActiveChallenge}
         onStartChallenge={handleStartChallenge}

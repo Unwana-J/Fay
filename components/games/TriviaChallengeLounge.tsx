@@ -44,6 +44,7 @@ import {
 } from "@/lib/trivia-challenge";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { type TriviaDifficultyFilter } from "@/lib/trivia-questions";
+import { calculateLeaguePoints } from "@/lib/trivia-league";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/utils";
 
@@ -835,7 +836,11 @@ export default function TriviaChallengeLounge({
           ) : (
             <div className="rounded-2xl border overflow-hidden surface divide-y divide-[var(--border-dim)]" style={{ borderColor: "var(--border-dim)" }}>
               {scores.map((sc, idx) => {
-                const isTop3 = idx < 3;
+                const agilityPts = calculateLeaguePoints(
+                  sc.score,
+                  sc.total || currentChallenge.questionCount || 10,
+                  sc.timeSpentSeconds ?? (sc.total || 10) * 10
+                );
                 return (
                   <div
                     key={sc.id || idx}
@@ -854,13 +859,20 @@ export default function TriviaChallengeLounge({
                           {sc.username}
                         </div>
                         <div className="text-[10px] text-[var(--text-dim)]">
-                          {sc.score}/{sc.total} correct ({sc.pct}%)
+                          {sc.score}/{sc.total} correct ({sc.pct}%){sc.timeSpentSeconds ? ` · ${sc.timeSpentSeconds}s` : ""}
                         </div>
                       </div>
                     </div>
 
-                    <div className="font-mono font-bold text-sm text-[var(--text)]">
-                      {sc.pct}%
+                    <div className="flex items-center gap-2.5 text-right shrink-0">
+                      <div>
+                        <div className="font-mono font-bold text-sm text-[var(--text)]">
+                          {sc.score}/{sc.total} ({sc.pct}%)
+                        </div>
+                        <div className="text-[10px] font-mono font-bold text-[var(--olive)]">
+                          {agilityPts} agility pts
+                        </div>
+                      </div>
                     </div>
                   </div>
                 );

@@ -32,6 +32,7 @@ import {
   type FriendshipLeague,
   getAllLocalLeagues,
   getLeagueStatus,
+  calculateLeaguePoints,
 } from "@/lib/trivia-league";
 import UserAvatar from "@/components/ui/UserAvatar";
 import { cn } from "@/lib/utils";
@@ -842,11 +843,14 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
 
                           <div className="flex items-center gap-4 text-right shrink-0">
                             <div>
-                              <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
-                                {s.pct}%
+                              <div className="font-space font-extrabold text-sm sm:text-base flex items-center justify-end gap-2" style={{ color: "var(--text)" }}>
+                                <span>{s.score}/{s.total} ({s.pct}%)</span>
+                                <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[var(--olive)]/10 text-[var(--olive)] border border-[var(--olive)]/25">
+                                  {calculateLeaguePoints(s.score, s.total || selectedChallenge.questionCount || 10, s.timeSpentSeconds ?? (s.total || 10) * 10)} agility pts
+                                </span>
                               </div>
-                              <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                                {s.score}/{s.total} score
+                              <div className="text-[10px] font-semibold text-[var(--text-mute)] mt-0.5">
+                                {s.timeSpentSeconds ? `Completed in ${s.timeSpentSeconds}s` : "Accuracy & Speed Agility"}
                               </div>
                             </div>
                           </div>
@@ -902,11 +906,14 @@ export default function TriviaLeaderboardView({ onPlay }: TriviaLeaderboardViewP
 
                         <div className="flex items-center gap-4 text-right shrink-0">
                           <div>
-                            <div className="font-space font-extrabold text-base" style={{ color: "var(--text)" }}>
-                              {userChallengeScore.pct}%
+                            <div className="font-space font-extrabold text-sm sm:text-base flex items-center justify-end gap-2" style={{ color: "var(--text)" }}>
+                              <span>{userChallengeScore.score}/{userChallengeScore.total} ({userChallengeScore.pct}%)</span>
+                              <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[var(--olive)]/10 text-[var(--olive)] border border-[var(--olive)]/25">
+                                {calculateLeaguePoints(userChallengeScore.score, userChallengeScore.total || selectedChallenge.questionCount || 10, userChallengeScore.timeSpentSeconds ?? (userChallengeScore.total || 10) * 10)} agility pts
+                              </span>
                             </div>
-                            <div className="text-[10px] font-semibold text-[var(--text-mute)]">
-                              {userChallengeScore.score}/{userChallengeScore.total} score
+                            <div className="text-[10px] font-semibold text-[var(--text-mute)] mt-0.5">
+                              {userChallengeScore.timeSpentSeconds ? `Completed in ${userChallengeScore.timeSpentSeconds}s` : "Accuracy & Speed Agility"}
                             </div>
                           </div>
                         </div>

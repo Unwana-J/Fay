@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import Link from "next/link";
 import {
@@ -22,6 +23,9 @@ import {
   Download,
   Flame,
   Award,
+  ShieldCheck,
+  Zap,
+  User,
 } from "lucide-react";
 import confetti from "canvas-confetti";
 import { MathView } from "@/components/math/MathView";
@@ -43,6 +47,11 @@ import {
   getMathleticsLeaderboard,
   type MathleticsScholarEntry,
 } from "@/lib/mathletics-leaderboard";
+import {
+  getAllLocalMathleticsLeagues,
+  computeUserMathleticsLeagueSummary,
+  type MathleticsLeague,
+} from "@/lib/mathletics-league";
 import { generateMathleticsCardCanvas } from "@/lib/mathletics-card-canvas";
 import { useAppStore } from "@/store/useAppStore";
 import MathleticsLeagueLounge from "@/components/mathletics/MathleticsLeagueLounge";
@@ -53,6 +62,7 @@ export interface ChallengerInfo {
   score: number;
   total: number;
   pct: number;
+  agilityScore?: number;
 }
 
 interface MathleticsGameClientProps {
@@ -121,17 +131,44 @@ export default function MathleticsGameClient({
   const [isExportingCard, setIsExportingCard] = useState(false);
   const [cardCopied, setCardCopied] = useState(false);
 
+  const router = useRouter();
+  const [dismissedChallenger, setDismissedChallenger] = useState(false);
+  const [localLeagues, setLocalLeagues] = useState<MathleticsLeague[]>([]);
+
+  useEffect(() => {
+    setLocalLeagues(getAllLocalMathleticsLeagues());
+  }, [gameState, activeTab, showCreateDuelModal]);
+
+  const activeLeaguePreviews = useMemo(() => {
+    return localLeagues
+      .map((league) => ({
+        league,
+        summary: computeUserMathleticsLeagueSummary(
+          league,
+          profile.id,
+          profile.username || "Scholar"
+        ),
+      }))
+      .filter(({ summary }) => summary.status.isActive || summary.status.isUpcoming)
+      .slice(0, 3);
+  }, [localLeagues, profile.id, profile.username]);
+
   // Challenge context
-  const activeChallenge = initialChallenge || null;
-  const isChallengerMode = Boolean(challengerInfo || activeChallenge?.creatorScore);
+  const activeChallenge = dismissedChallenger ? null : initialChallenge || null;
+  const activeChallengerInfo = dismissedChallenger ? null : challengerInfo || null;
+  const isChallengerMode = Boolean(activeChallengerInfo || activeChallenge?.creatorScore);
   const activeChallengerName =
-    challengerInfo?.name || activeChallenge?.creatorName || "Challenger";
+    activeChallengerInfo?.name || activeChallenge?.creatorName || "Challenger";
   const activeChallengerScore =
-    challengerInfo?.score ?? activeChallenge?.creatorScore?.score ?? 0;
+    activeChallengerInfo?.score ?? activeChallenge?.creatorScore?.score ?? 0;
   const activeChallengerTotal =
-    challengerInfo?.total ?? activeChallenge?.creatorScore?.total ?? 10;
+    activeChallengerInfo?.total ?? activeChallenge?.creatorScore?.total ?? 10;
   const activeChallengerPct =
-    challengerInfo?.pct ?? activeChallenge?.creatorScore?.pct ?? 0;
+    activeChallengerInfo?.pct ?? activeChallenge?.creatorScore?.pct ?? 0;
+  const activeChallengerAgility =
+    activeChallengerInfo?.agilityScore ??
+    activeChallenge?.creatorScore?.agilityScore ??
+    activeChallengerScore * 120;
 
   // Initialize questions if challenge provided
   useEffect(() => {
@@ -146,11 +183,18 @@ export default function MathleticsGameClient({
     }
   }, [activeChallenge]);
 
-  // Start new round
-  const handleStartRound = () => {
+  // Start new round (or fresh solo round after completing a 1v1 challenge)
+  const handleStartRound = (forceFresh: boolean = false) => {
     let roundQuestions: MathleticsQuestion[] = [];
 
-    if (activeChallenge && activeChallenge.questionIds.length > 0) {
+    if (forceFresh) {
+      setDismissedChallenger(true);
+      if (typeof window !== "undefined" && window.location.search) {
+        router.replace("/games/mathletics");
+      }
+    }
+
+    if (!forceFresh && activeChallenge && activeChallenge.questionIds.length > 0) {
       const map = new Map(MATHLETICS_QUESTIONS.map((q) => [q.id, q]));
       roundQuestions = activeChallenge.questionIds
         .map((id) => map.get(id))
@@ -361,6 +405,7 @@ export default function MathleticsGameClient({
         score: correctCount,
         total: totalQuestions,
         pct,
+        agilityScore,
       },
     };
 
@@ -431,6 +476,10 @@ export default function MathleticsGameClient({
     setIsTimerActive(false);
     setSelectedOption(null);
     setIsAnswerRevealed(false);
+    setDismissedChallenger(true);
+    if (typeof window !== "undefined" && window.location.search) {
+      router.replace("/games/mathletics");
+    }
     setGameState("setup");
     setActiveTab("arena");
   };
@@ -496,7 +545,7 @@ export default function MathleticsGameClient({
         >
           <button
             onClick={handleReturnToSetup}
-            className="relative px-4 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer z-10"
+            className="relative flex items-center gap-1.5 px-4 py-1.5 text-xs font-semibold rounded-xl transition-colors cursor-pointer z-10"
           >
             {activeTab === "arena" && (
               <motion.div
@@ -506,6 +555,7 @@ export default function MathleticsGameClient({
                 style={{ backgroundColor: "var(--terra)" }}
               />
             )}
+            <User className={`w-3.5 h-3.5 ${activeTab === "arena" ? "text-white" : "text-[var(--text-dim)]"}`} />
             <span className={activeTab === "arena" ? "text-white" : "text-[var(--text-dim)] hover:text-[var(--text)]"}>
               Arena
             </span>
@@ -593,14 +643,22 @@ export default function MathleticsGameClient({
                   Rank {leaderboard.userEntry.rankBadge} · {leaderboard.userEntry.title}
                 </div>
               </div>
-              <div className="flex items-center gap-4 text-sm">
+              <div className="flex items-center gap-5 text-sm">
                 <div>
-                  <span className="text-xs block" style={{ color: "var(--text-dim)" }}>Accuracy</span>
-                  <span className="font-bold" style={{ color: "var(--text)" }}>{leaderboard.userEntry.bestPct}%</span>
+                  <span className="text-xs block" style={{ color: "var(--text-dim)" }}>Best Score</span>
+                  <span className="font-bold" style={{ color: "var(--text)" }}>
+                    {leaderboard.userEntry.bestScore}/{leaderboard.userEntry.bestTotal} ({leaderboard.userEntry.bestPct}%)
+                  </span>
+                </div>
+                <div>
+                  <span className="text-xs block" style={{ color: "var(--text-dim)" }}>Agility</span>
+                  <span className="font-bold font-mono" style={{ color: "var(--olive)" }}>
+                    {leaderboard.userEntry.bestAgilityScore} pts
+                  </span>
                 </div>
                 <div>
                   <span className="text-xs block" style={{ color: "var(--text-dim)" }}>Quant XP</span>
-                  <span className="font-bold" style={{ color: "var(--gold)" }}>{leaderboard.userEntry.mathleticsXP} XP</span>
+                  <span className="font-bold font-mono" style={{ color: "var(--gold)" }}>{leaderboard.userEntry.mathleticsXP} XP</span>
                 </div>
               </div>
             </div>
@@ -639,12 +697,15 @@ export default function MathleticsGameClient({
                       </div>
                     </div>
                   </div>
-                  <div className="text-right">
-                    <div className="text-sm font-bold" style={{ color: "var(--text)" }}>
-                      {entry.bestScore}/{entry.bestTotal} ({entry.bestPct}%)
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-bold flex items-center justify-end gap-2" style={{ color: "var(--text)" }}>
+                      <span>{entry.bestScore}/{entry.bestTotal} ({entry.bestPct}%)</span>
+                      <span className="text-xs font-mono px-2 py-0.5 rounded-md bg-[var(--olive)]/10 text-[var(--olive)] border border-[var(--olive)]/25">
+                        {entry.bestAgilityScore} pts
+                      </span>
                     </div>
-                    <div className="text-xs" style={{ color: "var(--gold)" }}>
-                      {entry.mathleticsXP} XP
+                    <div className="text-xs font-mono mt-0.5" style={{ color: "var(--gold)" }}>
+                      {entry.mathleticsXP} XP · {entry.gamesPlayed} {entry.gamesPlayed === 1 ? "run" : "runs"}
                     </div>
                   </div>
                 </div>
@@ -664,141 +725,403 @@ export default function MathleticsGameClient({
               animate={{ opacity: 1, y: 0 }}
               className="space-y-6"
             >
-              {/* Challenger Banner if opened via challenge link */}
-              {isChallengerMode && (
+              {isChallengerMode ? (
+                /* ── Dedicated Head-to-Head Quant Challenge Landing Card ── */
                 <div
-                  className="surface rounded-2xl p-4 sm:p-5 border flex items-center gap-4"
+                  className="rounded-3xl p-6 sm:p-8 surface border relative overflow-hidden shadow-sm space-y-6"
                   style={{
-                    backgroundColor: "rgba(122, 28, 46, 0.05)",
-                    borderColor: "var(--terra)",
+                    borderColor: "var(--border)",
+                    background:
+                      "linear-gradient(135deg, rgba(122, 28, 46, 0.06) 0%, rgba(68, 78, 44, 0.07) 100%)",
                   }}
                 >
-                  <Swords className="w-8 h-8 flex-shrink-0" style={{ color: "var(--terra)" }} />
-                  <div>
-                    <h3 className="font-space font-bold text-base" style={{ color: "var(--text)" }}>
-                      Challenge from {activeChallengerName}
-                    </h3>
-                    <p className="text-xs sm:text-sm mt-0.5" style={{ color: "var(--text-dim)" }}>
-                      Scored <strong style={{ color: "var(--terra)" }}>{activeChallengerScore}/{activeChallengerTotal}</strong> ({activeChallengerPct}% accuracy) on these exact questions. Can you out-calculate them in {questionTimerSeconds} seconds?
-                    </p>
+                  {/* Header Badges */}
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div
+                      className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full border text-[11px] font-mono uppercase tracking-wider font-extrabold"
+                      style={{
+                        backgroundColor: "rgba(122, 28, 46, 0.1)",
+                        borderColor: "rgba(122, 28, 46, 0.3)",
+                        color: "var(--terra)",
+                      }}
+                    >
+                      <Swords size={12} />
+                      <span>Head-to-Head Quant Challenge</span>
+                    </div>
+                    <span className="inline-flex items-center gap-1 text-[11px] font-mono font-bold px-2.5 py-1 rounded-full bg-[var(--bg-card)] border border-[var(--border-dim)] text-[var(--text-dim)]">
+                      <ShieldCheck size={12} className="text-[var(--olive)]" />
+                      <span>Locked Identical Deck</span>
+                    </span>
+                  </div>
+
+                  {/* Challenger Score & Agility Plaque */}
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-5 p-5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] shadow-2xs">
+                    <div className="space-y-1.5">
+                      <div className="text-xs font-mono uppercase tracking-wider font-bold text-[var(--text-mute)]">
+                        Target Benchmark to Beat
+                      </div>
+                      <h2
+                        className="font-space font-extrabold text-xl sm:text-2xl tracking-tight"
+                        style={{ color: "var(--text)" }}
+                      >
+                        {activeChallengerName} scored {activeChallengerScore}/{activeChallengerTotal} ({activeChallengerPct}%)
+                      </h2>
+                      <p className="text-xs sm:text-sm text-[var(--text-dim)] leading-relaxed">
+                        Clocked <strong className="text-[var(--olive)] font-mono">{activeChallengerAgility} agility pts</strong> across these{" "}
+                        <strong className="text-[var(--text)]">exact {activeChallengerTotal} mental calculation problems</strong>. Can you out-calculate them under the {questionTimerSeconds}s clock?
+                      </p>
+                    </div>
+
+                    {/* Dual Score Pill: Accuracy + Agility Points */}
+                    <div className="flex sm:flex-col items-center justify-center px-5 py-3.5 rounded-2xl bg-[var(--olive)]/10 border border-[var(--olive)]/25 shrink-0 gap-3 sm:gap-1 text-center">
+                      <div className="font-mono font-black text-2xl sm:text-3xl text-[var(--terra)] leading-none">
+                        {activeChallengerScore}/{activeChallengerTotal}
+                        <span className="text-sm font-bold text-[var(--text-dim)] ml-1">({activeChallengerPct}%)</span>
+                      </div>
+                      <div className="text-xs font-mono font-extrabold text-[var(--olive)]">
+                        <span>{activeChallengerAgility} Agility Pts</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Locked Match Rules & Scoring Summary */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3">
+                    <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/85 border border-[var(--border-dim)] text-center">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                        Deck Size
+                      </div>
+                      <div className="font-space font-extrabold text-sm sm:text-base text-[var(--text)] mt-0.5">
+                        {activeChallengerTotal} Problems
+                      </div>
+                      <div className="text-[10px] text-[var(--text-dim)] mt-0.5">Locked Cards</div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/85 border border-[var(--border-dim)] text-center">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                        Turn Timer
+                      </div>
+                      <div className="font-space font-extrabold text-sm sm:text-base text-[var(--text)] mt-0.5">
+                        {questionTimerSeconds}s / card
+                      </div>
+                      <div className="text-[10px] text-[var(--text-dim)] mt-0.5">No Calculator</div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/85 border border-[var(--border-dim)] text-center">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                        Score Target
+                      </div>
+                      <div className="font-space font-extrabold text-sm sm:text-base text-[var(--terra)] mt-0.5">
+                        {activeChallengerScore}/{activeChallengerTotal} ({activeChallengerPct}%)
+                      </div>
+                      <div className="text-[10px] text-[var(--text-dim)] mt-0.5">Accuracy</div>
+                    </div>
+
+                    <div className="p-3.5 rounded-2xl bg-[var(--bg-card)]/85 border border-[var(--border-dim)] text-center">
+                      <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                        Agility Target
+                      </div>
+                      <div className="font-space font-extrabold text-sm sm:text-base text-[var(--olive)] mt-0.5">
+                        {activeChallengerAgility} pts
+                      </div>
+                      <div className="text-[10px] text-[var(--text-dim)] mt-0.5">100 + Speed Bonus</div>
+                    </div>
+                  </div>
+
+                  {/* Primary CTA + Escape Hatch */}
+                  <div className="space-y-3 pt-1">
+                    <button
+                      onClick={() => handleStartRound(false)}
+                      className="w-full py-4 rounded-2xl font-space font-extrabold text-base text-white shadow-md transition-all hover:opacity-95 active:scale-[0.99] flex items-center justify-center gap-2 cursor-pointer"
+                      style={{ backgroundColor: "var(--terra)" }}
+                    >
+                      <span>Accept Challenge · Solve Same {activeChallengerTotal} Problems</span>
+                      <ArrowRight className="w-4 h-4" />
+                    </button>
+
+                    <div className="text-center">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setDismissedChallenger(true);
+                          router.replace("/games/mathletics");
+                        }}
+                        className="text-xs font-semibold text-[var(--text-dim)] hover:text-[var(--text)] underline underline-offset-4 cursor-pointer transition-colors"
+                      >
+                        Or switch to the Quant Dashboard instead
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                /* ── Full Quant Dashboard (Personal Stats + Active Leagues + Solo Sprint Setup) ── */
+                <div className="space-y-5">
+                  {/* 1. Personal Quant Standing & Stats Summary Bar */}
+                  <div
+                    className="rounded-3xl p-5 sm:p-6 surface border shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-4"
+                    style={{
+                      borderColor: "var(--border-dim)",
+                      background:
+                        "linear-gradient(135deg, rgba(68, 78, 44, 0.06) 0%, rgba(166, 124, 30, 0.05) 100%)",
+                    }}
+                  >
+                    <div className="space-y-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-mono uppercase tracking-wider font-extrabold text-[var(--olive)]">
+                          Quant Dashboard · Your Standing
+                        </span>
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--olive)]/15 text-[var(--olive)] border border-[var(--olive)]/25">
+                          Rank {leaderboard.userEntry.rankBadge}
+                        </span>
+                      </div>
+                      <div className="font-space font-extrabold text-lg sm:text-xl" style={{ color: "var(--text)" }}>
+                        {leaderboard.userEntry.name} · {leaderboard.userEntry.title}
+                      </div>
+                      <p className="text-xs text-[var(--text-dim)]">
+                        {mathleticsHistory.length > 0
+                          ? `${mathleticsHistory.length} ${mathleticsHistory.length === 1 ? "sprint" : "sprints"} completed · ${seenMathleticsQuestionIds.length} of ${MATHLETICS_QUESTIONS.length} problems explored`
+                          : `Explore ${MATHLETICS_QUESTIONS.length} curated mental math, estimation, and probability problems.`}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-2.5 shrink-0">
+                      <div className="px-3.5 py-2.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-center">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                          Best Score
+                        </div>
+                        <div className="font-space font-extrabold text-sm text-[var(--text)] mt-0.5">
+                          {leaderboard.userEntry.bestScore}/{leaderboard.userEntry.bestTotal} ({leaderboard.userEntry.bestPct}%)
+                        </div>
+                      </div>
+
+                      <div className="px-3.5 py-2.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-center">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                          Best Agility
+                        </div>
+                        <div className="font-mono font-extrabold text-sm text-[var(--olive)] mt-0.5">
+                          {leaderboard.userEntry.bestAgilityScore} pts
+                        </div>
+                      </div>
+
+                      <div className="px-3.5 py-2.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] text-center">
+                        <div className="text-[10px] font-mono uppercase tracking-wider text-[var(--text-mute)] font-bold">
+                          Quant XP
+                        </div>
+                        <div className="font-mono font-extrabold text-sm text-[var(--gold)] mt-0.5">
+                          {leaderboard.userEntry.mathleticsXP} XP
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* 2. Active Quant Leagues & Friend Duels Quick-Access Bar */}
+                  <div
+                    className="rounded-3xl p-5 surface border shadow-xs space-y-3.5"
+                    style={{ borderColor: "var(--border-dim)" }}
+                  >
+                    <div className="flex items-center justify-between gap-2 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <Swords className="w-4 h-4 text-[var(--terra)]" />
+                        <span className="font-space font-bold text-sm text-[var(--text)]">
+                          Active Quant Leagues &amp; Duels
+                        </span>
+                        {activeLeaguePreviews.length > 0 && (
+                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-full bg-[var(--terra)]/10 text-[var(--terra)]">
+                            {activeLeaguePreviews.length} Active
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setShowCreateDuelModal(true)}
+                          className="px-3 py-1.5 rounded-xl text-xs font-bold text-white cursor-pointer transition-all shadow-2xs"
+                          style={{ backgroundColor: "var(--terra)" }}
+                        >
+                          + Create League / Duel
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("leagues")}
+                          className="px-3 py-1.5 rounded-xl border text-xs font-semibold cursor-pointer hover:bg-[var(--surface-hover)] transition-colors"
+                          style={{ borderColor: "var(--border-dim)", color: "var(--text)" }}
+                        >
+                          All Leagues →
+                        </button>
+                      </div>
+                    </div>
+
+                    {activeLeaguePreviews.length === 0 ? (
+                      <div className="p-3.5 rounded-2xl bg-[var(--bg-card)] border border-[var(--border-dim)] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
+                        <span className="text-[var(--text-dim)]">
+                          No active Quant leagues yet. Start a 1-round <strong>Sprint Duel</strong> or multi-day <strong>Marathon League</strong> with friends.
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setActiveTab("leagues")}
+                          className="text-xs font-bold text-[var(--olive)] hover:underline shrink-0 cursor-pointer"
+                        >
+                          Join with Code →
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                        {activeLeaguePreviews.map(({ league, summary }) => {
+                          const isSprint = league.format === "sprint_duel" || league.durationDays === 1;
+                          return (
+                            <div
+                              key={league.code}
+                              onClick={() => router.push(`/games/mathletics/league/${league.code}`)}
+                              className="p-3.5 rounded-2xl border bg-[var(--bg-card)] hover:border-[var(--terra)]/50 transition-all cursor-pointer flex items-center justify-between gap-3"
+                              style={{ borderColor: "var(--border-dim)" }}
+                            >
+                              <div className="min-w-0">
+                                <div className="flex items-center gap-1.5 mb-0.5">
+                                  <span className="text-[10px] font-mono font-bold uppercase px-1.5 py-0.2 rounded bg-[var(--olive)]/15 text-[var(--olive)]">
+                                    {isSprint ? "Sprint Duel" : `Day ${summary.status.dayNumber}/${league.durationDays}`}
+                                  </span>
+                                  <span className="text-[10px] font-mono text-[var(--text-dim)]">
+                                    {league.code}
+                                  </span>
+                                </div>
+                                <div className="font-space font-bold text-sm truncate text-[var(--text)]">
+                                  {league.title}
+                                </div>
+                                <div className="text-[11px] text-[var(--text-dim)]">
+                                  {summary.userDaysCompleted > 0
+                                    ? `Rank #${summary.userRank} · ${summary.userTotalCorrect}/${summary.userDaysCompleted * 10} (${summary.userTotalPoints} agility pts)`
+                                    : `Host: ${league.creatorName} · 10 Problems`}
+                                </div>
+                              </div>
+                              <span
+                                className="px-3 py-1.5 rounded-xl text-xs font-bold text-white shrink-0"
+                                style={{ backgroundColor: summary.hasCompletedToday ? "var(--olive)" : "var(--terra)" }}
+                              >
+                                {summary.hasCompletedToday ? "Board" : "Play"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* 3. Standard Solo Quant Setup Card */}
+                  <div className="surface rounded-3xl p-6 sm:p-8 border" style={{ borderColor: "var(--border-dim)" }}>
+                    <div className="max-w-2xl">
+                      <h2 className="font-space text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>
+                        {questionTimerSeconds}-Second Mental Calculation
+                      </h2>
+                      <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-dim)" }}>
+                        No scratchpad, no calculators. Test your mathematical intuition, order-of-magnitude estimation, and Socratic shortcuts against a running clock.
+                      </p>
+
+                      {/* Turn Duration Selector (Min 25s) */}
+                      <div className="mb-6">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>
+                            Question Duration
+                          </label>
+                          <span className="text-xs font-semibold" style={{ color: "var(--olive)" }}>
+                            Min 25s per question
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-4 gap-2">
+                          {[
+                            { sec: 25, label: "25s", desc: "Blitz" },
+                            { sec: 45, label: "45s", desc: "Standard" },
+                            { sec: 60, label: "60s", desc: "Deliberate" },
+                            { sec: 90, label: "90s", desc: "Extended" },
+                          ].map((d) => (
+                            <button
+                              key={d.sec}
+                              type="button"
+                              onClick={() => {
+                                setQuestionTimerSeconds(d.sec);
+                                setTimeLeft(d.sec);
+                              }}
+                              className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-all text-center cursor-pointer ${
+                                questionTimerSeconds === d.sec
+                                  ? "bg-[var(--terra)] text-white border-[var(--terra)] shadow-xs"
+                                  : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--text-dim)]"
+                              }`}
+                            >
+                              <span className="font-bold block">{d.label}</span>
+                              <span className={`text-[10px] block mt-0.5 ${questionTimerSeconds === d.sec ? "text-white/80" : "text-[var(--text-dim)]"}`}>
+                                {d.desc}
+                              </span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Difficulty Selector */}
+                      <div className="mb-6">
+                        <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-dim)" }}>
+                          Select Difficulty
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                          {(["random", "easy", "medium", "hard"] as const).map((diff) => (
+                            <button
+                              key={diff}
+                              onClick={() => setSelectedDifficulty(diff)}
+                              className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all text-center capitalize cursor-pointer ${
+                                selectedDifficulty === diff
+                                  ? "bg-[var(--olive)] text-white border-[var(--olive)] shadow-sm"
+                                  : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--text-dim)]"
+                              }`}
+                            >
+                              {diff === "random" ? "Mixed" : diff}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Topic Selector */}
+                      <div className="mb-8">
+                        <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-dim)" }}>
+                          Topic Focus
+                        </label>
+                        <div className="flex flex-wrap gap-2">
+                          <button
+                            onClick={() => setSelectedCategory("all")}
+                            className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                              selectedCategory === "all"
+                                ? "bg-[var(--terra)] text-white border-[var(--terra)]"
+                                : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)]"
+                            }`}
+                          >
+                            All Categories
+                          </button>
+                          {MATHLETICS_CATEGORIES.map((cat) => (
+                            <button
+                              key={cat}
+                              onClick={() => setSelectedCategory(cat)}
+                              className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all cursor-pointer ${
+                                selectedCategory === cat
+                                  ? "bg-[var(--terra)] text-white border-[var(--terra)]"
+                                  : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)]"
+                              }`}
+                            >
+                              {cat}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Start Action Button */}
+                      <button
+                        onClick={() => handleStartRound(true)}
+                        className="w-full sm:w-auto px-8 py-3.5 rounded-2xl font-bold text-sm text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer"
+                        style={{ backgroundColor: "var(--terra)" }}
+                      >
+                        <span>Begin Sprint</span>
+                        <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* Main Game Intro Card */}
-              <div className="surface rounded-3xl p-6 sm:p-8 border" style={{ borderColor: "var(--border-dim)" }}>
-                <div className="max-w-2xl">
-                  <h2 className="font-space text-2xl font-bold mb-2" style={{ color: "var(--text)" }}>
-                    {questionTimerSeconds}-Second Mental Calculation
-                  </h2>
-                  <p className="text-sm leading-relaxed mb-6" style={{ color: "var(--text-dim)" }}>
-                    No scratchpad, no calculators. Test your mathematical intuition, order-of-magnitude estimation, and Socratic shortcuts against a running clock.
-                  </p>
-
-                  {/* Turn Duration Selector (Min 25s) */}
-                  <div className="mb-6">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="block text-xs font-bold uppercase tracking-wider" style={{ color: "var(--text-dim)" }}>
-                        Question Duration
-                      </label>
-                      <span className="text-xs font-semibold" style={{ color: "var(--olive)" }}>
-                        Min 25s per question
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-4 gap-2">
-                      {[
-                        { sec: 25, label: "25s", desc: "Blitz" },
-                        { sec: 45, label: "45s", desc: "Standard" },
-                        { sec: 60, label: "60s", desc: "Deliberate" },
-                        { sec: 90, label: "90s", desc: "Extended" },
-                      ].map((d) => (
-                        <button
-                          key={d.sec}
-                          type="button"
-                          onClick={() => {
-                            setQuestionTimerSeconds(d.sec);
-                            setTimeLeft(d.sec);
-                          }}
-                          className={`py-2 px-2 text-xs font-semibold rounded-xl border transition-all text-center cursor-pointer ${
-                            questionTimerSeconds === d.sec
-                              ? "bg-[var(--terra)] text-white border-[var(--terra)] shadow-xs"
-                              : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--text-dim)]"
-                          }`}
-                        >
-                          <span className="font-bold block">{d.label}</span>
-                          <span className={`text-[10px] block mt-0.5 ${questionTimerSeconds === d.sec ? "text-white/80" : "text-[var(--text-dim)]"}`}>
-                            {d.desc}
-                          </span>
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Difficulty Selector */}
-                  <div className="mb-6">
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-dim)" }}>
-                      Select Difficulty
-                    </label>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                      {(["random", "easy", "medium", "hard"] as const).map((diff) => (
-                        <button
-                          key={diff}
-                          onClick={() => setSelectedDifficulty(diff)}
-                          className={`py-2 px-3 text-xs font-semibold rounded-xl border transition-all text-center capitalize ${
-                            selectedDifficulty === diff
-                              ? "bg-[var(--olive)] text-white border-[var(--olive)] shadow-sm"
-                              : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)] hover:border-[var(--text-dim)]"
-                          }`}
-                        >
-                          {diff === "random" ? "Mixed" : diff}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Topic Selector */}
-                  <div className="mb-8">
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: "var(--text-dim)" }}>
-                      Topic Focus
-                    </label>
-                    <div className="flex flex-wrap gap-2">
-                      <button
-                        onClick={() => setSelectedCategory("all")}
-                        className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all ${
-                          selectedCategory === "all"
-                            ? "bg-[var(--terra)] text-white border-[var(--terra)]"
-                            : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)]"
-                        }`}
-                      >
-                        All Categories
-                      </button>
-                      {MATHLETICS_CATEGORIES.map((cat) => (
-                        <button
-                          key={cat}
-                          onClick={() => setSelectedCategory(cat)}
-                          className={`py-1.5 px-3 text-xs font-semibold rounded-xl border transition-all ${
-                            selectedCategory === cat
-                              ? "bg-[var(--terra)] text-white border-[var(--terra)]"
-                              : "border-[var(--border-dim)] text-[var(--text-dim)] hover:text-[var(--text)]"
-                          }`}
-                        >
-                          {cat}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Start Action Button */}
-                  <button
-                    onClick={handleStartRound}
-                    className="w-full sm:w-auto px-8 py-3.5 rounded-2xl font-bold text-sm text-white shadow-md transition-all active:scale-95 flex items-center justify-center gap-2"
-                    style={{ backgroundColor: "var(--terra)" }}
-                  >
-                    <span>{isChallengerMode ? "Accept Challenge" : "Begin Sprint"}</span>
-                    <ArrowRight className="w-4 h-4" />
-                  </button>
-                </div>
-              </div>
             </motion.div>
           )}
 
@@ -998,7 +1321,7 @@ export default function MathleticsGameClient({
                 {/* Challenger Comparison if in Duel */}
                 {isChallengerMode && (
                   <div
-                    className="p-4 rounded-2xl border mb-8 flex items-center justify-between"
+                    className="p-4 sm:p-5 rounded-2xl border mb-8 flex flex-col sm:flex-row sm:items-center justify-between gap-4"
                     style={{
                       backgroundColor: "rgba(122, 28, 46, 0.05)",
                       borderColor: "var(--terra)",
@@ -1008,17 +1331,28 @@ export default function MathleticsGameClient({
                       <div className="text-xs font-bold uppercase tracking-wider" style={{ color: "var(--terra)" }}>
                         Duel Outcome
                       </div>
-                      <div className="text-sm font-bold mt-0.5" style={{ color: "var(--text)" }}>
-                        {userAnswers.filter((a) => a.isCorrect).length > activeChallengerScore
-                          ? `Victory! You beat ${activeChallengerName}`
-                          : userAnswers.filter((a) => a.isCorrect).length === activeChallengerScore
+                      <div className="text-sm sm:text-base font-bold mt-0.5" style={{ color: "var(--text)" }}>
+                        {agilityScore > activeChallengerAgility ||
+                        (agilityScore === activeChallengerAgility &&
+                          userAnswers.filter((a) => a.isCorrect).length > activeChallengerScore)
+                          ? `Victory! You out-calculated ${activeChallengerName}`
+                          : userAnswers.filter((a) => a.isCorrect).length === activeChallengerScore &&
+                            agilityScore === activeChallengerAgility
                           ? `Honorable Tie with ${activeChallengerName}`
                           : `${activeChallengerName} retained the lead`}
                       </div>
                     </div>
-                    <div className="text-right text-xs">
-                      <div>{activeChallengerName}: {activeChallengerScore}/{activeChallengerTotal}</div>
-                      <div>You: {userAnswers.filter((a) => a.isCorrect).length}/{questions.length}</div>
+                    <div className="flex sm:flex-col items-center sm:items-end justify-between gap-2 text-xs font-mono">
+                      <div className="px-2.5 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)]">
+                        <span className="text-[var(--text-dim)]">{activeChallengerName}:</span>{" "}
+                        <strong className="text-[var(--text)]">{activeChallengerScore}/{activeChallengerTotal}</strong>{" "}
+                        <span className="text-[var(--olive)] font-bold">({activeChallengerAgility} agility pts)</span>
+                      </div>
+                      <div className="px-2.5 py-1 rounded-lg bg-[var(--bg-card)] border border-[var(--border-dim)]">
+                        <span className="text-[var(--text-dim)]">You:</span>{" "}
+                        <strong className="text-[var(--text)]">{userAnswers.filter((a) => a.isCorrect).length}/{questions.length}</strong>{" "}
+                        <span className="text-[var(--terra)] font-bold">({agilityScore} agility pts)</span>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1026,12 +1360,12 @@ export default function MathleticsGameClient({
                 {/* Action Buttons */}
                 <div className="flex flex-col sm:flex-row flex-wrap items-center justify-center gap-3 mb-10">
                   <button
-                    onClick={handleStartRound}
+                    onClick={() => handleStartRound(true)}
                     className="w-full sm:w-auto px-6 py-3 rounded-2xl font-bold text-sm text-white shadow-xs flex items-center justify-center gap-2 transition-all active:scale-95 cursor-pointer"
                     style={{ backgroundColor: "var(--terra)" }}
                   >
                     <RotateCcw className="w-4 h-4" />
-                    <span>Play Another Round</span>
+                    <span>Play Fresh Round</span>
                   </button>
 
                   <button
