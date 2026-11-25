@@ -745,3 +745,22 @@
 - **"Building in Public" Content Takeaway**:
   > *"Synchronous study rooms fail because adults aren't free at the exact same 15-minute window—and solo study schedules fail because nobody notices if you skip. Merging our Library and Community tabs into asynchronous 'Speak-to-Unlock' Classrooms turned recording a 90-second explanation into the key that unlocks your friends' voices."*
 
+
+---
+
+## Duolingo-Style Practice Reminders on a Web App (Installable App + Web Push Soft-Ask)
+
+- **Date / Phase**: 25 Nov 2026 — Phase 2, Retention Infrastructure (Step 1 of 4)
+- **The Problem / Context**:
+  Fey is a mobile-optimised web app, not a native app, so it had no way to bring a user back the next day. There was no web app manifest, no service worker and no push. Streak state lived only in `localStorage`, so no server could tell whether someone had practised today. The naive fixes both fail: asking for notification permission on page load gets declined (and Chrome then quietly suppresses the prompt for the whole site), and iOS Safari only allows Web Push for sites added to the Home Screen.
+- **User Insight & Guiding Philosophy**:
+  Copy Duolingo's lessons, not its native-app tooling: (1) time the reminder to the user's own habit (~23.5 hours after they practised), (2) treat notifications as a scarce channel — at most one practice reminder a day, quiet hours 22:00–08:00, (3) ask at the moment of highest motivation (just after finishing a sprint), behind our own soft prompt, and (4) back off when reminders are ignored. Fey's voice is curious rather than guilt-driven: the day's topic is the hook.
+- **Architectural & Product Landing**:
+  1. **Installable app**: `app/manifest.ts` (standalone, olive theme, 192/512 icons) and `public/sw.js`, which handles only `push` and `notificationclick` (no offline caching, so there's no stale-cache risk). It is served with `Cache-Control: no-cache` via `next.config.ts` and registered in production by `components/notifications/ServiceWorkerRegistrar.tsx`.
+  2. **Soft-ask after the sprint** (`components/notifications/ReminderOptInCard.tsx` on the completion screen): *"I'll remind you tomorrow around 8:10pm"* → *Remind me* / *Not now*. The native permission dialog only fires from that tap (required on iOS). *Not now* snoozes for 7 days, and a browser-level denial is never re-prompted.
+  3. **iOS branch**: iPhone users outside Home Screen mode see a two-step "Share → Add to Home Screen" guide instead of a prompt that can't work.
+  4. **Thin server state** (`supabase/migrations/20261125_push_subscriptions.sql`, `app/api/push/subscribe`): one row per device with endpoint, keys, timezone, reminder time, streak and `last_practiced_at`. RLS has no public policies, so writes require the service role key. Every completed sprint PATCHes `last_practiced_at`, which lets the future scheduler skip anyone who already practised. Audio and the rest of the data stay local-first.
+  5. **Measurement**: PostHog events `reminder_prompt_shown`, `reminder_opt_in`, `reminder_prompt_dismissed`, `reminder_permission_denied` and `reminder_permission_dismissed`.
+  6. **Next steps**: a cron sender with the `web-push` library for the daily and streak-at-risk reminders, then social notifications (trivia challenges, classroom activity), then testing message templates and backing off from inactive users.
+- **"Building in Public" Content Takeaway**:
+  > *"You don't need a native app to do Duolingo-style reminders. Android Chrome supports Web Push without an install. The real work is asking at the right moment (right after a win, never on page load) and timing the reminder to the user's own habit. We remind you 23.5 hours after you last practised, once a day, and never at night."*

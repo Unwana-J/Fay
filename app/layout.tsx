@@ -62,6 +62,7 @@ export const metadata: Metadata = {
 
 import AppLayout from "@/components/ui/AppLayout";
 import { PostHogProvider } from "@/components/analytics/PostHogProvider";
+import ServiceWorkerRegistrar from "@/components/notifications/ServiceWorkerRegistrar";
 
 export default function RootLayout({
   children,
@@ -86,6 +87,7 @@ export default function RootLayout({
         <PostHogProvider>
           <AppLayout>{children}</AppLayout>
         </PostHogProvider>
+        <ServiceWorkerRegistrar />
       </body>
     </html>
   );

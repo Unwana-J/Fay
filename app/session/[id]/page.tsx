@@ -32,6 +32,8 @@ import type { Cue } from "@/lib/research-types";
 import { createVoiceMediaRecorder } from "@/lib/audio-recorder";
 import { useClassroomStore } from "@/store/useClassroomStore";
 import { normalizeClassroomCode } from "@/lib/classroom-types";
+import ReminderOptInCard from "@/components/notifications/ReminderOptInCard";
+import { syncPracticeActivity } from "@/lib/push-notifications";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -1638,6 +1640,9 @@ function StageComplete({
         </div>
       </motion.div>
 
+      {/* ── Practice Reminder Soft-Ask (Web Push, shown only after a completed sprint) ── */}
+      <ReminderOptInCard userId={profile.id || "local-scholar"} streak={streak} />
+
       {/* ── Queue Tomorrow's Topic (Next-Day Return Commitment Hook) ── */}
       {tomorrowCandidates.length > 0 && (
         <motion.div
@@ -1910,6 +1915,9 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
       ratings: data.ratings,
       audioBase64,
     });
+
+    // Let the reminder scheduler know the user practised today (no-op if not subscribed)
+    syncPracticeActivity(useAppStore.getState().streak.current);
 
     // If this session was launched from a Classroom slot, publish to the Classroom circle
     if (classroomRef?.code) {
