@@ -9,6 +9,7 @@ import {
   type ClassroomSubmission,
   normalizeClassroomCode,
   computeEffectiveUnlockedSlot,
+  isSameClassroomScholar,
 } from "@/lib/classroom-types";
 import {
   getClassroomWithSubmissions,
@@ -67,7 +68,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Ensure submitter is registered as a member in the circle
-    const isAlreadyMember = bundle.classroom.members.some((m) => m.userId === cleanUserId);
+    const isAlreadyMember = bundle.classroom.members.some((m) =>
+      isSameClassroomScholar(m.userId, m.username, cleanUserId, cleanUsername)
+    );
     if (!isAlreadyMember) {
       const joined = await addMemberToClassroom(cleanCode, {
         userId: cleanUserId,
@@ -132,14 +135,16 @@ export async function POST(req: NextRequest) {
     let finalClassroom = refreshed.classroom;
 
     // Auto-complete Classroom when >= 2 members have all submitted the final topic
-    const finalSlotSubs = new Set(
-      refreshed.submissions
-        .filter((s) => s.slotNumber === refreshed.classroom.totalTopics)
-        .map((s) => s.userId)
+    const finalSlotSubs = refreshed.submissions.filter(
+      (s) => s.slotNumber === refreshed.classroom.totalTopics
     );
     const allFinishedFinalTopic =
       refreshed.classroom.members.length >= 2 &&
-      refreshed.classroom.members.every((m) => finalSlotSubs.has(m.userId));
+      refreshed.classroom.members.every((m) =>
+        finalSlotSubs.some((s) =>
+          isSameClassroomScholar(s.userId, s.username, m.userId, m.username)
+        )
+      );
 
     if (
       unlockedNow > (refreshed.classroom.manualUnlockedUpToSlot || 1) ||

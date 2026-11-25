@@ -9,6 +9,7 @@ import {
   type MarginNote,
   normalizeClassroomCode,
   buildClassroomSyllabus,
+  isSameClassroomScholar,
 } from "@/lib/classroom-types";
 import type { Difficulty, Topic } from "@/lib/topics";
 import { getExtensionForAudioMime } from "@/lib/audio-recorder";
@@ -192,17 +193,19 @@ function mapFallbackScoreRowToSubmission(row: any): ClassroomSubmission | null {
   if (!embedded || embedded._kind !== "classroom_submission") {
     return null;
   }
+  const resolvedSlot =
+    Number(embedded.slotNumber) || Math.abs(Number(row.day_number)) || 1;
   return {
-    id: embedded.id || String(row.id || `sub-${row.league_code}-${row.day_number}-${row.user_id}`),
+    id: embedded.id || String(row.id || `sub-${row.league_code}-${resolvedSlot}-${row.user_id}`),
     classroomCode: normalizeClassroomCode(row.league_code || embedded.classroomCode),
-    slotNumber: Number(row.day_number || embedded.slotNumber) || 1,
-    userId: row.user_id || embedded.userId,
-    username: row.username || embedded.username || "Scholar",
-    avatar: row.avatar || embedded.avatar || "/avatars/avatar-scholar.svg",
+    slotNumber: resolvedSlot,
+    userId: embedded.userId || row.user_id,
+    username: embedded.username || row.username || "Scholar",
+    avatar: embedded.avatar || row.avatar || "/avatars/avatar-scholar.svg",
     topicId: embedded.topicId || "topic",
     topicText: embedded.topicText || "",
     category: embedded.category || "Technology",
-    durationSeconds: Number(row.duration_seconds || embedded.durationSeconds) || 0,
+    durationSeconds: Number(embedded.durationSeconds || row.duration_seconds) || 0,
     audioUrl: embedded.audioUrl || undefined,
     notes: embedded.notes || undefined,
     heardBy: Array.isArray(embedded.heardBy) ? embedded.heardBy : [],
@@ -213,6 +216,145 @@ function mapFallbackScoreRowToSubmission(row: any): ClassroomSubmission | null {
     marginNotes: Array.isArray(embedded.marginNotes) ? embedded.marginNotes : [],
     submittedAt: embedded.submittedAt || row.created_at || new Date().toISOString(),
   };
+}
+
+/**
+ * Reconciles a base Classroom row with append-only `league_scores` event & submission rows.
+ * Essential when Supabase RLS allows public INSERT + SELECT on `friendship_leagues` / `league_scores`
+ * without FOR UPDATE policies:
+ * 1. Applies chronological `_kind === "classroom_state"` snapshots (unioning members so concurrent
+ *    friend joins never overwrite each other).
+ * 2. Deduplicates `_kind === "classroom_submission"` revisions by (slotNumber, userId), keeping the
+ *    latest revision while unioning `heardBy` receipts and `marginNotes` across revisions.
+ * 3. Retroactively auto-heals `classroom.members` from any submission author who recorded a take
+ *    even if their initial Join state write was blocked prior to this event-sourced layer.
+ */
+function hydrateClassroomBundleFromScoreRows(
+  baseClassroom: Classroom,
+  scoreRows: any[]
+): { classroom: Classroom; submissions: ClassroomSubmission[] } {
+  let hydrated: Classroom = {
+    ...baseClassroom,
+    members: [...(baseClassroom.members || [])],
+    slots: [...(baseClassroom.slots || [])],
+    categories: [...(baseClassroom.categories || [])],
+  };
+
+  const mergeMemberIntoList = (list: ClassroomMember[], incoming: ClassroomMember): ClassroomMember[] => {
+    const idx = list.findIndex((m) =>
+      isSameClassroomScholar(m.userId, m.username, incoming.userId, incoming.username)
+    );
+    if (idx >= 0) {
+      const existing = list[idx];
+      return list.map((m, i) =>
+        i === idx
+          ? {
+              ...existing,
+              username:
+                incoming.username && incoming.username !== "Scholar"
+                  ? incoming.username
+                  : existing.username,
+              avatar: incoming.avatar || existing.avatar,
+              favoriteCategories:
+                incoming.favoriteCategories && incoming.favoriteCategories.length > 0
+                  ? incoming.favoriteCategories
+                  : existing.favoriteCategories,
+            }
+          : m
+      );
+    }
+    if (list.length >= (hydrated.maxMembers || 8)) return list;
+    return [...list, incoming];
+  };
+
+  // 1. Replay chronological `classroom_state` snapshots
+  for (const row of scoreRows) {
+    const qr = row?.question_results;
+    const embedded = Array.isArray(qr) ? qr[0] : qr;
+    if (embedded && embedded._kind === "classroom_state" && embedded._classroom) {
+      const snap = embedded._classroom as Classroom;
+      let unionedMembers = [...hydrated.members];
+      for (const m of snap.members || []) {
+        unionedMembers = mergeMemberIntoList(unionedMembers, m);
+      }
+      hydrated = {
+        ...hydrated,
+        title: snap.title || hydrated.title,
+        totalTopics: Number(snap.totalTopics) || snap.slots?.length || hydrated.totalTopics,
+        slots: Array.isArray(snap.slots) && snap.slots.length > 0 ? snap.slots : hydrated.slots,
+        categories: Array.from(
+          new Set([...(hydrated.categories || []), ...(snap.categories || [])])
+        ),
+        manualUnlockedUpToSlot: Math.max(
+          hydrated.manualUnlockedUpToSlot || 1,
+          snap.manualUnlockedUpToSlot || 1
+        ),
+        status: snap.status || hydrated.status,
+        closedAt: snap.status === "completed" ? snap.closedAt || hydrated.closedAt : undefined,
+        members: unionedMembers,
+      };
+    }
+  }
+
+  // 2. Collapse `classroom_submission` rows chronologically per (slotNumber, scholar)
+  const subList: ClassroomSubmission[] = [];
+  for (const row of scoreRows) {
+    const parsed = mapFallbackScoreRowToSubmission(row);
+    if (!parsed) continue;
+
+    const priorIdx = subList.findIndex(
+      (s) =>
+        s.slotNumber === parsed.slotNumber &&
+        isSameClassroomScholar(s.userId, s.username, parsed.userId, parsed.username)
+    );
+
+    if (priorIdx < 0) {
+      subList.push(parsed);
+    } else {
+      const prev = subList[priorIdx];
+      // Union heardBy receipts by scholar
+      const mergedHeard: HeardReceipt[] = [...(prev.heardBy || [])];
+      for (const h of parsed.heardBy || []) {
+        if (!mergedHeard.some((x) => isSameClassroomScholar(x.userId, x.username, h.userId, h.username))) {
+          mergedHeard.push(h);
+        }
+      }
+      // Union marginNotes by id
+      const seenNoteIds = new Set((prev.marginNotes || []).map((n) => n.id));
+      const mergedNotes: MarginNote[] = [...(prev.marginNotes || [])];
+      for (const n of parsed.marginNotes || []) {
+        if (!seenNoteIds.has(n.id)) {
+          seenNoteIds.add(n.id);
+          mergedNotes.push(n);
+        }
+      }
+
+      subList[priorIdx] = {
+        ...prev,
+        ...parsed,
+        audioUrl: parsed.audioUrl || prev.audioUrl,
+        notes: parsed.notes !== undefined ? parsed.notes : prev.notes,
+        heardBy: mergedHeard,
+        marginNotes: mergedNotes,
+      };
+    }
+  }
+
+  // 3. Retroactive Member Auto-Heal: ensure every submission author appears in `members`
+  let healedMembers = [...hydrated.members];
+  for (const sub of subList) {
+    if (!sub.userId && !sub.username) continue;
+    healedMembers = mergeMemberIntoList(healedMembers, {
+      userId: sub.userId,
+      username: sub.username || "Scholar",
+      avatar: sub.avatar || "/avatars/avatar-scholar.svg",
+      isHost: sub.userId === hydrated.hostId,
+      joinedAt: sub.submittedAt || hydrated.createdAt,
+    });
+  }
+  hydrated = { ...hydrated, members: healedMembers };
+
+  return { classroom: hydrated, submissions: subList };
 }
 
 // ─── Core Persistence Operations ─────────────────────────────────────────────
@@ -264,38 +406,79 @@ export async function saveClassroom(classroom: Classroom): Promise<Classroom> {
     if (!error && data) {
       return mapDedicatedRowToClassroom(data);
     }
-    if (!isTableMissingError(error)) {
-      // Fall through to friendship_leagues anyway for safety
-    }
   } catch {}
 
-  // 2. Fallback to `friendship_leagues` JSONB column `daily_seed_map`
+  // 2. Fallback to `friendship_leagues` + append-only `league_scores` state sync
   try {
     const startDate = todayStr();
     const endDate = formatDateToIso(addDaysToDate(new Date(), normalized.totalTopics));
-    await supabase
+    const seedPayload = {
+      _kind: "classroom",
+      _classroom: normalized,
+    };
+
+    const { data: existingLeague } = await supabase
       .from("friendship_leagues")
-      .upsert(
-        [
+      .select("code")
+      .eq("code", cleanCode)
+      .maybeSingle();
+
+    if (!existingLeague) {
+      // Initial creation: INSERT works under public INSERT RLS policy
+      await supabase.from("friendship_leagues").insert([
+        {
+          code: cleanCode,
+          title: normalized.title,
+          creator_name: normalized.hostName,
+          creator_id: normalized.hostId,
+          duration_days: normalized.totalTopics,
+          start_date: startDate,
+          end_date: endDate,
+          questions_per_day: 1,
+          difficulty: normalized.difficulty.toLowerCase(),
+          category: "classroom",
+          daily_seed_map: seedPayload,
+        },
+      ]);
+    } else {
+      // Existing Classroom: try direct UPDATE first
+      const { data: updatedRows, error: updateErr } = await supabase
+        .from("friendship_leagues")
+        .update({
+          title: normalized.title,
+          duration_days: normalized.totalTopics,
+          end_date: endDate,
+          daily_seed_map: seedPayload,
+        })
+        .eq("code", cleanCode)
+        .select();
+
+      // If RLS blocks UPDATE (0 rows updated), persist an append-only state event into `league_scores`
+      // with `day_number: 0` and `username: "__LEAGUE_SYNC__"` (ignored by global leaderboards).
+      if (updateErr || !updatedRows || updatedRows.length === 0) {
+        await supabase.from("league_scores").insert([
           {
-            code: cleanCode,
-            title: normalized.title,
-            creator_name: normalized.hostName,
-            creator_id: normalized.hostId,
-            duration_days: normalized.totalTopics,
-            start_date: startDate,
-            end_date: endDate,
-            questions_per_day: 1,
-            difficulty: normalized.difficulty.toLowerCase(),
-            category: "classroom",
-            daily_seed_map: {
-              _kind: "classroom",
-              _classroom: normalized,
-            },
+            league_code: cleanCode,
+            user_id: `__classroom_sync_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            username: "__LEAGUE_SYNC__",
+            avatar: normalized.hostAvatar || "/avatars/avatar-scholar.svg",
+            day_number: 0,
+            date: startDate,
+            score: normalized.manualUnlockedUpToSlot || 1,
+            total_questions: normalized.totalTopics || 7,
+            points: 0,
+            duration_seconds: 0,
+            question_results: [
+              {
+                _kind: "classroom_state",
+                _classroom: normalized,
+                _ts: Date.now(),
+              },
+            ],
           },
-        ],
-        { onConflict: "code" }
-      );
+        ]);
+      }
+    }
   } catch {}
 
   return normalized;
@@ -368,7 +551,7 @@ export async function getClassroomWithSubmissions(code: string): Promise<{
     } catch {}
   }
 
-  if (submissions.length === 0) {
+  if (!usedDedicatedTable) {
     try {
       const { data: scoreRows, error: scoreErr } = await supabase
         .from("league_scores")
@@ -377,9 +560,9 @@ export async function getClassroomWithSubmissions(code: string): Promise<{
         .order("created_at", { ascending: true });
 
       if (!scoreErr && Array.isArray(scoreRows)) {
-        submissions = scoreRows
-          .map(mapFallbackScoreRowToSubmission)
-          .filter((s): s is ClassroomSubmission => Boolean(s));
+        const reconciled = hydrateClassroomBundleFromScoreRows(classroom, scoreRows);
+        classroom = reconciled.classroom;
+        submissions = reconciled.submissions;
       }
     } catch {}
   }
@@ -394,24 +577,20 @@ export async function listClassroomsForUser(
 ): Promise<Array<{ classroom: Classroom; submissions: ClassroomSubmission[] }>> {
   const normName = username?.trim().toLowerCase();
   const matchesMember = (c: Classroom) =>
-    c.hostId === userId ||
-    c.members.some(
-      (m) =>
-        m.userId === userId ||
-        (normName && normName !== "scholar" && m.username?.trim().toLowerCase() === normName)
-    );
+    isSameClassroomScholar(c.hostId, c.hostName, userId, username) ||
+    c.members.some((m) => isSameClassroomScholar(m.userId, m.username, userId, username));
 
-  const resultsMap = new Map<string, Classroom>();
+  const resultsMap = new Map<string, { classroom: Classroom; submissions: ClassroomSubmission[] }>();
 
   // Include warm memory cache
   for (const [code, rec] of memoryClassrooms.entries()) {
     if (matchesMember(rec.classroom)) {
-      resultsMap.set(code, rec.classroom);
+      resultsMap.set(code, rec);
     }
   }
 
   if (isSupabaseConfigured && supabase) {
-    // 1. Check `classrooms`
+    // 1. Check dedicated `classrooms` table if present
     try {
       const { data, error } = await supabase
         .from("classrooms")
@@ -419,49 +598,73 @@ export async function listClassroomsForUser(
         .order("created_at", { ascending: false })
         .limit(80);
 
-      if (!error && Array.isArray(data)) {
+      if (!error && Array.isArray(data) && data.length > 0) {
         for (const row of data) {
           const c = mapDedicatedRowToClassroom(row);
           if (matchesMember(c)) {
-            resultsMap.set(c.code, c);
+            const hydrated = await getClassroomWithSubmissions(c.code);
+            if (hydrated) resultsMap.set(c.code, hydrated);
           }
         }
       }
     } catch {}
 
-    // 2. Check `friendship_leagues` fallback (`category = 'classroom'`)
+    // 2. Check `friendship_leagues` (`category = 'classroom'`) + batch-hydrate `league_scores`
+    // so joined friends (whose Join or Submission is stored in `league_scores`) see their Classrooms!
     try {
-      const { data, error } = await supabase
+      const { data: leagueRows, error } = await supabase
         .from("friendship_leagues")
         .select("*")
         .eq("category", "classroom")
         .order("created_at", { ascending: false })
         .limit(80);
 
-      if (!error && Array.isArray(data)) {
-        for (const row of data) {
+      if (!error && Array.isArray(leagueRows) && leagueRows.length > 0) {
+        const baseMap = new Map<string, Classroom>();
+        for (const row of leagueRows) {
           const c = mapFallbackLeagueRowToClassroom(row);
-          if (c && matchesMember(c)) {
-            resultsMap.set(c.code, c);
+          if (c) baseMap.set(c.code, c);
+        }
+
+        const allCodes = Array.from(baseMap.keys());
+        let allScoreRows: any[] = [];
+        if (allCodes.length > 0) {
+          const { data: scoreData } = await supabase
+            .from("league_scores")
+            .select("*")
+            .in("league_code", allCodes)
+            .order("created_at", { ascending: true });
+          if (Array.isArray(scoreData)) {
+            allScoreRows = scoreData;
+          }
+        }
+
+        const scoresByCode = new Map<string, any[]>();
+        for (const sr of allScoreRows) {
+          const codeKey = normalizeClassroomCode(sr.league_code);
+          const bucket = scoresByCode.get(codeKey) || [];
+          bucket.push(sr);
+          scoresByCode.set(codeKey, bucket);
+        }
+
+        for (const [codeKey, baseClassroom] of baseMap.entries()) {
+          const reconciled = hydrateClassroomBundleFromScoreRows(
+            baseClassroom,
+            scoresByCode.get(codeKey) || []
+          );
+          memoryClassrooms.set(codeKey, reconciled);
+          if (matchesMember(reconciled.classroom)) {
+            resultsMap.set(codeKey, reconciled);
           }
         }
       }
     } catch {}
   }
 
-  // Hydrate submissions for each matched Classroom
-  const hydrated = await Promise.all(
-    Array.from(resultsMap.keys()).map((code) => getClassroomWithSubmissions(code))
+  return Array.from(resultsMap.values()).sort(
+    (a, b) =>
+      new Date(b.classroom.createdAt).getTime() - new Date(a.classroom.createdAt).getTime()
   );
-
-  return hydrated
-    .filter((item): item is { classroom: Classroom; submissions: ClassroomSubmission[] } =>
-      Boolean(item)
-    )
-    .sort(
-      (a, b) =>
-        new Date(b.classroom.createdAt).getTime() - new Date(a.classroom.createdAt).getTime()
-    );
 }
 
 // ─── Submission Upsert & Collaborative Reactions ─────────────────────────────
@@ -526,44 +729,62 @@ export async function upsertClassroomSubmission(
   } catch {}
 
   // 2. Fallback to `league_scores` JSONB `question_results`
+  // Uses negative `day_number` (-slotNumber) so Classroom submissions never appear on
+  // Trivia global leaderboards, and falls back to append-only INSERT if RLS blocks UPDATE.
   if (!storedInDedicated) {
     try {
+      const negSlot = -Math.abs(normalizedSub.slotNumber || 1);
       const { data: existingRows } = await supabase
         .from("league_scores")
-        .select("id, user_id")
+        .select("id, user_id, username, day_number")
         .eq("league_code", cleanCode)
-        .eq("day_number", normalizedSub.slotNumber);
+        .in("day_number", [negSlot, Math.abs(normalizedSub.slotNumber || 1)]);
 
-      const prior = (existingRows || []).find((r: any) => r.user_id === normalizedSub.userId);
+      const prior = (existingRows || []).find((r: any) =>
+        isSameClassroomScholar(r.user_id, r.username, normalizedSub.userId, normalizedSub.username)
+      );
       const embeddedPayload = [
         {
           _kind: "classroom_submission",
           ...normalizedSub,
+          _rev: Date.now(),
         },
       ];
 
+      let updatedDirectly = false;
       if (prior?.id) {
-        await supabase
+        const { data: updData, error: updErr } = await supabase
           .from("league_scores")
           .update({
             username: normalizedSub.username,
             avatar: normalizedSub.avatar,
+            day_number: negSlot,
+            points: 0,
             duration_seconds: normalizedSub.durationSeconds,
             question_results: embeddedPayload,
           })
-          .eq("id", prior.id);
-      } else {
+          .eq("id", prior.id)
+          .select();
+
+        if (!updErr && Array.isArray(updData) && updData.length > 0) {
+          updatedDirectly = true;
+        }
+      }
+
+      if (!updatedDirectly) {
         await supabase.from("league_scores").insert([
           {
             league_code: cleanCode,
-            user_id: normalizedSub.userId,
+            user_id: prior?.id
+              ? `${normalizedSub.userId}__rev_${Date.now()}`
+              : normalizedSub.userId,
             username: normalizedSub.username,
             avatar: normalizedSub.avatar,
-            day_number: normalizedSub.slotNumber,
+            day_number: negSlot,
             date: todayStr(),
             score: 1,
             total_questions: 1,
-            points: normalizedSub.durationSeconds,
+            points: 0,
             duration_seconds: normalizedSub.durationSeconds,
             question_results: embeddedPayload,
           },

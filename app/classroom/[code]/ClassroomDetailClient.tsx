@@ -38,6 +38,7 @@ import {
   canSwapClassroomSlot,
   formatClassroomCodeDisplay,
   normalizeClassroomCode,
+  isSameClassroomScholar,
 } from "@/lib/classroom-types";
 import {
   CATEGORIES,
@@ -516,7 +517,10 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
     : "var(--olive)";
 
   const unrecordedMembersOnSlot = classroom.members.filter(
-    (m) => !slotSubmissions.some((s) => s.userId === m.userId)
+    (m) =>
+      !slotSubmissions.some((s) =>
+        isSameClassroomScholar(s.userId, s.username, m.userId, m.username)
+      )
   );
 
   return (
@@ -666,7 +670,9 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
         >
           <div className="flex items-center gap-2 flex-wrap">
             {classroom.members.map((m) => {
-              const recordedThisSlot = slotSubmissions.some((s) => s.userId === m.userId);
+              const recordedThisSlot = slotSubmissions.some((s) =>
+                isSameClassroomScholar(s.userId, s.username, m.userId, m.username)
+              );
               return (
                 <div
                   key={m.userId}

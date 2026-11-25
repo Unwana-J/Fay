@@ -242,6 +242,24 @@ export function buildClassroomSyllabus(opts: {
 }
 
 /**
+ * Match two Classroom identities by userId or non-generic case-insensitive username.
+ */
+export function isSameClassroomScholar(
+  idA?: string,
+  nameA?: string,
+  idB?: string,
+  nameB?: string
+): boolean {
+  if (idA && idB && idA === idB) return true;
+  const normA = (nameA || "").trim().toLowerCase();
+  const normB = (nameB || "").trim().toLowerCase();
+  if (normA && normB && normA !== "scholar" && normA !== "member" && normA === normB) {
+    return true;
+  }
+  return false;
+}
+
+/**
  * Consensus Unlock + 24-Hour Safety Valve:
  * - Slot 1 is always unlocked.
  * - Slot N+1 unlocks immediately once ALL joined members (when >= 2 members) submit Slot N.
@@ -257,7 +275,7 @@ export function computeEffectiveUnlockedSlot(
   const total = classroom.totalTopics || classroom.slots.length || 1;
   let unlocked = Math.max(1, Math.min(total, classroom.manualUnlockedUpToSlot || 1));
 
-  const memberIds = (classroom.members || []).map((m) => m.userId);
+  const members = classroom.members || [];
 
   for (let slot = 1; slot < total; slot++) {
     if (slot > unlocked) break;
@@ -268,9 +286,11 @@ export function computeEffectiveUnlockedSlot(
     }
 
     // 1. Fast Path: Consensus unlock when circle has >= 2 members and everyone submitted
-    const submittedUserIds = new Set(slotSubs.map((s) => s.userId));
     const allMembersSubmitted =
-      memberIds.length >= 2 && memberIds.every((id) => submittedUserIds.has(id));
+      members.length >= 2 &&
+      members.every((m) =>
+        slotSubs.some((s) => isSameClassroomScholar(s.userId, s.username, m.userId, m.username))
+      );
 
     // 2. 24-Hour Safety Valve from earliest submission on this slot
     const earliestMs = slotSubs.reduce((min, s) => {

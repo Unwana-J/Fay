@@ -741,6 +741,7 @@
   3. **Cross-Platform 24 kbps Voice Pipeline & Dual-Table Persistence (`lib/audio-recorder.ts`, `lib/classroom-db.ts`)**:
      - Prioritized `audio/mp4` (AAC) before `audio/webm;codecs=opus` at `audioBitsPerSecond: 24000` (~260 KB per 90s clip — 5× smaller) for universal iPhone ↔ Android playback and `1x / 1.25x / 1.5x` listening speeds.
      - Backed audio clips with Supabase Storage (`classroom-audio`) and implemented dual-table persistence (`classrooms` / `classroom_submissions` with automatic JSONB fallback to `friendship_leagues` / `league_scores`).
+     - **Append-Only RLS Event-Sourcing & Retroactive Member Auto-Heal**: Because production RLS on `friendship_leagues` and `league_scores` permits public `INSERT` and `SELECT` without `FOR UPDATE`, `saveClassroom` and `upsertClassroomSubmission` automatically emit append-only state/revision events (`day_number <= 0`) into `league_scores` whenever `UPDATE` affects 0 rows, unioning concurrent member joins, listen receipts, and margin notes on read while retroactively auto-healing `classroom.members` from any existing submission author.
 - **"Building in Public" Content Takeaway**:
   > *"Synchronous study rooms fail because adults aren't free at the exact same 15-minute window—and solo study schedules fail because nobody notices if you skip. Merging our Library and Community tabs into asynchronous 'Speak-to-Unlock' Classrooms turned recording a 90-second explanation into the key that unlocks your friends' voices."*
 
