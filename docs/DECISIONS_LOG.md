@@ -782,3 +782,28 @@
   5. **State** (`supabase/migrations/20261126_push_reminder_scheduler.sql`): adds `categories`, `last_daily_sent_at`, `last_risk_sent_at`, `last_template` and `paused_at`. Each sprint's PATCH resets `consecutive_ignored` and clears `paused_at`.
 - **"Building in Public" Content Takeaway**:
   > *"Our reminder logic fits in one pure function: is it the user's own practice time, have they already practised, is it night-time, did we ping them recently, and have they ignored us five times in a row? If they have, we tell them we're pausing reminders, and we do. Respecting the channel is what keeps it working."*
+
+---
+
+## Event-Driven Social Push Notifications (Classrooms & Trivia)
+
+- **Date / Phase**: 25 Nov 2026 — Phase 2, Retention Infrastructure (Step 3 of 4)
+- **The Problem / Context**:
+  Daily reminders help form a solo habit, but the highest-value pings are social: a friend recording their voice in your Classroom, leaving a margin note on your take, answering your Trivia challenge, or finishing a league drop. Without push, asynchronous social loops rely entirely on friends remembering to check back or manually sharing updates on WhatsApp.
+- **User Insight & Guiding Philosophy**:
+  Social notifications carry real urgency and curiosity, so they should **not** count against the once-a-day practice reminder cap or touch the ignored-reminder back-off counter. At the same time, they must still respect user trust: never notify the person who triggered the event, never wake people up during quiet hours (22:00–08:00 local time), and never slow down API responses.
+- **Architectural & Product Landing**:
+  1. **Shared Push Delivery Module (`lib/push-sender.ts`)**:
+     - Centralizes VAPID setup, single-row delivery with automatic `404`/`410` subscription pruning, and `sendSocialPushToUsers(...)` (deduplicates recipients, excludes the actor, respects quiet hours, batches sends by 25, and leaves daily reminder columns untouched).
+     - Refactored `app/api/push/cron/route.ts` to reuse the same delivery helper.
+  2. **Non-Blocking Delivery via Next.js `after()`**:
+     - Every social trigger runs inside `after(...)` from `next/server` so API responses return immediately while serverless execution stays alive until Web Push delivery completes.
+  3. **Classroom Triggers (`app/api/classroom/[code]/route.ts`, `app/api/classroom/submit/route.ts`)**:
+     - **Friend joined**: notifies existing members (`"New voice in <Classroom>"`).
+     - **Voice recorded (Speak-to-Unlock tailored copy)**: recipients who already recorded that slot get *"Their take is ready to hear"*; recipients who haven't yet get *"Record your 90-second take to unlock and listen."*
+     - **Margin note**: notifies the recording's author with a snippet of the note.
+  4. **Trivia Triggers (`app/api/trivia/scores/route.ts`, `app/api/trivia/league/score/route.ts`)**:
+     - **Head-to-head challenge answered**: notifies prior participants on the same `challenge_id` with the friend's score.
+     - **League drop finished**: notifies the league creator and other players in that league, deep-linking straight to `/games/trivia/league/[code]`.
+- **"Building in Public" Content Takeaway**:
+  > *"The best notification isn't 'come back and study' — it's 'Tunde just recorded Topic 2; record your 90-second take to unlock and listen.' Because our Classrooms are Speak-to-Unlock, every friend's recording becomes a natural curiosity trigger that brings the circle back without nagging."*

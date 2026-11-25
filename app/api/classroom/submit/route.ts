@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { sendSocialPushToUsers } from "@/lib/push-sender";
 import {
   checkRateLimit,
   getClientIp,
@@ -161,6 +162,30 @@ export async function POST(req: NextRequest) {
           : {}),
       });
     }
+
+    const slotSubmittedIds = new Set(
+      refreshed.submissions.filter((s) => s.slotNumber === slotNum).map((s) => s.userId)
+    );
+    const otherMemberIds = finalClassroom.members.map((m) => m.userId);
+    const roomTitle = finalClassroom.title;
+    after(() =>
+      sendSocialPushToUsers(
+        otherMemberIds,
+        (recipientId) => ({
+          title: `${cleanUsername} recorded Topic ${slotNum}`,
+          body: slotSubmittedIds.has(recipientId)
+            ? `Their take is ready to hear in ${roomTitle}.`
+            : `Record your 90-second take in ${roomTitle} to unlock and listen.`,
+          url: `/classroom/${cleanCode}`,
+          tag: `fey-classroom-${cleanCode}-slot-${slotNum}`,
+          template: slotSubmittedIds.has(recipientId)
+            ? "social_classroom_listen"
+            : "social_classroom_unlock",
+          renotify: true,
+        }),
+        { excludeUserId: cleanUserId }
+      )
+    );
 
     return NextResponse.json({
       submission,

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { sendSocialPushToUsers } from "@/lib/push-sender";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sanitizeScholarName } from "@/lib/name-moderation";
 import { calculateLeaguePoints, getLeagueStatus, type FriendshipLeague } from "@/lib/trivia-league";
@@ -205,6 +206,36 @@ export async function POST(req: NextRequest) {
           points,
         });
       }
+
+      const leagueTitle = leagueRow?.title || "your Trivia league";
+      const creatorId = leagueRow?.creator_id ? String(leagueRow.creator_id) : "";
+      after(async () => {
+        if (!supabase) return;
+        const { data: leaguePlayers } = await supabase
+          .from("league_scores")
+          .select("user_id")
+          .eq("league_code", cleanLeagueCode)
+          .gt("day_number", 0)
+          .limit(60);
+        const recipientIds = [
+          creatorId,
+          ...(leaguePlayers || []).map((r: { user_id?: string | null }) =>
+            String(r.user_id || "").split("__ext_")[0]
+          ),
+        ];
+        await sendSocialPushToUsers(
+          recipientIds,
+          {
+            title: `${cleanUsername} finished Drop ${dayNumber}`,
+            body: `Scored ${score}/${totalQuestions} in ${leagueTitle}.`,
+            url: `/games/trivia/league/${cleanLeagueCode}`,
+            tag: `fey-trivia-league-${cleanLeagueCode}-d${dayNumber}`,
+            template: "social_trivia_league_score",
+            renotify: true,
+          },
+          { excludeUserId: playerIdentifier }
+        );
+      });
 
       return NextResponse.json({
         success: true,

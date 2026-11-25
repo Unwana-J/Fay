@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
-import webpush from "web-push";
 import { supabase } from "@/lib/supabase";
 import { planReminder, stateAfterSend, type PushSubscriptionRow, type ReminderPlan } from "@/lib/reminder-rules";
+import { ensureWebPushConfigured, sendPushToRow, type DeliveryOutcome } from "@/lib/push-sender";
 
 /**
  * Reminder sender. Called every 15 minutes by the scheduler (.github/workflows/push-reminders.yml).
@@ -41,38 +41,21 @@ async function loadActiveRows(): Promise<PushSubscriptionRow[]> {
   return rows;
 }
 
-type Outcome = "sent" | "expired" | "failed";
-
-async function deliver(row: PushSubscriptionRow, plan: ReminderPlan, now: Date): Promise<Outcome> {
-  try {
-    await webpush.sendNotification(
-      { endpoint: row.endpoint, keys: { p256dh: row.p256dh, auth: row.auth } },
-      JSON.stringify(plan.payload),
-      { TTL: plan.ttlSeconds, urgency: plan.urgency, topic: plan.payload.tag }
-    );
+async function deliver(row: PushSubscriptionRow, plan: ReminderPlan, now: Date): Promise<DeliveryOutcome> {
+  const outcome = await sendPushToRow(row, plan.payload, {
+    ttlSeconds: plan.ttlSeconds,
+    urgency: plan.urgency,
+  });
+  if (outcome === "sent") {
     await supabase!.from(TABLE).update(stateAfterSend(row, plan, now)).eq("id", row.id);
-    return "sent";
-  } catch (err) {
-    const status = (err as { statusCode?: number }).statusCode;
-    if (status === 404 || status === 410) {
-      // Subscription is gone (app uninstalled, permission revoked, site data cleared).
-      await supabase!.from(TABLE).delete().eq("id", row.id);
-      return "expired";
-    }
-    console.error("[push/cron] send failed", status, (err as Error).message);
-    return "failed";
   }
+  return outcome;
 }
 
 async function handle(req: NextRequest) {
   if (!authorized(req)) return NextResponse.json({ error: "Unauthorized." }, { status: 401 });
   if (!supabase) return NextResponse.json({ error: "Supabase not configured." }, { status: 500 });
-
-  const publicKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  const subject = process.env.VAPID_SUBJECT || "https://fey.lokinlabs.com.ng";
-  if (!publicKey || !privateKey) return NextResponse.json({ error: "VAPID keys not configured." }, { status: 500 });
-  webpush.setVapidDetails(subject, publicKey, privateKey);
+  if (!ensureWebPushConfigured()) return NextResponse.json({ error: "VAPID keys not configured." }, { status: 500 });
 
   const dryRun = new URL(req.url).searchParams.get("dryRun") === "1";
   const now = new Date();
@@ -102,7 +85,7 @@ async function handle(req: NextRequest) {
     });
   }
 
-  const tally: Record<Outcome, number> & Record<string, number> = { sent: 0, expired: 0, failed: 0 };
+  const tally: Record<DeliveryOutcome, number> & Record<string, number> = { sent: 0, expired: 0, failed: 0 };
   for (let i = 0; i < planned.length; i += SEND_CONCURRENCY) {
     const batch = planned.slice(i, i + SEND_CONCURRENCY);
     const results = await Promise.all(batch.map(({ row, plan }) => deliver(row, plan, now)));

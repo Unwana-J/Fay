@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { sendSocialPushToUsers } from "@/lib/push-sender";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { sanitizeScholarName } from "@/lib/name-moderation";
 import { logPlaySession } from "@/lib/play-sessions";
@@ -122,6 +123,34 @@ export async function POST(req: NextRequest) {
       xpEarned: xpEarned || 0,
       sourceTable: "trivia_scores",
     });
+
+    if (challengeId && supabase) {
+      const db = supabase;
+      const challengeRef = String(challengeId);
+      const actorDeviceId = typeof deviceId === "string" ? deviceId : null;
+      after(async () => {
+        const { data: peers } = await db
+          .from("trivia_scores")
+          .select("device_id")
+          .eq("challenge_id", challengeRef)
+          .limit(30);
+        const peerIds = (peers || [])
+          .map((r: { device_id?: string | null }) => r.device_id || "")
+          .filter(Boolean);
+        await sendSocialPushToUsers(
+          peerIds,
+          {
+            title: `${cleanUsername} answered your Trivia challenge`,
+            body: `They scored ${score}/${total}. See how you compare.`,
+            url: "/games/trivia",
+            tag: `fey-trivia-challenge-${challengeRef}`,
+            template: "social_trivia_challenge",
+            renotify: true,
+          },
+          { excludeUserId: actorDeviceId }
+        );
+      });
+    }
 
     return NextResponse.json({ success: true, stored: true, data });
   } catch (err) {

@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { sendSocialPushToUsers } from "@/lib/push-sender";
 import {
   checkRateLimit,
   getClientIp,
@@ -78,6 +79,25 @@ export async function POST(
       if (res.error) {
         return NextResponse.json({ error: res.error }, { status: 400 });
       }
+      const joinedUserId = String(m.userId).slice(0, 80);
+      const joinedUsername = String(m.username || "Scholar").trim().slice(0, 50) || "Scholar";
+      const memberIds = res.classroom.members.map((mem) => mem.userId);
+      const title = res.classroom.title;
+      const roomCode = res.classroom.code;
+      after(() =>
+        sendSocialPushToUsers(
+          memberIds,
+          {
+            title: `New voice in ${title}`,
+            body: `${joinedUsername} joined your Classroom.`,
+            url: `/classroom/${roomCode}`,
+            tag: `fey-classroom-${roomCode}-join`,
+            template: "social_classroom_join",
+            renotify: true,
+          },
+          { excludeUserId: joinedUserId }
+        )
+      );
       return NextResponse.json(res);
     }
 
@@ -247,6 +267,27 @@ export async function POST(
       });
       if (!updated) {
         return NextResponse.json({ error: "Classroom not found." }, { status: 404 });
+      }
+      const targetSub = updated.submissions.find((s) => s.id === submissionId);
+      if (targetSub) {
+        const noteAuthorId = String(note.userId).slice(0, 80);
+        const noteAuthorName = String(note.username || "Scholar").trim().slice(0, 50);
+        const snippet = String(note.text).trim().slice(0, 110);
+        const roomCode = updated.classroom.code;
+        after(() =>
+          sendSocialPushToUsers(
+            [targetSub.userId],
+            {
+              title: `${noteAuthorName} left a margin note`,
+              body: `"${snippet}"`,
+              url: `/classroom/${roomCode}`,
+              tag: `fey-classroom-${roomCode}-note`,
+              template: "social_classroom_note",
+              renotify: true,
+            },
+            { excludeUserId: noteAuthorId }
+          )
+        );
       }
       return NextResponse.json(updated);
     }
