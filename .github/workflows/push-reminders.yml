@@ -1,0 +1,42 @@
+name: Practice reminders
+
+# Runs the Fey reminder sender every 15 minutes.
+# GitHub may delay scheduled runs by several minutes; the sender uses a 60-minute window to absorb that.
+# Required repository secret: CRON_SECRET (same value as the CRON_SECRET env var on Vercel).
+# Optional repository variable: FEY_BASE_URL (defaults to https://fey.lokinlabs.com.ng).
+
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Preview who would be notified without sending"
+        type: boolean
+        default: true
+
+concurrency:
+  group: push-reminders
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - name: Trigger reminder sender
+        env:
+          CRON_SECRET: ${{ secrets.CRON_SECRET }}
+          BASE_URL: ${{ vars.FEY_BASE_URL || 'https://fey.lokinlabs.com.ng' }}
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '1' || '0' }}
+        run: |
+          if [ -z "$CRON_SECRET" ]; then
+            echo "CRON_SECRET repository secret is not set." >&2
+            exit 1
+          fi
+          url="$BASE_URL/api/push/cron"
+          if [ "$DRY_RUN" = "1" ]; then url="$url?dryRun=1"; fi
+          curl --fail-with-body --silent --show-error --max-time 90 \
+            -H "Authorization: Bearer $CRON_SECRET" \
+            "$url"
+          echo

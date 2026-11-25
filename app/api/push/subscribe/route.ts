@@ -32,6 +32,13 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
   return Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback;
 }
 
+function sanitizeCategories(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value
+    .filter((c): c is string => typeof c === "string" && c.length > 0 && c.length <= 64)
+    .slice(0, 30);
+}
+
 function rateLimited(req: NextRequest) {
   const ip = getClientIp(req);
   return !checkRateLimit(`push:${ip}`, 20, 60).allowed;
@@ -57,6 +64,9 @@ export async function POST(req: NextRequest) {
     reminder_minutes: clampInt(body.reminderMinutes, 0, 24 * 60 - 1, 20 * 60),
     streak: clampInt(body.streak, 0, 100000, 0),
     last_practiced_at: typeof body.lastPracticedAt === "string" ? body.lastPracticedAt : new Date().toISOString(),
+    categories: sanitizeCategories(body.categories) ?? [],
+    consecutive_ignored: 0,
+    paused_at: null,
     enabled: true,
     updated_at: new Date().toISOString(),
   };
@@ -80,8 +90,13 @@ export async function PATCH(req: NextRequest) {
     streak: clampInt(body.streak, 0, 100000, 0),
     last_practiced_at: typeof body.lastPracticedAt === "string" ? body.lastPracticedAt : new Date().toISOString(),
     updated_at: new Date().toISOString(),
+    // Practising again resets the back-off and resumes paused reminders.
+    consecutive_ignored: 0,
+    paused_at: null,
   };
   if (isValidTimezone(body.timezone)) update.timezone = body.timezone;
+  const categories = sanitizeCategories(body.categories);
+  if (categories) update.categories = categories;
 
   const { error } = await supabase.from(TABLE).update(update).eq("endpoint", body.endpoint);
   return NextResponse.json({ stored: !error });

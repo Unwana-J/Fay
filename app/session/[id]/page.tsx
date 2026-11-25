@@ -1641,7 +1641,11 @@ function StageComplete({
       </motion.div>
 
       {/* ── Practice Reminder Soft-Ask (Web Push, shown only after a completed sprint) ── */}
-      <ReminderOptInCard userId={profile.id || "local-scholar"} streak={streak} />
+      <ReminderOptInCard
+        userId={profile.id || "local-scholar"}
+        streak={streak}
+        categories={settings.favoriteCategories?.length ? settings.favoriteCategories : settings.enabledCategories}
+      />
 
       {/* ── Queue Tomorrow's Topic (Next-Day Return Commitment Hook) ── */}
       {tomorrowCandidates.length > 0 && (
@@ -1917,7 +1921,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     });
 
     // Let the reminder scheduler know the user practised today (no-op if not subscribed)
-    syncPracticeActivity(useAppStore.getState().streak.current);
+    {
+      const { streak: latestStreak, settings: latestSettings } = useAppStore.getState();
+      syncPracticeActivity(
+        latestStreak.current,
+        latestSettings.favoriteCategories?.length ? latestSettings.favoriteCategories : latestSettings.enabledCategories
+      );
+    }
 
     // If this session was launched from a Classroom slot, publish to the Classroom circle
     if (classroomRef?.code) {

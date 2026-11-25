@@ -127,6 +127,7 @@ export async function subscribeToReminders(opts: {
   userId: string;
   reminderMinutes: number;
   streak: number;
+  categories?: string[];
 }): Promise<SubscribeResult> {
   if (getPushEnvironment() !== "supported") return { ok: false, reason: "unsupported" };
 
@@ -161,6 +162,7 @@ export async function subscribeToReminders(opts: {
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         reminderMinutes: opts.reminderMinutes,
         streak: opts.streak,
+        categories: opts.categories ?? [],
         lastPracticedAt: new Date().toISOString(),
       }),
     });
@@ -176,7 +178,7 @@ export async function subscribeToReminders(opts: {
  * Tell the server the user practised, so tonight's reminder / streak-at-risk nudge is skipped.
  * Fire-and-forget; no-op if the user never subscribed.
  */
-export function syncPracticeActivity(streak: number) {
+export function syncPracticeActivity(streak: number, categories?: string[]) {
   if (typeof window === "undefined") return;
   let endpoint: string | null = null;
   try {
@@ -193,6 +195,7 @@ export function syncPracticeActivity(streak: number) {
     body: JSON.stringify({
       endpoint,
       streak,
+      categories,
       lastPracticedAt: new Date().toISOString(),
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     }),

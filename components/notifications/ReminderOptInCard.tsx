@@ -20,7 +20,15 @@ type CardState = "hidden" | "ask" | "ios-install" | "working" | "done" | "denied
  * Soft-ask for practice reminders, shown on the sprint completion screen.
  * The native permission dialog only appears after the user taps "Remind me".
  */
-export default function ReminderOptInCard({ userId, streak }: { userId: string; streak: number }) {
+export default function ReminderOptInCard({
+  userId,
+  streak,
+  categories,
+}: {
+  userId: string;
+  streak: number;
+  categories?: string[];
+}) {
   const [state, setState] = useState<CardState>("hidden");
   const [env, setEnv] = useState<PushEnvironment>("unsupported");
   const [reminderMinutes, setReminderMinutes] = useState(() => suggestedReminderMinutes());
@@ -40,7 +48,7 @@ export default function ReminderOptInCard({ userId, streak }: { userId: string; 
 
   async function handleAccept() {
     setState("working");
-    const result = await subscribeToReminders({ userId, reminderMinutes, streak });
+    const result = await subscribeToReminders({ userId, reminderMinutes, streak, categories });
     if (result.ok) {
       setPromptState({ status: "accepted", at: Date.now(), reminderMinutes });
       analytics.track("reminder_opt_in", { stored: result.stored, reminderMinutes, streak });

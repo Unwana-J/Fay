@@ -764,3 +764,21 @@
   6. **Next steps**: a cron sender with the `web-push` library for the daily and streak-at-risk reminders, then social notifications (trivia challenges, classroom activity), then testing message templates and backing off from inactive users.
 - **"Building in Public" Content Takeaway**:
   > *"You don't need a native app to do Duolingo-style reminders. Android Chrome supports Web Push without an install. The real work is asking at the right moment (right after a win, never on page load) and timing the reminder to the user's own habit. We remind you 23.5 hours after you last practised, once a day, and never at night."*
+
+---
+
+## Reminder Sender: Habit-Timed Daily Push, Streak-at-Risk Nudge & Honest Back-Off
+
+- **Date / Phase**: 25 Nov 2026 — Phase 2, Retention Infrastructure (Step 2 of 4)
+- **The Problem / Context**:
+  Step 1 collected push subscriptions, but nothing sent them. A naive "blast everyone at 7pm" cron ignores time zones and personal habits, pings people who already practised, and wears the channel out until users block notifications. Vercel's Hobby plan only allows daily cron jobs, which is too coarse for per-user timing.
+- **User Insight & Guiding Philosophy**:
+  Notifications are a limited resource. Each one should be timely (at the user's own practice time), relevant (a topic from the categories they chose, never one outside them), and easy to justify (never after they've practised, never at night). When reminders stop working, say so honestly and stop, instead of nagging, the way Duolingo's famous "these reminders don't seem to be working" message does.
+- **Architectural & Product Landing**:
+  1. **Pure rules engine** (`lib/reminder-rules.ts`): `planReminder(row, now)` returns `daily | streak_risk | farewell | null` using the user's local time zone. Rules: daily reminder within 60 minutes of `reminder_minutes`; a streak-at-risk nudge between 21:00 and 22:00 only if they practised yesterday but not today; quiet hours 22:00–08:00; at least 90 minutes between notifications; at most two a day. After 5 ignored reminders in a row, one farewell message pauses reminders until the user's next sprint. Scenario tests cover habit windows, quiet hours, the minimum gap, broken streaks, back-off and time zones.
+  2. **Content-led copy**: a deterministic topic per user per day, drawn only from their chosen categories, with the topic itself as the hook ("Today's question: How do vector databases enable fast semantic search? You have 90 seconds."). Templates rotate without repeating back-to-back, and each send records its `last_template` as groundwork for step 4's template testing.
+  3. **Sender** (`app/api/push/cron`): protected by `CRON_SECRET`, sends with the `web-push` library (VAPID keys), and sets TTL and urgency per kind so a stale daily reminder dies after 4 hours and a streak nudge expires at midnight. It deletes 404/410 subscriptions automatically and supports `?dryRun=1` to preview.
+  4. **Scheduler** (`.github/workflows/push-reminders.yml`): GitHub Actions every 15 minutes (free, works on any Vercel plan). The 60-minute window absorbs GitHub's scheduling delays, and manual runs default to dry-run.
+  5. **State** (`supabase/migrations/20261126_push_reminder_scheduler.sql`): adds `categories`, `last_daily_sent_at`, `last_risk_sent_at`, `last_template` and `paused_at`. Each sprint's PATCH resets `consecutive_ignored` and clears `paused_at`.
+- **"Building in Public" Content Takeaway**:
+  > *"Our reminder logic fits in one pure function: is it the user's own practice time, have they already practised, is it night-time, did we ping them recently, and have they ignored us five times in a row? If they have, we tell them we're pausing reminders, and we do. Respecting the channel is what keeps it working."*
