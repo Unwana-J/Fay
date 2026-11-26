@@ -117,7 +117,18 @@ export default function ReminderSettingsCard({
   async function handleSendTest() {
     setBusy(true);
     setStatusNote(null);
-    const res = await sendTestPush();
+    let res = await sendTestPush();
+    // Auto-resync if the browser already has permission/endpoint locally but the server row is missing
+    if (!res.ok && (res.status === 404 || res.status === 410)) {
+      const synced = await subscribeToReminders({ userId, reminderMinutes, streak, categories });
+      if (synced.ok && synced.stored) {
+        res = await sendTestPush();
+      } else if (synced.ok && !synced.stored) {
+        setBusy(false);
+        setStatusNote("Could not save subscription to server. Check SUPABASE_SERVICE_ROLE_KEY.");
+        return;
+      }
+    }
     setBusy(false);
     setStatusNote(res.ok ? "Test notification sent." : res.error || "Could not send test.");
   }

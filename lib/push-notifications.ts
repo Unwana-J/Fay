@@ -244,9 +244,9 @@ export async function updateReminderPreferences(prefs: {
   }
 }
 
-export async function sendTestPush(): Promise<{ ok: boolean; error?: string }> {
+export async function sendTestPush(): Promise<{ ok: boolean; status?: number; error?: string }> {
   const endpoint = getStoredPushEndpoint();
-  if (!endpoint) return { ok: false, error: "Turn on reminders first." };
+  if (!endpoint) return { ok: false, status: 404, error: "Turn on reminders first." };
   try {
     const res = await fetch("/api/push/test", {
       method: "POST",
@@ -254,7 +254,9 @@ export async function sendTestPush(): Promise<{ ok: boolean; error?: string }> {
       body: JSON.stringify({ endpoint }),
     });
     const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
-    return res.ok && data.ok ? { ok: true } : { ok: false, error: data.error || "Could not send test." };
+    return res.ok && data.ok
+      ? { ok: true, status: res.status }
+      : { ok: false, status: res.status, error: data.error || "Could not send test." };
   } catch {
     return { ok: false, error: "Network error." };
   }
