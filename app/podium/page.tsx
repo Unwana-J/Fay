@@ -33,6 +33,7 @@ import { encodePodiumDeck } from "@/lib/podium-share";
 import { PODIUM_THEMES } from "@/lib/podium-themes";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { toXSafeUrl } from "@/lib/share-origin";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import TopicSpinner from "@/components/podium/TopicSpinner";
 import FeyLogo from "@/components/ui/FeyLogo";
@@ -1798,9 +1799,10 @@ function PodiumPageInner() {
           const whatsappShareUrl = `https://api.whatsapp.com/send?text=${encodeURIComponent(
             `${shareHeadline}\n\n${effectiveShareUrl}`
           )}`;
+          const xShareTarget = toXSafeUrl(effectiveShareUrl, targetShareUrl);
           const twitterShareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(
             shareHeadline
-          )}&url=${encodeURIComponent(effectiveShareUrl)}`;
+          )}&url=${encodeURIComponent(xShareTarget)}`;
           const linkedInShareUrl = `https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
             effectiveShareUrl
           )}`;

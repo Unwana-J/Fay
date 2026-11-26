@@ -7,6 +7,7 @@
 
 import type { Metadata } from "next";
 import { decodePodiumDeck } from "@/lib/podium-share";
+import { getRequestOrigin } from "@/lib/request-origin";
 import SlidesViewerClient from "./SlidesViewerClient";
 
 export async function generateMetadata({
@@ -69,10 +70,11 @@ export async function generateMetadata({
   if (slideIdx > 0) queryParams.set("slide", String(slideIdx + 1));
   if (excerpt) queryParams.set("highlight", excerpt);
 
-  const canonicalUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}${
+  const origin = await getRequestOrigin();
+  const canonicalUrl = `${origin}/podium/slides/${code}${
     slideIdx > 0 ? `?slide=${slideIdx + 1}` : ""
   }`;
-  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/podium?${queryParams.toString()}`;
+  const ogImageUrl = `${origin}/api/og/podium?${queryParams.toString()}`;
 
   return {
     title,

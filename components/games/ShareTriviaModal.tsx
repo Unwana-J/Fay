@@ -12,6 +12,7 @@ import {
   Download,
 } from "lucide-react";
 import { copyTextToClipboard } from "@/lib/clipboard";
+import { toXSafeUrl } from "@/lib/share-origin";
 import {
   copyTriviaCardToClipboard,
   downloadTriviaCard,
@@ -106,8 +107,9 @@ export default function ShareTriviaModal({
   }
 
   function handleShareTwitter() {
+    const urlToShare = toXSafeUrl(targetUrl, fullShareUrl);
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterMessage)}&url=${encodeURIComponent(targetUrl)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(twitterMessage)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }

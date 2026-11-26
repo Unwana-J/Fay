@@ -28,6 +28,7 @@ import {
 import { useAppStore } from "@/store/useAppStore";
 import OnboardingModal from "@/components/auth/OnboardingModal";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { toXSafeUrl } from "@/lib/share-origin";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 
@@ -165,7 +166,10 @@ export default function NoteContent({
 
   function handleShareTwitter() {
     if (!note) return;
-    const urlToShare = getCanonicalShareUrl(highlight);
+    const fallbackUrl = `https://fey.lokinlabs.com.ng/note/${code}${
+      highlight?.trim() ? `?q=${encodeURIComponent(highlight.trim())}` : ""
+    }`;
+    const urlToShare = toXSafeUrl(getCanonicalShareUrl(highlight), fallbackUrl);
     const tweet = highlight
       ? `“${highlight}”\n\n— From my synthesis on "${note.topicText}" via @FeyPlatform:\n`
       : `Read this synthesis on "${note.topicText}" — written using the Feynman Technique on Fey.\n\n`;
@@ -185,7 +189,8 @@ export default function NoteContent({
 
   function handleShareSelectedQuoteTwitter() {
     if (!note || !selectedText) return;
-    const urlToShare = getCanonicalShareUrl(selectedText);
+    const fallbackUrl = `https://fey.lokinlabs.com.ng/note/${code}?q=${encodeURIComponent(selectedText.trim())}`;
+    const urlToShare = toXSafeUrl(getCanonicalShareUrl(selectedText), fallbackUrl);
     const tweet = `“${selectedText}”\n\n— from Scholar ${note.author}'s synthesis on "${note.topicText}" via @FeyPlatform:\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,

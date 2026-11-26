@@ -11,6 +11,7 @@
 
 import type { Metadata } from "next";
 import { decodeSharedNote } from "@/lib/share-note";
+import { getRequestOrigin } from "@/lib/request-origin";
 import NoteContent from "./NoteContent";
 
 // ── Dynamic OG metadata ───────────────────────────────────────────────────────
@@ -55,10 +56,11 @@ export async function generateMetadata({
     : `"${note.topicText}" · Scholar Dispatch — Fey`;
 
   const byline = `By ${note.author} · ${note.category} · ${note.difficulty}`;
-  const canonicalUrl = `https://fey.lokinlabs.com.ng/note/${code}${
+  const origin = await getRequestOrigin();
+  const canonicalUrl = `${origin}/note/${code}${
     highlight ? `?q=${encodeURIComponent(highlight)}` : ""
   }`;
-  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/note?code=${encodeURIComponent(code)}${
+  const ogImageUrl = `${origin}/api/og/note?code=${encodeURIComponent(code)}${
     highlight ? `&highlight=${encodeURIComponent(highlight)}` : ""
   }`;
 

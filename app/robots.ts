@@ -32,9 +32,29 @@ const AI_BOTS = [
   "CCBot",
 ];
 
+/**
+ * Allow social card preview crawlers to read shared Podium decks, Notes,
+ * and first-party short links while keeping them out of search/AI indexes.
+ */
+const SOCIAL_PREVIEW_BOTS = [
+  "Twitterbot",
+  "facebookexternalhit",
+  "WhatsApp",
+  "LinkedInBot",
+  "Slackbot",
+  "Discordbot",
+  "TelegramBot",
+  "Applebot",
+];
+
 export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
+      {
+        userAgent: SOCIAL_PREVIEW_BOTS,
+        allow: ["/", "/s/", "/podium/slides/", "/note/", "/api/og/"],
+        disallow: ["/admin", "/profile", "/library", "/analytics", "/session/"],
+      },
       { userAgent: "*", allow: "/", disallow: PRIVATE_PATHS },
       { userAgent: AI_BOTS, allow: "/", disallow: PRIVATE_PATHS },
     ],

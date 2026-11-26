@@ -1,27 +1,79 @@
 import { NextRequest, NextResponse } from "next/server";
+import crypto from "crypto";
 import { checkRateLimit, getClientIp } from "@/lib/security-guard";
+import { supabase } from "@/lib/supabase";
+import { ALLOWED_SHARE_HOSTS } from "@/lib/share-origin";
 
 // Server-side in-memory cache to return instantly on repeat requests (capped at 1000 entries)
 const MAX_URL_CACHE_SIZE = 1000;
 const serverUrlCache = new Map<string, string>();
 
-const ALLOWED_SHORTEN_HOSTS = new Set([
-  "fey.lokinlabs.com.ng",
-  "www.fey.lokinlabs.com.ng",
-  "localhost",
-  "127.0.0.1",
-]);
-
-function isAllowedFeyUrl(rawUrl: string): boolean {
+function parseAllowedFeyUrl(rawUrl: string): URL | null {
   try {
     const parsed = new URL(rawUrl);
     if (parsed.protocol !== "https:" && parsed.protocol !== "http:") {
-      return false;
+      return null;
     }
-    return ALLOWED_SHORTEN_HOSTS.has(parsed.hostname.toLowerCase());
+    if (!ALLOWED_SHARE_HOSTS.has(parsed.hostname.toLowerCase())) {
+      return null;
+    }
+    return parsed;
   } catch {
-    return false;
+    return null;
   }
+}
+
+function generateShortCode(): string {
+  return crypto.randomBytes(6).toString("base64url").slice(0, 7);
+}
+
+async function createFirstPartyShortCode(targetPath: string): Promise<string | null> {
+  if (!supabase || !targetPath.startsWith("/") || targetPath.length > 32000) {
+    return null;
+  }
+
+  const targetHash = crypto.createHash("sha256").update(targetPath).digest("hex");
+
+  try {
+    const { data: existing, error: selectErr } = await supabase
+      .from("short_links")
+      .select("code")
+      .eq("target_hash", targetHash)
+      .maybeSingle();
+
+    if (!selectErr && existing?.code) {
+      return existing.code;
+    }
+
+    // Attempt insert with retry on rare code collision
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const code = generateShortCode();
+      const { error: insertErr } = await supabase
+        .from("short_links")
+        .insert({ code, target_path: targetPath, target_hash: targetHash });
+
+      if (!insertErr) {
+        return code;
+      }
+
+      // Unique target_hash race: re-fetch existing code
+      if (insertErr.code === "23505") {
+        const { data: raced } = await supabase
+          .from("short_links")
+          .select("code")
+          .eq("target_hash", targetHash)
+          .maybeSingle();
+        if (raced?.code) return raced.code;
+      } else {
+        // Table missing or RLS error -> fall through gracefully
+        return null;
+      }
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
 }
 
 export async function POST(req: NextRequest) {
@@ -34,8 +86,18 @@ export async function POST(req: NextRequest) {
 
     const { url } = await req.json();
 
-    if (!url || typeof url !== "string" || !isAllowedFeyUrl(url)) {
+    if (!url || typeof url !== "string") {
       return NextResponse.json({ error: "Missing or unauthorized URL host" }, { status: 400 });
+    }
+
+    const parsed = parseAllowedFeyUrl(url);
+    if (!parsed) {
+      return NextResponse.json({ error: "Missing or unauthorized URL host" }, { status: 400 });
+    }
+
+    // Already a first-party short link
+    if (/^\/s\/[A-Za-z0-9_-]{4,16}$/.test(parsed.pathname)) {
+      return NextResponse.json({ shortUrl: url });
     }
 
     if (serverUrlCache.has(url)) {
@@ -44,50 +106,34 @@ export async function POST(req: NextRequest) {
 
     let shortUrl = "";
 
-    // Strategy 1: Fast POST to TinyURL with urlencoded body
-    try {
-      const postResponse = await fetch("https://tinyurl.com/api-create.php", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/x-www-form-urlencoded",
-          "User-Agent": "FeyPlatform/1.0",
-        },
-        body: new URLSearchParams({ url }),
-        signal: AbortSignal.timeout(10000),
-      });
-
-      if (postResponse.ok) {
-        const text = (await postResponse.text()).trim();
-        if (text.startsWith("http")) {
-          shortUrl = text;
-        }
-      }
-    } catch (err) {
-      console.warn("TinyURL POST failed, attempting GET fallback:", err);
+    // Strategy 1 (Preferred): First-party /s/[code] via Supabase
+    const targetPath = `${parsed.pathname}${parsed.search}${parsed.hash}`;
+    const firstPartyCode = await createFirstPartyShortCode(targetPath);
+    if (firstPartyCode) {
+      shortUrl = `${parsed.origin}/s/${firstPartyCode}`;
     }
 
-    // Strategy 2: Fallback to GET TinyURL if POST failed
+    // Strategy 2 (Fallback if short_links table is not migrated yet): TinyURL
     if (!shortUrl) {
       try {
-        const getResponse = await fetch(
-          `https://tinyurl.com/api-create.php?url=${encodeURIComponent(url)}`,
-          {
-            method: "GET",
-            headers: {
-              "User-Agent": "FeyPlatform/1.0",
-            },
-            signal: AbortSignal.timeout(10000),
-          }
-        );
+        const postResponse = await fetch("https://tinyurl.com/api-create.php", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "FeyPlatform/1.0",
+          },
+          body: new URLSearchParams({ url }),
+          signal: AbortSignal.timeout(10000),
+        });
 
-        if (getResponse.ok) {
-          const text = (await getResponse.text()).trim();
+        if (postResponse.ok) {
+          const text = (await postResponse.text()).trim();
           if (text.startsWith("http")) {
             shortUrl = text;
           }
         }
       } catch (err) {
-        console.warn("TinyURL GET fallback also failed:", err);
+        console.warn("TinyURL POST fallback failed:", err);
       }
     }
 

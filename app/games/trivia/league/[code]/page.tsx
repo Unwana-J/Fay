@@ -11,6 +11,7 @@ import {
 import LeagueArenaClient from "./LeagueArenaClient";
 import { todayStr, formatDateToIso, addDaysToDate } from "@/lib/utils";
 import { loadAnswerOverrides } from "@/lib/trivia-contests";
+import { getRequestOrigin } from "@/lib/request-origin";
 
 export const dynamic = "force-dynamic";
 
@@ -45,6 +46,8 @@ export async function generateMetadata({
       const title = `🏆 ${leagueRow.title} · Day ${status.dayNumber} of ${leagueRow.duration_days} · Fey League`;
       const description = `Multi-day Naija Trivia tournament hosted by ${leagueRow.creator_name && leagueRow.creator_name !== "Scholar" ? leagueRow.creator_name : "Host"}. Answer 1 daily quiz drop and compete for the top spot!`;
 
+      const origin = await getRequestOrigin();
+
       return {
         title,
         description,
@@ -53,7 +56,7 @@ export async function generateMetadata({
           description,
           siteName: "Fey — Think Deeper, Articulate Clearly",
           type: "website",
-          url: `https://fey.lokinlabs.com.ng/games/trivia/league/${cleanCode}`,
+          url: `${origin}/games/trivia/league/${cleanCode}`,
         },
         twitter: {
           card: "summary_large_image",

@@ -17,6 +17,7 @@ import {
 import FeyLogo from "@/components/ui/FeyLogo";
 import { encodeSharedNote, type SharedNotePayload } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { toXSafeUrl } from "@/lib/share-origin";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { CATEGORY_COLORS, CATEGORY_ICONS, DIFFICULTY_LABELS, type Difficulty } from "@/lib/topics";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
@@ -110,7 +111,7 @@ export default function ShareNoteModal({
 
   function handleShareTwitter() {
     if (!note) return;
-    const urlToShare = activeUrl || fullShareUrl;
+    const urlToShare = toXSafeUrl(activeUrl || fullShareUrl, fullShareUrl);
     const quotePrefix = highlightExcerpt.trim()
       ? `“${highlightExcerpt.trim()}”\n\n— From my synthesis on "${note.topicText}" on @FeyPlatform:\n`
       : `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on @FeyPlatform:\n\n`;

@@ -23,6 +23,7 @@ import ShareNoteModal from "@/components/notes/ShareNoteModal";
 import { FeyLogo } from "@/components/ui/FeyLogo";
 import { encodeSharedNote } from "@/lib/share-note";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { toXSafeUrl } from "@/lib/share-origin";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { copyFeynmanCardToClipboard, downloadFeynmanCard } from "@/lib/feynman-card-canvas";
 import { analytics } from "@/lib/analytics";
@@ -1289,8 +1290,9 @@ function StageComplete({
 
   function handleShareTwitter() {
     const tweet = `Read my synthesis on "${topicText}" — written using the Feynman Technique on @FeyPlatform:\n\n`;
+    const urlToShare = toXSafeUrl(activeShareUrl, fullShareUrl);
     window.open(
-      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(activeShareUrl)}`,
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
     );
   }

@@ -8,6 +8,7 @@
 import type { Metadata } from "next";
 import TriviaGameClient, { type ChallengerInfo } from "./TriviaGameClient";
 import { decodeChallengeFromUrl, type TriviaChallenge } from "@/lib/trivia-challenge";
+import { getRequestOrigin } from "@/lib/request-origin";
 import FeatureGate from "@/components/ui/FeatureGate";
 
 export async function generateMetadata({
@@ -16,6 +17,7 @@ export async function generateMetadata({
   searchParams?: Promise<{ [key: string]: string | string[] | undefined }>;
 }): Promise<Metadata> {
   const sParams = searchParams ? await searchParams : {};
+  const origin = await getRequestOrigin();
 
   const challengeCode = typeof sParams.challenge === "string" ? sParams.challenge : undefined;
   if (challengeCode) {
@@ -23,14 +25,14 @@ export async function generateMetadata({
     if (challenge) {
       const title = `${challenge.title} · Timed Trivia Challenge · Fey`;
       const description = `Competed on Fey: ${challenge.questionCount} questions hosted by ${challenge.creatorName && challenge.creatorName !== "Scholar" ? challenge.creatorName : "Host"}. Join and beat the leaderboard!`;
-      const canonicalUrl = `https://fey.lokinlabs.com.ng/games/trivia?challenge=${challengeCode}`;
+      const canonicalUrl = `${origin}/games/trivia?challenge=${challengeCode}`;
 
       const ogParams = new URLSearchParams();
       ogParams.set("challengeTitle", challenge.title);
       ogParams.set("by", (challenge.creatorName && challenge.creatorName !== "Scholar") ? challenge.creatorName : "Player");
       ogParams.set("total", String(challenge.questionCount || 10));
       ogParams.set("difficulty", challenge.difficulty || "Mixed");
-      const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/trivia?${ogParams.toString()}`;
+      const ogImageUrl = `${origin}/api/og/trivia?${ogParams.toString()}`;
 
       return {
         title,
@@ -95,10 +97,10 @@ export async function generateMetadata({
     if (qRaw) queryParams.set("q", qRaw);
   }
 
-  const ogImageUrl = `https://fey.lokinlabs.com.ng/api/og/trivia${
+  const ogImageUrl = `${origin}/api/og/trivia${
     queryParams.toString() ? `?${queryParams.toString()}` : ""
   }`;
-  const canonicalUrl = `https://fey.lokinlabs.com.ng/games/trivia${
+  const canonicalUrl = `${origin}/games/trivia${
     queryParams.toString() ? `?${queryParams.toString()}` : ""
   }`;
 

@@ -8,6 +8,7 @@ import { decodePodiumDeck } from "@/lib/podium-share";
 import { type PodiumDeck } from "@/lib/podium-types";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { getShortenedUrl } from "@/lib/url-shortener";
+import { toXSafeUrl } from "@/lib/share-origin";
 import SlideRenderer from "@/components/podium/SlideRenderer";
 import FeyLogo from "@/components/ui/FeyLogo";
 
@@ -91,7 +92,10 @@ export default function SlidesViewerClient({
 
   const handleShareTwitter = () => {
     if (!deck) return;
-    const url = getActiveShareUrl();
+    const baseUrl = `https://fey.lokinlabs.com.ng/podium/slides/${code}${
+      currentSlide > 0 ? `?slide=${currentSlide + 1}` : ""
+    }`;
+    const url = toXSafeUrl(getActiveShareUrl(), baseUrl);
     const curSlideObj = deck.slides[currentSlide];
     const slidePrefix =
       currentSlide > 0 && curSlideObj?.title
