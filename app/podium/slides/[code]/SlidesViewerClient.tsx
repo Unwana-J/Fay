@@ -101,7 +101,7 @@ export default function SlidesViewerClient({
       currentSlide > 0 && curSlideObj?.title
         ? `"${curSlideObj.title}" (Slide ${currentSlide + 1})\n`
         : "";
-    const text = `${slidePrefix}Check out this presentation on "${deck.topic}" 🎤\n\n— Presented by ${deck.author} via @FeyPlatform:\n`;
+    const text = `${slidePrefix}Check out this presentation on "${deck.topic}" — presented by ${deck.author} on Fey:\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
       "_blank"

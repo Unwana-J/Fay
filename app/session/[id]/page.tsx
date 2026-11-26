@@ -1289,7 +1289,7 @@ function StageComplete({
   }
 
   function handleShareTwitter() {
-    const tweet = `Read my synthesis on "${topicText}" — written using the Feynman Technique on @FeyPlatform:\n\n`;
+    const tweet = `Read my synthesis on "${topicText}" — written using the Feynman Technique on Fey:\n\n`;
     const urlToShare = toXSafeUrl(activeShareUrl, fullShareUrl);
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,

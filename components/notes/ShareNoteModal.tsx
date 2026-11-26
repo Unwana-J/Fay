@@ -28,6 +28,21 @@ interface ShareNoteModalProps {
   note: SharedNotePayload | null;
 }
 
+function stripNoteHtml(raw: string): string {
+  return raw
+    .replace(/<\/(p|li|div|h[1-6]|blockquote)>/gi, " ")
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<[^>]*>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 export default function ShareNoteModal({
   isOpen,
   onClose,
@@ -38,19 +53,20 @@ export default function ShareNoteModal({
   const [activeUrl, setActiveUrl] = useState<string>("");
   const [highlightExcerpt, setHighlightExcerpt] = useState<string>("");
 
+  const plainNoteText = useMemo(() => {
+    if (!note?.notes) return "";
+    return stripNoteHtml(note.notes);
+  }, [note]);
+
   // Extract clean sentence candidates from the note for 1-click preview selection
   const sentenceSuggestions = useMemo(() => {
-    if (!note?.notes) return [];
-    const clean = note.notes
-      .replace(/<[^>]*>/g, " ")
-      .replace(/\s+/g, " ")
-      .trim();
-    const sentences = clean
+    if (!plainNoteText) return [];
+    const sentences = plainNoteText
       .split(/(?<=[.!?])\s+/)
       .map((s) => s.trim())
       .filter((s) => s.length >= 20 && s.length <= 220);
     return sentences.slice(0, 3);
-  }, [note]);
+  }, [plainNoteText]);
 
   const fullShareUrl = useMemo(() => {
     if (!note) return "";
@@ -113,8 +129,8 @@ export default function ShareNoteModal({
     if (!note) return;
     const urlToShare = toXSafeUrl(activeUrl || fullShareUrl, fullShareUrl);
     const quotePrefix = highlightExcerpt.trim()
-      ? `“${highlightExcerpt.trim()}”\n\n— From my synthesis on "${note.topicText}" on @FeyPlatform:\n`
-      : `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on @FeyPlatform:\n\n`;
+      ? `“${highlightExcerpt.trim()}”\n\n— From my synthesis on "${note.topicText}" on Fey:\n`
+      : `Read my synthesis on "${note.topicText}" — articulated using the Feynman Technique on Fey:\n\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(quotePrefix)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
@@ -138,7 +154,7 @@ export default function ShareNoteModal({
       category: note.category,
       difficulty: note.difficulty,
       author: note.author,
-      notesSnippet: highlightExcerpt.trim() || note.notes,
+      notesSnippet: highlightExcerpt.trim() || plainNoteText,
       speakingSeconds: note.speakingSeconds,
     };
     const success = await copyFeynmanCardToClipboard(cardData);
@@ -312,7 +328,7 @@ export default function ShareNoteModal({
                   : "line-clamp-3 text-[var(--text-dim)]"
               }`}
             >
-              &ldquo;{highlightExcerpt.trim() || note.notes}&rdquo;
+              &ldquo;{highlightExcerpt.trim() || plainNoteText}&rdquo;
             </p>
 
             <div className="flex items-center justify-between text-[10px] font-mono text-[var(--text-mute)] pt-2.5 border-t" style={{ borderColor: "var(--border-dim)" }}>

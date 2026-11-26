@@ -171,7 +171,7 @@ export default function NoteContent({
     }`;
     const urlToShare = toXSafeUrl(getCanonicalShareUrl(highlight), fallbackUrl);
     const tweet = highlight
-      ? `“${highlight}”\n\n— From my synthesis on "${note.topicText}" via @FeyPlatform:\n`
+      ? `“${highlight}”\n\n— From my synthesis on "${note.topicText}" on Fey:\n`
       : `Read this synthesis on "${note.topicText}" — written using the Feynman Technique on Fey.\n\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
@@ -191,7 +191,7 @@ export default function NoteContent({
     if (!note || !selectedText) return;
     const fallbackUrl = `https://fey.lokinlabs.com.ng/note/${code}?q=${encodeURIComponent(selectedText.trim())}`;
     const urlToShare = toXSafeUrl(getCanonicalShareUrl(selectedText), fallbackUrl);
-    const tweet = `“${selectedText}”\n\n— from Scholar ${note.author}'s synthesis on "${note.topicText}" via @FeyPlatform:\n`;
+    const tweet = `“${selectedText}”\n\n— from Scholar ${note.author}'s synthesis on "${note.topicText}" on Fey:\n`;
     window.open(
       `https://twitter.com/intent/tweet?text=${encodeURIComponent(tweet)}&url=${encodeURIComponent(urlToShare)}`,
       "_blank"
@@ -217,12 +217,19 @@ export default function NoteContent({
 
   async function handleCopyCardImage() {
     if (!note) return;
+    const cleanNotes = note.notes
+      .replace(/<\/(p|li|div|h[1-6]|blockquote)>/gi, " ")
+      .replace(/<br\s*\/?>/gi, " ")
+      .replace(/<[^>]*>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/\s+/g, " ")
+      .trim();
     const cardData = {
       topicText: note.topicText,
       category: note.category,
       difficulty: note.difficulty,
       author: note.author,
-      notesSnippet: note.notes,
+      notesSnippet: cleanNotes,
       speakingSeconds: note.speakingSeconds,
     };
     const success = await copyFeynmanCardToClipboard(cardData);
@@ -245,6 +252,20 @@ export default function NoteContent({
     };
 
     const sessionId = startSession(rebuttalTopic, 0, "speaking");
+    router.push(`/session/${sessionId}`);
+  }
+
+  function handleStudyAndRecord() {
+    if (!note) return;
+    const studyTopic: Topic = {
+      id: note.topicId || `study-${Date.now()}`,
+      text: note.topicText,
+      category: note.category || "General",
+      difficulty: (note.difficulty as Difficulty) || "Scholar",
+      tags: note.tags || [note.category || "General"],
+    };
+
+    const sessionId = startSession(studyTopic, 10, "research");
     router.push(`/session/${sessionId}`);
   }
 
@@ -615,25 +636,34 @@ export default function NoteContent({
             Passive reading creates the illusion of explanatory depth. Fey challenges you to research a topic for 15 minutes, then prove true understanding by speaking it aloud in 90 seconds.
           </p>
 
-          {/* Contextual Rebuttal Callout */}
+          {/* Contextual Study & Rebuttal Callout */}
           <div
-            className="mb-8 p-4 rounded-xl border max-w-xl mx-auto text-left flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap"
+            className="mb-8 p-4 rounded-xl border max-w-xl mx-auto text-left flex flex-col sm:flex-row sm:items-center justify-between gap-4"
             style={{ background: "rgba(166, 124, 30, 0.08)", borderColor: "rgba(166, 124, 30, 0.35)" }}
           >
             <div>
               <span className="text-[11px] font-mono font-bold uppercase tracking-wider block text-[var(--gold)]">
-                🎙️ The Feynman Rebuttal Challenge
+                Try This Topic Yourself
               </span>
               <p className="text-xs text-[var(--text)] mt-0.5 leading-normal">
-                Disagree with this take or have a simpler way to explain it? Articulate your thesis in 90 seconds.
+                Study this topic and record your own 90-second explanation, or jump straight to the mic.
               </p>
             </div>
-            <button
-              onClick={handleStartRebuttal}
-              className="btn-terra px-4 py-2 text-xs font-mono whitespace-nowrap shadow-sm hover:scale-105 transition-transform cursor-pointer shrink-0"
-            >
-              Record Take →
-            </button>
+            <div className="flex items-center gap-2 shrink-0 flex-wrap">
+              <button
+                onClick={handleStudyAndRecord}
+                className="btn-terra px-4 py-2 text-xs font-mono whitespace-nowrap shadow-sm hover:opacity-95 transition-opacity cursor-pointer"
+              >
+                Study &amp; Record
+              </button>
+              <button
+                onClick={handleStartRebuttal}
+                className="px-3.5 py-2 rounded-xl border text-xs font-mono whitespace-nowrap hover:bg-[var(--bg-input)] transition-colors cursor-pointer"
+                style={{ borderColor: "var(--border)", color: "var(--text)" }}
+              >
+                Record Now
+              </button>
+            </div>
           </div>
 
           <div className="flex flex-col sm:flex-row items-center justify-center gap-3">
