@@ -191,10 +191,16 @@ function render(t: Template, ctx: TemplateContext, kind: ReminderKind): Reminder
   };
 }
 
+/** Deterministic 10% holdout group for scheduled reminders (never blocks social pushes). */
+export function isInReminderHoldout(endpoint: string): boolean {
+  return hash(`holdout:${endpoint}`) % 10 === 0;
+}
+
 // ─── Planner ───────────────────────────────────────────────────────────────
 
 export function planReminder(row: PushSubscriptionRow, now: Date): ReminderPlan | null {
   if (row.paused_at) return null;
+  if (isInReminderHoldout(row.endpoint)) return null;
 
   const tz = row.timezone || "Africa/Lagos";
   const local = localParts(now, tz);

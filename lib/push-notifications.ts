@@ -203,3 +203,59 @@ export function syncPracticeActivity(streak: number, categories?: string[]) {
     /* offline — next sprint will resync */
   });
 }
+
+export function getStoredPushEndpoint(): string | null {
+  if (typeof window === "undefined") return null;
+  try {
+    return localStorage.getItem(SUBSCRIPTION_ENDPOINT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export async function updateReminderPreferences(prefs: {
+  enabled?: boolean;
+  reminderMinutes?: number;
+}): Promise<boolean> {
+  const endpoint = getStoredPushEndpoint();
+  if (!endpoint) return false;
+  try {
+    const res = await fetch("/api/push/subscribe", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        endpoint,
+        ...prefs,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      }),
+    });
+    if (!res.ok) return false;
+    const prev = getPromptState();
+    if (typeof prefs.reminderMinutes === "number") {
+      setPromptState({
+        status: prev?.status ?? "accepted",
+        at: prev?.at ?? Date.now(),
+        reminderMinutes: prefs.reminderMinutes,
+      });
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export async function sendTestPush(): Promise<{ ok: boolean; error?: string }> {
+  const endpoint = getStoredPushEndpoint();
+  if (!endpoint) return { ok: false, error: "Turn on reminders first." };
+  try {
+    const res = await fetch("/api/push/test", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ endpoint }),
+    });
+    const data = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+    return res.ok && data.ok ? { ok: true } : { ok: false, error: data.error || "Could not send test." };
+  } catch {
+    return { ok: false, error: "Network error." };
+  }
+}

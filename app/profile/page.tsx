@@ -26,6 +26,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import ReminderSettingsCard from "@/components/notifications/ReminderSettingsCard";
 import { ACHIEVEMENTS, getLevelForXP, getNextLevel, getLevelProgress } from "@/lib/achievements";
 import { CATEGORY_ICONS, CATEGORIES } from "@/lib/topics";
 import { cn } from "@/lib/utils";
@@ -472,6 +473,19 @@ export default function ProfilePage() {
                 );
               })}
             </div>
+          </motion.div>
+
+          {/* Practice & League Reminders */}
+          <motion.div variants={cardVariants}>
+            <ReminderSettingsCard
+              userId={profile.id || "local-scholar"}
+              streak={streak.current}
+              categories={
+                settings.favoriteCategories?.length
+                  ? settings.favoriteCategories
+                  : settings.enabledCategories
+              }
+            />
           </motion.div>
 
           {/* Reset Beta Data Controls */}

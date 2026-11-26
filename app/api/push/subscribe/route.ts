@@ -87,13 +87,29 @@ export async function PATCH(req: NextRequest) {
   if (!supabase) return NextResponse.json({ stored: false });
 
   const update: Record<string, unknown> = {
-    streak: clampInt(body.streak, 0, 100000, 0),
-    last_practiced_at: typeof body.lastPracticedAt === "string" ? body.lastPracticedAt : new Date().toISOString(),
     updated_at: new Date().toISOString(),
-    // Practising again resets the back-off and resumes paused reminders.
-    consecutive_ignored: 0,
-    paused_at: null,
   };
+
+  if (typeof body.lastPracticedAt === "string") {
+    update.last_practiced_at = body.lastPracticedAt;
+    // Practising again resets the back-off and resumes paused reminders.
+    update.consecutive_ignored = 0;
+    update.paused_at = null;
+  }
+  if (typeof body.streak === "number") {
+    update.streak = clampInt(body.streak, 0, 100000, 0);
+  }
+  if (typeof body.enabled === "boolean") {
+    update.enabled = body.enabled;
+    if (body.enabled) {
+      update.paused_at = null;
+      update.consecutive_ignored = 0;
+    }
+  }
+  if (typeof body.reminderMinutes === "number") {
+    // Respect quiet hours (08:00–21:30)
+    update.reminder_minutes = clampInt(body.reminderMinutes, 8 * 60, 21 * 60 + 30, 20 * 60);
+  }
   if (isValidTimezone(body.timezone)) update.timezone = body.timezone;
   const categories = sanitizeCategories(body.categories);
   if (categories) update.categories = categories;

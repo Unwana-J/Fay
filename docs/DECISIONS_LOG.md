@@ -830,3 +830,22 @@
      - Wired into `/api/push/cron`: scans active `strict` / `flexible` multi-day leagues on Day 2+, skips players who already submitted today's drop, and sends at most 1 scheduled league drop reminder per user per local day (09:00–22:00) using `last_league_sent_at`.
 - **"Building in Public" Content Takeaway**:
   > *"Don't bury your notification opt-in below the fold — and don't only ask in one feature. A single modal soft-ask with a shared 7-day snooze lets solo learners, Trivia League rivals, and Classroom friends opt in right at their own peak moment without ever nagging."*
+
+---
+
+## Notification Measurement, 10% Holdout Group & Profile Controls
+
+- **Date / Phase**: 26 Nov 2026 — Phase 2, Retention Infrastructure (Step 4 of 4)
+- **The Problem / Context**:
+  Sending notifications without measuring opens or comparing against an unnotified control group makes it impossible to know whether reminders actually improve retention or just create noise. Users also needed a permanent place to turn notifications on/off, pick their reminder time, or verify delivery without waiting for a sprint to end.
+- **User Insight & Guiding Philosophy**:
+  Treat notifications as an experiment you can audit and a preference the user fully owns. Measure opens per template cleanly in PostHog, hold out 10% of scheduled reminders (never blocking social alerts) to measure true retention lift, and give every user self-serve controls on `/profile`.
+- **Architectural & Product Landing**:
+  1. **Push-Open Attribution (`components/analytics/PostHogProvider.tsx`)**:
+     - Detects `?source=push&template=...` appended by `public/sw.js`, fires `push_notification_opened` with `{ template, path }`, and strips the tracking params via `history.replaceState` so refreshes and shared links stay clean.
+  2. **Deterministic 10% Holdout (`lib/reminder-rules.ts`, `app/api/push/cron/route.ts`)**:
+     - `isInReminderHoldout(endpoint)` hashes each endpoint into a stable 10% control cohort skipped by `planReminder(...)` (reported as `holdoutSkipped` in cron output) while social notifications remain unaffected.
+  3. **Self-Serve Profile Controls & Test Push (`components/notifications/ReminderSettingsCard.tsx`, `app/api/push/test/route.ts`, `app/api/push/subscribe/route.ts`)**:
+     - Mounted on `/profile` with status badge (`Active / Paused / Off / Blocked`), one-tap enable (or iOS Home Screen instructions), Pause/Resume toggle, 30-minute daily reminder time selector (`8:00am`–`9:30pm`), and a rate-limited **Send test** button.
+- **"Building in Public" Content Takeaway**:
+  > *"Open rates alone lie — people tap notifications out of habit even when reminders don't improve 7-day retention. A deterministic 10% holdout group on scheduled reminders lets us measure real retention lift, while keeping social pings instant for everyone."*

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
-import { planReminder, stateAfterSend, type PushSubscriptionRow, type ReminderPlan } from "@/lib/reminder-rules";
+import { isInReminderHoldout, planReminder, stateAfterSend, type PushSubscriptionRow, type ReminderPlan } from "@/lib/reminder-rules";
 import { ensureWebPushConfigured, sendPushToRow, type DeliveryOutcome } from "@/lib/push-sender";
 import { dispatchScheduledLeagueDrops } from "@/lib/league-reminders";
 
@@ -68,6 +68,7 @@ async function handle(req: NextRequest) {
     return NextResponse.json({ error: (err as Error).message }, { status: 500 });
   }
 
+  const holdoutSkipped = rows.filter((r) => isInReminderHoldout(r.endpoint)).length;
   const planned = rows
     .map((row) => ({ row, plan: planReminder(row, now) }))
     .filter((p): p is { row: PushSubscriptionRow; plan: ReminderPlan } => p.plan !== null);
@@ -76,6 +77,7 @@ async function handle(req: NextRequest) {
     const leagues = await dispatchScheduledLeagueDrops(rows, now, true);
     return NextResponse.json({
       scanned: rows.length,
+      holdoutSkipped,
       planned: planned.map(({ row, plan }) => ({
         id: row.id,
         timezone: row.timezone,
@@ -103,7 +105,7 @@ async function handle(req: NextRequest) {
 
   const leagues = await dispatchScheduledLeagueDrops(rows, now, false);
 
-  return NextResponse.json({ scanned: rows.length, planned: planned.length, ...tally, leagues });
+  return NextResponse.json({ scanned: rows.length, holdoutSkipped, planned: planned.length, ...tally, leagues });
 }
 
 export const GET = handle;
