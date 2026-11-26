@@ -1,4 +1,5 @@
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
+import { sendSocialPushToUsers } from "@/lib/push-sender";
 import { supabase, isSupabaseConfigured } from "@/lib/supabase";
 import { checkRateLimit, getClientIp, isBannedIdentifier, isBotPattern } from "@/lib/security-guard";
 import {
@@ -511,6 +512,39 @@ export async function PATCH(req: NextRequest) {
               ],
             },
           ]);
+        }
+
+        const prevUnlocked = currentHydrated.unlockedUpToDay || 1;
+        const nextUnlocked = updatedLeague.unlockedUpToDay || 1;
+        const addedDrops = (updatedLeague.durationDays || 5) - (currentHydrated.durationDays || 5);
+        if (nextUnlocked > prevUnlocked || addedDrops > 0) {
+          const recipientIds = (existingScoreRows || [])
+            .filter((r: any) => Number(r.day_number) > 0)
+            .map((r: any) => String(r.user_id || "").split("__ext_")[0]);
+          const hostId = leagueRow.creator_id ? String(leagueRow.creator_id) : null;
+          const leagueTitle = updatedLeague.title || "your Trivia league";
+          const title =
+            nextUnlocked > prevUnlocked
+              ? `Drop ${nextUnlocked} is live`
+              : `${addedDrops} new drop${addedDrops === 1 ? "" : "s"} added`;
+          const bodyText =
+            nextUnlocked > prevUnlocked
+              ? `${leagueTitle} just unlocked Drop ${nextUnlocked}. Play now.`
+              : `The host extended ${leagueTitle}. Jump back in.`;
+          after(() =>
+            sendSocialPushToUsers(
+              recipientIds,
+              {
+                title,
+                body: bodyText,
+                url: `/games/trivia/league/${cleanCode}`,
+                tag: `fey-trivia-league-${cleanCode}-unlock-${nextUnlocked}`,
+                template: "social_trivia_league_unlock",
+                renotify: true,
+              },
+              { excludeUserId: hostId }
+            )
+          );
         }
 
         return NextResponse.json({

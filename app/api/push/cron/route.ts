@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { supabase } from "@/lib/supabase";
 import { planReminder, stateAfterSend, type PushSubscriptionRow, type ReminderPlan } from "@/lib/reminder-rules";
 import { ensureWebPushConfigured, sendPushToRow, type DeliveryOutcome } from "@/lib/push-sender";
+import { dispatchScheduledLeagueDrops } from "@/lib/league-reminders";
 
 /**
  * Reminder sender. Called every 15 minutes by the scheduler (.github/workflows/push-reminders.yml).
@@ -72,6 +73,7 @@ async function handle(req: NextRequest) {
     .filter((p): p is { row: PushSubscriptionRow; plan: ReminderPlan } => p.plan !== null);
 
   if (dryRun) {
+    const leagues = await dispatchScheduledLeagueDrops(rows, now, true);
     return NextResponse.json({
       scanned: rows.length,
       planned: planned.map(({ row, plan }) => ({
@@ -82,6 +84,7 @@ async function handle(req: NextRequest) {
         title: plan.payload.title,
         body: plan.payload.body,
       })),
+      leagues,
     });
   }
 
@@ -98,7 +101,9 @@ async function handle(req: NextRequest) {
     });
   }
 
-  return NextResponse.json({ scanned: rows.length, planned: planned.length, ...tally });
+  const leagues = await dispatchScheduledLeagueDrops(rows, now, false);
+
+  return NextResponse.json({ scanned: rows.length, planned: planned.length, ...tally, leagues });
 }
 
 export const GET = handle;

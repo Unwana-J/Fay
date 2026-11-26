@@ -26,6 +26,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import ReminderOptInCard from "@/components/notifications/ReminderOptInCard";
 import { useClassroomStore } from "@/store/useClassroomStore";
 import {
   type ClassroomSlot,
@@ -1709,6 +1710,19 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {isMember && (
+        <ReminderOptInCard
+          context="classroom"
+          userId={profile.id || "local-scholar"}
+          streak={useAppStore.getState().streak?.current ?? 0}
+          categories={
+            useAppStore.getState().settings?.favoriteCategories?.length
+              ? useAppStore.getState().settings.favoriteCategories
+              : useAppStore.getState().settings?.enabledCategories
+          }
+        />
+      )}
 
       <audio
         ref={audioRef}

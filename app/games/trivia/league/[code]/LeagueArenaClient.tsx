@@ -34,6 +34,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAppStore } from "@/store/useAppStore";
+import ReminderOptInCard from "@/components/notifications/ReminderOptInCard";
 import { FeyLogo } from "@/components/ui/FeyLogo";
 import {
   type FriendshipLeague,
@@ -76,7 +77,7 @@ export default function LeagueArenaClient({
   initialLeaderboard,
 }: LeagueArenaClientProps) {
   const router = useRouter();
-  const { profile, addXP, saveTriviaRound, openClaimAccountPrompt } = useAppStore();
+  const { profile, streak, settings, addXP, saveTriviaRound, openClaimAccountPrompt } = useAppStore();
 
   const [league, setLeague] = useState<FriendshipLeague>(initialLeague);
   const [scores, setScores] = useState<LeagueDailyScore[]>(initialScores);
@@ -2380,6 +2381,12 @@ export default function LeagueArenaClient({
             className="rounded-3xl p-6 sm:p-8 surface border shadow-sm text-center space-y-6"
             style={{ borderColor: "var(--border)" }}
           >
+            <ReminderOptInCard
+              context="league"
+              userId={profile?.id || "local-scholar"}
+              streak={streak?.current ?? 0}
+              categories={settings?.favoriteCategories?.length ? settings.favoriteCategories : settings?.enabledCategories}
+            />
             <div
               className="w-16 h-16 rounded-full mx-auto flex items-center justify-center border shadow-md"
               style={{

@@ -807,3 +807,26 @@
      - **League drop finished**: notifies the league creator and other players in that league, deep-linking straight to `/games/trivia/league/[code]`.
 - **"Building in Public" Content Takeaway**:
   > *"The best notification isn't 'come back and study' — it's 'Tunde just recorded Topic 2; record your 90-second take to unlock and listen.' Because our Classrooms are Speak-to-Unlock, every friend's recording becomes a natural curiosity trigger that brings the circle back without nagging."*
+
+---
+
+## Modal Soft-Ask Popup + League & Scheduled-Game Reminders
+
+- **Date / Phase**: 25 Nov 2026 — Phase 2, Retention Infrastructure (UX & League Coverage)
+- **The Problem / Context**:
+  1. The inline reminder card on the sprint completion screen sat below four other cards (Broadside preview, Constellation ignition, Recall Check, 3-Day Habit Momentum), making it easy to miss without scrolling.
+  2. Users who enter Fey through Trivia Leagues, Quant Arena Leagues, or Classrooms might never complete a solo sprint on Day 1, and multi-day leagues needed both instant host-unlock pings and scheduled daily drop reminders.
+- **User Insight & Guiding Philosophy**:
+  Surface the soft-ask right where motivation peaks — as a focused, dismissible modal popup after a sprint, league drop, or Classroom join — while sharing one unified 7-day snooze so no user is ever prompted twice across flows.
+- **Architectural & Product Landing**:
+  1. **Contextual Modal Popup (`components/notifications/ReminderOptInCard.tsx`)**:
+     - Converted to a centered modal dialog (900ms delay after milestone, Escape/backdrop dismiss, coordinates with NPS feedback so two modals never stack).
+     - Supports `context: "sprint" | "league" | "classroom"` with tailored copy, mounted on solo/classroom sprints, Trivia League round summaries, Quant Arena League round summaries, and Classroom detail views.
+  2. **Instant Schedule-Advance Pushes**:
+     - Trivia League host unlocks next drop or extends league (`PATCH /api/trivia/league`).
+     - Classroom host unlocks next topic or member adds topics (`POST /api/classroom/[code]`).
+     - Quant Arena league drop completed (`POST /api/mathletics/league/score`).
+  3. **Scheduled Daily League Drop Cron (`lib/league-reminders.ts`, `supabase/migrations/20261127_push_league_reminders.sql`)**:
+     - Wired into `/api/push/cron`: scans active `strict` / `flexible` multi-day leagues on Day 2+, skips players who already submitted today's drop, and sends at most 1 scheduled league drop reminder per user per local day (09:00–22:00) using `last_league_sent_at`.
+- **"Building in Public" Content Takeaway**:
+  > *"Don't bury your notification opt-in below the fold — and don't only ask in one feature. A single modal soft-ask with a shared 7-day snooze lets solo learners, Trivia League rivals, and Classroom friends opt in right at their own peak moment without ever nagging."*

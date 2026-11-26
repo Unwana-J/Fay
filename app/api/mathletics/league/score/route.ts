@@ -1,11 +1,11 @@
-import { NextRequest, NextResponse } from "next/server";
-import { supabase, isSupabaseConfigured } from "@/lib/supabase";
+import { NextRequest, NextResponse, after } from "next/server";
 import { sanitizeScholarName } from "@/lib/name-moderation";
 import {
   calculateMathleticsPoints,
   type MathleticsLeagueScore,
 } from "@/lib/mathletics-league";
-import { persistMathleticsScoreRow } from "@/lib/mathletics-db";
+import { getOrRestoreMathleticsLeague, persistMathleticsScoreRow } from "@/lib/mathletics-db";
+import { sendSocialPushToUsers } from "@/lib/push-sender";
 import { todayStr } from "@/lib/utils";
 import {
   getClientIp,
@@ -96,6 +96,30 @@ export async function POST(req: NextRequest) {
       durationDays: typeof durationDays === "number" ? durationDays : undefined,
       format,
     });
+
+    if (persisted.stored) {
+      after(async () => {
+        const fetched = await getOrRestoreMathleticsLeague(cleanLeagueCode);
+        if (!fetched) return;
+        const recipientIds = [
+          fetched.league?.creatorId ? String(fetched.league.creatorId) : "",
+          ...(fetched.scores || []).map((s: any) => String(s.userId || s.user_id || "").split("__ext_")[0]),
+        ];
+        const titleLabel = fetched.league?.title || leagueTitle || "your Quant Arena league";
+        await sendSocialPushToUsers(
+          recipientIds,
+          {
+            title: `${cleanUsername} finished Drop ${dayNumber}`,
+            body: `Scored ${score}/${totalQuestions} (${agilityScore} pts) in ${titleLabel}.`,
+            url: `/games/mathletics/league/${cleanLeagueCode}`,
+            tag: `fey-math-league-${cleanLeagueCode}-d${dayNumber}`,
+            template: "social_mathletics_league_score",
+            renotify: true,
+          },
+          { excludeUserId: playerIdentifier }
+        );
+      });
+    }
 
     return NextResponse.json({
       success: true,

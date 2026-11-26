@@ -50,6 +50,7 @@ import { type MathleticsQuestion } from "@/lib/mathletics-questions";
 import { generateMathleticsCardCanvas } from "@/lib/mathletics-card-canvas";
 import { copyTextToClipboard } from "@/lib/clipboard";
 import { useAppStore } from "@/store/useAppStore";
+import ReminderOptInCard from "@/components/notifications/ReminderOptInCard";
 import { todayStr, cn } from "@/lib/utils";
 
 interface MathleticsLeagueClientProps {
@@ -68,7 +69,7 @@ export default function MathleticsLeagueClient({
   initialLeaderboard,
 }: MathleticsLeagueClientProps) {
   const router = useRouter();
-  const { profile, addXP } = useAppStore();
+  const { profile, streak, settings, addXP } = useAppStore();
 
   const [league, setLeague] = useState<MathleticsLeague>(initialLeague);
   const [scores, setScores] = useState<MathleticsLeagueScore[]>(initialScores);
@@ -1353,6 +1354,12 @@ export default function MathleticsLeagueClient({
       ═══════════════════════════════════════════════════════════════════ */}
       {phase === "round_summary" && (
         <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          <ReminderOptInCard
+            context="league"
+            userId={profile?.id || "local-scholar"}
+            streak={streak?.current ?? 0}
+            categories={settings?.favoriteCategories?.length ? settings.favoriteCategories : settings?.enabledCategories}
+          />
           <div className="surface rounded-3xl p-6 sm:p-10 border shadow-xs" style={{ borderColor: "var(--border-dim)" }}>
             <div className="text-center max-w-md mx-auto mb-8">
               <span

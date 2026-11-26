@@ -153,6 +153,25 @@ export async function POST(
         ...existing.classroom,
         manualUnlockedUpToSlot: nextSlot,
       });
+      if (nextSlot > currentEffective) {
+        const memberIds = saved.members.map((mem) => mem.userId);
+        const roomTitle = saved.title;
+        const roomCode = saved.code;
+        after(() =>
+          sendSocialPushToUsers(
+            memberIds,
+            {
+              title: `Topic ${nextSlot} is unlocked`,
+              body: `Your host opened the next topic in ${roomTitle}.`,
+              url: `/classroom/${roomCode}`,
+              tag: `fey-classroom-${roomCode}-unlock-${nextSlot}`,
+              template: "social_classroom_unlock_topic",
+              renotify: true,
+            },
+            { excludeUserId: hostId }
+          )
+        );
+      }
       return NextResponse.json({ classroom: saved, submissions: existing.submissions });
     }
 
@@ -195,6 +214,23 @@ export async function POST(
       if (res.error) {
         return NextResponse.json({ error: res.error }, { status: 400 });
       }
+      const memberIds = res.classroom.members.map((mem) => mem.userId);
+      const roomTitle = res.classroom.title;
+      const roomCode = res.classroom.code;
+      after(() =>
+        sendSocialPushToUsers(
+          memberIds,
+          {
+            title: `New topics in ${roomTitle}`,
+            body: `${actorName} added ${addCount} new topic${addCount === 1 ? "" : "s"} to your Classroom.`,
+            url: `/classroom/${roomCode}`,
+            tag: `fey-classroom-${roomCode}-extend`,
+            template: "social_classroom_extend",
+            renotify: true,
+          },
+          { excludeUserId: actorId }
+        )
+      );
       return NextResponse.json(res);
     }
 

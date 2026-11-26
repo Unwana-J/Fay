@@ -33,7 +33,7 @@ import { createVoiceMediaRecorder } from "@/lib/audio-recorder";
 import { useClassroomStore } from "@/store/useClassroomStore";
 import { normalizeClassroomCode } from "@/lib/classroom-types";
 import ReminderOptInCard from "@/components/notifications/ReminderOptInCard";
-import { syncPracticeActivity } from "@/lib/push-notifications";
+import { syncPracticeActivity, shouldShowReminderPrompt } from "@/lib/push-notifications";
 
 // ─── Utility: Blob to Base64 ────────────────────────────────────────────────
 function blobToBase64(blob: Blob): Promise<string> {
@@ -1949,10 +1949,12 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     setCompletionData(result);
     fireConfetti();
 
-    // Trigger NPS feedback prompt if eligible (after Day 1, with 7-day snooze)
-    setTimeout(() => {
-      triggerActivityFeedbackIfEligible("solo_sprint");
-    }, 1500);
+    // Trigger NPS feedback prompt if eligible — skip if the reminder popup will show on this sprint
+    if (!shouldShowReminderPrompt()) {
+      setTimeout(() => {
+        triggerActivityFeedbackIfEligible("solo_sprint");
+      }, 1500);
+    }
   }
 
   function handleAbandon() {
