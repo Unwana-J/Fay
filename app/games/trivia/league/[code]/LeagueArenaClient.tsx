@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useRef, useCallback, useTransition } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toXSafeUrl } from "@/lib/share-origin";
 import {
   Trophy,
   Flame,
@@ -1349,6 +1350,16 @@ export default function LeagueArenaClient({
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
   }
 
+  function shareX() {
+    const xUrl = toXSafeUrl(shareUrl);
+    const text = `Naija Trivia League: "${league.title}" on Fey — Day ${currentDay} of ${league.durationDays} is live. Join the daily drop:`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(xUrl)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
+  }
+
   const currentQ = questions[currentIndex];
 
   return (
@@ -1884,6 +1895,14 @@ export default function LeagueArenaClient({
                   >
                     <Share2 size={14} />
                     <span className="hidden sm:inline">WhatsApp</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={shareX}
+                    className="p-2 sm:px-3 sm:py-2 rounded-xl text-xs font-semibold text-white bg-[#14171A] hover:opacity-90 flex items-center gap-1.5 transition-opacity shadow-xs cursor-pointer"
+                    title="Share on X"
+                  >
+                    <span>Share on X</span>
                   </button>
                 </div>
               </div>
@@ -2534,6 +2553,13 @@ export default function LeagueArenaClient({
                 className="w-full sm:w-auto py-2.5 px-5 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-1.5 transition-colors shadow-xs cursor-pointer"
               >
                 <Share2 size={14} /> Share Score to WhatsApp
+              </button>
+              <button
+                type="button"
+                onClick={shareX}
+                className="w-full sm:w-auto py-2.5 px-5 rounded-xl text-xs font-semibold text-white bg-[#14171A] hover:opacity-90 flex items-center justify-center gap-1.5 transition-opacity shadow-xs cursor-pointer"
+              >
+                Share on X
               </button>
             </div>
           </motion.div>

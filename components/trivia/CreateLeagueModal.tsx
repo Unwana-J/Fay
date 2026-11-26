@@ -24,6 +24,7 @@ import { FeyLogo } from "@/components/ui/FeyLogo";
 import { useRouter } from "next/navigation";
 import confetti from "canvas-confetti";
 import { saveLocalLeague, unmarkLocalLeagueDeleted } from "@/lib/trivia-league";
+import { toXSafeUrl } from "@/lib/share-origin";
 
 interface CreateLeagueModalProps {
   isOpen: boolean;
@@ -148,6 +149,16 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
       `Join here: ${leagueUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+  }
+
+  function shareX() {
+    const xUrl = toXSafeUrl(leagueUrl);
+    const text = `Join my ${durationDays}-day Daily League "${title.trim()}" on Fey (${questionsPerDay} questions per daily drop):`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(xUrl)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   return (
@@ -611,6 +622,13 @@ export default function CreateLeagueModal({ isOpen, onClose }: CreateLeagueModal
                   className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 flex items-center justify-center gap-1.5 transition-colors shadow-sm"
                 >
                   <Share2 size={14} /> Share on WhatsApp
+                </button>
+                <button
+                  type="button"
+                  onClick={shareX}
+                  className="flex-1 py-2.5 px-4 rounded-xl text-xs font-semibold text-white bg-[#14171A] hover:opacity-90 flex items-center justify-center gap-1.5 transition-opacity shadow-sm cursor-pointer"
+                >
+                  Share on X
                 </button>
               </div>
 

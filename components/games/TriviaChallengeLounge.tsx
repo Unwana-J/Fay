@@ -26,6 +26,7 @@ import {
   Compass,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import { toXSafeUrl } from "@/lib/share-origin";
 import {
   type TriviaChallenge,
   type ChallengeParticipantScore,
@@ -376,6 +377,17 @@ export default function TriviaChallengeLounge({
       `⚔️ *${currentChallenge.title}* on Fey!\nAnswer the exact same ${currentChallenge.questionCount} questions and see where you rank on our group leaderboard:\n${shareableUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+  }
+
+  function handleShareX() {
+    if (!shareableUrl || !currentChallenge) return;
+    const xUrl = toXSafeUrl(shareableUrl);
+    const text = `"${currentChallenge.title}" on Fey — answer the exact same ${currentChallenge.questionCount} questions and see where you rank:`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(xUrl)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   function handleDeleteChallenge(id: string, e: React.MouseEvent) {
@@ -766,6 +778,13 @@ export default function TriviaChallengeLounge({
             >
               <Share2 size={13} />
               <span className="hidden sm:inline">WhatsApp</span>
+            </button>
+
+            <button
+              onClick={handleShareX}
+              className="px-3.5 py-1.5 rounded-xl text-xs font-space font-bold flex items-center gap-1.5 cursor-pointer bg-[#14171A] text-white hover:opacity-90 transition-opacity shadow-xs"
+            >
+              <span>Share on X</span>
             </button>
 
             <button

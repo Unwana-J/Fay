@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { playBuzzerSound } from "@/lib/sound";
 import { useAppStore } from "@/store/useAppStore";
 import ArticulateGuideModal from "@/components/games/ArticulateGuideModal";
+import { toXSafeUrl } from "@/lib/share-origin";
 
 interface RoomLobbyProps {
   room: ArticulateRoom;
@@ -101,6 +102,16 @@ export default function RoomLobby({
       `Join my Fey Articulate party room! Code: ${room.room_code}\n\nTap link to enter:\n${shareUrl}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+  };
+
+  const handleXShare = () => {
+    const xUrl = toXSafeUrl(shareUrl);
+    const text = `Join my Fey Articulate party room (Code: ${room.room_code}):`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(xUrl)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   const myTeam = (room.teams?.teamA?.playerIds || []).includes(myPlayerId)
@@ -325,6 +336,12 @@ export default function RoomLobby({
             >
               <Share2 className="w-3.5 h-3.5" />
               WhatsApp
+            </button>
+            <button
+              onClick={handleXShare}
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold bg-[#14171A] text-white hover:opacity-90 transition cursor-pointer"
+            >
+              Share on X
             </button>
             {onLeaveRoom && (
               <button

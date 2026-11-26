@@ -9,6 +9,7 @@ import Link from "next/link";
 import BoardMap from "@/app/play/BoardMap";
 import ScholarTrophy from "@/components/ui/ScholarTrophy";
 import { useAppStore } from "@/store/useAppStore";
+import { toXSafeUrl } from "@/lib/share-origin";
 
 interface RoomGameOverProps {
   room: ArticulateRoom;
@@ -110,6 +111,17 @@ export default function RoomGameOver({
       `🏆 Fey Articulate Match Result!\n${title}\n\n👑 ${winner.name}: ${winner.score} pts\n⚔️ ${runnerUp.name}: ${runnerUp.score} pts\n\n⏱️ Play Time: ${playTime.formatted} • Final Round: Round ${room.current_turn?.roundNumber || 1}\nMargin: ${margin} pts lead! Play with us: https://fey.lokinlabs.com.ng/play/room/${room.room_code}`
     );
     window.open(`https://api.whatsapp.com/send?text=${text}`, "_blank");
+  };
+
+  const handleXShare = () => {
+    const title = room.room_name ? `${room.room_name} (${room.room_code})` : `Room ${room.room_code}`;
+    const xUrl = toXSafeUrl(`https://fey.lokinlabs.com.ng/play/room/${room.room_code}`);
+    const text = `Fey Articulate Match Result — ${title}: ${winner.name} (${winner.score} pts) vs ${runnerUp.name} (${runnerUp.score} pts). Play with us:`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}&url=${encodeURIComponent(xUrl)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   };
 
   return (
@@ -367,6 +379,13 @@ export default function RoomGameOver({
         >
           <Share2 className="w-4 h-4" />
           Share to WhatsApp
+        </button>
+        <button
+          type="button"
+          onClick={handleXShare}
+          className="flex-1 bg-[#14171A] text-white py-3 px-4 rounded-2xl font-space font-bold text-xs shadow-sm hover:opacity-90 flex items-center justify-center gap-2 cursor-pointer transition"
+        >
+          Share on X
         </button>
         <button
           type="button"

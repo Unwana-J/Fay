@@ -26,6 +26,7 @@ import {
   RotateCcw,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
+import { toXSafeUrl } from "@/lib/share-origin";
 import ReminderOptInCard from "@/components/notifications/ReminderOptInCard";
 import { useClassroomStore } from "@/store/useClassroomStore";
 import {
@@ -284,6 +285,21 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
       ? `I started a ${classroom.totalTopics}-topic Fey Classroom ("${classroom.title}") and already recorded Topic 1: "${firstTopic}". Record your ${classroom.speakingDurationSec}s take to unlock & hear mine: ${url}`
       : `Join my ${classroom.totalTopics}-topic Fey Classroom ("${classroom.title}") — we learn and record a ${classroom.speakingDurationSec}s take on each topic together: ${url}`;
     window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, "_blank", "noopener,noreferrer");
+  }
+
+  function handleXInvite() {
+    if (!classroom) return;
+    const xUrl = toXSafeUrl(getInviteUrl());
+    const slot1Recorded = submissions.some((s) => s.slotNumber === 1);
+    const firstTopic = classroom.slots[0]?.topicText || "";
+    const msg = slot1Recorded
+      ? `I started a ${classroom.totalTopics}-topic Fey Classroom ("${classroom.title}") and already recorded Topic 1: "${firstTopic}". Record your ${classroom.speakingDurationSec}s take to unlock and hear mine:`
+      : `Join my ${classroom.totalTopics}-topic Fey Classroom ("${classroom.title}") — learn and record a ${classroom.speakingDurationSec}s take on each topic together:`;
+    window.open(
+      `https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}&url=${encodeURIComponent(xUrl)}`,
+      "_blank",
+      "noopener,noreferrer"
+    );
   }
 
   async function handleJoinCircle(e: React.FormEvent) {
@@ -660,6 +676,14 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
             >
               <Share2 size={13} />
               <span>Invite on WhatsApp</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleXInvite}
+              className="px-3.5 py-2 rounded-xl text-xs font-mono font-bold bg-[#14171A] text-white flex items-center gap-1.5 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer"
+            >
+              <span>Share on X</span>
             </button>
           </div>
         </div>
