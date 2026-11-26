@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { getClassroomWithSubmissions } from "@/lib/classroom-db";
 import { formatClassroomCodeDisplay, normalizeClassroomCode } from "@/lib/classroom-types";
+import { getRequestOrigin } from "@/lib/request-origin";
 import ClassroomDetailClient from "./ClassroomDetailClient";
 
 export async function generateMetadata({
@@ -11,13 +12,31 @@ export async function generateMetadata({
   const { code } = await params;
   const cleanCode = normalizeClassroomCode(code);
   const displayCode = formatClassroomCodeDisplay(cleanCode);
+  const origin = await getRequestOrigin();
+  const pageUrl = `${origin}/classroom/${cleanCode}`;
+  const ogImageUrl = `${origin}/opengraph-image`;
 
   const bundle = await getClassroomWithSubmissions(cleanCode).catch(() => null);
   if (!bundle?.classroom) {
+    const fallbackTitle = `Classroom ${displayCode} · Fey`;
+    const fallbackDesc =
+      "Join this Fey Classroom to learn, record your 90-second take, and unlock your friends' voice explanations.";
     return {
-      title: `Classroom ${displayCode} · Fey`,
-      description:
-        "Join this Fey Classroom to learn, record your 90-second take, and unlock your friends' voice explanations.",
+      title: fallbackTitle,
+      description: fallbackDesc,
+      openGraph: {
+        title: fallbackTitle,
+        description: fallbackDesc,
+        url: pageUrl,
+        type: "website",
+        images: [{ url: ogImageUrl, width: 1200, height: 630, alt: fallbackTitle, type: "image/png" }],
+      },
+      twitter: {
+        card: "summary_large_image",
+        title: fallbackTitle,
+        description: fallbackDesc,
+        images: [ogImageUrl],
+      },
     };
   }
 
@@ -29,13 +48,24 @@ export async function generateMetadata({
       ? `${classroom.hostName} already recorded Topic 1. `
       : `${classroom.hostName} invited you to a ${classroom.totalTopics}-topic Classroom. `;
 
+  const title = `${classroom.title} (${displayCode}) · Fey Classroom`;
+  const description = `${hookPrefix}Record your ${classroom.speakingDurationSec}s take on "${firstTopic.slice(0, 110)}" to unlock everyone's audio.`;
+
   return {
-    title: `${classroom.title} (${displayCode}) · Fey Classroom`,
-    description: `${hookPrefix}Record your ${classroom.speakingDurationSec}s take on "${firstTopic.slice(0, 110)}" to unlock everyone's audio.`,
+    title,
+    description,
     openGraph: {
       title: `${classroom.title} · Fey Classroom`,
       description: `${hookPrefix}Speak-to-Unlock voice learning with ${classroom.members.length} friend${classroom.members.length === 1 ? "" : "s"}.`,
+      url: pageUrl,
       type: "website",
+      images: [{ url: ogImageUrl, width: 1200, height: 630, alt: title, type: "image/png" }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title: `${classroom.title} · Fey Classroom`,
+      description,
+      images: [ogImageUrl],
     },
   };
 }
