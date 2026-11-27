@@ -255,6 +255,27 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
     [classroom, submissions]
   );
 
+  const pushEnabledSet = useMemo(
+    () => new Set(pushEnabledByCode[cleanCode] || []),
+    [pushEnabledByCode, cleanCode]
+  );
+
+  // Detect if the user already has a matching local recording in their Library for this slot
+  // (e.g. if a Classroom session lost its URL query or had a transient network error)
+  const matchingLocalSession = useMemo(() => {
+    if (!currentSlotObj || !isSlotUnlocked || hasRecordedCurrentSlot) return null;
+    const targetText = currentSlotObj.topicText.trim().toLowerCase();
+    return (
+      sessions.find(
+        (s) =>
+          Boolean(s.audioBase64) &&
+          s.speakingSeconds > 0 &&
+          (s.topicId === currentSlotObj.topicId ||
+            s.topicText.trim().toLowerCase() === targetText)
+      ) || null
+    );
+  }, [currentSlotObj, isSlotUnlocked, hasRecordedCurrentSlot, sessions]);
+
   // Support deep-linking directly into Extend Modal via `?extend=1`
   useEffect(() => {
     if (!classroom || !isMember || didAutoOpenExtendRef.current) return;
@@ -584,27 +605,6 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
   const catColor = currentSlotObj
     ? CATEGORY_COLORS[currentSlotObj.category] || "var(--olive)"
     : "var(--olive)";
-
-  const pushEnabledSet = useMemo(
-    () => new Set(pushEnabledByCode[cleanCode] || []),
-    [pushEnabledByCode, cleanCode]
-  );
-
-  // Detect if the user already has a matching local recording in their Library for this slot
-  // (e.g. if a Classroom session lost its URL query or had a transient network error)
-  const matchingLocalSession = useMemo(() => {
-    if (!currentSlotObj || !isSlotUnlocked || hasRecordedCurrentSlot) return null;
-    const targetText = currentSlotObj.topicText.trim().toLowerCase();
-    return (
-      sessions.find(
-        (s) =>
-          Boolean(s.audioBase64) &&
-          s.speakingSeconds > 0 &&
-          (s.topicId === currentSlotObj.topicId ||
-            s.topicText.trim().toLowerCase() === targetText)
-      ) || null
-    );
-  }, [currentSlotObj, isSlotUnlocked, hasRecordedCurrentSlot, sessions]);
 
   async function handlePublishSavedTake() {
     if (!classroom || !currentSlotObj || !matchingLocalSession) return;
