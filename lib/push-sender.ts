@@ -75,6 +75,42 @@ export async function sendPushToRow(
 }
 
 /**
+ * Returns the subset of `userIds` that currently have at least one enabled
+ * Web Push subscription. Safe to call on read paths; never exposes endpoints.
+ */
+export async function getPushEnabledUserIds(userIds: string[]): Promise<string[]> {
+  if (!supabase || !ensureWebPushConfigured()) return [];
+  const uniqueIds = Array.from(
+    new Set(
+      userIds
+        .map((id) => (typeof id === "string" ? id.trim() : ""))
+        .filter((id) => id.length > 0 && id !== "anonymous" && id !== "local-scholar")
+    )
+  ).slice(0, 50);
+
+  if (uniqueIds.length === 0) return [];
+
+  try {
+    const { data, error } = await supabase
+      .from(TABLE)
+      .select("user_id")
+      .eq("enabled", true)
+      .in("user_id", uniqueIds);
+
+    if (error || !data) return [];
+    return Array.from(
+      new Set(
+        (data as Array<{ user_id?: string | null }>)
+          .map((r) => (r.user_id || "").trim())
+          .filter(Boolean)
+      )
+    );
+  } catch {
+    return [];
+  }
+}
+
+/**
  * Sends an event-driven social notification to a set of user IDs.
  *
  * Rules:
@@ -91,8 +127,14 @@ export async function sendSocialPushToUsers(
     ttlSeconds?: number;
     respectQuietHours?: boolean;
   } = {}
-): Promise<{ targeted: number; sent: number; expired: number; failed: number }> {
-  const empty = { targeted: 0, sent: 0, expired: 0, failed: 0 };
+): Promise<{
+  targeted: number;
+  sent: number;
+  expired: number;
+  failed: number;
+  quietSkipped: number;
+}> {
+  const empty = { targeted: 0, sent: 0, expired: 0, failed: 0, quietSkipped: 0 };
   if (!supabase || !ensureWebPushConfigured()) return empty;
 
   const excluded = opts.excludeUserId?.trim();
@@ -122,10 +164,13 @@ export async function sendSocialPushToUsers(
       const local = localParts(now, row.timezone || "Africa/Lagos");
       return local.minutes >= QUIET_END_MIN && local.minutes < QUIET_START_MIN;
     });
+    const quietSkipped = data.length - eligible.length;
 
-    if (eligible.length === 0) return empty;
+    if (eligible.length === 0) {
+      return { ...empty, quietSkipped };
+    }
 
-    const tally = { targeted: eligible.length, sent: 0, expired: 0, failed: 0 };
+    const tally = { targeted: eligible.length, sent: 0, expired: 0, failed: 0, quietSkipped };
     for (let i = 0; i < eligible.length; i += SEND_CONCURRENCY) {
       const batch = eligible.slice(i, i + SEND_CONCURRENCY);
       const results = await Promise.all(

@@ -41,6 +41,8 @@ interface SubmitClassroomRecordingInput {
 interface ClassroomStoreState {
   classrooms: Classroom[];
   submissionsByCode: Record<string, ClassroomSubmission[]>;
+  pushEnabledByCode: Record<string, string[]>;
+  nudgedAtByKey: Record<string, number>;
   isLoading: boolean;
   lastSyncedAt: number | null;
 
@@ -48,7 +50,11 @@ interface ClassroomStoreState {
   fetchMyClassrooms: (userId: string, username?: string) => Promise<void>;
   fetchClassroom: (
     code: string
-  ) => Promise<{ classroom: Classroom; submissions: ClassroomSubmission[] } | null>;
+  ) => Promise<{
+    classroom: Classroom;
+    submissions: ClassroomSubmission[];
+    pushEnabledUserIds?: string[];
+  } | null>;
   createClassroom: (
     input: CreateClassroomInput
   ) => Promise<{ classroom?: Classroom; error?: string }>;
@@ -104,6 +110,17 @@ interface ClassroomStoreState {
     author: { userId: string; username: string; avatar: string },
     text: string
   ) => Promise<void>;
+  nudgeMember: (opts: {
+    code: string;
+    actorId: string;
+    actorName: string;
+    targetUserId: string;
+    slotNumber?: number;
+  }) => Promise<{
+    ok: boolean;
+    status?: "sent" | "quiet_hours" | "cooldown" | "not_enabled";
+    message?: string;
+  }>;
 }
 
 export const useClassroomStore = create<ClassroomStoreState>()(
@@ -111,6 +128,8 @@ export const useClassroomStore = create<ClassroomStoreState>()(
     (set, get) => ({
       classrooms: [],
       submissionsByCode: {},
+      pushEnabledByCode: {},
+      nudgedAtByKey: {},
       isLoading: false,
       lastSyncedAt: null,
 
@@ -188,7 +207,20 @@ export const useClassroomStore = create<ClassroomStoreState>()(
             const data = await res.json();
             if (data?.classroom) {
               get().upsertLocalBundle(data.classroom, data.submissions || []);
-              return { classroom: data.classroom, submissions: data.submissions || [] };
+              const pushEnabledUserIds = Array.isArray(data.pushEnabledUserIds)
+                ? data.pushEnabledUserIds
+                : [];
+              set((s) => ({
+                pushEnabledByCode: {
+                  ...s.pushEnabledByCode,
+                  [cleanCode]: pushEnabledUserIds,
+                },
+              }));
+              return {
+                classroom: data.classroom,
+                submissions: data.submissions || [],
+                pushEnabledUserIds,
+              };
             }
           }
         } catch {}
@@ -481,6 +513,53 @@ export const useClassroomStore = create<ClassroomStoreState>()(
           }
         } catch {}
       },
+
+      nudgeMember: async ({ code, actorId, actorName, targetUserId, slotNumber }) => {
+        const cleanCode = normalizeClassroomCode(code);
+        if (!cleanCode || !actorId || !targetUserId) {
+          return { ok: false, message: "Missing nudge details." };
+        }
+        try {
+          const res = await fetch(`/api/classroom/${encodeURIComponent(cleanCode)}`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              action: "nudge",
+              actorId,
+              actorName,
+              targetUserId,
+              slotNumber,
+            }),
+          });
+          const data = await res.json().catch(() => ({}));
+          if (data?.status === "sent" || data?.status === "cooldown") {
+            const key = `${cleanCode}:${targetUserId}`;
+            set((s) => ({
+              nudgedAtByKey: {
+                ...s.nudgedAtByKey,
+                [key]: Date.now(),
+              },
+            }));
+          }
+          if (data?.status === "not_enabled") {
+            set((s) => ({
+              pushEnabledByCode: {
+                ...s.pushEnabledByCode,
+                [cleanCode]: (s.pushEnabledByCode[cleanCode] || []).filter(
+                  (id) => id !== targetUserId
+                ),
+              },
+            }));
+          }
+          return {
+            ok: Boolean(data?.ok),
+            status: data?.status,
+            message: data?.message || data?.error,
+          };
+        } catch {
+          return { ok: false, message: "Could not send nudge right now." };
+        }
+      },
     }),
     {
       name: "fey-classroom-store",
@@ -488,6 +567,7 @@ export const useClassroomStore = create<ClassroomStoreState>()(
       partialize: (state) => ({
         classrooms: state.classrooms,
         submissionsByCode: state.submissionsByCode,
+        nudgedAtByKey: state.nudgedAtByKey,
         lastSyncedAt: state.lastSyncedAt,
       }),
     }

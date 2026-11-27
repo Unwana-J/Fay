@@ -52,6 +52,8 @@ export interface ActiveSession {
   cues?: Cue[];
   researchCompletedAt?: number;
   speakingCompletedAt?: number;
+  classroomCode?: string;
+  classroomSlot?: number;
 }
 
 export interface ScheduledTopicItem {
@@ -427,7 +429,8 @@ export interface AppState {
     researchMin: number,
     initialStage?: "research" | "speaking",
     speakingDurationSec?: number,
-    initialNotes?: string
+    initialNotes?: string,
+    classroomCtx?: { code: string; slot: number }
   ) => string;
   updateActiveSessionStage: (stage: ActiveSession["stage"]) => void;
   updateActiveSessionSpeakingSec: (speakingDurationSec: number) => void;
@@ -970,7 +973,14 @@ export const useAppStore = create<AppState>()(
       },
 
 
-      startSession: (topic, researchMin, initialStage = "research", speakingDurationSec, initialNotes) => {
+      startSession: (
+        topic,
+        researchMin,
+        initialStage = "research",
+        speakingDurationSec,
+        initialNotes,
+        classroomCtx
+      ) => {
         const id = uid();
         set((s) => ({
           pendingTopic: null,
@@ -993,6 +1003,9 @@ export const useAppStore = create<AppState>()(
                 ? "Impromptu Articulation (Direct-to-speech sprint)"
                 : "",
             ...(initialStage === "speaking" ? { researchCompletedAt: Date.now() } : {}),
+            ...(classroomCtx?.code
+              ? { classroomCode: classroomCtx.code, classroomSlot: classroomCtx.slot }
+              : {}),
           },
         }));
         analytics.trackSprintStarted({

@@ -25,6 +25,7 @@ import {
   Archive,
   RotateCcw,
   Award,
+  Bell,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { toXSafeUrl } from "@/lib/share-origin";
@@ -95,6 +96,7 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
   const {
     profile,
     settings,
+    sessions,
     customTopics,
     updateProfile,
     startSession,
@@ -103,15 +105,19 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
   const {
     classrooms,
     submissionsByCode,
+    pushEnabledByCode,
+    nudgedAtByKey,
     fetchClassroom,
     joinClassroom,
     swapSlotTopic,
     unlockNextSlotEarly,
     setClassroomStatus,
     extendClassroom,
+    submitRecording,
     markHeard,
     toggleAppreciation,
     addMarginNote,
+    nudgeMember,
   } = useClassroomStore();
 
   const classroom = useMemo(
@@ -165,6 +171,10 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
   const [extendingSaving, setExtendingSaving] = useState(false);
   const [extendError, setExtendError] = useState<string | null>(null);
   const didAutoOpenExtendRef = useRef(false);
+  const [nudgingUserId, setNudgingUserId] = useState<string | null>(null);
+  const [nudgeNoticeByUser, setNudgeNoticeByUser] = useState<Record<string, string>>({});
+  const [publishingSavedTake, setPublishingSavedTake] = useState(false);
+  const [publishSavedError, setPublishSavedError] = useState<string | null>(null);
 
   // Initial load + gentle 12s sync while visible
   useEffect(() => {
@@ -385,7 +395,9 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
       topicObj,
       classroom.researchDurationMin || settings.researchMin || 10,
       initialStage,
-      classroom.speakingDurationSec || 90
+      classroom.speakingDurationSec || 90,
+      undefined,
+      { code: cleanCode, slot: slot.slotNumber }
     );
     router.push(
       `/session/${sessionId}?classroom=${encodeURIComponent(cleanCode)}&slot=${slot.slotNumber}`
@@ -572,6 +584,66 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
   const catColor = currentSlotObj
     ? CATEGORY_COLORS[currentSlotObj.category] || "var(--olive)"
     : "var(--olive)";
+
+  const pushEnabledSet = useMemo(
+    () => new Set(pushEnabledByCode[cleanCode] || []),
+    [pushEnabledByCode, cleanCode]
+  );
+
+  // Detect if the user already has a matching local recording in their Library for this slot
+  // (e.g. if a Classroom session lost its URL query or had a transient network error)
+  const matchingLocalSession = useMemo(() => {
+    if (!currentSlotObj || !isSlotUnlocked || hasRecordedCurrentSlot) return null;
+    const targetText = currentSlotObj.topicText.trim().toLowerCase();
+    return (
+      sessions.find(
+        (s) =>
+          Boolean(s.audioBase64) &&
+          s.speakingSeconds > 0 &&
+          (s.topicId === currentSlotObj.topicId ||
+            s.topicText.trim().toLowerCase() === targetText)
+      ) || null
+    );
+  }, [currentSlotObj, isSlotUnlocked, hasRecordedCurrentSlot, sessions]);
+
+  async function handlePublishSavedTake() {
+    if (!classroom || !currentSlotObj || !matchingLocalSession) return;
+    setPublishingSavedTake(true);
+    setPublishSavedError(null);
+    const res = await submitRecording({
+      classroomCode: cleanCode,
+      slotNumber: currentSlotObj.slotNumber,
+      userId: profile.id || "local-scholar",
+      username: profile.username || "Scholar",
+      avatar: profile.avatar || "/avatars/avatar-scholar.svg",
+      topicId: currentSlotObj.topicId,
+      topicText: currentSlotObj.topicText,
+      category: currentSlotObj.category,
+      durationSeconds: matchingLocalSession.speakingSeconds,
+      audioData: matchingLocalSession.audioBase64,
+      notes: matchingLocalSession.notes,
+    });
+    setPublishingSavedTake(false);
+    if (res.error) {
+      setPublishSavedError(res.error);
+    }
+  }
+
+  async function handleNudgeMember(targetUserId: string) {
+    if (!classroom || !isMember) return;
+    setNudgingUserId(targetUserId);
+    const res = await nudgeMember({
+      code: cleanCode,
+      actorId: profile.id || "local-scholar",
+      actorName: profile.username || "Your friend",
+      targetUserId,
+      slotNumber: selectedSlot,
+    });
+    setNudgingUserId(null);
+    if (res.message) {
+      setNudgeNoticeByUser((prev) => ({ ...prev, [targetUserId]: res.message! }));
+    }
+  }
 
   const unrecordedMembersOnSlot = classroom.members.filter(
     (m) =>
@@ -1179,6 +1251,35 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
                   </button>
                 </div>
               </div>
+
+              {matchingLocalSession && isMember && (
+                <div
+                  className="mt-4 pt-3.5 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                  style={{ borderColor: "var(--border-dim)" }}
+                >
+                  <div>
+                    <div className="text-xs font-bold text-[var(--olive)]">
+                      Found your saved {formatDuration(matchingLocalSession.speakingSeconds)} take for this topic
+                    </div>
+                    <p className="text-[11px]" style={{ color: "var(--text-dim)" }}>
+                      Publish your existing recording from your Recordings vault to unlock the circle immediately.
+                    </p>
+                    {publishSavedError && (
+                      <div className="text-[11px] mt-1" style={{ color: "var(--red)" }}>
+                        {publishSavedError}
+                      </div>
+                    )}
+                  </div>
+                  <button
+                    type="button"
+                    disabled={publishingSavedTake}
+                    onClick={handlePublishSavedTake}
+                    className="px-4 py-2 rounded-xl border border-[var(--olive)] bg-[var(--olive)] text-white text-xs font-mono font-bold shrink-0 hover:opacity-90 active:scale-[0.98] transition-all cursor-pointer disabled:opacity-60"
+                  >
+                    {publishingSavedTake ? "Publishing..." : "Publish Saved Take"}
+                  </button>
+                </div>
+              )}
             </div>
           ) : (
             <div
@@ -1512,13 +1613,82 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
               );
             })}
 
-            {/* Pending Friends Indicator */}
+            {/* Pending Friends Indicator + 1-Tap Nudge (when you've recorded and friend has push on) */}
             {unrecordedMembersOnSlot.length > 0 && (
-              <div className="text-xs pt-1" style={{ color: "var(--text-mute)" }}>
-                Waiting on:{" "}
-                <span className="font-medium" style={{ color: "var(--text-dim)" }}>
-                  {unrecordedMembersOnSlot.map((m) => m.username).join(", ")}
-                </span>
+              <div
+                className="rounded-xl border px-4 py-3 mt-1"
+                style={{ background: "var(--bg-panel)", borderColor: "var(--border-dim)" }}
+              >
+                <div className="text-[11px] font-mono uppercase tracking-wider mb-2" style={{ color: "var(--text-mute)" }}>
+                  Waiting on Topic {selectedSlot}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  {unrecordedMembersOnSlot.map((m) => {
+                    const isSelf = isSameClassroomScholar(
+                      m.userId,
+                      m.username,
+                      profile.id,
+                      profile.username
+                    );
+                    const canNudge =
+                      isMember &&
+                      hasRecordedCurrentSlot &&
+                      !isSelf &&
+                      pushEnabledSet.has(m.userId);
+                    const nudgeKey = `${cleanCode}:${m.userId}`;
+                    const recentlyNudged =
+                      Date.now() - (nudgedAtByKey[nudgeKey] || 0) < 6 * 3600 * 1000;
+                    const isSending = nudgingUserId === m.userId;
+                    const notice = nudgeNoticeByUser[m.userId];
+
+                    return (
+                      <div
+                        key={m.userId}
+                        className="inline-flex items-center gap-2 px-2.5 py-1.5 rounded-xl border text-xs"
+                        style={{
+                          background: "var(--bg-card)",
+                          borderColor: "var(--border-dim)",
+                          color: "var(--text)",
+                        }}
+                      >
+                        <UserAvatar avatar={m.avatar} size="xs" />
+                        <span className="font-medium">{m.username}</span>
+
+                        {canNudge && (
+                          <button
+                            type="button"
+                            disabled={isSending || recentlyNudged}
+                            onClick={() => handleNudgeMember(m.userId)}
+                            className={cn(
+                              "ml-0.5 px-2.5 py-1 rounded-lg text-[11px] font-mono font-bold flex items-center gap-1 transition-all cursor-pointer disabled:cursor-default",
+                              recentlyNudged
+                                ? "bg-[var(--olive)]/12 text-[var(--olive)]"
+                                : "bg-[var(--terra)] text-white hover:opacity-90 active:scale-[0.97]"
+                            )}
+                            title={notice || `Send a gentle nudge to ${m.username}`}
+                          >
+                            {recentlyNudged ? (
+                              <>
+                                <Check size={11} />
+                                <span>Nudged</span>
+                              </>
+                            ) : (
+                              <>
+                                <Bell size={11} />
+                                <span>{isSending ? "..." : "Nudge"}</span>
+                              </>
+                            )}
+                          </button>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+                {Object.values(nudgeNoticeByUser).length > 0 && (
+                  <div className="text-[11px] mt-2" style={{ color: "var(--text-dim)" }}>
+                    {Object.values(nudgeNoticeByUser).slice(-1)[0]}
+                  </div>
+                )}
               </div>
             )}
           </div>

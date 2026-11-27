@@ -14,7 +14,7 @@ import {
   Bold, Italic, List, ListOrdered, CheckSquare,
   ChevronRight, Star, ArrowLeft, Zap, Volume2, RefreshCcw, Globe,
   Share2, Check, ExternalLink, Sparkles, Image as ImageIcon,
-  Calendar, ShieldCheck, Flame, Target, MessageSquareQuote,
+  Calendar, ShieldCheck, Flame, Target, MessageSquareQuote, Bell,
 } from "lucide-react";
 import { useAppStore, type ActiveSession } from "@/store/useAppStore";
 import { CATEGORY_ICONS, CATEGORY_COLORS, TOPIC_BANK, DIFFICULTY_LABELS, type Topic, type Difficulty } from "@/lib/topics";
@@ -32,7 +32,8 @@ import ResearchQuizCard from "@/components/research/ResearchQuizCard";
 import type { Cue } from "@/lib/research-types";
 import { createVoiceMediaRecorder } from "@/lib/audio-recorder";
 import { useClassroomStore } from "@/store/useClassroomStore";
-import { normalizeClassroomCode } from "@/lib/classroom-types";
+import { normalizeClassroomCode, isSameClassroomScholar } from "@/lib/classroom-types";
+import UserAvatar from "@/components/ui/UserAvatar";
 import ReminderOptInCard from "@/components/notifications/ReminderOptInCard";
 import { syncPracticeActivity, shouldShowReminderPrompt } from "@/lib/push-notifications";
 
@@ -1127,6 +1128,10 @@ function StageComplete({
   tags,
   speakingSeconds,
   classroomCode,
+  classroomSlot,
+  classroomSubmitError,
+  retryingClassroomSubmit,
+  onRetryClassroomSubmit,
 }: {
   sessionId: string;
   xpEarned: number;
@@ -1141,6 +1146,10 @@ function StageComplete({
   tags?: string[];
   speakingSeconds: number;
   classroomCode?: string | null;
+  classroomSlot?: number | null;
+  classroomSubmitError?: string | null;
+  retryingClassroomSubmit?: boolean;
+  onRetryClassroomSubmit?: () => void;
 }) {
   const [bonusQuizXP, setBonusQuizXP] = useState(0);
   const { ACHIEVEMENTS } = require("@/lib/achievements");
@@ -1161,6 +1170,76 @@ function StageComplete({
   const [copiedDispatch, setCopiedDispatch] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
+
+  // Classroom Nudge state (Duolingo-style post-session friend nudge)
+  const {
+    classrooms,
+    submissionsByCode,
+    pushEnabledByCode,
+    nudgedAtByKey,
+    fetchClassroom,
+    nudgeMember,
+  } = useClassroomStore();
+  const [nudgingUserId, setNudgingUserId] = useState<string | null>(null);
+  const [nudgeFeedbackByUser, setNudgeFeedbackByUser] = useState<Record<string, string>>({});
+
+  const cleanClassroomCode = classroomCode ? normalizeClassroomCode(classroomCode) : "";
+  useEffect(() => {
+    if (cleanClassroomCode) {
+      fetchClassroom(cleanClassroomCode);
+    }
+  }, [cleanClassroomCode, fetchClassroom]);
+
+  const activeClassroom = useMemo(
+    () =>
+      cleanClassroomCode
+        ? classrooms.find((c) => normalizeClassroomCode(c.code) === cleanClassroomCode) || null
+        : null,
+    [classrooms, cleanClassroomCode]
+  );
+
+  const nudgeableFriends = useMemo(() => {
+    if (!activeClassroom || !cleanClassroomCode) return [];
+    const pushIds = new Set(pushEnabledByCode[cleanClassroomCode] || []);
+    const subs = submissionsByCode[cleanClassroomCode] || [];
+    const targetSlot = classroomSlot || 1;
+    const slotSubs = subs.filter((s) => s.slotNumber === targetSlot);
+
+    return activeClassroom.members.filter((m) => {
+      if (isSameClassroomScholar(m.userId, m.username, profile.id, profile.username)) {
+        return false;
+      }
+      if (!pushIds.has(m.userId)) return false;
+      const alreadySubmitted = slotSubs.some((s) =>
+        isSameClassroomScholar(s.userId, s.username, m.userId, m.username)
+      );
+      return !alreadySubmitted;
+    });
+  }, [
+    activeClassroom,
+    cleanClassroomCode,
+    pushEnabledByCode,
+    submissionsByCode,
+    classroomSlot,
+    profile.id,
+    profile.username,
+  ]);
+
+  async function handleNudgeFriend(targetUserId: string) {
+    if (!cleanClassroomCode || !activeClassroom) return;
+    setNudgingUserId(targetUserId);
+    const res = await nudgeMember({
+      code: cleanClassroomCode,
+      actorId: profile.id || "local-scholar",
+      actorName: profile.username || "Your friend",
+      targetUserId,
+      slotNumber: classroomSlot || undefined,
+    });
+    setNudgingUserId(null);
+    if (res.message) {
+      setNudgeFeedbackByUser((prev) => ({ ...prev, [targetUserId]: res.message! }));
+    }
+  }
 
   const activeDifficulty: Difficulty =
     (settings.difficultyMode as Difficulty) ||
@@ -1785,6 +1864,113 @@ function StageComplete({
         </motion.div>
       )}
 
+      {/* Classroom Publish Error / Retry Banner */}
+      {classroomCode && classroomSubmitError && (
+        <div
+          className="w-full max-w-2xl mb-5 rounded-2xl border-[1.5px] p-4 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+          style={{ background: "var(--red-bg)", borderColor: "var(--red)" }}
+        >
+          <div>
+            <div className="text-xs font-bold mb-0.5" style={{ color: "var(--red)" }}>
+              Saved to your Recordings, but couldn&apos;t publish to the Classroom yet
+            </div>
+            <p className="text-xs" style={{ color: "var(--text-dim)" }}>
+              {classroomSubmitError}
+            </p>
+          </div>
+          {onRetryClassroomSubmit && (
+            <button
+              type="button"
+              disabled={retryingClassroomSubmit}
+              onClick={onRetryClassroomSubmit}
+              className="btn-terra px-4 py-2 rounded-xl text-xs font-mono font-bold shrink-0 cursor-pointer disabled:opacity-60"
+            >
+              {retryingClassroomSubmit ? "Publishing..." : "Retry Publish"}
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Post-Session Friend Nudge (when friends in this Classroom have notifications on) */}
+      {activeClassroom && nudgeableFriends.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.25, duration: 0.35 }}
+          className="w-full max-w-2xl mb-6 rounded-2xl border-[1.5px] p-5 text-left surface"
+          style={{ borderColor: "var(--olive)" }}
+        >
+          <div className="flex items-center gap-1.5 text-[10px] font-mono font-bold uppercase tracking-widest text-[var(--olive)] mb-1">
+            <Bell size={12} />
+            <span>Your Take Is Live · Nudge Your Circle</span>
+          </div>
+          <p className="text-xs sm:text-sm mb-3.5" style={{ color: "var(--text-dim)" }}>
+            Send a gentle push nudge so your friends in{" "}
+            <span className="font-semibold" style={{ color: "var(--text)" }}>
+              {activeClassroom.title}
+            </span>{" "}
+            record their take on Topic {classroomSlot || 1}.
+          </p>
+
+          <div className="space-y-2">
+            {nudgeableFriends.map((friend) => {
+              const nudgeKey = `${cleanClassroomCode}:${friend.userId}`;
+              const lastNudged = nudgedAtByKey[nudgeKey] || 0;
+              const recentlyNudged = Date.now() - lastNudged < 6 * 3600 * 1000;
+              const isSending = nudgingUserId === friend.userId;
+              const feedback = nudgeFeedbackByUser[friend.userId];
+
+              return (
+                <div
+                  key={friend.userId}
+                  className="rounded-xl px-3.5 py-2.5 border flex items-center justify-between gap-3 flex-wrap"
+                  style={{
+                    background: "var(--bg-panel)",
+                    borderColor: recentlyNudged ? "var(--olive)" : "var(--border-dim)",
+                  }}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <UserAvatar avatar={friend.avatar} size="sm" />
+                    <div className="min-w-0">
+                      <div className="text-xs sm:text-sm font-bold truncate" style={{ color: "var(--text)" }}>
+                        {friend.username}
+                      </div>
+                      <div className="text-[11px]" style={{ color: "var(--text-mute)" }}>
+                        {feedback || `Waiting on Topic ${classroomSlot || 1}`}
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    disabled={isSending || recentlyNudged}
+                    onClick={() => handleNudgeFriend(friend.userId)}
+                    className={cn(
+                      "px-3.5 py-1.5 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 shrink-0 transition-all cursor-pointer disabled:cursor-default",
+                      recentlyNudged
+                        ? "bg-[var(--olive)]/12 text-[var(--olive)] border border-[var(--olive)]/30"
+                        : "btn-terra active:scale-[0.98]"
+                    )}
+                  >
+                    {recentlyNudged ? (
+                      <>
+                        <Check size={12} />
+                        <span>Nudged</span>
+                      </>
+                    ) : (
+                      <>
+                        <Bell size={12} />
+                        <span>{isSending ? "Sending..." : "Nudge"}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
       <button
         onClick={onNext}
         className="btn-terra h-14 px-8"
@@ -1840,6 +2026,21 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [completedSession, setCompletedSession] = useState<ActiveSession | null>(null);
   const [showExitNudge, setShowExitNudge] = useState(false);
   const [classroomRef, setClassroomRef] = useState<{ code: string; slot: number } | null>(null);
+  const [classroomSubmitError, setClassroomSubmitError] = useState<string | null>(null);
+  const [retryingClassroomSubmit, setRetryingClassroomSubmit] = useState(false);
+  const lastClassroomPayloadRef = useRef<{
+    classroomCode: string;
+    slotNumber: number;
+    userId: string;
+    username: string;
+    avatar: string;
+    topicId: string;
+    topicText: string;
+    category: string;
+    durationSeconds: number;
+    audioData?: string;
+    notes?: string;
+  } | null>(null);
 
   useEffect(() => {
     if (typeof window !== "undefined") {
@@ -1866,6 +2067,14 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   }, []);
 
   const currentSession = activeSession || completedSession;
+  const effectiveClassroomRef =
+    classroomRef ||
+    (currentSession?.classroomCode
+      ? {
+          code: normalizeClassroomCode(currentSession.classroomCode),
+          slot: Math.max(1, currentSession.classroomSlot || 1),
+        }
+      : null);
 
   const STAGES = ["research", "speaking", "reflection", "complete"] as const;
   const stageIndex = completionData
@@ -1932,10 +2141,11 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     }
 
     // If this session was launched from a Classroom slot, publish to the Classroom circle
-    if (classroomRef?.code) {
-      await useClassroomStore.getState().submitRecording({
-        classroomCode: classroomRef.code,
-        slotNumber: classroomRef.slot,
+    // (with 1 automatic retry + visible retry fallback if offline/transient error)
+    if (effectiveClassroomRef?.code) {
+      const payload = {
+        classroomCode: effectiveClassroomRef.code,
+        slotNumber: effectiveClassroomRef.slot,
         userId: profile.id || "local-scholar",
         username: profile.username || "Scholar",
         avatar: profile.avatar || "/avatars/avatar-scholar.svg",
@@ -1945,7 +2155,18 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         durationSeconds: speakingSeconds,
         audioData: audioBase64,
         notes: activeSession.notes,
-      });
+      };
+      lastClassroomPayloadRef.current = payload;
+      setClassroomSubmitError(null);
+
+      let submitRes = await useClassroomStore.getState().submitRecording(payload);
+      if (submitRes.error) {
+        await new Promise((r) => setTimeout(r, 1200));
+        submitRes = await useClassroomStore.getState().submitRecording(payload);
+      }
+      if (submitRes.error) {
+        setClassroomSubmitError(submitRes.error);
+      }
     }
 
     setCompletionData(result);
@@ -1959,19 +2180,31 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     }
   }
 
+  async function handleRetryClassroomSubmit() {
+    if (!lastClassroomPayloadRef.current) return;
+    setRetryingClassroomSubmit(true);
+    const res = await useClassroomStore.getState().submitRecording(lastClassroomPayloadRef.current);
+    setRetryingClassroomSubmit(false);
+    if (res.error) {
+      setClassroomSubmitError(res.error);
+    } else {
+      setClassroomSubmitError(null);
+    }
+  }
+
   function handleAbandon() {
     if (!completionData && currentSession && (currentSession.stage === "research" || currentSession.stage === "speaking")) {
       setShowExitNudge(true);
       return;
     }
     abandonSession();
-    router.push(classroomRef?.code ? `/classroom/${classroomRef.code}` : "/");
+    router.push(effectiveClassroomRef?.code ? `/classroom/${effectiveClassroomRef.code}` : "/");
   }
 
   function handleConfirmAbandon() {
     setShowExitNudge(false);
     abandonSession();
-    router.push(classroomRef?.code ? `/classroom/${classroomRef.code}` : "/");
+    router.push(effectiveClassroomRef?.code ? `/classroom/${effectiveClassroomRef.code}` : "/");
   }
 
   function handleQuick45sDownsell() {
@@ -2041,7 +2274,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               newAchievements={completionData.newAchievements}
               streak={streak.current}
               onNext={() =>
-                router.push(classroomRef?.code ? `/classroom/${classroomRef.code}` : "/")
+                router.push(effectiveClassroomRef?.code ? `/classroom/${effectiveClassroomRef.code}` : "/")
               }
               topicId={currentSession.topic.id}
               topicText={currentSession.topic.text}
@@ -2050,7 +2283,11 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               notes={currentSession.notes}
               tags={currentSession.topic.tags}
               speakingSeconds={speakingSeconds}
-              classroomCode={classroomRef?.code || null}
+              classroomCode={effectiveClassroomRef?.code || null}
+              classroomSlot={effectiveClassroomRef?.slot ?? null}
+              classroomSubmitError={classroomSubmitError}
+              retryingClassroomSubmit={retryingClassroomSubmit}
+              onRetryClassroomSubmit={handleRetryClassroomSubmit}
             />
           </motion.div>
         ) : currentSession.stage === "research" ? (

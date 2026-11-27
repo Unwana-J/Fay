@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse, after } from "next/server";
-import { sendSocialPushToUsers } from "@/lib/push-sender";
+import { getPushEnabledUserIds, sendSocialPushToUsers } from "@/lib/push-sender";
 import {
   checkRateLimit,
   getClientIp,
@@ -10,6 +10,7 @@ import {
   type AppreciationTag,
   APPRECIATION_TAGS,
   computeEffectiveUnlockedSlot,
+  isSameClassroomScholar,
 } from "@/lib/classroom-types";
 import {
   getClassroomWithSubmissions,
@@ -31,7 +32,10 @@ export async function GET(
     if (!bundle) {
       return NextResponse.json({ error: "Classroom not found." }, { status: 404 });
     }
-    return NextResponse.json(bundle);
+    const pushEnabledUserIds = await getPushEnabledUserIds(
+      bundle.classroom.members.map((m) => m.userId)
+    );
+    return NextResponse.json({ ...bundle, pushEnabledUserIds });
   } catch {
     return NextResponse.json({ error: "Failed to load Classroom." }, { status: 500 });
   }
@@ -326,6 +330,91 @@ export async function POST(
         );
       }
       return NextResponse.json(updated);
+    }
+
+    if (action === "nudge") {
+      const actorId = String(body?.actorId || "").trim().slice(0, 80);
+      const actorName = String(body?.actorName || "Your friend").trim().slice(0, 50) || "Your friend";
+      const targetUserId = String(body?.targetUserId || "").trim().slice(0, 80);
+      const slotNumber = Number(body?.slotNumber) || 0;
+
+      if (!actorId || !targetUserId || actorId === targetUserId) {
+        return NextResponse.json({ error: "Invalid nudge target." }, { status: 400 });
+      }
+      if (isBotPattern(actorName) || isBannedIdentifier(actorName)) {
+        return NextResponse.json({ error: "Action not permitted." }, { status: 403 });
+      }
+
+      const existing = await getClassroomWithSubmissions(code);
+      if (!existing) {
+        return NextResponse.json({ error: "Classroom not found." }, { status: 404 });
+      }
+
+      const { classroom } = existing;
+      const actorIsMember =
+        classroom.hostId === actorId ||
+        classroom.members.some((m) =>
+          isSameClassroomScholar(m.userId, m.username, actorId, actorName)
+        );
+      const targetMember = classroom.members.find((m) => m.userId === targetUserId);
+      if (!actorIsMember || !targetMember) {
+        return NextResponse.json(
+          { error: "Both members must belong to this Classroom." },
+          { status: 403 }
+        );
+      }
+
+      // Limit to 1 nudge per friend per Classroom every 6 hours to stay warm & non-spammy
+      const nudgeLimit = checkRateLimit(
+        `classroom-nudge:${classroom.code}:${actorId}:${targetUserId}`,
+        1,
+        6 * 3600
+      );
+      if (!nudgeLimit.allowed) {
+        return NextResponse.json({
+          ok: false,
+          status: "cooldown",
+          message: `You already nudged ${targetMember.username} recently.`,
+        });
+      }
+
+      const slotPrompt =
+        slotNumber > 0
+          ? `Your turn on Topic ${slotNumber} — record a ${classroom.speakingDurationSec}s take to unlock ${actorName}'s voice.`
+          : `Your turn is waiting in ${classroom.title}. Record a quick take to keep the circle moving.`;
+
+      const tally = await sendSocialPushToUsers(
+        [targetUserId],
+        {
+          title: `${actorName} nudged you in ${classroom.title}`,
+          body: slotPrompt,
+          url: `/classroom/${classroom.code}`,
+          tag: `fey-classroom-${classroom.code}-nudge-${slotNumber || 0}`,
+          template: "social_classroom_nudge",
+          renotify: true,
+        },
+        { excludeUserId: actorId, respectQuietHours: true }
+      );
+
+      if (tally.sent > 0) {
+        return NextResponse.json({
+          ok: true,
+          status: "sent",
+          message: `Nudge sent to ${targetMember.username}.`,
+        });
+      }
+      if (tally.quietSkipped > 0) {
+        return NextResponse.json({
+          ok: false,
+          status: "quiet_hours",
+          message: `${targetMember.username} is in quiet hours right now.`,
+        });
+      }
+      return NextResponse.json({
+        ok: false,
+        status: "not_enabled",
+        message: `${targetMember.username} doesn't have notifications turned on.`,
+      });
     }
 
     return NextResponse.json({ error: "Unknown Classroom action." }, { status: 400 });

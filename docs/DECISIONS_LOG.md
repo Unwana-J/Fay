@@ -869,3 +869,22 @@
      - Completed Classrooms finished by all members now show a gold `All N/N Topics Complete` badge with a direct **Continue Circle** CTA, and the final submission triggers a celebratory `social_classroom_complete` push notification.
 - **"Building in Public" Content Takeaway**:
   > *"Auto-archiving a finished group challenge into a cold 'Closed' banner kills the exact moment momentum is highest. Celebrate the full sweep first — total voices, minutes spoken, margin notes — then make adding the next 3 topics a single calm tap."*
+
+---
+
+## Post-Session & In-Room Friend Nudge for Push-Enabled Classroom Circles
+
+- **Date / Phase**: 27 Nov 2026 — Phase 2, Social Classrooms Retention Loop
+- **The Problem / Context**:
+  After finishing a Classroom topic, a member only had passive automatic notifications or manual WhatsApp link-sharing to bring friends back. Unlike Duolingo's friend nudge loop, there was no intentional, lightweight 1-tap way to personally poke a friend who already opted into notifications.
+- **User Insight & Guiding Philosophy**:
+  A personal nudge from a friend carries far more social warmth than an automated system ping — as long as it only appears for friends who opted into push notifications, respects their quiet hours, and is rate-limited so it never feels spammy.
+- **Architectural & Product Landing**:
+  1. **Privacy-Safe Push Capability Lookup (`lib/push-sender.ts`, `app/api/classroom/[code]/route.ts`)**:
+     - Added `getPushEnabledUserIds(userIds)` returning only the subset of Classroom member IDs with an active `enabled = true` push subscription (never exposing endpoints/keys).
+     - Added `action: "nudge"` on `POST /api/classroom/[code]` with membership verification, a 6-hour per-friend cooldown, quiet-hours awareness (`quietSkipped`), and `social_classroom_nudge` push delivery.
+  2. **Duolingo-Style Nudge Touchpoints (`store/useClassroomStore.ts`, `app/session/[id]/page.tsx`, `app/classroom/[code]/ClassroomDetailClient.tsx`)**:
+     - **Post-Session (`StageComplete`)**: Right after submitting a Classroom take, surfaces a **"Your Take Is Live · Nudge Your Circle"** card for pending friends with notifications enabled.
+     - **In-Room (`ClassroomDetailClient`)**: Upgrades the `"Waiting on"` list once you've recorded your take with inline 1-tap **Nudge** buttons (`Nudge` → `Nudged`, persisted across the 6-hour cooldown).
+- **"Building in Public" Content Takeaway**:
+  > *"Automated reminders tell you the app misses you. A 1-tap 'Sammy nudged you on Topic 2' tells you your friend is actually waiting to hear your voice. Gating the Nudge button to push-enabled friends with a 6-hour cooldown and quiet-hours check keeps it magical instead of noisy."*
