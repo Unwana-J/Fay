@@ -849,3 +849,23 @@
      - Mounted on `/profile` with status badge (`Active / Paused / Off / Blocked`), one-tap enable (or iOS Home Screen instructions), Pause/Resume toggle, 30-minute daily reminder time selector (`8:00am`–`9:30pm`), and a rate-limited **Send test** button.
 - **"Building in Public" Content Takeaway**:
   > *"Open rates alone lie — people tap notifications out of habit even when reminders don't improve 7-day retention. A deterministic 10% holdout group on scheduled reminders lets us measure real retention lift, while keeping social pings instant for everyone."*
+
+---
+
+## Classroom Full-Circle Completion Celebration & Subtle Extension Nudge
+
+- **Date / Phase**: 27 Nov 2026 — Phase 2, Social Classrooms Retention Loop
+- **The Problem / Context**:
+  When all participants in a Classroom finished the final topic (e.g., 3/3), the backend auto-marked `status = "completed"`, which hid the active "Syllabus Exhausted" prompt and showed a cold **"Classroom Closed & Archived"** banner instead. There was no distinction between a host manually closing early vs. every member completing the syllabus together, and no celebratory moment before nudging the circle to continue.
+- **User Insight & Guiding Philosophy**:
+  Finishing a multi-topic Classroom together is a genuine social milestone. Praise the circle first with their collective effort (voices, minutes articulated, notes/stamps exchanged), then offer a warm, low-pressure nudge to keep the momentum going without forcing a new invite link.
+- **Architectural & Product Landing**:
+  1. **Completion & Collective Stats Helper (`lib/classroom-types.ts`)**:
+     - Added `getClassroomCompletionSummary` computing `allMembersFinishedFinalTopic`, `allMembersCompletedEverySlot` ("Full Sweep"), pending final-slot members, total takes, total duration articulated, and total appreciations + margin notes.
+  2. **Editorial Circle Complete Card (`app/classroom/[code]/ClassroomDetailClient.tsx`)**:
+     - Replaces the archived banner when all members finish the final topic, using `--gold` framing, member avatars, collective recap pills, and a hairline-separated extension footer (`Add +3 Topics` and `Custom Topic`, plus `?extend=1` deep-link support).
+     - Preserves the `"Classroom Closed & Archived"` banner only for early manual closes, and refines the individual waiting banner when you finish 3/3 before your friends.
+  3. **Hub & Push Alignment (`app/classroom/page.tsx`, `app/api/classroom/submit/route.ts`)**:
+     - Completed Classrooms finished by all members now show a gold `All N/N Topics Complete` badge with a direct **Continue Circle** CTA, and the final submission triggers a celebratory `social_classroom_complete` push notification.
+- **"Building in Public" Content Takeaway**:
+  > *"Auto-archiving a finished group challenge into a cold 'Closed' banner kills the exact moment momentum is highest. Celebrate the full sweep first — total voices, minutes spoken, margin notes — then make adding the next 3 topics a single calm tap."*

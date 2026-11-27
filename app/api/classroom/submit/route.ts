@@ -147,9 +147,12 @@ export async function POST(req: NextRequest) {
         )
       );
 
+    const justCompletedCircle =
+      allFinishedFinalTopic && refreshed.classroom.status !== "completed";
+
     if (
       unlockedNow > (refreshed.classroom.manualUnlockedUpToSlot || 1) ||
-      (allFinishedFinalTopic && refreshed.classroom.status !== "completed")
+      justCompletedCircle
     ) {
       finalClassroom = await saveClassroom({
         ...refreshed.classroom,
@@ -168,21 +171,32 @@ export async function POST(req: NextRequest) {
     );
     const otherMemberIds = finalClassroom.members.map((m) => m.userId);
     const roomTitle = finalClassroom.title;
+    const totalTopics = finalClassroom.totalTopics;
     after(() =>
       sendSocialPushToUsers(
         otherMemberIds,
-        (recipientId) => ({
-          title: `${cleanUsername} recorded Topic ${slotNum}`,
-          body: slotSubmittedIds.has(recipientId)
-            ? `Their take is ready to hear in ${roomTitle}.`
-            : `Record your 90-second take in ${roomTitle} to unlock and listen.`,
-          url: `/classroom/${cleanCode}`,
-          tag: `fey-classroom-${cleanCode}-slot-${slotNum}`,
-          template: slotSubmittedIds.has(recipientId)
-            ? "social_classroom_listen"
-            : "social_classroom_unlock",
-          renotify: true,
-        }),
+        (recipientId) =>
+          justCompletedCircle
+            ? {
+                title: `${roomTitle} — All ${totalTopics}/${totalTopics} complete`,
+                body: `${cleanUsername} recorded the final take. Hear everyone's voice or add the next round of topics.`,
+                url: `/classroom/${cleanCode}`,
+                tag: `fey-classroom-${cleanCode}-complete-${totalTopics}`,
+                template: "social_classroom_complete",
+                renotify: true,
+              }
+            : {
+                title: `${cleanUsername} recorded Topic ${slotNum}`,
+                body: slotSubmittedIds.has(recipientId)
+                  ? `Their take is ready to hear in ${roomTitle}.`
+                  : `Record your 90-second take in ${roomTitle} to unlock and listen.`,
+                url: `/classroom/${cleanCode}`,
+                tag: `fey-classroom-${cleanCode}-slot-${slotNum}`,
+                template: slotSubmittedIds.has(recipientId)
+                  ? "social_classroom_listen"
+                  : "social_classroom_unlock",
+                renotify: true,
+              },
         { excludeUserId: cleanUserId }
       )
     );

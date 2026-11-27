@@ -386,3 +386,85 @@ export function canSwapClassroomSlot(
 ): boolean {
   return !submissions.some((s) => s.slotNumber === slotNumber);
 }
+
+export interface ClassroomCompletionSummary {
+  totalTopics: number;
+  memberCount: number;
+  /** True when >= 2 members exist and every member submitted the final topic slot. */
+  allMembersFinishedFinalTopic: boolean;
+  /** True when >= 2 members exist and every member submitted every slot 1..totalTopics. */
+  allMembersCompletedEverySlot: boolean;
+  /** Count of members who have submitted the final topic slot. */
+  finalSlotCompletedMembers: number;
+  /** Members who haven't yet submitted the final topic slot. */
+  pendingFinalSlotMembers: ClassroomMember[];
+  /** Total voice takes recorded across the entire classroom. */
+  totalTakes: number;
+  /** Total seconds spoken across all recordings. */
+  totalDurationSeconds: number;
+  /** Total appreciation stamps + margin notes exchanged across all recordings. */
+  totalInteractions: number;
+}
+
+/**
+ * Compute full-circle completion state and collective stats for a Classroom.
+ */
+export function getClassroomCompletionSummary(
+  classroom: Classroom,
+  submissions: ClassroomSubmission[]
+): ClassroomCompletionSummary {
+  const totalTopics = classroom.totalTopics || classroom.slots.length || 1;
+  const members = classroom.members || [];
+  const memberCount = members.length;
+
+  const finalSlotSubs = submissions.filter((s) => s.slotNumber === totalTopics);
+  const pendingFinalSlotMembers = members.filter(
+    (m) =>
+      !finalSlotSubs.some((s) =>
+        isSameClassroomScholar(s.userId, s.username, m.userId, m.username)
+      )
+  );
+  const finalSlotCompletedMembers = memberCount - pendingFinalSlotMembers.length;
+
+  const allMembersFinishedFinalTopic =
+    memberCount >= 2 && pendingFinalSlotMembers.length === 0;
+
+  let allMembersCompletedEverySlot = allMembersFinishedFinalTopic;
+  if (allMembersCompletedEverySlot) {
+    for (let slot = 1; slot <= totalTopics; slot++) {
+      const slotSubs = submissions.filter((s) => s.slotNumber === slot);
+      const allOnSlot = members.every((m) =>
+        slotSubs.some((s) =>
+          isSameClassroomScholar(s.userId, s.username, m.userId, m.username)
+        )
+      );
+      if (!allOnSlot) {
+        allMembersCompletedEverySlot = false;
+        break;
+      }
+    }
+  }
+
+  let totalDurationSeconds = 0;
+  let totalInteractions = 0;
+  for (const sub of submissions) {
+    totalDurationSeconds += Number(sub.durationSeconds) || 0;
+    const appCounts = Object.values(sub.appreciations || {}).reduce(
+      (sum, voters) => sum + (Array.isArray(voters) ? voters.length : 0),
+      0
+    );
+    totalInteractions += appCounts + (sub.marginNotes?.length || 0);
+  }
+
+  return {
+    totalTopics,
+    memberCount,
+    allMembersFinishedFinalTopic,
+    allMembersCompletedEverySlot,
+    finalSlotCompletedMembers,
+    pendingFinalSlotMembers,
+    totalTakes: submissions.length,
+    totalDurationSeconds,
+    totalInteractions,
+  };
+}

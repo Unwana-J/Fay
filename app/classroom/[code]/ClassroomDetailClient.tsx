@@ -24,6 +24,7 @@ import {
   Plus,
   Archive,
   RotateCcw,
+  Award,
 } from "lucide-react";
 import { useAppStore } from "@/store/useAppStore";
 import { toXSafeUrl } from "@/lib/share-origin";
@@ -41,6 +42,7 @@ import {
   formatClassroomCodeDisplay,
   normalizeClassroomCode,
   isSameClassroomScholar,
+  getClassroomCompletionSummary,
 } from "@/lib/classroom-types";
 import {
   CATEGORIES,
@@ -75,6 +77,15 @@ function formatCountdownHours(ms: number): string {
   const mins = totalMins % 60;
   if (hrs > 0) return `${hrs}h ${mins}m`;
   return `${mins}m`;
+}
+
+function formatCollectiveDuration(totalSec: number): string {
+  const safe = Math.max(0, Math.round(totalSec));
+  if (safe < 60) return `${safe}s`;
+  const mins = Math.floor(safe / 60);
+  const rem = safe % 60;
+  if (rem === 0) return `${mins}m`;
+  return `${mins}m ${rem}s`;
 }
 
 export default function ClassroomDetailClient({ code }: { code: string }) {
@@ -153,6 +164,7 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
   const [extendCustomCategory, setExtendCustomCategory] = useState("Technology");
   const [extendingSaving, setExtendingSaving] = useState(false);
   const [extendError, setExtendError] = useState<string | null>(null);
+  const didAutoOpenExtendRef = useRef(false);
 
   // Initial load + gentle 12s sync while visible
   useEffect(() => {
@@ -227,6 +239,31 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
       classroom ? getSafetyValveRemainingMs(selectedSlot, classroom, submissions) : null,
     [classroom, selectedSlot, submissions]
   );
+
+  const completionSummary = useMemo(
+    () => (classroom ? getClassroomCompletionSummary(classroom, submissions) : null),
+    [classroom, submissions]
+  );
+
+  // Support deep-linking directly into Extend Modal via `?extend=1`
+  useEffect(() => {
+    if (!classroom || !isMember || didAutoOpenExtendRef.current) return;
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("extend") === "1") {
+      didAutoOpenExtendRef.current = true;
+      setExtendError(null);
+      setExtendMode("categories");
+      setExtendCount(3);
+      setExtendCategories(
+        classroom.categories?.length > 0
+          ? classroom.categories.slice(0, 6)
+          : ["Technology", "Philosophy"]
+      );
+      setExtendCustomCategory(classroom.categories?.[0] || "Technology");
+      setShowExtendModal(true);
+    }
+  }, [classroom, isMember]);
 
   // Swap bank candidates
   const swapCandidates = useMemo(() => {
@@ -414,11 +451,14 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
     }
   }
 
-  function openExtendModal() {
+  function openExtendModal(
+    initialMode: "categories" | "custom" = "categories",
+    initialCount: 1 | 3 | 5 | 7 = 3
+  ) {
     if (!classroom) return;
     setExtendError(null);
-    setExtendMode("categories");
-    setExtendCount(3);
+    setExtendMode(initialMode);
+    setExtendCount(initialCount);
     setExtendCategories(
       classroom.categories?.length > 0
         ? classroom.categories.slice(0, 6)
@@ -601,8 +641,167 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
         </div>
       </div>
 
-      {/* Closed / Completed Classroom Banner */}
-      {classroom.status === "completed" && (
+      {/* Full-Circle Celebration Card (All Participants Completed the Final Topic) */}
+      {completionSummary?.allMembersFinishedFinalTopic && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 320, damping: 28 }}
+          className="rounded-2xl border-[1.5px] p-5 sm:p-6 mb-6 relative overflow-hidden"
+          style={{
+            borderColor: "var(--gold)",
+            background:
+              "linear-gradient(180deg, rgba(166, 124, 30, 0.09) 0%, var(--bg-card) 52%)",
+          }}
+        >
+          <div className="flex items-start justify-between gap-4 flex-wrap mb-3">
+            <div>
+              <div
+                className="text-[10px] font-mono font-bold uppercase tracking-widest mb-1.5 flex items-center gap-1.5"
+                style={{ color: "var(--gold)" }}
+              >
+                <Award size={13} />
+                <span>
+                  {completionSummary.allMembersCompletedEverySlot
+                    ? `Full Sweep · ${completionSummary.totalTopics}/${completionSummary.totalTopics} Topics`
+                    : `Circle Complete · ${completionSummary.totalTopics}/${completionSummary.totalTopics} Topics`}
+                </span>
+              </div>
+              <h2
+                className="font-serif font-bold text-xl sm:text-2xl leading-snug mb-1"
+                style={{ color: "var(--text)" }}
+              >
+                {completionSummary.allMembersCompletedEverySlot
+                  ? "Every voice, every topic — well done."
+                  : `All ${completionSummary.totalTopics} topics completed together.`}
+              </h2>
+              <p className="text-xs sm:text-sm max-w-xl leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                All {completionSummary.memberCount} of you stepped up and put these ideas into your own words. Every recording stays playable below whenever you want to revisit.
+              </p>
+            </div>
+
+            {/* Circle Avatars Cluster */}
+            <div className="flex items-center -space-x-2 shrink-0 pt-1">
+              {classroom.members.slice(0, 6).map((m) => (
+                <div
+                  key={m.userId}
+                  className="rounded-full p-0.5"
+                  style={{ background: "var(--gold)" }}
+                  title={m.username}
+                >
+                  <UserAvatar
+                    avatar={m.avatar}
+                    size="sm"
+                    className="border-2 border-[var(--bg-card)]"
+                  />
+                </div>
+              ))}
+              {classroom.members.length > 6 && (
+                <span
+                  className="w-8 h-8 rounded-full border-2 border-[var(--bg-card)] text-[10px] font-mono font-bold flex items-center justify-center"
+                  style={{ background: "var(--bg-input)", color: "var(--text)" }}
+                >
+                  +{classroom.members.length - 6}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Collective Recap Metrics */}
+          <div className="flex items-center gap-2 flex-wrap mb-4">
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold"
+              style={{
+                background: "var(--bg-panel)",
+                borderColor: "var(--border-dim)",
+                color: "var(--text)",
+              }}
+            >
+              <Mic size={11} style={{ color: "var(--gold)" }} />
+              <span>
+                {completionSummary.totalTakes} take{completionSummary.totalTakes === 1 ? "" : "s"} recorded
+              </span>
+            </span>
+            <span
+              className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold"
+              style={{
+                background: "var(--bg-panel)",
+                borderColor: "var(--border-dim)",
+                color: "var(--text)",
+              }}
+            >
+              <Clock size={11} style={{ color: "var(--gold)" }} />
+              <span>{formatCollectiveDuration(completionSummary.totalDurationSeconds)} articulated</span>
+            </span>
+            {completionSummary.totalInteractions > 0 ? (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold"
+                style={{
+                  background: "var(--bg-panel)",
+                  borderColor: "var(--border-dim)",
+                  color: "var(--text)",
+                }}
+              >
+                <MessageSquare size={11} style={{ color: "var(--gold)" }} />
+                <span>
+                  {completionSummary.totalInteractions} note{completionSummary.totalInteractions === 1 ? "" : "s"} &amp; stamp{completionSummary.totalInteractions === 1 ? "" : "s"}
+                </span>
+              </span>
+            ) : (
+              <span
+                className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg border text-[11px] font-mono font-semibold"
+                style={{
+                  background: "var(--bg-panel)",
+                  borderColor: "var(--border-dim)",
+                  color: "var(--text)",
+                }}
+              >
+                <Check size={11} style={{ color: "var(--olive)" }} />
+                <span>
+                  {completionSummary.totalTopics}/{completionSummary.totalTopics} topics completed
+                </span>
+              </span>
+            )}
+          </div>
+
+          {/* Subtle Extend Nudge */}
+          {isMember && (
+            <div
+              className="pt-4 border-t flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              style={{ borderColor: "var(--border-dim)" }}
+            >
+              <p className="text-xs leading-relaxed" style={{ color: "var(--text-dim)" }}>
+                Momentum like this is rare. Keep this circle going with a fresh round — same code, same friends, zero repeats.
+              </p>
+              <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => openExtendModal("custom", 1)}
+                  className="px-3.5 py-2 rounded-xl border text-xs font-mono font-semibold hover:border-[var(--olive)] transition-colors cursor-pointer"
+                  style={{
+                    background: "var(--bg-panel)",
+                    borderColor: "var(--border)",
+                    color: "var(--text)",
+                  }}
+                >
+                  Custom Topic
+                </button>
+                <button
+                  type="button"
+                  onClick={() => openExtendModal("categories", 3)}
+                  className="btn-terra px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 active:scale-[0.98] transition-transform cursor-pointer"
+                >
+                  <Plus size={13} />
+                  <span>Add 3 Topics</span>
+                </button>
+              </div>
+            </div>
+          )}
+        </motion.div>
+      )}
+
+      {/* Manually Closed / Archived Classroom Banner (only when closed before everyone finished) */}
+      {classroom.status === "completed" && !completionSummary?.allMembersFinishedFinalTopic && (
         <div
           className="rounded-2xl border-[1.5px] p-4 sm:p-5 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4 surface"
           style={{ borderColor: "var(--olive)" }}
@@ -632,7 +831,7 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
             {isMember && (
               <button
                 type="button"
-                onClick={openExtendModal}
+                onClick={() => openExtendModal("categories", 3)}
                 className="btn-terra px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 cursor-pointer"
               >
                 <Plus size={13} />
@@ -828,7 +1027,7 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
           {isMember && (
             <button
               type="button"
-              onClick={openExtendModal}
+              onClick={() => openExtendModal("categories", 3)}
               className="px-3.5 py-2 rounded-xl border border-dashed text-xs font-mono font-bold flex items-center gap-1 whitespace-nowrap transition-colors hover:border-[var(--olive)] hover:text-[var(--olive)] cursor-pointer shrink-0"
               style={{ borderColor: "var(--border)", color: "var(--text-dim)", background: "var(--bg-panel)" }}
             >
@@ -839,9 +1038,10 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
         </div>
       </div>
 
-      {/* Syllabus Exhausted Prompt — Extend Without Creating a New Link */}
+      {/* Individual Final-Topic Done Note (waiting on remaining friends before full-circle completion) */}
       {isMember &&
         classroom.status === "active" &&
+        !completionSummary?.allMembersFinishedFinalTopic &&
         unlockedUpTo >= classroom.totalTopics &&
         hasUserUnlockedSlotAudio(classroom.totalTopics, profile.id, profile.username, submissions) && (
           <div
@@ -850,16 +1050,20 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
           >
             <div>
               <div className="text-xs font-serif font-bold" style={{ color: "var(--text)" }}>
-                Reached the Final Scheduled Topic ({classroom.totalTopics}/{classroom.totalTopics})
+                You finished all {classroom.totalTopics}/{classroom.totalTopics} topics
               </div>
               <p className="text-xs" style={{ color: "var(--text-dim)" }}>
-                Want to keep this circle going? Add +1, +3, or +7 new topics right here—same code, same friends.
+                {completionSummary && completionSummary.pendingFinalSlotMembers.length > 0
+                  ? `Waiting on ${completionSummary.pendingFinalSlotMembers
+                      .map((m) => m.username)
+                      .join(", ")} to wrap up Topic ${classroom.totalTopics}. You can line up the next round anytime.`
+                  : "Invite friends to unlock their takes, or add more topics to keep this Classroom going."}
               </p>
             </div>
             <button
               type="button"
-              onClick={openExtendModal}
-              className="btn-terra px-4 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1.5 shrink-0 cursor-pointer"
+              onClick={() => openExtendModal("categories", 3)}
+              className="px-3.5 py-2 rounded-xl border border-[var(--olive)] text-xs font-mono font-bold text-[var(--olive)] hover:bg-[var(--olive)] hover:text-white transition-colors flex items-center gap-1.5 shrink-0 cursor-pointer"
             >
               <Plus size={13} />
               <span>Add More Topics</span>

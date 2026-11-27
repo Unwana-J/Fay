@@ -18,6 +18,7 @@ import {
   Check,
   X,
   Headphones,
+  Award,
 } from "lucide-react";
 import { useAppStore, getNext7ScheduleDays } from "@/store/useAppStore";
 import { useCommunityStore } from "@/store/useCommunityStore";
@@ -34,6 +35,7 @@ import {
   getNextActionableSlotForUser,
   formatClassroomCodeDisplay,
   normalizeClassroomCode,
+  getClassroomCompletionSummary,
 } from "@/lib/classroom-types";
 import { todayStr, cn } from "@/lib/utils";
 import UserAvatar from "@/components/ui/UserAvatar";
@@ -575,29 +577,74 @@ export default function ClassroomHubPage() {
                   <div className="text-[11px] font-mono font-bold uppercase tracking-wider" style={{ color: "var(--text-mute)" }}>
                     Completed Classrooms ({completedClassrooms.length})
                   </div>
-                  {completedClassrooms.map((c) => (
-                    <div
-                      key={c.code}
-                      className="rounded-2xl border p-4 surface flex items-center justify-between gap-3"
-                      style={{ borderColor: "var(--border-dim)" }}
-                    >
-                      <div>
-                        <h4 className="font-serif font-bold text-base" style={{ color: "var(--text)" }}>
-                          {c.title}
-                        </h4>
-                        <div className="text-xs" style={{ color: "var(--text-mute)" }}>
-                          {c.totalTopics} topics completed · {c.members.length} friends
+                  {completedClassrooms.map((c) => {
+                    const cleanCode = normalizeClassroomCode(c.code);
+                    const subs = submissionsByCode[cleanCode] || [];
+                    const summary = getClassroomCompletionSummary(c, subs);
+                    const isFullFinish = summary.allMembersFinishedFinalTopic;
+
+                    return (
+                      <div
+                        key={c.code}
+                        className="rounded-2xl border p-4 sm:p-5 surface flex flex-col sm:flex-row sm:items-center justify-between gap-3.5"
+                        style={{
+                          borderColor: isFullFinish ? "var(--gold)" : "var(--border-dim)",
+                          background: isFullFinish
+                            ? "linear-gradient(180deg, rgba(166, 124, 30, 0.06) 0%, var(--bg-card) 70%)"
+                            : undefined,
+                        }}
+                      >
+                        <div className="min-w-0">
+                          {isFullFinish && (
+                            <div
+                              className="text-[10px] font-mono font-bold uppercase tracking-wider mb-1 flex items-center gap-1"
+                              style={{ color: "var(--gold)" }}
+                            >
+                              <Award size={11} />
+                              <span>
+                                All {c.totalTopics}/{c.totalTopics} Topics Complete
+                              </span>
+                            </div>
+                          )}
+                          <h4 className="font-serif font-bold text-base leading-snug" style={{ color: "var(--text)" }}>
+                            {c.title}
+                          </h4>
+                          <div className="text-xs mt-0.5 flex items-center gap-2 flex-wrap" style={{ color: "var(--text-mute)" }}>
+                            <span>
+                              {summary.totalTakes > 0
+                                ? `${summary.totalTakes} take${summary.totalTakes === 1 ? "" : "s"} · `
+                                : ""}
+                              {c.members.length} friend{c.members.length === 1 ? "" : "s"}
+                            </span>
+                            {isFullFinish && (
+                              <span style={{ color: "var(--text-dim)" }}>
+                                · Ready for another round?
+                              </span>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2 shrink-0 flex-wrap">
+                          <Link
+                            href={`/classroom/${c.code}`}
+                            className="px-3.5 py-2 rounded-xl border text-xs font-mono font-semibold hover:border-[var(--olive)] transition-colors"
+                            style={{ borderColor: "var(--border)", color: "var(--text)" }}
+                          >
+                            {isFullFinish ? "Replay" : "Replay Archive"}
+                          </Link>
+                          {isFullFinish && (
+                            <Link
+                              href={`/classroom/${c.code}?extend=1`}
+                              className="btn-terra px-3.5 py-2 rounded-xl text-xs font-mono font-bold flex items-center gap-1 transition-transform active:scale-[0.98]"
+                            >
+                              <Plus size={12} />
+                              <span>Continue Circle</span>
+                            </Link>
+                          )}
                         </div>
                       </div>
-                      <Link
-                        href={`/classroom/${c.code}`}
-                        className="px-3.5 py-2 rounded-xl border text-xs font-mono font-semibold hover:border-[var(--olive)]"
-                        style={{ borderColor: "var(--border)", color: "var(--text)" }}
-                      >
-                        Replay Archive
-                      </Link>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </>
