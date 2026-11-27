@@ -305,24 +305,37 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
       settings.favoriteCategories?.length > 0
         ? settings.favoriteCategories
         : classroom.categories;
+    const query = swapSearch.trim().toLowerCase();
 
-    return pool.filter((t) => {
+    const filtered = pool.filter((t) => {
       if (usedIds.has(t.id)) return false;
       if (swapCategory === "all") {
-        if (preferredCats.length > 0 && !preferredCats.includes(t.category)) return false;
+        // When browsing without a query, prioritize Suggested categories;
+        // when actively searching, search across the entire Topic Bank.
+        if (!query && preferredCats.length > 0 && !preferredCats.includes(t.category)) {
+          return false;
+        }
       } else if (t.category !== swapCategory) {
         return false;
       }
-      if (swapSearch.trim()) {
-        const q = swapSearch.toLowerCase();
+      if (query) {
         return (
-          t.text.toLowerCase().includes(q) ||
-          t.category.toLowerCase().includes(q) ||
-          (t.tags || []).some((tg) => tg.toLowerCase().includes(q))
+          t.text.toLowerCase().includes(query) ||
+          t.category.toLowerCase().includes(query) ||
+          (t.tags || []).some((tg) => tg.toLowerCase().includes(query))
         );
       }
       return true;
     });
+
+    if (query && swapCategory === "all" && preferredCats.length > 0) {
+      return filtered.sort((a, b) => {
+        const aPref = preferredCats.includes(a.category) ? 0 : 1;
+        const bPref = preferredCats.includes(b.category) ? 0 : 1;
+        return aPref - bPref;
+      });
+    }
+    return filtered;
   }, [classroom, customTopics, settings.favoriteCategories, swapCategory, swapSearch]);
 
   function getInviteUrl() {
@@ -1868,30 +1881,71 @@ export default function ClassroomDetailClient({ code }: { code: string }) {
                   </div>
 
                   <div className="flex-1 overflow-y-auto space-y-2 pr-1">
-                    {swapCandidates.slice(0, 25).map((t) => (
+                    {swapCandidates.length === 0 ? (
                       <div
-                        key={t.id}
-                        className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                        className="rounded-xl border p-6 text-center"
                         style={{ background: "var(--bg-panel)", borderColor: "var(--border-dim)" }}
                       >
-                        <div className="flex-1 min-w-0">
-                          <div className="text-[10px] font-mono font-bold text-[var(--olive)] mb-0.5">
-                            {t.category} · {t.difficulty}
-                          </div>
-                          <p className="font-serif font-bold text-xs sm:text-sm leading-snug" style={{ color: "var(--text)" }}>
-                            {t.text}
-                          </p>
+                        <p className="text-xs sm:text-sm font-semibold mb-1" style={{ color: "var(--text)" }}>
+                          No matching topics found
+                          {swapSearch.trim() ? ` for "${swapSearch.trim()}"` : ""}
+                        </p>
+                        <p className="text-xs mb-4" style={{ color: "var(--text-dim)" }}>
+                          {swapCategory !== "all"
+                            ? `No results inside ${swapCategory}. Try searching all categories or write your own prompt.`
+                            : "Try another keyword or turn this into a custom prompt for your Classroom."}
+                        </p>
+                        <div className="flex items-center justify-center gap-2 flex-wrap">
+                          {swapCategory !== "all" && (
+                            <button
+                              type="button"
+                              onClick={() => setSwapCategory("all")}
+                              className="px-3.5 py-2 rounded-xl border text-xs font-mono font-semibold hover:border-[var(--olive)] cursor-pointer"
+                              style={{ background: "var(--bg-card)", borderColor: "var(--border)", color: "var(--text)" }}
+                            >
+                              Search All Categories
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (swapSearch.trim() && !swapCustomText.trim()) {
+                                setSwapCustomText(swapSearch.trim());
+                              }
+                              setSwapMode("custom");
+                            }}
+                            className="btn-terra px-4 py-2 rounded-xl text-xs font-mono font-bold cursor-pointer"
+                          >
+                            Write Custom Prompt
+                          </button>
                         </div>
-                        <button
-                          type="button"
-                          disabled={swapSaving}
-                          onClick={() => handleSwapPick(t)}
-                          className="btn-terra px-3 py-1.5 rounded-lg text-xs font-mono font-bold shrink-0 cursor-pointer"
-                        >
-                          Select
-                        </button>
                       </div>
-                    ))}
+                    ) : (
+                      swapCandidates.slice(0, 25).map((t) => (
+                        <div
+                          key={t.id}
+                          className="p-3.5 rounded-xl border flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                          style={{ background: "var(--bg-panel)", borderColor: "var(--border-dim)" }}
+                        >
+                          <div className="flex-1 min-w-0">
+                            <div className="text-[10px] font-mono font-bold text-[var(--olive)] mb-0.5">
+                              {t.category} · {t.difficulty}
+                            </div>
+                            <p className="font-serif font-bold text-xs sm:text-sm leading-snug" style={{ color: "var(--text)" }}>
+                              {t.text}
+                            </p>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={swapSaving}
+                            onClick={() => handleSwapPick(t)}
+                            className="btn-terra px-3 py-1.5 rounded-lg text-xs font-mono font-bold shrink-0 cursor-pointer"
+                          >
+                            Select
+                          </button>
+                        </div>
+                      ))
+                    )}
                   </div>
                 </>
               )}

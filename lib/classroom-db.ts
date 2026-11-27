@@ -218,12 +218,56 @@ function mapFallbackScoreRowToSubmission(row: any): ClassroomSubmission | null {
   };
 }
 
+function getFallbackStateTs(row: any): number {
+  const seedMap = row?.daily_seed_map;
+  const ts = Number(seedMap?._stateTs);
+  return Number.isFinite(ts) && ts > 0 ? ts : 0;
+}
+
+/**
+ * Merge two slot arrays without ever letting a stale snapshot overwrite a newer
+ * user-initiated topic swap (`swappedBy.swappedAt`) or drop extended slots.
+ */
+function mergeClassroomSlots(
+  currentSlots: ClassroomSlot[],
+  incomingSlots: ClassroomSlot[],
+  incomingIsNewer: boolean
+): ClassroomSlot[] {
+  if (!Array.isArray(incomingSlots) || incomingSlots.length === 0) {
+    return currentSlots;
+  }
+  const bySlot = new Map<number, ClassroomSlot>();
+  for (const s of currentSlots) {
+    bySlot.set(s.slotNumber, s);
+  }
+  for (const inc of incomingSlots) {
+    const cur = bySlot.get(inc.slotNumber);
+    if (!cur) {
+      bySlot.set(inc.slotNumber, inc);
+      continue;
+    }
+    const curSwapMs = cur.swappedBy?.swappedAt ? new Date(cur.swappedBy.swappedAt).getTime() : 0;
+    const incSwapMs = inc.swappedBy?.swappedAt ? new Date(inc.swappedBy.swappedAt).getTime() : 0;
+
+    if (incSwapMs > curSwapMs) {
+      bySlot.set(inc.slotNumber, inc);
+    } else if (curSwapMs > incSwapMs) {
+      // Preserve the newer swapped topic even if an older snapshot replays later
+      bySlot.set(inc.slotNumber, cur);
+    } else if (incomingIsNewer) {
+      bySlot.set(inc.slotNumber, inc);
+    }
+  }
+  return Array.from(bySlot.values()).sort((a, b) => a.slotNumber - b.slotNumber);
+}
+
 /**
  * Reconciles a base Classroom row with append-only `league_scores` event & submission rows.
  * Essential when Supabase RLS allows public INSERT + SELECT on `friendship_leagues` / `league_scores`
  * without FOR UPDATE policies:
  * 1. Applies chronological `_kind === "classroom_state"` snapshots (unioning members so concurrent
- *    friend joins never overwrite each other).
+ *    friend joins never overwrite each other, and respecting `_stateTs` + `swappedBy.swappedAt`
+ *    so stale snapshots never clobber a newer `friendship_leagues` update or topic swap).
  * 2. Deduplicates `_kind === "classroom_submission"` revisions by (slotNumber, userId), keeping the
  *    latest revision while unioning `heardBy` receipts and `marginNotes` across revisions.
  * 3. Retroactively auto-heals `classroom.members` from any submission author who recorded a take
@@ -231,7 +275,8 @@ function mapFallbackScoreRowToSubmission(row: any): ClassroomSubmission | null {
  */
 function hydrateClassroomBundleFromScoreRows(
   baseClassroom: Classroom,
-  scoreRows: any[]
+  scoreRows: any[],
+  baseStateTs: number = 0
 ): { classroom: Classroom; submissions: ClassroomSubmission[] } {
   let hydrated: Classroom = {
     ...baseClassroom,
@@ -267,33 +312,61 @@ function hydrateClassroomBundleFromScoreRows(
     return [...list, incoming];
   };
 
-  // 1. Replay chronological `classroom_state` snapshots
+  // 1. Replay chronological `classroom_state` snapshots, respecting `_stateTs` & slot swap timestamps
+  let latestStateTs = baseStateTs;
+  const stateEvents: Array<{ snap: Classroom; ts: number }> = [];
   for (const row of scoreRows) {
     const qr = row?.question_results;
     const embedded = Array.isArray(qr) ? qr[0] : qr;
     if (embedded && embedded._kind === "classroom_state" && embedded._classroom) {
-      const snap = embedded._classroom as Classroom;
-      let unionedMembers = [...hydrated.members];
-      for (const m of snap.members || []) {
-        unionedMembers = mergeMemberIntoList(unionedMembers, m);
-      }
-      hydrated = {
-        ...hydrated,
-        title: snap.title || hydrated.title,
-        totalTopics: Number(snap.totalTopics) || snap.slots?.length || hydrated.totalTopics,
-        slots: Array.isArray(snap.slots) && snap.slots.length > 0 ? snap.slots : hydrated.slots,
-        categories: Array.from(
-          new Set([...(hydrated.categories || []), ...(snap.categories || [])])
-        ),
-        manualUnlockedUpToSlot: Math.max(
-          hydrated.manualUnlockedUpToSlot || 1,
-          snap.manualUnlockedUpToSlot || 1
-        ),
-        status: snap.status || hydrated.status,
-        closedAt: snap.status === "completed" ? snap.closedAt || hydrated.closedAt : undefined,
-        members: unionedMembers,
-      };
+      const ts =
+        Number(embedded._ts) ||
+        (row?.created_at ? new Date(row.created_at).getTime() : 0) ||
+        0;
+      stateEvents.push({ snap: embedded._classroom as Classroom, ts });
     }
+  }
+  stateEvents.sort((a, b) => a.ts - b.ts);
+
+  for (const { snap, ts } of stateEvents) {
+    let unionedMembers = [...hydrated.members];
+    for (const m of snap.members || []) {
+      unionedMembers = mergeMemberIntoList(unionedMembers, m);
+    }
+    const incomingIsNewer = ts >= latestStateTs;
+    const mergedSlots = mergeClassroomSlots(
+      hydrated.slots,
+      Array.isArray(snap.slots) ? snap.slots : [],
+      incomingIsNewer
+    );
+
+    if (incomingIsNewer) {
+      latestStateTs = ts;
+    }
+
+    hydrated = {
+      ...hydrated,
+      title: incomingIsNewer && snap.title ? snap.title : hydrated.title,
+      totalTopics: Math.max(
+        hydrated.totalTopics || 1,
+        mergedSlots.length,
+        incomingIsNewer ? Number(snap.totalTopics) || 0 : 0
+      ),
+      slots: mergedSlots,
+      categories: Array.from(
+        new Set([...(hydrated.categories || []), ...(snap.categories || [])])
+      ),
+      manualUnlockedUpToSlot: Math.max(
+        hydrated.manualUnlockedUpToSlot || 1,
+        snap.manualUnlockedUpToSlot || 1
+      ),
+      status: incomingIsNewer && snap.status ? snap.status : hydrated.status,
+      closedAt:
+        (incomingIsNewer ? snap.status : hydrated.status) === "completed"
+          ? (incomingIsNewer ? snap.closedAt : hydrated.closedAt) || hydrated.closedAt
+          : undefined,
+      members: unionedMembers,
+    };
   }
 
   // 2. Collapse `classroom_submission` rows chronologically per (slotNumber, scholar)
@@ -412,9 +485,11 @@ export async function saveClassroom(classroom: Classroom): Promise<Classroom> {
   try {
     const startDate = todayStr();
     const endDate = formatDateToIso(addDaysToDate(new Date(), normalized.totalTopics));
+    const stateTs = Date.now();
     const seedPayload = {
       _kind: "classroom",
       _classroom: normalized,
+      _stateTs: stateTs,
     };
 
     const { data: existingLeague } = await supabase
@@ -459,7 +534,7 @@ export async function saveClassroom(classroom: Classroom): Promise<Classroom> {
         await supabase.from("league_scores").insert([
           {
             league_code: cleanCode,
-            user_id: `__classroom_sync_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+            user_id: `__classroom_sync_${stateTs}_${Math.random().toString(36).slice(2, 6)}`,
             username: "__LEAGUE_SYNC__",
             avatar: normalized.hostAvatar || "/avatars/avatar-scholar.svg",
             day_number: 0,
@@ -472,7 +547,7 @@ export async function saveClassroom(classroom: Classroom): Promise<Classroom> {
               {
                 _kind: "classroom_state",
                 _classroom: normalized,
-                _ts: Date.now(),
+                _ts: stateTs,
               },
             ],
           },
@@ -514,6 +589,7 @@ export async function getClassroomWithSubmissions(code: string): Promise<{
   } catch {}
 
   // 2. Fallback to `friendship_leagues`
+  let baseStateTs = 0;
   if (!classroom) {
     try {
       const { data, error } = await supabase
@@ -524,6 +600,7 @@ export async function getClassroomWithSubmissions(code: string): Promise<{
 
       if (!error && data) {
         classroom = mapFallbackLeagueRowToClassroom(data);
+        baseStateTs = getFallbackStateTs(data);
       }
     } catch {}
   }
@@ -560,7 +637,11 @@ export async function getClassroomWithSubmissions(code: string): Promise<{
         .order("created_at", { ascending: true });
 
       if (!scoreErr && Array.isArray(scoreRows)) {
-        const reconciled = hydrateClassroomBundleFromScoreRows(classroom, scoreRows);
+        const reconciled = hydrateClassroomBundleFromScoreRows(
+          classroom,
+          scoreRows,
+          baseStateTs
+        );
         classroom = reconciled.classroom;
         submissions = reconciled.submissions;
       }
@@ -620,10 +701,10 @@ export async function listClassroomsForUser(
         .limit(80);
 
       if (!error && Array.isArray(leagueRows) && leagueRows.length > 0) {
-        const baseMap = new Map<string, Classroom>();
+        const baseMap = new Map<string, { classroom: Classroom; stateTs: number }>();
         for (const row of leagueRows) {
           const c = mapFallbackLeagueRowToClassroom(row);
-          if (c) baseMap.set(c.code, c);
+          if (c) baseMap.set(c.code, { classroom: c, stateTs: getFallbackStateTs(row) });
         }
 
         const allCodes = Array.from(baseMap.keys());
@@ -647,10 +728,11 @@ export async function listClassroomsForUser(
           scoresByCode.set(codeKey, bucket);
         }
 
-        for (const [codeKey, baseClassroom] of baseMap.entries()) {
+        for (const [codeKey, entry] of baseMap.entries()) {
           const reconciled = hydrateClassroomBundleFromScoreRows(
-            baseClassroom,
-            scoresByCode.get(codeKey) || []
+            entry.classroom,
+            scoresByCode.get(codeKey) || [],
+            entry.stateTs
           );
           memoryClassrooms.set(codeKey, reconciled);
           if (matchesMember(reconciled.classroom)) {
