@@ -1129,6 +1129,7 @@ function StageComplete({
   speakingSeconds,
   classroomCode,
   classroomSlot,
+  classroomSubmitStatus,
   classroomSubmitError,
   retryingClassroomSubmit,
   onRetryClassroomSubmit,
@@ -1147,6 +1148,7 @@ function StageComplete({
   speakingSeconds: number;
   classroomCode?: string | null;
   classroomSlot?: number | null;
+  classroomSubmitStatus?: "idle" | "publishing" | "published" | "error";
   classroomSubmitError?: string | null;
   retryingClassroomSubmit?: boolean;
   onRetryClassroomSubmit?: () => void;
@@ -1864,7 +1866,17 @@ function StageComplete({
         </motion.div>
       )}
 
-      {/* Classroom Publish Error / Retry Banner */}
+      {/* Classroom Publish Status / Retry Banner */}
+      {classroomCode && classroomSubmitStatus === "publishing" && (
+        <div
+          className="w-full max-w-2xl mb-5 rounded-2xl border px-4 py-3 text-left flex items-center gap-2.5 text-xs font-mono"
+          style={{ background: "var(--bg-panel)", borderColor: "var(--border)", color: "var(--text-dim)" }}
+        >
+          <span className="w-2 h-2 rounded-full bg-[var(--olive)] animate-pulse shrink-0" />
+          <span>Publishing your take to the Classroom...</span>
+        </div>
+      )}
+
       {classroomCode && classroomSubmitError && (
         <div
           className="w-full max-w-2xl mb-5 rounded-2xl border-[1.5px] p-4 text-left flex flex-col sm:flex-row sm:items-center justify-between gap-3"
@@ -2026,8 +2038,12 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   const [completedSession, setCompletedSession] = useState<ActiveSession | null>(null);
   const [showExitNudge, setShowExitNudge] = useState(false);
   const [classroomRef, setClassroomRef] = useState<{ code: string; slot: number } | null>(null);
+  const [classroomSubmitStatus, setClassroomSubmitStatus] = useState<
+    "idle" | "publishing" | "published" | "error"
+  >("idle");
   const [classroomSubmitError, setClassroomSubmitError] = useState<string | null>(null);
   const [retryingClassroomSubmit, setRetryingClassroomSubmit] = useState(false);
+  const isCompletingRef = useRef(false);
   const lastClassroomPayloadRef = useRef<{
     classroomCode: string;
     slotNumber: number;
@@ -2084,11 +2100,11 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     : 2;
 
   useEffect(() => {
-    if (!hasHydrated || completionData) return;
+    if (!hasHydrated || completionData || completedSession || isCompletingRef.current) return;
     if (!activeSession || activeSession.id !== unwrappedParams.id) {
       router.replace("/discover");
     }
-  }, [hasHydrated, activeSession, unwrappedParams.id, router, completionData]);
+  }, [hasHydrated, activeSession, unwrappedParams.id, router, completionData, completedSession]);
 
   if (!hasHydrated) return null;
   if (!currentSession && !completionData) return null;
@@ -2109,10 +2125,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     reflection: { interesting: string; hardest: string; different: string };
     ratings: { confidence: number; understanding: number; communication: number };
   }) {
-    if (!activeSession) return;
-    
-    // Preserve snapshot so completion screen renders smoothly without null dereference
-    setCompletedSession({ ...activeSession });
+    if (!activeSession || isCompletingRef.current) return;
+    isCompletingRef.current = true;
+
+    // Capture session snapshot & Classroom ref BEFORE completeSession clears activeSession
+    const sessionSnapshot = { ...activeSession };
+    const targetClassroom = effectiveClassroomRef;
+    setCompletedSession(sessionSnapshot);
 
     let audioBase64 = undefined;
     if (recordedBlob) {
@@ -2124,12 +2143,17 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
     }
 
     const result = completeSession({
-      notes: activeSession.notes,
+      notes: sessionSnapshot.notes,
       speakingSeconds,
       reflection: data.reflection,
       ratings: data.ratings,
       audioBase64,
     });
+
+    // Transition immediately to StageComplete (knowledge check quiz + XP + nudge)
+    // before awaiting network upload so the redirect guard never fires mid-publish.
+    setCompletionData(result);
+    fireConfetti();
 
     // Let the reminder scheduler know the user practised today (no-op if not subscribed)
     {
@@ -2142,22 +2166,23 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
 
     // If this session was launched from a Classroom slot, publish to the Classroom circle
     // (with 1 automatic retry + visible retry fallback if offline/transient error)
-    if (effectiveClassroomRef?.code) {
+    if (targetClassroom?.code) {
       const payload = {
-        classroomCode: effectiveClassroomRef.code,
-        slotNumber: effectiveClassroomRef.slot,
+        classroomCode: targetClassroom.code,
+        slotNumber: targetClassroom.slot,
         userId: profile.id || "local-scholar",
         username: profile.username || "Scholar",
         avatar: profile.avatar || "/avatars/avatar-scholar.svg",
-        topicId: activeSession.topic.id,
-        topicText: activeSession.topic.text,
-        category: activeSession.topic.category,
+        topicId: sessionSnapshot.topic.id,
+        topicText: sessionSnapshot.topic.text,
+        category: sessionSnapshot.topic.category,
         durationSeconds: speakingSeconds,
         audioData: audioBase64,
-        notes: activeSession.notes,
+        notes: sessionSnapshot.notes,
       };
       lastClassroomPayloadRef.current = payload;
       setClassroomSubmitError(null);
+      setClassroomSubmitStatus("publishing");
 
       let submitRes = await useClassroomStore.getState().submitRecording(payload);
       if (submitRes.error) {
@@ -2165,12 +2190,13 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
         submitRes = await useClassroomStore.getState().submitRecording(payload);
       }
       if (submitRes.error) {
+        setClassroomSubmitStatus("error");
         setClassroomSubmitError(submitRes.error);
+      } else {
+        setClassroomSubmitStatus("published");
+        useClassroomStore.getState().fetchClassroom(targetClassroom.code);
       }
     }
-
-    setCompletionData(result);
-    fireConfetti();
 
     // Trigger NPS feedback prompt if eligible — skip if the reminder popup will show on this sprint
     if (!shouldShowReminderPrompt()) {
@@ -2183,12 +2209,16 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
   async function handleRetryClassroomSubmit() {
     if (!lastClassroomPayloadRef.current) return;
     setRetryingClassroomSubmit(true);
+    setClassroomSubmitStatus("publishing");
     const res = await useClassroomStore.getState().submitRecording(lastClassroomPayloadRef.current);
     setRetryingClassroomSubmit(false);
     if (res.error) {
+      setClassroomSubmitStatus("error");
       setClassroomSubmitError(res.error);
     } else {
+      setClassroomSubmitStatus("published");
       setClassroomSubmitError(null);
+      useClassroomStore.getState().fetchClassroom(lastClassroomPayloadRef.current.classroomCode);
     }
   }
 
@@ -2285,6 +2315,7 @@ export default function SessionPage({ params }: { params: Promise<{ id: string }
               speakingSeconds={speakingSeconds}
               classroomCode={effectiveClassroomRef?.code || null}
               classroomSlot={effectiveClassroomRef?.slot ?? null}
+              classroomSubmitStatus={classroomSubmitStatus}
               classroomSubmitError={classroomSubmitError}
               retryingClassroomSubmit={retryingClassroomSubmit}
               onRetryClassroomSubmit={handleRetryClassroomSubmit}
